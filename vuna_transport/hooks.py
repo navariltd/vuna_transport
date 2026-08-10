@@ -8,18 +8,21 @@ app_license = "agpl-3.0"
 # Apps
 # ------------------
 
-# required_apps = []
+required_apps = ["frappe/erpnext"]
 
 # Each item in the list will be shown as an app in the apps page
-# add_to_apps_screen = [
-# 	{
-# 		"name": "vuna_transport",
-# 		"logo": "/assets/vuna_transport/logo.png",
-# 		"title": "Vuna Transport",
-# 		"route": "/vuna_transport",
-# 		"has_permission": "vuna_transport.api.permission.has_app_permission"
-# 	}
-# ]
+app_logo_url = "/assets/vuna_transport/public/vuna_transport.png"
+app_icon_title = "Vuna Transport"
+
+add_to_apps_screen = [
+	{
+		"name": app_name,
+		"logo": app_logo_url,
+		"title": app_title,
+		"route": "/desk/vuna_transport",
+		"has_permission": "vuna_transport.permissions.has_app_permission"
+	}
+]
 
 # Includes in <head>
 # ------------------
