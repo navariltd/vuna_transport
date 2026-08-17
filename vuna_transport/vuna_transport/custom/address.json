@@ -1,0 +1,119 @@
+{
+ "custom_fields": [
+  {
+   "dt": "Address",
+   "fieldname": "vuna_transport_planning_section",
+   "fieldtype": "Section Break",
+   "insert_after": "disabled",
+   "label": "Transport Planning",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "vuna_delivery_zone",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "insert_after": "vuna_transport_planning_section",
+   "label": "Delivery Zone",
+   "module": "Vuna Transport",
+   "options": "Transport Zone"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "vuna_location",
+   "fieldtype": "Geolocation",
+   "insert_after": "vuna_delivery_zone",
+   "label": "Delivery Location",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "vuna_delivery_window_section",
+   "fieldtype": "Section Break",
+   "insert_after": "vuna_location",
+   "label": "Delivery Window & Access",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "vuna_preferred_delivery_from",
+   "fieldtype": "Time",
+   "insert_after": "vuna_delivery_window_section",
+   "label": "Preferred Delivery From",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "vuna_preferred_delivery_to",
+   "fieldtype": "Time",
+   "insert_after": "vuna_preferred_delivery_from",
+   "label": "Preferred Delivery To",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "vuna_average_service_duration",
+   "fieldtype": "Duration",
+   "insert_after": "vuna_preferred_delivery_to",
+   "label": "Average Service Duration",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "vuna_access_column",
+   "fieldtype": "Column Break",
+   "insert_after": "vuna_average_service_duration",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "vuna_maximum_vehicle_category",
+   "fieldtype": "Link",
+   "insert_after": "vuna_access_column",
+   "label": "Maximum Vehicle Category",
+   "module": "Vuna Transport",
+   "options": "Vehicle Category"
+  },
+  {
+   "default": "0",
+   "dt": "Address",
+   "fieldname": "vuna_requires_tail_lift",
+   "fieldtype": "Check",
+   "insert_after": "vuna_maximum_vehicle_category",
+   "label": "Requires Tail Lift",
+   "module": "Vuna Transport"
+  },
+  {
+   "default": "0",
+   "dt": "Address",
+   "fieldname": "vuna_loading_dock_available",
+   "fieldtype": "Check",
+   "insert_after": "vuna_requires_tail_lift",
+   "label": "Loading Dock Available",
+   "module": "Vuna Transport"
+  },
+  {
+   "default": "0",
+   "dt": "Address",
+   "fieldname": "vuna_restricted_access",
+   "fieldtype": "Check",
+   "insert_after": "vuna_loading_dock_available",
+   "label": "Restricted Vehicle Access",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "vuna_access_notes",
+   "fieldtype": "Small Text",
+   "insert_after": "vuna_restricted_access",
+   "label": "Access Notes",
+   "module": "Vuna Transport"
+  }
+ ],
+ "custom_perms": [],
+ "doctype": "Address",
+ "links": [],
+ "property_setters": [],
+ "sync_on_migrate": 1
+}

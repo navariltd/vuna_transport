@@ -1,0 +1,33 @@
+{
+ "custom_fields": [
+  {
+   "dt": "Sales Order",
+   "fieldname": "vuna_delivery_method",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "insert_after": "delivery_date",
+   "label": "Delivery Method",
+   "module": "Vuna Transport",
+   "options": "Delivery Method"
+  }
+ ],
+ "custom_perms": [],
+ "doctype": "Sales Order",
+ "links": [
+  {
+   "custom": 1,
+   "group": "Transport",
+   "hidden": 0,
+   "is_child_table": 0,
+   "link_doctype": "Delivery Order",
+   "link_fieldname": "sales_order",
+   "parent": "Sales Order",
+   "parent_doctype": "DocType",
+   "parentfield": "links",
+   "parenttype": "DocType",
+   "table_fieldname": null
+  }
+ ],
+ "property_setters": [],
+ "sync_on_migrate": 1
+}

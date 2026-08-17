@@ -1,0 +1,78 @@
+{
+ "custom_fields": [
+  {
+   "dt": "Item",
+   "fieldname": "vuna_transport_dimensions_section",
+   "fieldtype": "Section Break",
+   "insert_after": "weight_uom",
+   "label": "Transport Dimensions",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "vuna_volume_per_stock_uom",
+   "fieldtype": "Float",
+   "insert_after": "vuna_transport_dimensions_section",
+   "label": "Volume Per Stock UOM",
+   "module": "Vuna Transport",
+   "non_negative": 1
+  },
+  {
+   "dt": "Item",
+   "fieldname": "vuna_volume_uom",
+   "fieldtype": "Link",
+   "insert_after": "vuna_volume_per_stock_uom",
+   "label": "Volume UOM",
+   "module": "Vuna Transport",
+   "options": "UOM"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "vuna_transport_capabilities_section",
+   "fieldtype": "Section Break",
+   "insert_after": "vuna_volume_uom",
+   "label": "Transport Requirements",
+   "module": "Vuna Transport"
+  },
+  {
+   "default": "0",
+   "dt": "Item",
+   "fieldname": "vuna_refrigeration_required",
+   "fieldtype": "Check",
+   "insert_after": "vuna_transport_capabilities_section",
+   "label": "Refrigeration Required",
+   "module": "Vuna Transport"
+  },
+  {
+   "default": "0",
+   "dt": "Item",
+   "fieldname": "vuna_tail_lift_required",
+   "fieldtype": "Check",
+   "insert_after": "vuna_refrigeration_required",
+   "label": "Tail Lift Required",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "vuna_required_body_type",
+   "fieldtype": "Select",
+   "insert_after": "vuna_tail_lift_required",
+   "label": "Required Vehicle Body Type",
+   "module": "Vuna Transport",
+   "options": "\nVan\nRigid Truck\nTrailer\nOther"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "vuna_special_equipment_required",
+   "fieldtype": "Small Text",
+   "insert_after": "vuna_required_body_type",
+   "label": "Special Equipment Required",
+   "module": "Vuna Transport"
+  }
+ ],
+ "custom_perms": [],
+ "doctype": "Item",
+ "links": [],
+ "property_setters": [],
+ "sync_on_migrate": 1
+}

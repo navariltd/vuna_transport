@@ -1,0 +1,87 @@
+{
+ "custom_fields": [
+  {
+   "dt": "Vehicle",
+   "fieldname": "vuna_transport_section",
+   "fieldtype": "Section Break",
+   "insert_after": "company",
+   "label": "Transport Planning",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Vehicle",
+   "fieldname": "vuna_vehicle_category",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "insert_after": "vuna_transport_section",
+   "label": "Vehicle Category",
+   "module": "Vuna Transport",
+   "options": "Vehicle Category",
+   "reqd": 1
+  },
+  {
+   "dt": "Vehicle",
+   "fieldname": "vuna_vehicle_model",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "insert_after": "vuna_vehicle_category",
+   "label": "Vehicle Model",
+   "module": "Vuna Transport",
+   "options": "Vehicle Model"
+  },
+  {
+   "dt": "Vehicle",
+   "fieldname": "vuna_transport_column",
+   "fieldtype": "Column Break",
+   "insert_after": "vuna_vehicle_model",
+   "module": "Vuna Transport"
+  },
+  {
+   "default": "1",
+   "dt": "Vehicle",
+   "fieldname": "vuna_transport_enabled",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "insert_after": "vuna_transport_column",
+   "label": "Transport Enabled",
+   "module": "Vuna Transport"
+  },
+  {
+   "default": "Company Owned",
+   "dt": "Vehicle",
+   "fieldname": "vuna_ownership_type",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "insert_after": "vuna_transport_enabled",
+   "label": "Ownership Type",
+   "module": "Vuna Transport",
+   "options": "Company Owned\nLeased\nSubcontracted"
+  },
+  {
+   "dt": "Vehicle",
+   "fieldname": "vuna_supplier",
+   "fieldtype": "Link",
+   "insert_after": "vuna_ownership_type",
+   "label": "Supplier",
+   "mandatory_depends_on": "eval:doc.vuna_ownership_type == 'Leased' || doc.vuna_ownership_type == 'Subcontracted'",
+   "module": "Vuna Transport",
+   "options": "Supplier"
+  },
+  {
+   "dt": "Vehicle",
+   "fieldname": "vuna_home_location",
+   "fieldtype": "Link",
+   "insert_after": "vuna_supplier",
+   "label": "Home Location",
+   "module": "Vuna Transport",
+   "options": "Address"
+  }
+ ],
+ "custom_perms": [],
+ "doctype": "Vehicle",
+ "links": [],
+ "property_setters": [],
+ "sync_on_migrate": 1
+}
