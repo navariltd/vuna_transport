@@ -11,7 +11,7 @@ app_license = "agpl-3.0"
 required_apps = ["frappe/erpnext"]
 
 # Each item in the list will be shown as an app in the apps page
-app_logo_url = "/assets/vuna_transport/public/vuna_transport.png"
+app_logo_url = "/assets/vuna_transport/images/vuna_transport.png"
 app_icon_title = "Vuna Transport"
 
 add_to_apps_screen = [
@@ -141,6 +141,47 @@ add_to_apps_screen = [
 # ---------------
 # Hook on document methods and events
 
+doc_events = {
+	"Sales Order": {
+		"on_submit": "vuna_transport.services.delivery_order_service.create_delivery_orders_for_sales_order",
+	},
+	"Delivery Note": {
+		"validate": "vuna_transport.services.lineage_service.populate_delivery_note_delivery_links",
+		"on_submit": "vuna_transport.services.lineage_service.complete_load_without_trip",
+		"on_cancel": "vuna_transport.services.lineage_service.reconcile_load_after_delivery_note_cancel",
+	},
+	"Delivery Trip": {
+		"validate": "vuna_transport.services.lineage_service.validate_delivery_trip",
+		"on_update": "vuna_transport.services.lineage_service.link_delivery_trip",
+		"on_submit": "vuna_transport.services.lineage_service.submit_delivery_trip",
+		"on_cancel": [
+			"vuna_transport.services.lineage_service.cancel_delivery_trip",
+			"vuna_transport.services.lineage_service.unlink_delivery_trip",
+		],
+		"on_trash": "vuna_transport.services.lineage_service.unlink_delivery_trip",
+	},
+	"Vehicle": {
+		"validate": "vuna_transport.services.fleet_service.validate_vehicle",
+	},
+}
+
+doctype_js = {
+	"Delivery Trip": "public/js/delivery_trip.js",
+	"Vehicle": "public/js/vehicle.js",
+}
+
+fixtures = [
+	{
+		"dt": "Role",
+		"filters": {
+			"name": [
+				"in",
+				["Transport Planner", "Transport Dispatcher", "Transport Manager"],
+			]
+		},
+	}
+]
+
 # doc_events = {
 # 	"*": {
 # 		"on_update": "method",
@@ -258,4 +299,3 @@ add_to_apps_screen = [
 # ------------
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
-

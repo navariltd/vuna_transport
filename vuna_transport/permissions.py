@@ -24,4 +24,14 @@ def has_app_permission() -> bool:
 	if is_website_user():
 		return False
 
-	return True
+	if user == "Administrator":
+		return True
+	return bool(
+		set(frappe.get_roles(user))
+		& {
+			"System Manager",
+			"Transport Planner",
+			"Transport Dispatcher",
+			"Transport Manager",
+		}
+	)
