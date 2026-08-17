@@ -1,0 +1,79 @@
+{
+ "custom_fields": [
+  {
+   "allow_on_submit": 1,
+   "dt": "Delivery Trip",
+   "fieldname": "vuna_delivery_load",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "insert_after": "company",
+   "label": "Delivery Load",
+   "module": "Vuna Transport",
+   "options": "Delivery Load",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "dt": "Delivery Trip",
+   "fieldname": "vuna_vehicle_allocation",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "insert_after": "vuna_delivery_load",
+   "label": "Initial Vehicle Allocation",
+   "module": "Vuna Transport",
+   "options": "Vehicle Allocation",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "dt": "Delivery Trip",
+   "fieldname": "vuna_current_vehicle_allocation",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "insert_after": "vuna_vehicle_allocation",
+   "label": "Current Vehicle Allocation",
+   "module": "Vuna Transport",
+   "options": "Vehicle Allocation",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "dt": "Delivery Trip",
+   "fieldname": "vuna_current_vehicle",
+   "fieldtype": "Link",
+   "insert_after": "vuna_current_vehicle_allocation",
+   "label": "Current Execution Vehicle",
+   "module": "Vuna Transport",
+   "options": "Vehicle",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "dt": "Delivery Trip",
+   "fieldname": "vuna_current_driver",
+   "fieldtype": "Link",
+   "insert_after": "vuna_current_vehicle",
+   "label": "Current Execution Driver",
+   "module": "Vuna Transport",
+   "options": "Driver",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "0",
+   "dt": "Delivery Trip",
+   "fieldname": "vuna_reallocation_count",
+   "fieldtype": "Int",
+   "insert_after": "vuna_current_driver",
+   "label": "Vehicle Reallocations",
+   "module": "Vuna Transport",
+   "read_only": 1
+  }
+ ],
+ "custom_perms": [],
+ "doctype": "Delivery Trip",
+ "links": [],
+ "property_setters": [],
+ "sync_on_migrate": 1
+}

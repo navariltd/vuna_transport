@@ -1,0 +1,377 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-08-15 11:12:48.674932",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "allocation_tab",
+  "load_section",
+  "naming_series",
+  "delivery_load",
+  "company",
+  "column_break_allocation",
+  "allocation_type",
+  "required_vehicle_category",
+  "status",
+  "replacement_section",
+  "assignment_event",
+  "replacement_of",
+  "replacement_stage",
+  "column_break_replacement",
+  "replacement_reason",
+  "replacement_details",
+  "owned_fleet_section",
+  "vehicle",
+  "driver",
+  "subcontractor_section",
+  "supplier",
+  "subcontractor_vehicle_registration",
+  "subcontractor_vehicle_category",
+  "column_break_subcontractor",
+  "subcontractor_driver_name",
+  "subcontractor_driver_phone",
+  "planning_section",
+  "allocated_by",
+  "allocated_on",
+  "effective_from",
+  "column_break_planning",
+  "planned_reporting_time",
+  "effective_to",
+  "replaced_by",
+  "remarks",
+  "section_break_amendment",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "allocation_tab",
+   "fieldtype": "Tab Break",
+   "label": "Allocation"
+  },
+  {
+   "fieldname": "load_section",
+   "fieldtype": "Section Break",
+   "label": "Load Assignment"
+  },
+  {
+   "default": "VA-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "VA-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "delivery_load",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Delivery Load",
+   "options": "Delivery Load",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "delivery_load.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_allocation",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Owned Fleet",
+   "fieldname": "allocation_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Allocation Type",
+   "options": "Owned Fleet\nSubcontractor",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "delivery_load.required_vehicle_category",
+   "fieldname": "required_vehicle_category",
+   "fieldtype": "Link",
+   "label": "Required Vehicle Category",
+   "options": "Vehicle Category",
+   "read_only": 1
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nAllocated\nAccepted\nRejected\nReplaced\nCancelled",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.assignment_event == 'Reallocation'",
+   "fieldname": "replacement_section",
+   "fieldtype": "Section Break",
+   "label": "Replacement Details"
+  },
+  {
+   "default": "Initial Assignment",
+   "fieldname": "assignment_event",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Assignment Event",
+   "options": "Initial Assignment\nReallocation",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.assignment_event == 'Reallocation'",
+   "fieldname": "replacement_of",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Replaces Allocation",
+   "options": "Vehicle Allocation",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.assignment_event == 'Reallocation'",
+   "fieldname": "replacement_stage",
+   "fieldtype": "Select",
+   "label": "Replacement Stage",
+   "options": "Before Departure\nIn Transit",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_replacement",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.assignment_event == 'Reallocation'",
+   "fieldname": "replacement_reason",
+   "fieldtype": "Select",
+   "label": "Replacement Reason",
+   "mandatory_depends_on": "eval:doc.assignment_event == 'Reallocation'",
+   "options": "Breakdown\nAccident\nDriver Unavailable\nVehicle Unavailable\nOperational Change\nOther"
+  },
+  {
+   "depends_on": "eval:doc.assignment_event == 'Reallocation'",
+   "fieldname": "replacement_details",
+   "fieldtype": "Small Text",
+   "label": "Replacement Details",
+   "mandatory_depends_on": "eval:doc.assignment_event == 'Reallocation'"
+  },
+  {
+   "fieldname": "owned_fleet_section",
+   "fieldtype": "Section Break",
+   "label": "Execution Vehicle"
+  },
+  {
+   "description": "Required for owned fleet and for creating an ERPNext Delivery Trip.",
+   "fieldname": "vehicle",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Vehicle",
+   "mandatory_depends_on": "eval:doc.allocation_type == 'Owned Fleet'",
+   "options": "Vehicle"
+  },
+  {
+   "fieldname": "driver",
+   "fieldtype": "Link",
+   "label": "Driver",
+   "mandatory_depends_on": "eval:doc.allocation_type == 'Owned Fleet'",
+   "options": "Driver"
+  },
+  {
+   "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
+   "fieldname": "subcontractor_section",
+   "fieldtype": "Section Break",
+   "label": "Subcontractor Details"
+  },
+  {
+   "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Supplier",
+   "mandatory_depends_on": "eval:doc.allocation_type == 'Subcontractor'",
+   "options": "Supplier"
+  },
+  {
+   "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
+   "fieldname": "subcontractor_vehicle_registration",
+   "fieldtype": "Data",
+   "label": "Vehicle Registration",
+   "mandatory_depends_on": "eval:doc.allocation_type == 'Subcontractor'"
+  },
+  {
+   "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
+   "fieldname": "subcontractor_vehicle_category",
+   "fieldtype": "Link",
+   "label": "Vehicle Category",
+   "mandatory_depends_on": "eval:doc.allocation_type == 'Subcontractor'",
+   "options": "Vehicle Category"
+  },
+  {
+   "fieldname": "column_break_subcontractor",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
+   "fieldname": "subcontractor_driver_name",
+   "fieldtype": "Data",
+   "label": "Driver Name",
+   "mandatory_depends_on": "eval:doc.allocation_type == 'Subcontractor'"
+  },
+  {
+   "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
+   "fieldname": "subcontractor_driver_phone",
+   "fieldtype": "Data",
+   "label": "Driver Phone",
+   "options": "Phone"
+  },
+  {
+   "fieldname": "planning_section",
+   "fieldtype": "Section Break",
+   "label": "Allocation Details"
+  },
+  {
+   "default": "__user",
+   "fieldname": "allocated_by",
+   "fieldtype": "Link",
+   "label": "Allocated By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "allocated_on",
+   "fieldtype": "Datetime",
+   "label": "Allocated On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "effective_from",
+   "fieldtype": "Datetime",
+   "label": "Effective From",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_planning",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "planned_reporting_time",
+   "fieldtype": "Datetime",
+   "label": "Planned Reporting Time"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "effective_to",
+   "fieldtype": "Datetime",
+   "label": "Effective To",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "replaced_by",
+   "fieldtype": "Link",
+   "label": "Replaced By",
+   "options": "Vehicle Allocation",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "section_break_amendment",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Vehicle Allocation",
+   "print_hide": 1,
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [
+  {
+   "link_doctype": "Delivery Trip",
+   "link_fieldname": "vuna_vehicle_allocation"
+  },
+  {
+   "link_doctype": "Delivery Trip",
+   "link_fieldname": "vuna_current_vehicle_allocation"
+  }
+ ],
+ "modified": "2026-08-17 12:09:27.772750",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Vehicle Allocation",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Planner"
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Dispatcher",
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
