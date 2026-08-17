@@ -1,0 +1,225 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "field:model_name",
+ "creation": "2026-08-15 10:58:44.284611",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "identity_tab",
+  "identity_section",
+  "model_name",
+  "manufacturer",
+  "vehicle_category",
+  "column_break_identity",
+  "model_year",
+  "fuel_type",
+  "disabled",
+  "specifications_tab",
+  "weight_section",
+  "gross_vehicle_weight",
+  "tare_weight",
+  "default_payload",
+  "weight_uom",
+  "column_break_capacity",
+  "default_volume",
+  "volume_uom",
+  "refrigerated_supported",
+  "media_section",
+  "image",
+  "description"
+ ],
+ "fields": [
+  {
+   "fieldname": "identity_tab",
+   "fieldtype": "Tab Break",
+   "label": "Identity"
+  },
+  {
+   "fieldname": "identity_section",
+   "fieldtype": "Section Break",
+   "label": "Model Identity"
+  },
+  {
+   "fieldname": "model_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Model Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "manufacturer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Manufacturer",
+   "options": "Vehicle Manufacturer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "vehicle_category",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Vehicle Category",
+   "options": "Vehicle Category",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_identity",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "model_year",
+   "fieldtype": "Int",
+   "label": "Model Year",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "fuel_type",
+   "fieldtype": "Select",
+   "label": "Fuel Type",
+   "options": "Petrol\nDiesel\nNatural Gas\nElectric\nHybrid\nHydrogen\nOther"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  },
+  {
+   "fieldname": "specifications_tab",
+   "fieldtype": "Tab Break",
+   "label": "Capacity & Specifications"
+  },
+  {
+   "fieldname": "weight_section",
+   "fieldtype": "Section Break",
+   "label": "Weight and Capacity"
+  },
+  {
+   "fieldname": "gross_vehicle_weight",
+   "fieldtype": "Float",
+   "label": "Gross Vehicle Weight",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "tare_weight",
+   "fieldtype": "Float",
+   "label": "Tare Weight",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "default_payload",
+   "fieldtype": "Float",
+   "label": "Default Payload",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "weight_uom",
+   "fieldtype": "Link",
+   "label": "Weight UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "column_break_capacity",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "default_volume",
+   "fieldtype": "Float",
+   "label": "Default Volume",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "volume_uom",
+   "fieldtype": "Link",
+   "label": "Volume UOM",
+   "options": "UOM"
+  },
+  {
+   "default": "0",
+   "fieldname": "refrigerated_supported",
+   "fieldtype": "Check",
+   "label": "Refrigerated Supported"
+  },
+  {
+   "fieldname": "media_section",
+   "fieldtype": "Section Break",
+   "label": "Media & Description"
+  },
+  {
+   "fieldname": "image",
+   "fieldtype": "Attach Image",
+   "label": "Image"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Text Editor",
+   "label": "Description"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "link_doctype": "Vehicle",
+   "link_fieldname": "vuna_vehicle_model"
+  }
+ ],
+ "modified": "2026-08-16 15:50:49.666893",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Vehicle Model",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Planner"
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Dispatcher"
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "model_name"
+}

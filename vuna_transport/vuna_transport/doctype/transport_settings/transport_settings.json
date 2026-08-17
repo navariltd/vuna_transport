@@ -1,0 +1,214 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "creation": "2026-08-10 09:58:45.455707",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "general_tab",
+  "general_section",
+  "default_source_document_type",
+  "default_capacity_buffer_percentage",
+  "load_suggestion_option_count",
+  "column_break_xyxh",
+  "enabled",
+  "auto_create_delivery_orders",
+  "require_sales_order_submission",
+  "planning_section",
+  "section_break_yskt",
+  "require_load_approval",
+  "allow_capacity_override",
+  "column_break_gnzw",
+  "allow_partial_requirement_allocation",
+  "units_tab",
+  "default_uoms_section",
+  "default_distance_uom",
+  "default_weight_uom",
+  "default_volume_uom",
+  "features_tab",
+  "feature_controls_section",
+  "enable_carrier_management",
+  "enable_transport_costing",
+  "column_break_zhxz",
+  "enable_gps_tracking",
+  "enable_route_optimization"
+ ],
+ "fields": [
+  {"fieldname":"general_tab","fieldtype":"Tab Break","label":"General"},
+  {"fieldname":"general_section","fieldtype":"Section Break","label":"Operating Defaults"},
+  {"fieldname":"planning_section","fieldtype":"Section Break","label":"Planning Controls"},
+  {"fieldname":"units_tab","fieldtype":"Tab Break","label":"Units"},
+  {"fieldname":"features_tab","fieldtype":"Tab Break","label":"Features"},
+  {
+   "default": "Sales Order",
+   "fieldname": "default_source_document_type",
+   "fieldtype": "Link",
+   "label": "Default Source Document Type",
+   "options": "DocType"
+  },
+  {
+   "default": "0",
+   "fieldname": "default_capacity_buffer_percentage",
+   "fieldtype": "Percent",
+   "label": "Default Capacity Buffer Percentage"
+  },
+  {
+   "default": "3",
+   "description": "Number of ranked configurations shown to the planner. The engine may return fewer when distinct valid alternatives do not exist.",
+   "fieldname": "load_suggestion_option_count",
+   "fieldtype": "Int",
+   "label": "Load Suggestion Options"
+  },
+  {
+   "fieldname": "column_break_xyxh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "default": "1",
+   "fieldname": "auto_create_delivery_orders",
+   "fieldtype": "Check",
+   "label": "Auto Create Delivery Orders"
+  },
+  {
+   "default": "1",
+   "fieldname": "require_sales_order_submission",
+   "fieldtype": "Check",
+   "label": "Require Sales Order Submission"
+  },
+  {
+   "fieldname": "section_break_yskt",
+   "fieldtype": "Section Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "require_load_approval",
+   "fieldtype": "Check",
+   "label": "Require Load Approval"
+  },
+  {
+   "default": "0",
+   "fieldname": "allow_capacity_override",
+   "fieldtype": "Check",
+   "label": "Allow Capacity Override"
+  },
+  {
+   "fieldname": "column_break_gnzw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "allow_partial_requirement_allocation",
+   "fieldtype": "Check",
+   "label": "Allow Partial Requirement Allocation"
+  },
+  {
+   "fieldname": "default_uoms_section",
+   "fieldtype": "Section Break",
+   "label": "Default UOMs"
+  },
+  {
+   "fieldname": "default_distance_uom",
+   "fieldtype": "Link",
+   "label": "Default Distance UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "default_weight_uom",
+   "fieldtype": "Link",
+   "label": "Default Weight UOM",
+   "options": "UOM",
+   "reqd": 1
+  },
+  {
+   "fieldname": "default_volume_uom",
+   "fieldtype": "Link",
+   "label": "Default Volume UOM",
+   "options": "UOM",
+   "reqd": 1
+  },
+  {
+   "fieldname": "feature_controls_section",
+   "fieldtype": "Section Break",
+   "label": "Feature Controls"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_carrier_management",
+   "fieldtype": "Check",
+   "label": "Enable Carrier Management"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_transport_costing",
+   "fieldtype": "Check",
+   "label": "Enable Transport Costing"
+  },
+  {
+   "fieldname": "column_break_zhxz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_gps_tracking",
+   "fieldtype": "Check",
+   "label": "Enable GPS Tracking"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_route_optimization",
+   "fieldtype": "Check",
+   "label": "Enable Route Optimization"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-08-16 16:23:11.930968",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Transport Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Transport Planner"
+  },
+  {
+   "read": 1,
+   "role": "Transport Dispatcher"
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Transport Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

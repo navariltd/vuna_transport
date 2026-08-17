@@ -1,0 +1,225 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "creation": "2026-08-10 07:26:50.918944",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "identity_section",
+  "vehicle_category_name",
+  "body_type",
+  "column_break_pxpq",
+  "disabled",
+  "refrigerated",
+  "tanker",
+  "trailer",
+  "open_body",
+  "closed_body",
+  "capacity_section",
+  "section_break_pbqv",
+  "max_payload_weight",
+  "max_payload_weight_uom",
+  "max_volume",
+  "max_volume_uom",
+  "column_break_kuyt",
+  "max_pallets",
+  "max_cases",
+  "max_crates",
+  "equipment_section",
+  "section_break_ymgh",
+  "special_equipment",
+  "tail_lift",
+  "crane"
+ ],
+ "fields": [
+  {"fieldname":"identity_section","fieldtype":"Section Break","label":"Vehicle Identity"},
+  {"fieldname":"capacity_section","fieldtype":"Section Break","label":"Capacity Limits"},
+  {"fieldname":"equipment_section","fieldtype":"Section Break","label":"Equipment & Operating Conditions"},
+  {
+   "fieldname": "vehicle_category_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Vehicle Category Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "body_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Body Type",
+   "options": "Van\nRigid Truck\nTrailer\nOther"
+  },
+  {
+   "fieldname": "column_break_pxpq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  },
+  {
+   "default": "0",
+   "fieldname": "refrigerated",
+   "fieldtype": "Check",
+   "label": "Refrigerated"
+  },
+  {
+   "default": "0",
+   "fieldname": "tanker",
+   "fieldtype": "Check",
+   "label": "Tanker"
+  },
+  {
+   "default": "0",
+   "fieldname": "trailer",
+   "fieldtype": "Check",
+   "label": "Trailer"
+  },
+  {
+   "default": "0",
+   "fieldname": "open_body",
+   "fieldtype": "Check",
+   "label": "Open Body"
+  },
+  {
+   "default": "0",
+   "fieldname": "closed_body",
+   "fieldtype": "Check",
+   "label": "Closed Body"
+  },
+  {
+   "fieldname": "section_break_pbqv",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "max_payload_weight",
+   "fieldtype": "Float",
+   "label": "Maximum Payload Weight",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "max_payload_weight_uom",
+   "fieldtype": "Link",
+   "label": "Payload Weight UOM",
+   "options": "UOM",
+   "reqd": 1
+  },
+  {
+   "fieldname": "max_pallets",
+   "fieldtype": "Float",
+   "label": "Maximum Pallets",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "column_break_kuyt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "max_cases",
+   "fieldtype": "Float",
+   "label": "Maximum Cases",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "max_crates",
+   "fieldtype": "Float",
+   "label": "Maximum Crates"
+  },
+  {
+   "fieldname": "section_break_ymgh",
+   "fieldtype": "Section Break",
+   "label": "More Info"
+  },
+  {
+   "fieldname": "special_equipment",
+   "fieldtype": "Small Text",
+   "label": "Special Equipment"
+  },
+  {
+   "default": "0",
+   "fieldname": "tail_lift",
+   "fieldtype": "Check",
+   "label": "Tail Lift"
+  },
+  {
+   "default": "0",
+   "fieldname": "crane",
+   "fieldtype": "Check",
+   "label": "Crane"
+  },
+  {
+   "fieldname": "max_volume",
+   "fieldtype": "Float",
+   "label": "Maximum Volume",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "max_volume_uom",
+   "fieldtype": "Link",
+   "label": "Volume UOM",
+   "options": "UOM",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-16 15:50:49.666893",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Vehicle Category",
+ "title_field": "vehicle_category_name",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Planner"
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Dispatcher"
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

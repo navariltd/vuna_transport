@@ -1,0 +1,142 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "field:delivery_method_name",
+ "creation": "2026-08-15 11:09:02.085699",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "identity_section",
+  "delivery_method_name",
+  "delivery_provider_type",
+  "column_break_method",
+  "disabled",
+  "requirements_section",
+  "requires_transport_planning",
+  "requires_vehicle_allocation",
+  "requires_delivery_trip"
+ ],
+ "fields": [
+  {
+   "fieldname": "identity_section",
+   "fieldtype": "Section Break",
+   "label": "Delivery Method"
+  },
+  {
+   "fieldname": "delivery_method_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Delivery Method Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "delivery_provider_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Delivery Provider Type",
+   "options": "Internal Fleet\nTransporter\nCustomer\nCourier\nSupplier\nOther",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_method",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "label": "Disabled"
+  },
+  {
+   "fieldname": "requirements_section",
+   "fieldtype": "Section Break",
+   "label": "Required Workflow"
+  },
+  {
+   "default": "1",
+   "fieldname": "requires_transport_planning",
+   "fieldtype": "Check",
+   "label": "Requires Transport Planning"
+  },
+  {
+   "default": "1",
+   "fieldname": "requires_vehicle_allocation",
+   "fieldtype": "Check",
+   "label": "Requires Vehicle Allocation"
+  },
+  {
+   "default": "1",
+   "fieldname": "requires_delivery_trip",
+   "fieldtype": "Check",
+   "label": "Requires Delivery Trip"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "link_doctype": "Delivery Order",
+   "link_fieldname": "delivery_method"
+  },
+  {
+   "link_doctype": "Delivery Load",
+   "link_fieldname": "delivery_method"
+  }
+ ],
+ "modified": "2026-08-16 15:50:49.666893",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Delivery Method",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Planner"
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Dispatcher"
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "delivery_method_name"
+}

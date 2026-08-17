@@ -1,0 +1,113 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "creation": "2026-08-10 10:00:05.974493",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "sequence",
+  "column_break_apva",
+  "location",
+  "section_break_gqmj",
+  "address",
+  "column_break_cngh",
+  "transport_zone",
+  "latitude",
+  "longitude",
+  "section_break_qhnz",
+  "estimated_distance_from_previous",
+  "column_break_ngbj",
+  "estimated_travel_time"
+ ],
+ "fields": [
+  {
+   "fieldname": "sequence",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Sequence",
+   "reqd": 1
+  },
+  {
+   "fieldname": "location",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Location",
+   "reqd": 1
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Link",
+   "label": "Address",
+   "options": "Address"
+  },
+  {
+   "fieldname": "transport_zone",
+   "fieldtype": "Link",
+   "label": "Transport Zone",
+   "options": "Transport Zone"
+  },
+  {
+   "fieldname": "latitude",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Latitude",
+   "precision": "8",
+   "read_only": 1
+  },
+  {
+   "fieldname": "longitude",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Longitude",
+   "precision": "8",
+   "read_only": 1
+  },
+  {
+   "fieldname": "estimated_distance_from_previous",
+   "fieldtype": "Float",
+   "label": "Distance From Previous"
+  },
+  {
+   "fieldname": "estimated_travel_time",
+   "fieldtype": "Float",
+   "label": "Travel Time (Hours)"
+  },
+  {
+   "fieldname": "column_break_apva",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_gqmj",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_cngh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_qhnz",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_ngbj",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-15 11:28:53.214706",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Transport Route Stop",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
