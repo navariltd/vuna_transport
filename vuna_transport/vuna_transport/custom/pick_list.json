@@ -1,0 +1,21 @@
+{
+ "custom_fields": [
+  {
+   "allow_on_submit": 1,
+   "dt": "Pick List",
+   "fieldname": "vuna_delivery_load",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "insert_after": "company",
+   "label": "Delivery Load",
+   "module": "Vuna Transport",
+   "options": "Delivery Load",
+   "read_only": 1
+  }
+ ],
+ "custom_perms": [],
+ "doctype": "Pick List",
+ "links": [],
+ "property_setters": [],
+ "sync_on_migrate": 1
+}

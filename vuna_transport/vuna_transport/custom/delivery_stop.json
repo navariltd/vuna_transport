@@ -1,0 +1,75 @@
+{
+ "custom_fields": [
+  {
+   "allow_on_submit": 1,
+   "dt": "Delivery Stop",
+   "fieldname": "vuna_delivery_order",
+   "fieldtype": "Link",
+   "insert_after": "delivery_note",
+   "label": "Delivery Order",
+   "module": "Vuna Transport",
+   "options": "Delivery Order",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "dt": "Delivery Stop",
+   "fieldname": "vuna_delivery_load_order",
+   "fieldtype": "Link",
+   "insert_after": "vuna_delivery_order",
+   "label": "Delivery Load Order",
+   "module": "Vuna Transport",
+   "options": "Delivery Load Order",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "dt": "Delivery Stop",
+   "fieldname": "vuna_proof_of_delivery",
+   "fieldtype": "Link",
+   "insert_after": "vuna_delivery_load_order",
+   "label": "Proof of Delivery",
+   "module": "Vuna Transport",
+   "options": "Proof of Delivery",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "default": "Pending",
+   "dt": "Delivery Stop",
+   "fieldname": "vuna_delivery_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "insert_after": "vuna_proof_of_delivery",
+   "label": "Delivery Status",
+   "module": "Vuna Transport",
+   "options": "Pending\nAccepted\nPartially Delivered\nRejected\nFailed",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "dt": "Delivery Stop",
+   "fieldname": "vuna_actual_arrival",
+   "fieldtype": "Datetime",
+   "insert_after": "vuna_delivery_status",
+   "label": "Actual Arrival",
+   "module": "Vuna Transport",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "dt": "Delivery Stop",
+   "fieldname": "vuna_actual_departure",
+   "fieldtype": "Datetime",
+   "insert_after": "vuna_actual_arrival",
+   "label": "Actual Departure",
+   "module": "Vuna Transport",
+   "read_only": 1
+  }
+ ],
+ "custom_perms": [],
+ "doctype": "Delivery Stop",
+ "links": [],
+ "property_setters": [],
+ "sync_on_migrate": 1
+}

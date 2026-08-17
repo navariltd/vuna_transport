@@ -1,0 +1,32 @@
+{
+ "custom_fields": [
+  {
+   "allow_on_submit": 1,
+   "dt": "Delivery Note",
+   "fieldname": "vuna_delivery_load",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "insert_after": "customer",
+   "label": "Delivery Load",
+   "module": "Vuna Transport",
+   "options": "Delivery Load",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "dt": "Delivery Note",
+   "fieldname": "vuna_delivery_order",
+   "fieldtype": "Link",
+   "insert_after": "vuna_delivery_load",
+   "label": "Delivery Order",
+   "module": "Vuna Transport",
+   "options": "Delivery Order",
+   "read_only": 1
+  }
+ ],
+ "custom_perms": [],
+ "doctype": "Delivery Note",
+ "links": [],
+ "property_setters": [],
+ "sync_on_migrate": 1
+}
