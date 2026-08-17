@@ -1,0 +1,179 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "creation": "2026-08-10 10:31:48.202219",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "item_name",
+  "column_break_yxgi",
+  "sales_order_item",
+  "section_break_qumm",
+  "ordered_qty",
+  "transport_qty",
+  "delivery_date",
+  "column_break_efmj",
+  "stock_uom",
+  "s_warehouse",
+  "section_break_tmci",
+  "weight",
+  "weight_uom",
+  "volume",
+  "volume_uom",
+  "transport_handling_profile",
+  "column_break_indl",
+  "pallets",
+  "cases",
+  "crates"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_yxgi",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "sales_order_item",
+   "fieldtype": "Link",
+   "label": "Sales Order Item",
+   "options": "Sales Order Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_qumm",
+   "fieldtype": "Section Break",
+   "label": "Requested Quantity & Delivery"
+  },
+  {
+   "fieldname": "ordered_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Ordered Qty",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "transport_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Transport Qty",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_efmj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "label": "Stock UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "s_warehouse",
+   "fieldtype": "Link",
+   "label": "Source Warehouse",
+   "options": "Warehouse",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_date",
+   "fieldtype": "Date",
+   "label": "Delivery Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "weight",
+   "fieldtype": "Float",
+   "label": "Weight",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "weight_uom",
+   "fieldtype": "Link",
+   "label": "Weight UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "volume",
+   "fieldtype": "Float",
+   "label": "Volume",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "volume_uom",
+   "fieldtype": "Link",
+   "label": "Volume UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_tmci",
+   "fieldtype": "Section Break",
+   "label": "Handling & Dimensions"
+  },
+  {
+   "fieldname": "transport_handling_profile",
+   "fieldtype": "Data",
+   "label": "Transport Handling Profile"
+  },
+  {
+   "fieldname": "column_break_indl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pallets",
+   "fieldtype": "Float",
+   "label": "Pallets",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "cases",
+   "fieldtype": "Float",
+   "label": "Cases",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "crates",
+   "fieldtype": "Float",
+   "label": "Crates",
+   "non_negative": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-08-11 14:21:29.828636",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Delivery Order Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
