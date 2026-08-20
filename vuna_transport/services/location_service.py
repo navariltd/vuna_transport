@@ -1,6 +1,9 @@
-"""Resolve operational locations and snapshot them onto planning documents."""
+"""Resolve, normalize, and snapshot operational locations."""
+
+import json
 
 import frappe
+from frappe import _
 from frappe.contacts.doctype.address.address import get_default_address
 
 
@@ -10,7 +13,13 @@ def get_address_planning_data(address_name):
 
 	address = frappe.get_cached_doc("Address", address_name)
 	location = getattr(address, "vuna_location", None)
-	latitude, longitude = get_point_coordinates(location)
+	map_latitude, map_longitude = get_point_coordinates(location)
+	latitude = _coordinate_or_fallback(
+		getattr(address, "vuna_latitude", None), map_latitude
+	)
+	longitude = _coordinate_or_fallback(
+		getattr(address, "vuna_longitude", None), map_longitude
+	)
 	return frappe._dict(
 		address=address.name,
 		delivery_zone=getattr(address, "vuna_delivery_zone", None),
@@ -26,6 +35,88 @@ def get_address_planning_data(address_name):
 		restricted_access=getattr(address, "vuna_restricted_access", 0),
 		access_notes=getattr(address, "vuna_access_notes", None),
 	)
+
+
+def synchronize_address_location(address, method=None):
+	"""Keep explicit coordinates and the Address GeoJSON point consistent."""
+	if not all(
+		address.meta.has_field(fieldname)
+		for fieldname in ("vuna_latitude", "vuna_longitude", "vuna_location")
+	):
+		return
+
+	coordinates_changed = address.is_new() or any(
+		address.has_value_changed(fieldname)
+		for fieldname in ("vuna_latitude", "vuna_longitude")
+	)
+	location_changed = address.is_new() or address.has_value_changed("vuna_location")
+	latitude = address.get("vuna_latitude")
+	longitude = address.get("vuna_longitude")
+	coordinates_present = _has_coordinate(latitude) or _has_coordinate(longitude)
+
+	# Explicit coordinate entry takes precedence when both representations change.
+	if coordinates_changed and coordinates_present:
+		latitude, longitude = validate_point_coordinates(latitude, longitude)
+		address.vuna_latitude = latitude
+		address.vuna_longitude = longitude
+		address.vuna_location = make_point_geojson(latitude, longitude)
+		return
+
+	if location_changed:
+		if not address.vuna_location:
+			address.vuna_latitude = None
+			address.vuna_longitude = None
+			return
+		latitude, longitude = get_point_coordinates(address.vuna_location)
+		if latitude is None or longitude is None:
+			frappe.throw(
+				_("Delivery Location must contain a point marker rather than a line or area.")
+			)
+		address.vuna_latitude = latitude
+		address.vuna_longitude = longitude
+		return
+
+	# Normalize records created before explicit coordinate fields were introduced.
+	if address.vuna_location and not coordinates_present:
+		latitude, longitude = get_point_coordinates(address.vuna_location)
+		if latitude is not None and longitude is not None:
+			address.vuna_latitude = latitude
+			address.vuna_longitude = longitude
+	elif coordinates_present and not address.vuna_location:
+		latitude, longitude = validate_point_coordinates(latitude, longitude)
+		address.vuna_location = make_point_geojson(latitude, longitude)
+	else:
+		validate_point_coordinates(latitude, longitude, allow_empty=True)
+
+
+def backfill_address_coordinates():
+	"""Populate explicit coordinates after app custom fields have been synchronized."""
+	if not all(
+		frappe.db.has_column("Address", fieldname)
+		for fieldname in ("vuna_location", "vuna_latitude", "vuna_longitude")
+	):
+		return
+	for address in frappe.get_all(
+		"Address",
+		filters={"vuna_location": ["is", "set"]},
+		fields=["name", "vuna_location", "vuna_latitude", "vuna_longitude"],
+	):
+		if _has_coordinate(address.vuna_latitude) and _has_coordinate(
+			address.vuna_longitude
+		):
+			continue
+		latitude, longitude = get_point_coordinates(address.vuna_location)
+		if latitude is None or longitude is None:
+			continue
+		frappe.db.set_value(
+			"Address",
+			address.name,
+			{
+				"vuna_latitude": latitude,
+				"vuna_longitude": longitude,
+			},
+			update_modified=False,
+		)
 
 
 def get_warehouse_planning_data(warehouse):
@@ -78,6 +169,54 @@ def get_point_coordinates(location):
 	except (TypeError, ValueError, AttributeError):
 		pass
 	return None, None
+
+
+def make_point_geojson(latitude, longitude):
+	"""Build Frappe Geolocation GeoJSON from latitude and longitude."""
+	latitude, longitude = validate_point_coordinates(latitude, longitude)
+	return json.dumps(
+		{
+			"type": "FeatureCollection",
+			"features": [
+				{
+					"type": "Feature",
+					"properties": {},
+					"geometry": {
+						"type": "Point",
+						"coordinates": [longitude, latitude],
+					},
+				}
+			],
+		},
+		separators=(",", ":"),
+	)
+
+
+def validate_point_coordinates(latitude, longitude, allow_empty=False):
+	latitude_present = _has_coordinate(latitude)
+	longitude_present = _has_coordinate(longitude)
+	if not latitude_present and not longitude_present and allow_empty:
+		return None, None
+	if not latitude_present or not longitude_present:
+		frappe.throw(_("Enter both Latitude and Longitude."))
+	try:
+		latitude = float(latitude)
+		longitude = float(longitude)
+	except (TypeError, ValueError):
+		frappe.throw(_("Latitude and Longitude must be numeric values."))
+	if not -90 <= latitude <= 90:
+		frappe.throw(_("Latitude must be between -90 and 90."))
+	if not -180 <= longitude <= 180:
+		frappe.throw(_("Longitude must be between -180 and 180."))
+	return latitude, longitude
+
+
+def _has_coordinate(value):
+	return value is not None and value != ""
+
+
+def _coordinate_or_fallback(value, fallback):
+	return value if _has_coordinate(value) else fallback
 
 
 def _set_if_empty(doc, fieldname, value, overwrite):

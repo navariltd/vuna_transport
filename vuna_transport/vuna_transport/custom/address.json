@@ -21,9 +21,61 @@
   },
   {
    "dt": "Address",
+   "fieldname": "vuna_coordinates_section",
+   "fieldtype": "Section Break",
+   "insert_after": "vuna_delivery_zone",
+   "label": "Delivery Coordinates",
+   "module": "Vuna Transport"
+  },
+  {
+   "description": "Latitude must be between -90 and 90.",
+   "dt": "Address",
+   "fieldname": "vuna_latitude",
+   "fieldtype": "Float",
+   "insert_after": "vuna_coordinates_section",
+   "label": "Latitude",
+   "module": "Vuna Transport",
+   "precision": "8"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "vuna_coordinates_column",
+   "fieldtype": "Column Break",
+   "insert_after": "vuna_latitude",
+   "module": "Vuna Transport"
+  },
+  {
+   "description": "Longitude must be between -180 and 180.",
+   "dt": "Address",
+   "fieldname": "vuna_longitude",
+   "fieldtype": "Float",
+   "insert_after": "vuna_coordinates_column",
+   "label": "Longitude",
+   "module": "Vuna Transport",
+   "precision": "8"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "vuna_use_device_location",
+   "fieldtype": "Button",
+   "insert_after": "vuna_longitude",
+   "label": "Use Device Location",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Address",
+   "fieldname": "vuna_location_section",
+   "fieldtype": "Section Break",
+   "insert_after": "vuna_use_device_location",
+   "label": "Delivery Map Pin",
+   "module": "Vuna Transport"
+  },
+  {
+   "description": "The map pin and coordinates are synchronized automatically.",
+   "dt": "Address",
    "fieldname": "vuna_location",
    "fieldtype": "Geolocation",
-   "insert_after": "vuna_delivery_zone",
+   "insert_after": "vuna_location_section",
    "label": "Delivery Location",
    "module": "Vuna Transport"
   },

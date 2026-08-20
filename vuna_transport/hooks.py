@@ -142,6 +142,9 @@ add_to_apps_screen = [
 # Hook on document methods and events
 
 doc_events = {
+	"Address": {
+		"validate": "vuna_transport.services.location_service.synchronize_address_location",
+	},
 	"Sales Order": {
 		"on_submit": "vuna_transport.services.delivery_order_service.create_delivery_orders_for_sales_order",
 	},
@@ -166,6 +169,7 @@ doc_events = {
 }
 
 doctype_js = {
+	"Address": "public/js/address.js",
 	"Delivery Trip": "public/js/delivery_trip.js",
 	"Vehicle": "public/js/vehicle.js",
 }
@@ -180,6 +184,10 @@ fixtures = [
 			]
 		},
 	}
+]
+
+after_migrate = [
+	"vuna_transport.services.location_service.backfill_address_coordinates",
 ]
 
 # doc_events = {
