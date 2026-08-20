@@ -222,7 +222,7 @@ after_migrate = [
 # Testing
 # -------
 
-# before_tests = "vuna_transport.install.before_tests"
+before_tests = "vuna_transport.setup.utils.before_tests"
 
 # Extend DocType Class
 # ------------------------------
