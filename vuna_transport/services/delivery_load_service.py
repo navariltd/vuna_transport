@@ -345,8 +345,22 @@ def _validate_delivery_orders(delivery_orders):
 def calculate_load_totals(load):
 	"""Calculate aggregate capacity and stop values on a Delivery Load."""
 	uoms = get_transport_uoms()
-	load.weight_uom = uoms.weight_uom or next((row.weight_uom for row in load.delivery_orders if row.weight_uom), None)
-	load.volume_uom = uoms.volume_uom or next((row.volume_uom for row in load.delivery_orders if row.volume_uom), None)
+	load.weight_uom = uoms.weight_uom or next(
+		(
+			getattr(row, "weight_uom", None)
+			for row in load.delivery_orders
+			if getattr(row, "weight_uom", None)
+		),
+		None,
+	)
+	load.volume_uom = uoms.volume_uom or next(
+		(
+			getattr(row, "volume_uom", None)
+			for row in load.delivery_orders
+			if getattr(row, "volume_uom", None)
+		),
+		None,
+	)
 	load.total_weight = sum(flt(row.weight) for row in load.delivery_orders)
 	load.total_volume = sum(flt(row.volume) for row in load.delivery_orders)
 	load.total_pallets = sum(flt(row.pallets) for row in load.delivery_orders)
