@@ -4,6 +4,7 @@
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import frappe
 from frappe.utils import flt
 from frappe.tests import UnitTestCase
 
@@ -14,7 +15,12 @@ from vuna_transport.services.delivery_order_service import (
 	_requires_transport_planning,
 	_get_transport_quantity,
 )
-from vuna_transport.services.location_service import get_point_coordinates
+from vuna_transport.services.location_service import (
+	get_point_coordinates,
+	make_point_geojson,
+	synchronize_address_location,
+	validate_point_coordinates,
+)
 
 
 # On IntegrationTestCase, the doctype test records and all
@@ -84,6 +90,26 @@ class TestDeliveryOrder(UnitTestCase):
 		latitude, longitude = get_point_coordinates(location)
 		self.assertEqual(latitude, -1.2921)
 		self.assertEqual(longitude, 36.8219)
+
+	def test_coordinate_entry_builds_address_map_point(self):
+		address = frappe.new_doc("Address")
+		address.vuna_latitude = -1.2921
+		address.vuna_longitude = 36.8219
+		synchronize_address_location(address)
+		self.assertEqual(get_point_coordinates(address.vuna_location), (-1.2921, 36.8219))
+
+	def test_map_point_populates_address_coordinates(self):
+		address = frappe.new_doc("Address")
+		address.vuna_location = make_point_geojson(-1.2921, 36.8219)
+		synchronize_address_location(address)
+		self.assertEqual(address.vuna_latitude, -1.2921)
+		self.assertEqual(address.vuna_longitude, 36.8219)
+
+	def test_coordinate_ranges_are_validated(self):
+		with self.assertRaises(frappe.ValidationError):
+			validate_point_coordinates(91, 36.8219)
+		with self.assertRaises(frappe.ValidationError):
+			validate_point_coordinates(-1.2921, 181)
 
 	@patch("vuna_transport.services.delivery_order_service.frappe.get_cached_doc")
 	def test_customer_pickup_can_skip_transport_planning(self, get_cached_doc):
