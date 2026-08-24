@@ -18,6 +18,9 @@ from vuna_transport.services.security_service import (
 	require_doctype_permission,
 	require_document_permission,
 )
+from vuna_transport.services.workflow_policy_service import (
+	allocation_is_required_before_delivery_notes,
+)
 
 
 def create_pick_list_for_load(load):
@@ -116,24 +119,33 @@ def create_delivery_notes_for_load(load):
 		delivery_note.save()
 		created.append(delivery_note.name)
 
+	requires_allocation = _delivery_method_requires_vehicle_allocation(load)
+	has_allocation = bool(get_active_allocation(load, required=False))
+	target_status = "Awaiting Vehicle" if requires_allocation and not has_allocation else "Ready for Dispatch"
 	set_delivery_load_status(
 		load,
-		"Ready for Dispatch",
+		target_status,
 		_("Delivery Notes created or confirmed for this load"),
 	)
 	return created
 
 
 def _validate_delivery_note_allocation(load):
-	requires_allocation = True
-	if load.delivery_method:
-		requires_allocation = bool(
-			frappe.db.get_value(
-				"Delivery Method", load.delivery_method, "requires_vehicle_allocation"
-			)
-		)
-	if requires_allocation:
+	if (
+		_delivery_method_requires_vehicle_allocation(load)
+		and allocation_is_required_before_delivery_notes()
+	):
 		get_active_allocation(load, required=True)
+
+
+def _delivery_method_requires_vehicle_allocation(load):
+	if not load.delivery_method:
+		return True
+	return bool(
+		frappe.db.get_value(
+			"Delivery Method", load.delivery_method, "requires_vehicle_allocation"
+		)
+	)
 
 
 def _make_delivery_note_from_pick_list(delivery_order_name, load_rows, pick_list):

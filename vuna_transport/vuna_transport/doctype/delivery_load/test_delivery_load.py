@@ -2,6 +2,7 @@
 # See license.txt
 
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
@@ -12,6 +13,7 @@ from vuna_transport.services.delivery_load_service import (
 	calculate_load_totals,
 )
 from vuna_transport.services.erpnext_integration import apply_allocated_delivery_quantities
+from vuna_transport.services.execution_service import _get_next_action
 from vuna_transport.services.dispatch_guard_service import is_load_status_transition_allowed
 from vuna_transport.services.lineage_service import (
 	validate_delivery_note_item_allocations,
@@ -25,6 +27,10 @@ from vuna_transport.services.geography_service import (
 from vuna_transport.services.vehicle_category_service import (
 	evaluate_vehicle_category,
 	maximum_fitting_fraction,
+)
+from vuna_transport.services.workflow_policy_service import (
+	ALLOCATION_AFTER_DELIVERY_NOTES,
+	ALLOCATION_BEFORE_DELIVERY_NOTES,
 )
 
 
@@ -60,6 +66,67 @@ class TestDeliveryLoad(UnitTestCase):
 		self.assertEqual(load.total_volume, 15)
 		self.assertEqual(load.total_pallets, 3)
 		self.assertEqual(load.total_stops, 2)
+
+	@patch("vuna_transport.services.execution_service._requires_vehicle_allocation", return_value=True)
+	def test_after_notes_policy_creates_delivery_notes_before_allocation(self, _requires_allocation):
+		result = _get_next_action(
+			self._submitted_scheduled_load(),
+			None,
+			None,
+			{"DO-1"},
+			[],
+			[],
+			[],
+			None,
+			[],
+			[],
+			ALLOCATION_AFTER_DELIVERY_NOTES,
+		)
+		self.assertEqual(result["key"], "create_delivery_notes")
+
+	@patch("vuna_transport.services.execution_service._requires_vehicle_allocation", return_value=True)
+	def test_before_notes_policy_allocates_vehicle_first(self, _requires_allocation):
+		result = _get_next_action(
+			self._submitted_scheduled_load(),
+			None,
+			None,
+			{"DO-1"},
+			[],
+			[],
+			[],
+			None,
+			[],
+			[],
+			ALLOCATION_BEFORE_DELIVERY_NOTES,
+		)
+		self.assertEqual(result["key"], "create_vehicle_allocation")
+
+	@patch("vuna_transport.services.execution_service._requires_vehicle_allocation", return_value=True)
+	def test_after_notes_policy_allocates_after_draft_notes_exist(self, _requires_allocation):
+		draft_note = SimpleNamespace(name="DN-1", docstatus=0)
+		result = _get_next_action(
+			self._submitted_scheduled_load(),
+			None,
+			None,
+			{"DO-1"},
+			[draft_note],
+			[],
+			[draft_note],
+			None,
+			[],
+			[],
+			ALLOCATION_AFTER_DELIVERY_NOTES,
+		)
+		self.assertEqual(result["key"], "create_vehicle_allocation")
+
+	@staticmethod
+	def _submitted_scheduled_load():
+		return SimpleNamespace(
+			docstatus=1,
+			status="Approved",
+			planned_departure="2026-08-22 08:00:00",
+			planned_arrival="2026-08-22 12:00:00",
+		)
 
 	def test_direct_delivery_note_uses_allocated_quantity(self):
 		item = SimpleNamespace(

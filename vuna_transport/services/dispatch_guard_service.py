@@ -41,7 +41,7 @@ ALLOWED_LOAD_STATUS_TRANSITIONS = {
 		"Ready for Dispatch",
 		"Cancelled",
 	},
-	"Awaiting Vehicle": {"Approved", "Allocated", "Cancelled"},
+	"Awaiting Vehicle": {"Approved", "Allocated", "Ready for Dispatch", "Cancelled"},
 	"Allocated": {
 		"Approved",
 		"Awaiting Vehicle",

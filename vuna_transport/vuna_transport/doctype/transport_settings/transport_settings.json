@@ -19,6 +19,7 @@
   "section_break_yskt",
   "require_load_approval",
   "allow_capacity_override",
+  "vehicle_allocation_timing",
   "column_break_gnzw",
   "allow_partial_requirement_allocation",
   "units_tab",
@@ -99,6 +100,15 @@
    "label": "Allow Capacity Override"
   },
   {
+   "default": "After Delivery Notes",
+   "description": "Controls whether a submitted vehicle allocation is required before Delivery Notes are generated, or whether Delivery Notes must be generated before the initial allocation.",
+   "fieldname": "vehicle_allocation_timing",
+   "fieldtype": "Select",
+   "label": "Vehicle Allocation Timing",
+   "options": "Before Delivery Notes\nAfter Delivery Notes",
+   "reqd": 1
+  },
+  {
    "fieldname": "column_break_gnzw",
    "fieldtype": "Column Break"
   },
@@ -171,7 +181,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-16 16:23:11.930968",
+ "modified": "2026-08-21 15:52:26.122957",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Settings",

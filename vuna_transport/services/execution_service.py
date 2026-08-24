@@ -4,6 +4,10 @@ import frappe
 from frappe import _
 
 from vuna_transport.services.security_service import require_document_permission
+from vuna_transport.services.workflow_policy_service import (
+	ALLOCATION_AFTER_DELIVERY_NOTES,
+	get_vehicle_allocation_timing,
+)
 
 
 DOCSTATUS_LABELS = {0: "Draft", 1: "Submitted", 2: "Cancelled"}
@@ -65,6 +69,7 @@ def get_load_execution_summary(load):
 		order_by="creation asc",
 	)
 	submitted_pods = [pod for pod in pods if pod.docstatus == 1]
+	vehicle_allocation_timing = get_vehicle_allocation_timing()
 
 	next_action = _get_next_action(
 		load,
@@ -77,6 +82,7 @@ def get_load_execution_summary(load):
 		delivery_trip,
 		stops,
 		submitted_pods,
+		vehicle_allocation_timing,
 	)
 
 	return {
@@ -84,6 +90,7 @@ def get_load_execution_summary(load):
 		"workflow": {
 			"requires_vehicle_allocation": _requires_vehicle_allocation(load),
 			"requires_delivery_trip": _requires_delivery_trip(load),
+			"vehicle_allocation_timing": vehicle_allocation_timing,
 		},
 		"delivery_orders": {"total": len(delivery_orders)},
 		"vehicle_allocation": _serialize_doc(
@@ -196,6 +203,7 @@ def _get_next_action(
 	delivery_trip,
 	stops,
 	submitted_pods,
+	vehicle_allocation_timing,
 ):
 	if load.docstatus == 0:
 		return _action("submit_load", _("Submit Delivery Load"), _("Review capacity and submit this load."))
@@ -203,21 +211,22 @@ def _get_next_action(
 		return _action("cancelled", _("Delivery Load Cancelled"), _("Amend the load to continue."))
 	if load.status in ("Completed", "Completed with Exceptions"):
 		return _action("completed", _("Execution Completed"), _("This Delivery Load is closed."))
-	if _requires_vehicle_allocation(load):
-		if not load.planned_departure or not load.planned_arrival:
-			return _action(
-				"set_schedule",
-				_("Set Dispatch Schedule"),
-				_("Set Planned Departure and Planned Arrival before allocating a vehicle."),
-			)
-		if not vehicle_allocation or vehicle_allocation.docstatus == 2:
-			return _action("create_vehicle_allocation", _("Allocate Vehicle"), _("Assign the physical vehicle and driver."))
-		if vehicle_allocation.docstatus == 0:
-			return _action("open_vehicle_allocation", _("Complete Vehicle Allocation"), _("Review and submit the allocation."))
+	requires_vehicle_allocation = _requires_vehicle_allocation(load)
+	allocation_after_notes = (
+		vehicle_allocation_timing == ALLOCATION_AFTER_DELIVERY_NOTES
+	)
+	if requires_vehicle_allocation and not allocation_after_notes:
+		action = _get_vehicle_allocation_action(load, vehicle_allocation)
+		if action:
+			return action
 	if pick_list and pick_list.docstatus == 0:
 		return _action("open_pick_list", _("Complete Pick List"), _("Pick and submit the warehouse document."))
 	if len(active_notes) < len(delivery_orders):
 		return _action("create_delivery_notes", _("Create Delivery Notes"), _("Create one stock movement per delivery stop."))
+	if requires_vehicle_allocation and allocation_after_notes:
+		action = _get_vehicle_allocation_action(load, vehicle_allocation)
+		if action:
+			return action
 	if draft_notes:
 		return _action("review_delivery_notes", _("Review Delivery Notes"), _("Review and submit every Delivery Note."))
 	if len(submitted_notes) < len(delivery_orders):
@@ -233,6 +242,28 @@ def _get_next_action(
 	if len(submitted_pods) < len(stops):
 		return _action("open_delivery_trip", _("Capture Proofs of Delivery"), _("Record the outcome for every delivery stop."))
 	return _action("completed", _("Execution Completed"), _("Every delivery stop has a submitted Proof of Delivery."))
+
+
+def _get_vehicle_allocation_action(load, vehicle_allocation):
+	if not load.planned_departure or not load.planned_arrival:
+		return _action(
+			"set_schedule",
+			_("Set Dispatch Schedule"),
+			_("Set Planned Departure and Planned Arrival before allocating a vehicle."),
+		)
+	if not vehicle_allocation or vehicle_allocation.docstatus == 2:
+		return _action(
+			"create_vehicle_allocation",
+			_("Allocate Vehicle"),
+			_("Assign the physical vehicle and driver."),
+		)
+	if vehicle_allocation.docstatus == 0:
+		return _action(
+			"open_vehicle_allocation",
+			_("Complete Vehicle Allocation"),
+			_("Review and submit the allocation."),
+		)
+	return None
 
 
 def _requires_vehicle_allocation(load):

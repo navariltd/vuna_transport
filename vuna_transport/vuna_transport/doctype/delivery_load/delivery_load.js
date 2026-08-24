@@ -245,73 +245,77 @@ function render_new_load_progress(frm) {
 }
 
 function render_execution_progress(frm, summary) {
-	const steps = [
-		{
-			label: __("Load"),
-			value: summary.load.docstatus === 1 ? __("Submitted") : __("Draft"),
-			state: summary.load.docstatus === 1 ? "complete" : "current",
-		},
-		{
-			label: __("Vehicle Allocation"),
-			value: !summary.workflow.requires_vehicle_allocation
-				? __("Not Required")
-				: summary.vehicle_allocation
-					? __(summary.vehicle_allocation.document_status)
-					: __("Not Allocated"),
-			state:
-				!summary.workflow.requires_vehicle_allocation
-					? "complete"
-					: summary.vehicle_allocation?.docstatus === 1
-						? "complete"
-						: summary.vehicle_allocation
-							? "current"
-							: "pending",
-		},
-		{
-			label: __("Picking"),
-			value: summary.pick_list ? __(summary.pick_list.document_status) : __("Optional"),
-			state: summary.pick_list?.docstatus === 1 ? "complete" : summary.pick_list ? "current" : "pending",
-		},
-		{
-			label: __("Delivery Notes"),
-			value: __("{0} of {1} submitted", [summary.delivery_notes.submitted, summary.delivery_notes.expected]),
-			state:
-				summary.delivery_notes.expected && summary.delivery_notes.submitted >= summary.delivery_notes.expected
-					? "complete"
-					: summary.delivery_notes.total
-						? "current"
-						: "pending",
-		},
-		{
-			label: __("Delivery Trip"),
-			value: !summary.workflow.requires_delivery_trip
-				? __("Not Required")
-				: summary.delivery_trip
-					? __(summary.delivery_trip.document_status)
-					: __("Not Created"),
-			state: !summary.workflow.requires_delivery_trip
+	const load_step = {
+		label: __("Load"),
+		value: summary.load.docstatus === 1 ? __("Submitted") : __("Draft"),
+		state: summary.load.docstatus === 1 ? "complete" : "current",
+	};
+	const allocation_step = {
+		label: __("Vehicle Allocation"),
+		value: !summary.workflow.requires_vehicle_allocation
+			? __("Not Required")
+			: summary.vehicle_allocation
+				? __(summary.vehicle_allocation.document_status)
+				: __("Not Allocated"),
+		state:
+			!summary.workflow.requires_vehicle_allocation
 				? "complete"
-				: summary.delivery_trip?.docstatus === 1
+				: summary.vehicle_allocation?.docstatus === 1
 					? "complete"
-					: summary.delivery_trip
+					: summary.vehicle_allocation
 						? "current"
 						: "pending",
-		},
-		{
-			label: __("Proof of Delivery"),
-			value: !summary.workflow.requires_delivery_trip
-				? __("Not Required")
-				: __("{0} of {1} submitted", [summary.proofs_of_delivery.submitted, summary.stops.total]),
-			state:
-				!summary.workflow.requires_delivery_trip
+	};
+	const picking_step = {
+		label: __("Picking"),
+		value: summary.pick_list ? __(summary.pick_list.document_status) : __("Optional"),
+		state: summary.pick_list?.docstatus === 1 ? "complete" : summary.pick_list ? "current" : "pending",
+	};
+	const delivery_notes_step = {
+		label: __("Delivery Notes"),
+		value: __("{0} of {1} submitted", [summary.delivery_notes.submitted, summary.delivery_notes.expected]),
+		state:
+			summary.delivery_notes.expected && summary.delivery_notes.submitted >= summary.delivery_notes.expected
+				? "complete"
+				: summary.delivery_notes.total
+					? "current"
+					: "pending",
+	};
+	const trip_step = {
+		label: __("Delivery Trip"),
+		value: !summary.workflow.requires_delivery_trip
+			? __("Not Required")
+			: summary.delivery_trip
+				? __(summary.delivery_trip.document_status)
+				: __("Not Created"),
+		state: !summary.workflow.requires_delivery_trip
+			? "complete"
+			: summary.delivery_trip?.docstatus === 1
+				? "complete"
+				: summary.delivery_trip
+					? "current"
+					: "pending",
+	};
+	const pod_step = {
+		label: __("Proof of Delivery"),
+		value: !summary.workflow.requires_delivery_trip
+			? __("Not Required")
+			: __("{0} of {1} submitted", [summary.proofs_of_delivery.submitted, summary.stops.total]),
+		state:
+			!summary.workflow.requires_delivery_trip
+				? "complete"
+				: summary.stops.total && summary.proofs_of_delivery.submitted >= summary.stops.total
 					? "complete"
-					: summary.stops.total && summary.proofs_of_delivery.submitted >= summary.stops.total
-						? "complete"
-						: summary.proofs_of_delivery.total
-							? "current"
-							: "pending",
-		},
-	];
+					: summary.proofs_of_delivery.total
+						? "current"
+						: "pending",
+	};
+	const allocation_after_notes =
+		summary.workflow.vehicle_allocation_timing === "After Delivery Notes";
+	const operational_steps = allocation_after_notes
+		? [picking_step, delivery_notes_step, allocation_step]
+		: [allocation_step, picking_step, delivery_notes_step];
+	const steps = [load_step, ...operational_steps, trip_step, pod_step];
 
 	const colors = { complete: "green", current: "blue", pending: "gray" };
 	const cards = steps
