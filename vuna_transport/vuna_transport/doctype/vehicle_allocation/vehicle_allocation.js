@@ -10,7 +10,13 @@ frappe.ui.form.on("Vehicle Allocation", {
 				filters: { delivery_load: frm.doc.delivery_load },
 			};
 		});
-		frm.set_query("driver", () => ({ filters: { status: "Active" } }));
+		frm.set_query("driver", () => {
+			if (!frm.doc.delivery_load) return { filters: { status: "Active" } };
+			return {
+				query: "vuna_transport.api.get_drivers_for_load",
+				filters: { delivery_load: frm.doc.delivery_load },
+			};
+		});
 	},
 
 	refresh(frm) {

@@ -13,6 +13,16 @@ from vuna_transport.services.security_service import (
 	require_doctype_permission,
 	require_document_permission,
 )
+from vuna_transport.services.driver_availability_service import (
+	evaluate_driver_availability,
+)
+from vuna_transport.services.resource_scheduling_service import time_windows_overlap
+from vuna_transport.services.vehicle_availability_service import (
+	evaluate_vehicle_availability,
+)
+from vuna_transport.services.workflow_policy_service import (
+	allocation_is_required_before_delivery_notes,
+)
 
 
 ACTIVE_STATUSES = ("Allocated", "Accepted")
@@ -26,6 +36,7 @@ def make_vehicle_allocation_from_load(source_name):
 	require_document_permission(load, "write")
 	validate_load_is_operational(load, _("allocating a vehicle"))
 	_validate_planning_window(load)
+	_validate_initial_allocation_sequence(load)
 	existing_draft = frappe.db.get_value(
 		"Vehicle Allocation",
 		{"delivery_load": load.name, "docstatus": 0},
@@ -102,6 +113,7 @@ def validate_allocation(allocation):
 	require_document_permission(load, "write")
 	validate_load_is_operational(load, _("allocating a vehicle"))
 	_validate_planning_window(load)
+	_validate_initial_allocation_sequence(load, allocation)
 	trip = _get_active_trip(load)
 	_validate_trip_allows_reallocation(trip)
 
@@ -161,18 +173,12 @@ def _validate_owned_fleet(allocation, load):
 	if not allocation.vehicle or not allocation.driver:
 		frappe.throw(_("Vehicle and Driver are required for an Owned Fleet allocation."))
 
-	vehicle = frappe.get_cached_doc("Vehicle", allocation.vehicle)
-	if not vehicle.vuna_transport_enabled:
-		frappe.throw(_("Vehicle {0} is not enabled for transport planning.").format(vehicle.name))
-	_validate_vehicle_category_for_load(load, vehicle.vuna_vehicle_category)
-	if vehicle.company and vehicle.company != load.company:
-		frappe.throw(_("Vehicle {0} belongs to a different company.").format(vehicle.name))
-	if frappe.db.get_value("Driver", allocation.driver, "status") != "Active":
-		frappe.throw(_("Driver {0} must be active.").format(allocation.driver))
 	lock_document("Vehicle", allocation.vehicle)
 	lock_document("Driver", allocation.driver)
-	_validate_resource_overlap(allocation, load, "vehicle")
-	_validate_resource_overlap(allocation, load, "driver")
+	vehicle = frappe.get_doc("Vehicle", allocation.vehicle)
+	_validate_vehicle_category_for_load(load, vehicle.vuna_vehicle_category)
+	_validate_vehicle_is_available(allocation, load)
+	_validate_driver_is_available(allocation, load)
 
 
 def _validate_subcontractor(allocation, load):
@@ -182,17 +188,13 @@ def _validate_subcontractor(allocation, load):
 			"Vehicle", allocation.subcontractor_vehicle_registration
 		)
 	if allocation.vehicle:
-		vehicle = frappe.get_cached_doc("Vehicle", allocation.vehicle)
-		if not vehicle.vuna_transport_enabled:
-			frappe.throw(_("Vehicle {0} is not enabled for transport planning.").format(vehicle.name))
-		_validate_vehicle_category_for_load(load, vehicle.vuna_vehicle_category)
 		lock_document("Vehicle", allocation.vehicle)
-		_validate_resource_overlap(allocation, load, "vehicle")
-	if allocation.driver and frappe.db.get_value("Driver", allocation.driver, "status") != "Active":
-		frappe.throw(_("Driver {0} must be active.").format(allocation.driver))
+		vehicle = frappe.get_doc("Vehicle", allocation.vehicle)
+		_validate_vehicle_category_for_load(load, vehicle.vuna_vehicle_category)
+		_validate_vehicle_is_available(allocation, load)
 	if allocation.driver:
 		lock_document("Driver", allocation.driver)
-		_validate_resource_overlap(allocation, load, "driver")
+		_validate_driver_is_available(allocation, load)
 
 
 def _validate_planning_window(load):
@@ -206,6 +208,41 @@ def _validate_planning_window(load):
 		frappe.throw(_("Planned Arrival must be after Planned Departure."))
 
 
+def _validate_initial_allocation_sequence(load, allocation=None):
+	"""Enforce the configured order for the first assignment, not replacements."""
+	if allocation_is_required_before_delivery_notes():
+		return
+	if load.active_vehicle_allocation or (
+		allocation and getattr(allocation, "replacement_of", None)
+	):
+		return
+	if load.delivery_method and not frappe.db.get_value(
+		"Delivery Method", load.delivery_method, "requires_vehicle_allocation"
+	):
+		return
+
+	expected_orders = {
+		row.delivery_order for row in load.delivery_orders if row.delivery_order
+	}
+	covered_orders = set(
+		frappe.get_all(
+			"Delivery Note",
+			filters={
+				"vuna_delivery_load": load.name,
+				"docstatus": ["!=", 2],
+			},
+			pluck="vuna_delivery_order",
+		)
+	)
+	missing = sorted(expected_orders - covered_orders)
+	if missing:
+		frappe.throw(
+			_(
+				"Generate Delivery Notes for every Delivery Order before allocating a vehicle. Missing: {0}."
+			).format(", ".join(missing))
+		)
+
+
 def _validate_vehicle_category_for_load(load, vehicle_category):
 	if not vehicle_category:
 		frappe.throw(_("Select a Vehicle Category for the allocated vehicle."))
@@ -214,49 +251,37 @@ def _validate_vehicle_category_for_load(load, vehicle_category):
 	validate_capacity(load, vehicle_category)
 
 
-def _validate_resource_overlap(allocation, load, resource_field):
-	resource = allocation.get(resource_field)
-	if not resource:
-		return
-	other_allocations = frappe.get_all(
-		"Vehicle Allocation",
-		filters={
-			"name": ["!=", allocation.name or ""],
-			"delivery_load": ["!=", load.name],
-			resource_field: resource,
-			"docstatus": 1,
-			"status": ["in", ACTIVE_STATUSES],
-		},
-		fields=["name", "delivery_load"],
+def _validate_vehicle_is_available(allocation, load):
+	result = evaluate_vehicle_availability(
+		allocation.vehicle,
+		load.planned_departure,
+		load.planned_arrival,
+		delivery_load=load,
+		exclude_allocation=allocation.name,
 	)
-	for other in other_allocations:
-		other_load = frappe.db.get_value(
-			"Delivery Load",
-			other.delivery_load,
-			["planned_departure", "planned_arrival"],
-			as_dict=True,
-		)
-		if other_load and time_windows_overlap(load, other_load):
-			frappe.throw(
-				_("{0} {1} is already allocated to Delivery Load {2} during this period.").format(
-					resource_field.replace("_", " ").title(), resource, other.delivery_load
-				)
+	if not result.dispatch_eligible:
+		frappe.throw(
+			_("Vehicle {0} is unavailable: {1}").format(
+				allocation.vehicle, result.primary_reason
 			)
-
-
-def time_windows_overlap(first, second):
-	if not all(
-		(
-			first.planned_departure,
-			first.planned_arrival,
-			second.planned_departure,
-			second.planned_arrival,
 		)
-	):
-		return False
-	return get_datetime(first.planned_departure) < get_datetime(second.planned_arrival) and get_datetime(
-		second.planned_departure
-	) < get_datetime(first.planned_arrival)
+
+
+def _validate_driver_is_available(allocation, load):
+	result = evaluate_driver_availability(
+		allocation.driver,
+		load.planned_departure,
+		load.planned_arrival,
+		exclude_allocation=allocation.name,
+		exclude_delivery_load=load.name,
+		expected_company=load.company,
+	)
+	if not result.dispatch_eligible:
+		frappe.throw(
+			_("Driver {0} is unavailable: {1}").format(
+				allocation.driver, result.primary_reason
+			)
+		)
 
 
 def activate_allocation(allocation):
@@ -290,7 +315,16 @@ def activate_allocation(allocation):
 	load.db_set("active_vehicle_allocation", allocation.name, update_modified=False)
 	_sync_trip_execution_allocation(load, allocation)
 	if load.status in ("Approved", "Proposed", "Under Review", "Awaiting Vehicle"):
-		set_delivery_load_status(load, "Allocated", _("Vehicle Allocation {0} submitted").format(allocation.name))
+		has_delivery_notes = frappe.db.exists(
+			"Delivery Note",
+			{"vuna_delivery_load": load.name, "docstatus": ["!=", 2]},
+		)
+		target_status = "Ready for Dispatch" if has_delivery_notes else "Allocated"
+		set_delivery_load_status(
+			load,
+			target_status,
+			_("Vehicle Allocation {0} submitted").format(allocation.name),
+		)
 
 
 def restore_previous_allocation(allocation):

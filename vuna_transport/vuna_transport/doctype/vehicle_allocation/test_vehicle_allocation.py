@@ -2,12 +2,14 @@
 # See license.txt
 
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
 
 from vuna_transport.services.vehicle_allocation_service import (
 	_get_replacement_stage,
+	_validate_initial_allocation_sequence,
 	_validate_planning_window,
 	time_windows_overlap,
 )
@@ -37,6 +39,21 @@ class TestVehicleAllocation(UnitTestCase):
 		)
 		with self.assertRaises(ValidationError):
 			_validate_planning_window(load)
+
+	@patch(
+		"vuna_transport.services.vehicle_allocation_service.allocation_is_required_before_delivery_notes",
+		return_value=False,
+	)
+	@patch("vuna_transport.services.vehicle_allocation_service.frappe.get_all", return_value=[])
+	def test_after_notes_policy_rejects_initial_allocation_without_notes(self, _get_all, _policy):
+		load = SimpleNamespace(
+			name="LOAD-1",
+			active_vehicle_allocation=None,
+			delivery_method=None,
+			delivery_orders=[SimpleNamespace(delivery_order="DO-1")],
+		)
+		with self.assertRaises(ValidationError):
+			_validate_initial_allocation_sequence(load)
 
 	def test_replacement_stage_tracks_actual_trip_execution(self):
 		self.assertEqual(

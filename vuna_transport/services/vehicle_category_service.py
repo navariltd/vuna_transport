@@ -1,10 +1,8 @@
 """Vehicle-category capacity and fleet-availability rules shared by planning flows."""
 
-from collections import Counter
-
 import frappe
 from frappe import _
-from frappe.utils import flt, getdate
+from frappe.utils import add_days, flt, get_datetime
 
 from vuna_transport.services.measurement_service import convert_measurement
 
@@ -146,44 +144,25 @@ def maximum_fitting_fraction(totals, category):
 	return min([1, *ratios]) if ratios else 1
 
 
-def get_available_vehicle_category_counts(company, dispatch_date):
-	"""Count enabled physical vehicles, subtracting active allocations on the date."""
-	vehicles = frappe.get_all(
-		"Vehicle",
-		filters={
-			"vuna_transport_enabled": 1,
-			"vuna_vehicle_category": ["is", "set"],
-			"company": ["in", [company, ""]],
-		},
-		fields=["name", "vuna_vehicle_category"],
+def get_available_vehicle_category_counts(
+	company, dispatch_date, from_time=None, to_time=None
+):
+	"""Return canonical available counts while preserving the existing API shape."""
+	from vuna_transport.services.vehicle_availability_service import (
+		get_vehicle_category_availability,
 	)
-	counts = Counter(vehicle.vuna_vehicle_category for vehicle in vehicles)
-	vehicle_categories = {vehicle.name: vehicle.vuna_vehicle_category for vehicle in vehicles}
-	if not vehicle_categories:
-		return {"counts": {}, "fleet_tracked": False}
 
-	allocations = frappe.get_all(
-		"Vehicle Allocation",
-		filters={
-			"vehicle": ["in", list(vehicle_categories)],
-			"docstatus": 1,
-			"status": ["in", ["Allocated", "Accepted"]],
+	from_time = get_datetime(from_time or dispatch_date)
+	to_time = get_datetime(to_time or add_days(from_time, 1))
+	availability = get_vehicle_category_availability(company, from_time, to_time)
+	return {
+		"counts": {
+			category: summary["available"]
+			for category, summary in availability["categories"].items()
 		},
-		fields=["vehicle", "delivery_load"],
-	)
-	load_dates = dict(
-		frappe.get_all(
-			"Delivery Load",
-			filters={"name": ["in", [row.delivery_load for row in allocations]]},
-			fields=["name", "dispatch_date"],
-			as_list=True,
-		)
-	) if allocations else {}
-	for allocation in allocations:
-		if getdate(load_dates.get(allocation.delivery_load)) == getdate(dispatch_date):
-			category = vehicle_categories.get(allocation.vehicle)
-			counts[category] = max(counts[category] - 1, 0)
-	return {"counts": dict(counts), "fleet_tracked": True}
+		"fleet_tracked": availability["fleet_tracked"],
+		"categories": availability["categories"],
+	}
 
 
 def _normalise_equipment(value):
