@@ -3,11 +3,18 @@
 
 from types import SimpleNamespace
 
+from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
 
-from vuna_transport.services.driver_availability_service import _evaluate_driver
+from vuna_transport.services.driver_availability_service import (
+	_evaluate_driver,
+	_normalize_interval as normalize_driver_interval,
+)
 from vuna_transport.services.resource_scheduling_service import interval_overlaps
-from vuna_transport.services.vehicle_availability_service import _evaluate_vehicle
+from vuna_transport.services.vehicle_availability_service import (
+	_evaluate_vehicle,
+	_normalize_interval as normalize_vehicle_interval,
+)
 
 
 class TestVehicleAvailabilityService(UnitTestCase):
@@ -102,6 +109,10 @@ class TestVehicleAvailabilityService(UnitTestCase):
 			)
 		)
 
+	def test_invalid_vehicle_window_has_validation_message(self):
+		with self.assertRaises(ValidationError):
+			normalize_vehicle_interval("undefined 00:00:00", "2026-08-25 00:00:00")
+
 	def _evaluate(self, allocations=None, trips=None, loads=None):
 		return _evaluate_vehicle(
 			self.vehicle,
@@ -177,6 +188,10 @@ class TestDriverAvailabilityService(UnitTestCase):
 		self.assertFalse(result.dispatch_eligible)
 		self.assertEqual(result.operational_state, "In Trip")
 		self.assertEqual(result.current_trip, "DT-1")
+
+	def test_invalid_driver_window_has_validation_message(self):
+		with self.assertRaises(ValidationError):
+			normalize_driver_interval("undefined 00:00:00", "2026-08-25 00:00:00")
 
 	def _evaluate(self, allocations=None, trips=None, loads=None):
 		return _evaluate_driver(

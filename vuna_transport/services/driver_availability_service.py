@@ -290,8 +290,16 @@ def _reason(code, message, reference_doctype=None, reference_name=None):
 
 
 def _normalize_interval(from_time, to_time):
-	from_time = get_datetime(from_time or now_datetime())
-	to_time = get_datetime(to_time or add_to_date(from_time, seconds=1))
+	if str(from_time).lower() in ("undefined", "null") or str(to_time).lower() in (
+		"undefined",
+		"null",
+	):
+		frappe.throw(_("Select a valid planning date and time window."))
+	try:
+		from_time = get_datetime(from_time or now_datetime())
+		to_time = get_datetime(to_time or add_to_date(from_time, seconds=1))
+	except (TypeError, ValueError):
+		frappe.throw(_("Select a valid planning date and time window."))
 	if from_time >= to_time:
 		frappe.throw(_("Availability end time must be after start time."))
 	return from_time, to_time

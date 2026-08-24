@@ -49,6 +49,17 @@
 .dp-suggestion-card { border-bottom: 1px solid var(--border-color); padding: 12px 0; }
 .dp-suggestion-card:first-child { padding-top: 8px; }
 .dp-suggestion-card .indicator-pill { float: right; }
+.dp-suggestion-review { background: var(--subtle-fg); border-radius: var(--border-radius); margin-top: 10px; }
+.dp-suggestion-review > summary { cursor: pointer; font-weight: 500; padding: 10px; user-select: none; }
+.dp-suggestion-review-body { border-top: 1px solid var(--border-color); padding: 10px; }
+.dp-utilization { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); margin-bottom: 12px; }
+.dp-utilization span { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); padding: 8px; }
+.dp-utilization strong { display: block; }
+.dp-suggestion-order { align-items: center; border-bottom: 1px solid var(--border-color); display: grid; gap: 10px; grid-template-columns: 1.2fr 1.5fr 0.8fr; padding: 8px 4px; }
+.dp-suggestion-order small { color: var(--text-muted); display: block; margin-top: 2px; }
+.dp-suggestion-order-header { color: var(--text-muted); font-size: var(--text-xs); font-weight: 600; }
+.dp-reason-list { margin-top: 12px; }
+.dp-reason-list > div { align-items: baseline; display: flex; gap: 7px; margin-top: 5px; }
 .dp-exclusions { background: var(--alert-bg); border-radius: var(--border-radius); margin-top: 12px; padding: 10px; }
 .dp-availability-row { display: block; margin-top: 8px; width: 100%; }
 .dp-empty { color: var(--text-muted); padding: 18px; text-align: center; }
