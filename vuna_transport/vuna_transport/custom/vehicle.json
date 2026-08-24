@@ -77,6 +77,23 @@
    "label": "Home Location",
    "module": "Vuna Transport",
    "options": "Address"
+  },
+  {
+   "collapsible": 1,
+   "dt": "Vehicle",
+   "fieldname": "vuna_operational_status_section",
+   "fieldtype": "Section Break",
+   "insert_after": "vuna_home_location",
+   "label": "Operational Availability",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Vehicle",
+   "fieldname": "vuna_operational_status_html",
+   "fieldtype": "HTML",
+   "insert_after": "vuna_operational_status_section",
+   "label": "Operational Status",
+   "module": "Vuna Transport"
   }
  ],
  "custom_perms": [],
