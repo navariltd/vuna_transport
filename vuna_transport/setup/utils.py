@@ -29,6 +29,5 @@ def before_tests():
 		)
 
 	enable_all_roles_and_domains()
-	ensure_vunapos_custom_fields()
 	# Manually commit to save setup progress in case of timeout
 	frappe.db.commit()  # nosemgrep
