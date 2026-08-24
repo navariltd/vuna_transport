@@ -18,6 +18,9 @@ def validate_load_allocations(load, lock=True):
 	item_names = sorted({row.delivery_order_item for row in load.delivery_orders if row.delivery_order_item})
 	if lock:
 		_lock_delivery_order_items(item_names)
+	available_quantities = get_available_quantities(
+		item_names, exclude_load=load.name
+	)
 
 	delivery_orders = {}
 	delivery_order_items = {}
@@ -49,14 +52,15 @@ def validate_load_allocations(load, lock=True):
 
 		key = (delivery_order.name, delivery_order_item.name)
 		current_allocations[key] += flt(row.allocated_quantity)
-		_populate_load_row(row, delivery_order, delivery_order_item)
+		_populate_load_row(
+			row,
+			delivery_order,
+			delivery_order_item,
+			available_quantities.get(delivery_order_item.name, 0),
+		)
 
 	for (delivery_order_name, delivery_order_item_name), current_quantity in current_allocations.items():
-		available_quantity = get_available_quantity(
-			delivery_order_name,
-			delivery_order_item_name,
-			exclude_load=load.name,
-		)
+		available_quantity = available_quantities.get(delivery_order_item_name, 0)
 		if current_quantity > available_quantity:
 			frappe.throw(
 				_("Allocation for {0} exceeds the available transport quantity by {1}.").format(
@@ -157,16 +161,14 @@ def _validate_delivery_order_for_load(load, delivery_order, first_order):
 	load.special_equipment_required = ", ".join(sorted(equipment))
 
 
-def _populate_load_row(row, delivery_order, delivery_order_item):
+def _populate_load_row(
+	row, delivery_order, delivery_order_item, available_quantity
+):
 	metrics = calculate_allocated_measurements(delivery_order_item, row.allocated_quantity)
 	row.sales_order = delivery_order.sales_order
 	row.customer = delivery_order.customer
 	row.delivery_address = delivery_order.delivery_address
-	row.available_quantity = get_available_quantity(
-		delivery_order.name,
-		delivery_order_item.name,
-		exclude_load=row.parent,
-	)
+	row.available_quantity = available_quantity
 	for fieldname, value in metrics.items():
 		row.set(fieldname, value)
 
@@ -203,9 +205,9 @@ def calculate_allocated_measurements(delivery_order_item, allocated_quantity):
 def get_available_quantity(delivery_order_name, delivery_order_item_name=None, exclude_load=None):
 	"""Return quantity not reserved by an active draft or allocated on a submitted load."""
 	if delivery_order_item_name:
-		requested = flt(
-			frappe.db.get_value("Delivery Order Item", delivery_order_item_name, "transport_qty")
-		)
+		return get_available_quantities(
+			[delivery_order_item_name], exclude_load=exclude_load
+		).get(delivery_order_item_name, 0)
 	else:
 		requested = flt(
 			frappe.db.get_value("Delivery Order", delivery_order_name, "requested_quantity")
@@ -217,6 +219,46 @@ def get_available_quantity(delivery_order_name, delivery_order_item_name=None, e
 		)
 	)
 	return max(requested - allocated, 0)
+
+
+def get_available_quantities(delivery_order_item_names, exclude_load=None):
+	"""Return live item balances with one requested and one allocation query."""
+	item_names = sorted(set(delivery_order_item_names or []))
+	if not item_names:
+		return {}
+	requested = dict(
+		frappe.get_all(
+			"Delivery Order Item",
+			filters={"name": ["in", item_names]},
+			fields=["name", "transport_qty"],
+			as_list=True,
+		)
+	)
+	conditions = [
+		"dlo.delivery_order_item in %(item_names)s",
+		"dlo.parenttype = 'Delivery Load'",
+		"dl.docstatus in (0, 1)",
+	]
+	values = {"item_names": tuple(item_names)}
+	if exclude_load:
+		conditions.append("dlo.parent != %(exclude_load)s")
+		values["exclude_load"] = exclude_load
+	allocated = dict(
+		frappe.db.sql(
+			f"""
+				select dlo.delivery_order_item, coalesce(sum(dlo.allocated_quantity), 0)
+				from `tabDelivery Load Order` dlo
+				join `tabDelivery Load` dl on dl.name = dlo.parent
+				where {' and '.join(conditions)}
+				group by dlo.delivery_order_item
+			""",
+			values,
+		)
+	)
+	return {
+		item_name: max(flt(requested.get(item_name)) - flt(allocated.get(item_name)), 0)
+		for item_name in item_names
+	}
 
 
 def _get_existing_allocations(delivery_order_name, delivery_order_item_name=None, exclude_load=None):

@@ -7,6 +7,9 @@ from frappe import _
 from frappe.utils import cint, flt, getdate
 
 from vuna_transport.services.delivery_load_service import get_capacity_buffer_percentage
+from vuna_transport.services.delivery_load_service import (
+	build_delivery_load_from_allocations,
+)
 from vuna_transport.services.geography_service import (
 	calculate_delivery_window_compatibility,
 	calculate_geographic_cohesion,
@@ -170,51 +173,7 @@ def create_delivery_load_from_suggestion(suggestion):
 	first = delivery_orders[delivery_order_names[0]]
 	_validate_acceptance_context(delivery_orders.values(), first)
 
-	load = frappe.new_doc("Delivery Load")
-	load.company = first.company
-	load.source_warehouse = first.source_warehouse
-	load.delivery_method = first.delivery_method
-	load.dispatch_date = first.required_delivery_date
-	load.transport_zone = first.transport_zone
-	load.transport_route = first.preferred_route
-	load.required_vehicle_category = vehicle_category
-	load.status = "Proposed"
-	load.refrigeration_required = bool(
-		first.refrigeration_required
-		or _requires_refrigeration(first.transport_handling_profile)
-	)
-	load.tail_lift_required = bool(
-		first.tail_lift_required or _requires_tail_lift(first.transport_handling_profile)
-	)
-	load.required_body_type = first.required_body_type
-	load.special_equipment_required = first.special_equipment_required
-	stop_sequences = {}
-	seen_items = set()
-	for row in allocations:
-		delivery_order_name = row.get("delivery_order")
-		item_name = row.get("delivery_order_item")
-		quantity = flt(row.get("allocated_quantity"))
-		if delivery_order_name not in delivery_orders or not item_name or quantity <= 0:
-			frappe.throw(_("Suggestion allocations are incomplete or invalid."))
-		if item_name in seen_items:
-			frappe.throw(_("Delivery Order Item {0} appears more than once.").format(item_name))
-		seen_items.add(item_name)
-		item = frappe.get_doc("Delivery Order Item", item_name)
-		if item.parent != delivery_order_name:
-			frappe.throw(_("Delivery Order Item {0} does not belong to {1}.").format(item_name, delivery_order_name))
-		delivery_order = delivery_orders[delivery_order_name]
-		stop_sequences.setdefault(
-			delivery_order.delivery_address, len(stop_sequences) + 1
-		)
-		load.append(
-			"delivery_orders",
-			{
-				"delivery_order": delivery_order_name,
-				"delivery_order_item": item_name,
-				"allocated_quantity": quantity,
-				"stop_sequence": stop_sequences[delivery_order.delivery_address],
-			},
-		)
+	load = build_delivery_load_from_allocations(allocations, vehicle_category)
 
 	availability = get_available_vehicle_category_counts(load.company, load.dispatch_date)
 	if (

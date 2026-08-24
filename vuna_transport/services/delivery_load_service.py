@@ -24,6 +24,9 @@ from vuna_transport.services.vehicle_category_service import (
 )
 
 
+MAX_PLANNING_ALLOCATION_ROWS = 500
+
+
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def get_available_delivery_orders(
@@ -84,51 +87,99 @@ def create_delivery_load(delivery_order_names):
 	require_company_access(delivery_orders[0].company)
 	_validate_delivery_orders(delivery_orders)
 
-	load = frappe.new_doc("Delivery Load")
-	load.company = delivery_orders[0].company
-	load.source_warehouse = delivery_orders[0].source_warehouse
-	load.delivery_method = delivery_orders[0].delivery_method
-	load.dispatch_date = min(order.required_delivery_date for order in delivery_orders)
-	load.transport_zone = delivery_orders[0].transport_zone
-	load.transport_route = delivery_orders[0].preferred_route
-	load.status = "Proposed"
-
-	stop_sequences = {}
+	allocations = []
 	for delivery_order in delivery_orders:
 		for delivery_order_item in delivery_order.items:
 			available_quantity = get_available_quantity(delivery_order.name, delivery_order_item.name)
 			if available_quantity <= 0:
 				continue
-
-			stop_key = delivery_order.delivery_address
-			stop_sequences.setdefault(stop_key, len(stop_sequences) + 1)
-			ratio = available_quantity / flt(delivery_order_item.transport_qty or 1)
-			load.append(
-				"delivery_orders",
+			allocations.append(
 				{
 					"delivery_order": delivery_order.name,
 					"delivery_order_item": delivery_order_item.name,
-					"sales_order": delivery_order.sales_order,
-					"customer": delivery_order.customer,
-					"delivery_address": delivery_order.delivery_address,
 					"allocated_quantity": available_quantity,
-					"available_quantity": available_quantity,
-					"weight": flt(delivery_order_item.weight) * ratio,
-					"weight_uom": delivery_order_item.weight_uom,
-					"volume": flt(delivery_order_item.volume) * ratio,
-					"volume_uom": delivery_order_item.volume_uom,
-					"pallets": flt(delivery_order_item.pallets) * ratio,
-					"cases": flt(delivery_order_item.cases) * ratio,
-					"crates": flt(delivery_order_item.crates) * ratio,
-					"stop_sequence": stop_sequences[stop_key],
 				}
 			)
-
-	if not load.delivery_orders:
+	if not allocations:
 		frappe.throw(_("The selected Delivery Orders have no unallocated quantity."))
-
+	load = build_delivery_load_from_allocations(allocations)
 	load.insert()
 	return load.name
+
+
+@frappe.whitelist()
+def create_delivery_load_from_plan(allocations, vehicle_category=None):
+	"""Create a draft load from planner-selected item quantities."""
+	require_doctype_permission("Delivery Load", "create")
+	load = build_delivery_load_from_allocations(allocations, vehicle_category)
+	load.insert()
+	load.add_comment("Info", _("Created from the Dispatch Planning workbench."))
+	return load.name
+
+
+def build_delivery_load_from_allocations(allocations, vehicle_category=None):
+	"""Build one unsaved authoritative Delivery Load from item allocations."""
+	allocations = frappe.parse_json(allocations) if isinstance(allocations, str) else allocations
+	if not isinstance(allocations, list) or not allocations:
+		frappe.throw(_("Select at least one Delivery Order item."))
+	if len(allocations) > MAX_PLANNING_ALLOCATION_ROWS:
+		frappe.throw(
+			_("A Delivery Load cannot contain more than {0} planning rows.").format(
+				MAX_PLANNING_ALLOCATION_ROWS
+			)
+		)
+
+	delivery_order_names = sorted(
+		{row.get("delivery_order") for row in allocations if row.get("delivery_order")}
+	)
+	if not delivery_order_names:
+		frappe.throw(_("Every planning row must reference a Delivery Order."))
+	delivery_orders = {
+		name: frappe.get_doc("Delivery Order", name) for name in delivery_order_names
+	}
+	for delivery_order in delivery_orders.values():
+		require_document_permission(delivery_order, "read")
+	_validate_delivery_orders(list(delivery_orders.values()))
+	first = delivery_orders[delivery_order_names[0]]
+	require_company_access(first.company)
+
+	load = frappe.new_doc("Delivery Load")
+	load.company = first.company
+	load.source_warehouse = first.source_warehouse
+	load.delivery_method = first.delivery_method
+	load.dispatch_date = first.required_delivery_date
+	load.transport_zone = first.transport_zone
+	load.transport_route = first.preferred_route
+	load.required_vehicle_category = vehicle_category
+	load.status = "Proposed"
+
+	stop_sequences = {}
+	seen_items = set()
+	for row in allocations:
+		delivery_order_name = row.get("delivery_order")
+		item_name = row.get("delivery_order_item")
+		quantity = flt(row.get("allocated_quantity"))
+		if delivery_order_name not in delivery_orders or not item_name or quantity <= 0:
+			frappe.throw(_("Planning allocations are incomplete or invalid."))
+		if item_name in seen_items:
+			frappe.throw(
+				_("Delivery Order Item {0} appears more than once.").format(item_name)
+			)
+		seen_items.add(item_name)
+		delivery_order = delivery_orders[delivery_order_name]
+		stop_sequences.setdefault(
+			delivery_order.delivery_address, len(stop_sequences) + 1
+		)
+		load.append(
+			"delivery_orders",
+			{
+				"delivery_order": delivery_order_name,
+				"delivery_order_item": item_name,
+				"allocated_quantity": quantity,
+				"stop_sequence": stop_sequences[delivery_order.delivery_address],
+			},
+		)
+	return load
 
 
 @frappe.whitelist()

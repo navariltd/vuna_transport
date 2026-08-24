@@ -106,10 +106,20 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Transport",
-   "link_count": 6,
+   "link_count": 7,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Dispatch Planning",
+   "link_count": 0,
+   "link_to": "dispatch-planning",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
   },
   {
    "hidden": 0,
@@ -250,7 +260,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-18 13:27:39.072749",
+ "modified": "2026-08-24 12:06:11.408113",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vuna Transport",
