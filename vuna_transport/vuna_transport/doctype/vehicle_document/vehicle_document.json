@@ -1,0 +1,199 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-08-24 20:28:02.184726",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "document_tab",
+  "identity_section",
+  "naming_series",
+  "vehicle",
+  "company",
+  "column_break_identity",
+  "document_type",
+  "document_number",
+  "issued_by",
+  "validity_section",
+  "issue_date",
+  "expiry_date",
+  "column_break_validity",
+  "suspended",
+  "cancelled",
+  "evidence_section",
+  "attachment",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "document_tab",
+   "fieldtype": "Tab Break",
+   "label": "Document"
+  },
+  {
+   "fieldname": "identity_section",
+   "fieldtype": "Section Break",
+   "label": "Vehicle Document"
+  },
+  {
+   "default": "VD-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "VD-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "vehicle",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Vehicle",
+   "options": "Vehicle",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "vehicle.company",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_identity",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "document_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Document Type",
+   "options": "Vehicle Document Type",
+   "reqd": 1
+  },
+  {
+   "fieldname": "document_number",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Document Number"
+  },
+  {
+   "fieldname": "issued_by",
+   "fieldtype": "Data",
+   "label": "Issued By"
+  },
+  {
+   "fieldname": "validity_section",
+   "fieldtype": "Section Break",
+   "label": "Validity"
+  },
+  {
+   "fieldname": "issue_date",
+   "fieldtype": "Date",
+   "label": "Issue Date"
+  },
+  {
+   "fieldname": "expiry_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Expiry Date"
+  },
+  {
+   "fieldname": "column_break_validity",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "suspended",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "label": "Suspended"
+  },
+  {
+   "default": "0",
+   "fieldname": "cancelled",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "label": "Cancelled"
+  },
+  {
+   "fieldname": "evidence_section",
+   "fieldtype": "Section Break",
+   "label": "Evidence & Notes"
+  },
+  {
+   "fieldname": "attachment",
+   "fieldtype": "Attach",
+   "label": "Attachment"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-08-24 20:28:02.184726",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Vehicle Document",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Planner"
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Dispatcher",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "document_number",
+ "track_changes": 1
+}

@@ -17,10 +17,20 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Settings",
-   "link_count": 8,
+   "link_count": 9,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Vehicle Document Type",
+   "link_count": 0,
+   "link_to": "Vehicle Document Type",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   },
   {
    "hidden": 0,
@@ -106,10 +116,30 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Transport",
-   "link_count": 7,
+   "link_count": 9,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Vehicle Document",
+   "link_count": 0,
+   "link_to": "Vehicle Document",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Vehicle Availability Block",
+   "link_count": 0,
+   "link_to": "Vehicle Availability Block",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   },
   {
    "hidden": 0,
@@ -260,7 +290,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-24 12:06:11.408113",
+ "modified": "2026-08-24 20:31:18.744210",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vuna Transport",
