@@ -9,7 +9,7 @@
  "field_order": [
   "identity_section",
   "delivery_method_name",
-  "delivery_provider_type",
+  "fulfilment_type",
   "column_break_method",
   "disabled",
   "requirements_section",
@@ -33,12 +33,13 @@
    "unique": 1
   },
   {
-   "fieldname": "delivery_provider_type",
+   "description": "Describes how the customer order is fulfilled. Owned or subcontracted transport is selected later on Vehicle Allocation.",
+   "fieldname": "fulfilment_type",
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Delivery Provider Type",
-   "options": "Internal Fleet\nTransporter\nCustomer\nCourier\nSupplier\nOther",
+   "label": "Fulfilment Type",
+   "options": "Company Delivery\nCustomer Pickup\nCourier\nDirect Supplier Delivery\nOther",
    "reqd": 1
   },
   {
@@ -87,7 +88,7 @@
    "link_fieldname": "delivery_method"
   }
  ],
- "modified": "2026-08-16 15:50:49.666893",
+ "modified": "2026-08-25 08:06:09.382121",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Delivery Method",

@@ -109,10 +109,10 @@ def _ensure_zones():
 
 
 def _ensure_delivery_method():
-	name = "Company Fleet"
+	name = "Company Delivery"
 	doc = frappe.get_doc("Delivery Method", name) if frappe.db.exists("Delivery Method", name) else frappe.new_doc("Delivery Method")
 	doc.delivery_method_name = name
-	doc.delivery_provider_type = "Internal Fleet"
+	doc.fulfilment_type = "Company Delivery"
 	doc.requires_transport_planning = 1
 	doc.requires_vehicle_allocation = 1
 	doc.requires_delivery_trip = 1

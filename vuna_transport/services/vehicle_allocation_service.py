@@ -9,6 +9,9 @@ from vuna_transport.services.dispatch_guard_service import (
 	set_delivery_load_status,
 	validate_load_is_operational,
 )
+from vuna_transport.services.delivery_method_service import (
+	validate_delivery_method_allows_vehicle_allocation,
+)
 from vuna_transport.services.security_service import (
 	require_doctype_permission,
 	require_document_permission,
@@ -123,6 +126,7 @@ def validate_allocation(allocation):
 	allocation.allocated_on = allocation.allocated_on or now_datetime()
 	allocation.planned_reporting_time = allocation.planned_reporting_time or load.planned_departure
 	_set_assignment_context(allocation, load, trip)
+	validate_delivery_method_allows_vehicle_allocation(load.delivery_method)
 
 	if allocation.allocation_type == "Owned Fleet":
 		_validate_owned_fleet(allocation, load)

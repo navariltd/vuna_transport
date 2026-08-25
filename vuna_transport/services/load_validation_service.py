@@ -6,6 +6,10 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate
 
+from vuna_transport.services.delivery_method_service import (
+	canonical_delivery_method,
+	delivery_methods_are_compatible,
+)
 
 PLANNABLE_DELIVERY_ORDER_STATUSES = ("Open", "Partially Allocated")
 
@@ -103,7 +107,7 @@ def _validate_delivery_order_for_load(load, delivery_order, first_order):
 	defaults = {
 		"company": first_order.company,
 		"source_warehouse": first_order.source_warehouse,
-		"delivery_method": first_order.delivery_method,
+		"delivery_method": canonical_delivery_method(first_order.delivery_method),
 		"transport_zone": first_order.transport_zone,
 		"dispatch_date": first_order.required_delivery_date,
 	}
@@ -114,7 +118,6 @@ def _validate_delivery_order_for_load(load, delivery_order, first_order):
 	comparisons = (
 		("company", "company"),
 		("source_warehouse", "source warehouse"),
-		("delivery_method", "Delivery Method"),
 		("transport_zone", "Transport Zone"),
 	)
 	for fieldname, label in comparisons:
@@ -124,6 +127,14 @@ def _validate_delivery_order_for_load(load, delivery_order, first_order):
 					delivery_order.name, label
 				)
 			)
+	if not delivery_methods_are_compatible(
+		delivery_order.delivery_method, load.delivery_method
+	):
+		frappe.throw(
+			_("Delivery Order {0} does not match the load's Delivery Method.").format(
+				delivery_order.name
+			)
+		)
 
 	if getdate(delivery_order.required_delivery_date) != getdate(first_order.required_delivery_date):
 		frappe.throw(_("All Delivery Orders in a load must have the same required delivery date."))
@@ -132,11 +143,12 @@ def _validate_delivery_order_for_load(load, delivery_order, first_order):
 	).strip():
 		frappe.throw(_("All Delivery Orders in a load must have compatible handling profiles."))
 
-	if delivery_order.delivery_method and frappe.db.get_value(
-		"Delivery Method", delivery_order.delivery_method, "disabled"
+	canonical_method = canonical_delivery_method(delivery_order.delivery_method)
+	if canonical_method and frappe.db.get_value(
+		"Delivery Method", canonical_method, "disabled"
 	):
 		frappe.throw(
-			_("Delivery Method {0} is disabled.").format(delivery_order.delivery_method)
+			_("Delivery Method {0} is disabled.").format(canonical_method)
 		)
 
 	load.refrigeration_required = bool(

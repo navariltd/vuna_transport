@@ -8,6 +8,7 @@ from frappe.utils import flt, getdate
 
 from vuna_transport.services.measurement_service import convert_measurement, get_transport_uoms
 from vuna_transport.services.location_service import get_address_planning_data
+from vuna_transport.services.delivery_method_service import canonical_delivery_method
 
 
 GROUPING_FIELDS = (
@@ -94,7 +95,9 @@ def _get_group_key(sales_order, item):
 		"transport_zone": getattr(item, "transport_zone", None) or address_data.delivery_zone,
 		"preferred_route": getattr(item, "preferred_route", None),
 		"handling_profile": getattr(item, "transport_handling_profile", None),
-		"delivery_method": getattr(sales_order, "vuna_delivery_method", None),
+		"delivery_method": canonical_delivery_method(
+			getattr(sales_order, "vuna_delivery_method", None)
+		),
 	}
 
 	return tuple(_normalise_group_value(values[field]) for field in GROUPING_FIELDS)

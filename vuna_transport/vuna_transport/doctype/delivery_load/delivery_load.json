@@ -143,6 +143,7 @@
    "reqd": 1
   },
   {
+   "description": "Business fulfilment method inherited from the Delivery Orders; transport sourcing is selected on Vehicle Allocation.",
    "fieldname": "delivery_method",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -387,7 +388,7 @@
    "link_fieldname": "vuna_delivery_load"
   }
  ],
- "modified": "2026-08-17 12:09:27.772750",
+ "modified": "2026-08-25 08:10:44.970164",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Delivery Load",

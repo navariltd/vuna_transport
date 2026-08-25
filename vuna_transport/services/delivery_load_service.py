@@ -4,6 +4,10 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
+from vuna_transport.services.delivery_method_service import (
+	canonical_delivery_method,
+	delivery_methods_are_compatible,
+)
 from vuna_transport.services.measurement_service import get_transport_uoms
 from vuna_transport.services.load_validation_service import (
 	calculate_allocated_measurements,
@@ -146,7 +150,7 @@ def build_delivery_load_from_allocations(allocations, vehicle_category=None):
 	load = frappe.new_doc("Delivery Load")
 	load.company = first.company
 	load.source_warehouse = first.source_warehouse
-	load.delivery_method = first.delivery_method
+	load.delivery_method = canonical_delivery_method(first.delivery_method)
 	load.dispatch_date = first.required_delivery_date
 	load.transport_zone = first.transport_zone
 	load.transport_route = first.preferred_route
@@ -205,7 +209,7 @@ def add_delivery_orders_to_load(load, delivery_order_names):
 	if not load.source_warehouse:
 		load.source_warehouse = delivery_orders[0].source_warehouse
 	if not load.delivery_method:
-		load.delivery_method = delivery_orders[0].delivery_method
+		load.delivery_method = canonical_delivery_method(delivery_orders[0].delivery_method)
 	if not load.transport_zone:
 		load.transport_zone = delivery_orders[0].transport_zone
 	if not load.dispatch_date:
@@ -215,7 +219,10 @@ def add_delivery_orders_to_load(load, delivery_order_names):
 		frappe.throw(_("All Delivery Orders in a load must belong to the same company."))
 	if any(order.source_warehouse != load.source_warehouse for order in delivery_orders):
 		frappe.throw(_("All Delivery Orders in a load must use the same source warehouse."))
-	if any(order.delivery_method != load.delivery_method for order in delivery_orders):
+	if any(
+		not delivery_methods_are_compatible(order.delivery_method, load.delivery_method)
+		for order in delivery_orders
+	):
 		frappe.throw(_("All Delivery Orders in a load must use the same Delivery Method."))
 	if any(order.transport_zone != load.transport_zone for order in delivery_orders):
 		frappe.throw(_("All Delivery Orders in a load must use the same Transport Zone."))
@@ -325,7 +332,7 @@ def get_delivery_order_items(delivery_order_names):
 	return {
 		"company": delivery_orders[0].company,
 		"source_warehouse": delivery_orders[0].source_warehouse,
-		"delivery_method": delivery_orders[0].delivery_method,
+		"delivery_method": canonical_delivery_method(delivery_orders[0].delivery_method),
 		"transport_zone": delivery_orders[0].transport_zone,
 		"transport_route": delivery_orders[0].preferred_route,
 		"dispatch_date": min(order.required_delivery_date for order in delivery_orders),
@@ -381,7 +388,9 @@ def _validate_delivery_orders(delivery_orders):
 			frappe.throw(_("All Delivery Orders in a load must belong to the same company."))
 		if delivery_order.source_warehouse != first.source_warehouse:
 			frappe.throw(_("All Delivery Orders in a load must use the same source warehouse."))
-		if delivery_order.delivery_method != first.delivery_method:
+		if not delivery_methods_are_compatible(
+			delivery_order.delivery_method, first.delivery_method
+		):
 			frappe.throw(_("All Delivery Orders in a load must use the same Delivery Method."))
 		if delivery_order.transport_zone != first.transport_zone:
 			frappe.throw(_("All Delivery Orders in a load must use the same Transport Zone."))

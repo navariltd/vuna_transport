@@ -10,6 +10,10 @@ from vuna_transport.services.delivery_load_service import get_capacity_buffer_pe
 from vuna_transport.services.delivery_load_service import (
 	build_delivery_load_from_allocations,
 )
+from vuna_transport.services.delivery_method_service import (
+	canonical_delivery_method,
+	delivery_methods_are_compatible,
+)
 from vuna_transport.services.geography_service import (
 	calculate_delivery_window_compatibility,
 	calculate_geographic_cohesion,
@@ -95,16 +99,8 @@ def suggest_delivery_loads(
 		availability = get_available_vehicle_category_counts(
 			pool[0].company, pool[0].required_delivery_date
 		)
-		internal_fleet = pool[0].delivery_provider_type == "Internal Fleet"
 		for category in categories:
 			available_count = cint(availability["counts"].get(category.name))
-			if internal_fleet and availability["fleet_tracked"] and available_count <= 0:
-				exclusions.append(
-					_('{0} excluded because no physical vehicle is available for the dispatch date.').format(
-						category.name
-					)
-				)
-				continue
 			for strategy in STRATEGIES:
 				candidate = _build_candidate(pool, category, strategy)
 				if not candidate:
@@ -178,18 +174,6 @@ def create_delivery_load_from_suggestion(suggestion):
 
 	load = build_delivery_load_from_allocations(allocations, vehicle_category)
 
-	availability = get_available_vehicle_category_counts(load.company, load.dispatch_date)
-	if (
-		first.delivery_method
-		and first.delivery_provider_type == "Internal Fleet"
-		and availability["fleet_tracked"]
-		and cint(availability["counts"].get(vehicle_category)) <= 0
-	):
-		frappe.throw(
-			_('No {0} vehicle is currently available. Refresh load suggestions.').format(
-				vehicle_category
-			)
-		)
 	load.insert()
 	load.add_comment(
 		"Info",
@@ -250,23 +234,38 @@ def _get_plannable_orders(
 	)
 	if delivery_order_names and len(orders) != len(set(delivery_order_names)):
 		frappe.throw(_("One or more selected Delivery Orders are unavailable or not permitted."))
-	_populate_delivery_method_types(orders)
+	_populate_delivery_method_workflows(orders)
 	_populate_available_items(orders)
-	return [order for order in orders if order.order_items and not order.delivery_method_disabled]
+	return [
+		order
+		for order in orders
+		if order.order_items
+		and not order.delivery_method_disabled
+		and order.requires_transport_planning
+	]
 
 
-def _populate_delivery_method_types(orders):
+def _populate_delivery_method_workflows(orders):
 	methods = sorted({order.delivery_method for order in orders if order.delivery_method})
 	method_rows = frappe.get_all(
-			"Delivery Method",
-			filters={"name": ["in", methods]},
-			fields=["name", "delivery_provider_type", "disabled"],
-		) if methods else []
-	provider_types = {row.name: row.delivery_provider_type for row in method_rows}
-	disabled_methods = {row.name for row in method_rows if row.disabled}
+		"Delivery Method",
+		filters={"name": ["in", methods]},
+		fields=["name", "requires_transport_planning", "disabled"],
+	) if methods else []
+	planning_methods = {
+		canonical_delivery_method(row.name)
+		for row in method_rows
+		if row.requires_transport_planning
+	}
+	disabled_methods = {
+		canonical_delivery_method(row.name) for row in method_rows if row.disabled
+	}
 	for order in orders:
-		order.delivery_provider_type = provider_types.get(order.delivery_method)
+		order.delivery_method = canonical_delivery_method(order.delivery_method)
 		order.delivery_method_disabled = order.delivery_method in disabled_methods
+		order.requires_transport_planning = (
+			not order.delivery_method or order.delivery_method in planning_methods
+		)
 
 
 def _populate_available_items(orders):
@@ -324,7 +323,7 @@ def _partition_orders(orders):
 			order.company,
 			order.source_warehouse,
 			getdate(order.required_delivery_date),
-			order.delivery_method or "",
+			canonical_delivery_method(order.delivery_method) or "",
 			(order.transport_handling_profile or "").strip().lower(),
 			order.transport_zone or "",
 			bool(order.refrigeration_required),
@@ -402,7 +401,7 @@ def _build_candidate(pool, category, strategy):
 		"company": pool[0].company,
 		"source_warehouse": pool[0].source_warehouse,
 		"delivery_date": pool[0].required_delivery_date,
-		"delivery_method": pool[0].delivery_method,
+		"delivery_method": canonical_delivery_method(pool[0].delivery_method),
 		"transport_zone": pool[0].transport_zone,
 		"transport_route": pool[0].preferred_route,
 		"strategy": strategy,
@@ -480,12 +479,17 @@ def _score_candidate(candidate):
 	if candidate["fleet_availability_tracked"]:
 		if candidate["available_vehicle_count"] > 0:
 			reasons.append(
-				_('{0} physical vehicle(s) currently available in this category.').format(
+				_('{0} owned physical vehicle(s) currently available in this category.').format(
 					candidate["available_vehicle_count"]
 				)
 			)
 		else:
-			warnings.append(_("No physical vehicle is currently available in this category."))
+			warnings.append(
+				_(
+					"No owned physical vehicle is currently available in this category; "
+					"subcontracted capacity may be selected during Vehicle Allocation."
+				)
+			)
 	else:
 		warnings.append(_("Physical fleet availability is not configured; capacity compatibility only was scored."))
 	if not candidate["delivery_method"]:
@@ -516,7 +520,6 @@ def _validate_acceptance_context(delivery_orders, first):
 			("company", "company"),
 			("source_warehouse", "source warehouse"),
 			("required_delivery_date", "delivery date"),
-			("delivery_method", "Delivery Method"),
 			("transport_zone", "Transport Zone"),
 			("transport_handling_profile", "handling profile"),
 			("refrigeration_required", "refrigeration requirement"),
@@ -527,9 +530,14 @@ def _validate_acceptance_context(delivery_orders, first):
 		for fieldname, label in comparisons:
 			if (order.get(fieldname) or None) != (first.get(fieldname) or None):
 				frappe.throw(_("Delivery Order {0} has an incompatible {1}.").format(order.name, label))
-	first.delivery_provider_type = frappe.db.get_value(
-		"Delivery Method", first.delivery_method, "delivery_provider_type"
-	) if first.delivery_method else None
+		if not delivery_methods_are_compatible(
+			order.delivery_method, first.delivery_method
+		):
+			frappe.throw(
+				_("Delivery Order {0} has an incompatible Delivery Method.").format(
+					order.name
+				)
+			)
 
 
 def _sort_orders(orders, strategy):

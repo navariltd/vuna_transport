@@ -1,6 +1,7 @@
 {
  "custom_fields": [
   {
+   "description": "How the customer order will be fulfilled. Owned or subcontracted transport is selected later during Vehicle Allocation.",
    "dt": "Sales Order",
    "fieldname": "vuna_delivery_method",
    "fieldtype": "Link",
