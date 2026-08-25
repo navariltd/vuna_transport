@@ -4,7 +4,7 @@ from collections import defaultdict
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt
+from frappe.utils import cint, flt, getdate
 
 from vuna_transport.services.delivery_load_service import (
 	build_delivery_load_from_allocations,
@@ -42,7 +42,8 @@ CAPACITY_DIMENSIONS = ("weight", "volume", "pallets", "cases", "crates")
 @frappe.whitelist()
 def get_planning_demand(
 	company,
-	required_delivery_date=None,
+	required_delivery_date_from=None,
+	required_delivery_date_to=None,
 	source_warehouse=None,
 	transport_zone=None,
 	delivery_method=None,
@@ -51,6 +52,7 @@ def get_planning_demand(
 	allocation_state=None,
 	start=0,
 	page_length=50,
+	required_delivery_date=None,
 ):
 	"""Return a paginated demand list and bounded warehouse summaries."""
 	require_doctype_permission("Delivery Order", "read")
@@ -59,7 +61,8 @@ def get_planning_demand(
 	page_length = max(1, min(cint(page_length or 50), MAX_PAGE_LENGTH))
 	filters = _planning_filters(
 		company,
-		required_delivery_date,
+		required_delivery_date_from or required_delivery_date,
+		required_delivery_date_to or required_delivery_date,
 		source_warehouse,
 		transport_zone,
 		delivery_method,
@@ -257,7 +260,8 @@ def get_driver_availability_details(company, from_time, to_time):
 
 def _planning_filters(
 	company,
-	required_delivery_date,
+	required_delivery_date_from,
+	required_delivery_date_to,
 	source_warehouse,
 	transport_zone,
 	delivery_method,
@@ -269,8 +273,12 @@ def _planning_filters(
 		"docstatus": 1,
 		"status": ["in", PLANNABLE_STATUSES],
 	}
+	date_filter = _delivery_date_filter(
+		required_delivery_date_from, required_delivery_date_to
+	)
+	if date_filter:
+		filters["required_delivery_date"] = date_filter
 	for fieldname, value in {
-		"required_delivery_date": required_delivery_date,
 		"source_warehouse": source_warehouse,
 		"transport_zone": transport_zone,
 		"delivery_method": delivery_method,
@@ -280,6 +288,18 @@ def _planning_filters(
 		if value:
 			filters[fieldname] = value
 	return filters
+
+
+def _delivery_date_filter(date_from=None, date_to=None):
+	if date_from and date_to and getdate(date_from) > getdate(date_to):
+		frappe.throw(_("Delivery Date From cannot be after Delivery Date To."))
+	if date_from and date_to:
+		return ["between", [getdate(date_from), getdate(date_to)]]
+	if date_from:
+		return [">=", getdate(date_from)]
+	if date_to:
+		return ["<=", getdate(date_to)]
+	return None
 
 
 def _delivery_order_fields():

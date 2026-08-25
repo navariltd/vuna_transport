@@ -67,12 +67,12 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 							</div>
 						</div>
 						<div class="dp-section">
-							<div class="dp-section-title">${__("Fleet Availability")}</div>
-							<div class="dp-fleet dp-empty">${__("Choose a company and date.")}</div>
+							<div class="dp-section-title">${__("Fleet Availability")} <small class="text-muted dp-availability-date"></small></div>
+							<div class="dp-fleet dp-empty">${__("Choose a company.")}</div>
 						</div>
 						<div class="dp-section">
 							<div class="dp-section-title">${__("Driver Availability")}</div>
-							<div class="dp-drivers dp-empty">${__("Choose a company and date.")}</div>
+							<div class="dp-drivers dp-empty">${__("Choose a company.")}</div>
 						</div>
 					</div>
 				</div>
@@ -83,7 +83,8 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	make_filters() {
 		const definitions = [
 			["company", "Link", __("Company"), "Company", frappe.defaults.get_default("company")],
-			["required_delivery_date", "Date", __("Required Delivery Date")],
+			["required_delivery_date_from", "Date", __("Delivery Date From")],
+			["required_delivery_date_to", "Date", __("Delivery Date To")],
 			["source_warehouse", "Link", __("Source Warehouse"), "Warehouse"],
 			["transport_zone", "Link", __("Transport Zone"), "Transport Zone"],
 			["delivery_method", "Link", __("Delivery Method"), "Delivery Method"],
@@ -131,11 +132,17 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	planning_window() {
-		const date = this.filters.required_delivery_date.get_value();
-		if (!date || date === "undefined") return null;
+		const filter_from = this.filters.required_delivery_date_from.get_value();
+		const filter_to = this.filters.required_delivery_date_to.get_value();
+		const date_from = filter_from && filter_from !== "undefined" ? filter_from : null;
+		const date_to = filter_to && filter_to !== "undefined" ? filter_to : null;
+		const fallback = frappe.datetime.get_today();
+		const start_date = date_from || date_to || fallback;
+		const end_date = date_to || date_from || fallback;
+		if (start_date > end_date) return null;
 		return {
-			from_time: `${date} 00:00:00`,
-			to_time: `${frappe.datetime.add_days(date, 1)} 00:00:00`,
+			from_time: `${start_date} 00:00:00`,
+			to_time: `${frappe.datetime.add_days(end_date, 1)} 00:00:00`,
 		};
 	}
 
@@ -165,14 +172,23 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		if (!company) return;
 		const window = this.planning_window();
 		if (!window) {
-			this.$root.find(".dp-fleet").addClass("dp-empty").html(
-				__("Select a Required Delivery Date to view fleet availability."),
-			);
-			this.$root.find(".dp-drivers").addClass("dp-empty").html(
-				__("Select a Required Delivery Date to view driver availability."),
-			);
+			const message = __("Delivery Date From cannot be after Delivery Date To.");
+			this.$root.find(".dp-fleet, .dp-drivers").addClass("dp-empty").html(message);
 			return;
 		}
+		const filter_from = this.filters.required_delivery_date_from.get_value();
+		const filter_to = this.filters.required_delivery_date_to.get_value();
+		const date_from = filter_from && filter_from !== "undefined" ? filter_from : null;
+		const date_to = filter_to && filter_to !== "undefined" ? filter_to : null;
+		const fallback = frappe.datetime.get_today();
+		const start_date = date_from || date_to || fallback;
+		const end_date = date_to || date_from || fallback;
+		const availability_label = start_date === end_date
+			? frappe.datetime.str_to_user(start_date)
+			: `${frappe.datetime.str_to_user(start_date)} – ${frappe.datetime.str_to_user(end_date)}`;
+		this.$root.find(".dp-availability-date").text(
+			date_from || date_to ? `— ${availability_label}` : `— ${__("Today")}, ${availability_label}`,
+		);
 		const [fleet, drivers] = await Promise.all([
 			this.call("get_fleet_availability_summary", { company, ...window }),
 			this.call("get_driver_availability_summary", { company, ...window }),
@@ -312,7 +328,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		if (!filters.company) return;
 		this.$root.find(".dp-suggestions").html(this.loading());
 		const selected_names = [...new Set([...this.allocations.values()].map((row) => row.delivery_order))];
-		const response = await frappe.call({ method: "vuna_transport.services.load_suggestion_service.suggest_delivery_loads", args: { company: filters.company, source_warehouse: filters.source_warehouse || null, delivery_date: filters.required_delivery_date || null, delivery_order_names: selected_names.length ? selected_names : null }, freeze: true, freeze_message: __("Building load suggestions...") });
+		const response = await frappe.call({ method: "vuna_transport.services.load_suggestion_service.suggest_delivery_loads", args: { company: filters.company, source_warehouse: filters.source_warehouse || null, delivery_date_from: filters.required_delivery_date_from || null, delivery_date_to: filters.required_delivery_date_to || null, delivery_order_names: selected_names.length ? selected_names : null }, freeze: true, freeze_message: __("Building load suggestions...") });
 		const result = response.message || {};
 		this.suggestions = result.suggestions || [];
 		this.render_suggestions(result);

@@ -1,9 +1,12 @@
 # Copyright (c) 2026, Yovuna Technologies Limited and Contributors
 # See license.txt
 
+from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
+from frappe.utils import getdate
 
 from vuna_transport.services.dispatch_planning_service import (
+	_delivery_date_filter,
 	_filter_allocation_state,
 	_planning_filters,
 	_summarize_vehicle_categories,
@@ -16,9 +19,10 @@ class TestDispatchPlanningService(UnitTestCase):
 		filters = _planning_filters(
 			"Vuna Foods",
 			"2026-08-24",
+			"2026-08-30",
 			"Main Warehouse",
 			"Nairobi East",
-			"Company Fleet",
+			"Company Delivery",
 			"High",
 			"Customer A",
 		)
@@ -26,6 +30,24 @@ class TestDispatchPlanningService(UnitTestCase):
 		self.assertEqual(filters["docstatus"], 1)
 		self.assertEqual(filters["status"][1], ("Open", "Partially Allocated"))
 		self.assertEqual(filters["source_warehouse"], "Main Warehouse")
+		self.assertEqual(
+			filters["required_delivery_date"],
+			["between", [getdate("2026-08-24"), getdate("2026-08-30")]],
+		)
+
+	def test_open_ended_delivery_date_filters(self):
+		self.assertEqual(
+			_delivery_date_filter("2026-08-24", None),
+			[">=", getdate("2026-08-24")],
+		)
+		self.assertEqual(
+			_delivery_date_filter(None, "2026-08-30"),
+			["<=", getdate("2026-08-30")],
+		)
+
+	def test_invalid_delivery_date_range_is_rejected(self):
+		with self.assertRaises(ValidationError):
+			_delivery_date_filter("2026-08-30", "2026-08-24")
 
 	def test_partial_allocation_filter_uses_live_balances(self):
 		rows = [

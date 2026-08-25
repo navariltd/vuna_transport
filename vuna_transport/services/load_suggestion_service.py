@@ -45,6 +45,8 @@ def suggest_delivery_loads(
 	delivery_date=None,
 	delivery_order_names=None,
 	option_count=None,
+	delivery_date_from=None,
+	delivery_date_to=None,
 ):
 	"""Return ranked load configurations without changing transactional state."""
 	require_doctype_permission("Delivery Order", "read")
@@ -58,7 +60,8 @@ def suggest_delivery_loads(
 	orders = _get_plannable_orders(
 		company,
 		source_warehouse=source_warehouse,
-		delivery_date=delivery_date,
+		delivery_date_from=delivery_date_from or delivery_date,
+		delivery_date_to=delivery_date_to or delivery_date,
 		delivery_order_names=delivery_order_names,
 	)
 	logger.debug(
@@ -197,7 +200,13 @@ def create_delivery_load_from_suggestion(suggestion):
 	return load.name
 
 
-def _get_plannable_orders(company, source_warehouse=None, delivery_date=None, delivery_order_names=None):
+def _get_plannable_orders(
+	company,
+	source_warehouse=None,
+	delivery_date_from=None,
+	delivery_date_to=None,
+	delivery_order_names=None,
+):
 	filters = {
 		"company": company,
 		"docstatus": 1,
@@ -205,8 +214,21 @@ def _get_plannable_orders(company, source_warehouse=None, delivery_date=None, de
 	}
 	if source_warehouse:
 		filters["source_warehouse"] = source_warehouse
-	if delivery_date:
-		filters["required_delivery_date"] = delivery_date
+	if (
+		delivery_date_from
+		and delivery_date_to
+		and getdate(delivery_date_from) > getdate(delivery_date_to)
+	):
+		frappe.throw(_("Delivery Date From cannot be after Delivery Date To."))
+	if delivery_date_from and delivery_date_to:
+		filters["required_delivery_date"] = [
+			"between",
+			[getdate(delivery_date_from), getdate(delivery_date_to)],
+		]
+	elif delivery_date_from:
+		filters["required_delivery_date"] = [">=", getdate(delivery_date_from)]
+	elif delivery_date_to:
+		filters["required_delivery_date"] = ["<=", getdate(delivery_date_to)]
 	if delivery_order_names:
 		filters["name"] = ["in", delivery_order_names]
 	fields = [
