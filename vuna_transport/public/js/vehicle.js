@@ -2,7 +2,22 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Vehicle", {
+	setup(frm) {
+		frm.set_query("vuna_asset", () => ({
+			filters: {
+				company: frm.doc.company,
+				docstatus: 1,
+				status: ["not in", ["Sold", "Scrapped", "Cancelled"]],
+			},
+		}));
+	},
+
 	refresh(frm) {
+		if (!frm.is_new() && frm.doc.vuna_asset) {
+			frm.add_custom_button(__("Linked Asset"), () => {
+				frappe.set_route("Form", "Asset", frm.doc.vuna_asset);
+			}, __("View"));
+		}
 		render_operational_status(frm);
 	},
 
@@ -40,6 +55,14 @@ function render_operational_status(frm) {
 		args: { vehicle: frm.doc.name },
 	}).then(({ message }) => {
 		if (!message || frm.doc.name !== message.vehicle) return;
+		frm.doc.vuna_operational_status = message.operational_state;
+		frm.doc.vuna_dispatch_eligible = message.dispatch_eligible ? 1 : 0;
+		frm.doc.vuna_status_updated_at = message.evaluated_at;
+		frm.refresh_fields([
+			"vuna_operational_status",
+			"vuna_dispatch_eligible",
+			"vuna_status_updated_at",
+		]);
 		field.$wrapper.html(get_operational_status_html(message));
 		field.$wrapper.find(".vuna-refresh-vehicle-status").on("click", () => {
 			render_operational_status(frm);
@@ -60,6 +83,12 @@ function get_operational_status_html(status) {
 	const next_available = status.next_available_at
 		? frappe.datetime.str_to_user(status.next_available_at)
 		: status.dispatch_eligible ? __("Now") : __("Not determined");
+	const blocker_details = (status.reasons || []).map((reason) => {
+		const linked = reason.reference_doctype && reason.reference_name
+			? reference(reason.reference_doctype, reason.reference_name)
+			: "";
+		return `<li>${escape(reason.message)}${linked ? ` — ${linked}` : ""}</li>`;
+	}).join("");
 
 	return `<div class="vuna-vehicle-operational-status" style="border:1px solid var(--border-color);border-radius:var(--border-radius-md);padding:var(--padding-md);background:var(--control-bg);">
 		<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
@@ -70,10 +99,13 @@ function get_operational_status_html(status) {
 			<button type="button" class="btn btn-xs btn-default vuna-refresh-vehicle-status">${__("Refresh Status")}</button>
 		</div>
 		<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-top:14px;">
+			<div><div class="text-muted small">${__("Linked Asset")}</div><div>${reference("Asset", status.linked_asset)}</div></div>
+			<div><div class="text-muted small">${__("Compliance")}</div><div>${escape(status.compliance_status || __("Not evaluated"))}</div></div>
 			<div><div class="text-muted small">${__("Reason")}</div><div>${escape(status.primary_reason || __("No operational blockers"))}</div></div>
 			<div><div class="text-muted small">${__("Current Allocation")}</div><div>${reference("Vehicle Allocation", status.current_allocation)}</div></div>
 			<div><div class="text-muted small">${__("Current Trip")}</div><div>${reference("Delivery Trip", status.current_trip)}</div></div>
 			<div><div class="text-muted small">${__("Next Available")}</div><div>${escape(next_available)}</div></div>
 		</div>
+		${blocker_details ? `<details style="margin-top:12px;"><summary>${__("View all blockers")}</summary><ul style="margin-top:8px;">${blocker_details}</ul></details>` : ""}
 	</div>`;
 }

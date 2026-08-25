@@ -58,12 +58,16 @@ class TestDispatchPlanningService(UnitTestCase):
 			self._availability("Available"),
 			self._availability("Allocated"),
 			self._availability("In Trip"),
+			self._availability("Under Maintenance"),
+			self._availability("Unavailable", compliance_status="Blocked"),
 		]
 		summary = _summarize_vehicle_categories(rows)[0]
-		self.assertEqual(summary["total"], 3)
+		self.assertEqual(summary["total"], 5)
 		self.assertEqual(summary["available"], 1)
 		self.assertEqual(summary["allocated"], 1)
 		self.assertEqual(summary["in_trip"], 1)
+		self.assertEqual(summary["under_maintenance"], 1)
+		self.assertEqual(summary["compliance_blocked"], 1)
 
 	@staticmethod
 	def _demand_row(warehouse, remaining, **dimensions):
@@ -78,9 +82,13 @@ class TestDispatchPlanningService(UnitTestCase):
 		}
 
 	@staticmethod
-	def _availability(state):
+	def _availability(state, compliance_status="Compliant"):
 		return type(
 			"Availability",
 			(),
-			{"vehicle_category": "8 Ton Truck", "operational_state": state},
+			{
+				"vehicle_category": "8 Ton Truck",
+				"operational_state": state,
+				"compliance_status": compliance_status,
+			},
 		)()

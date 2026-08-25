@@ -526,6 +526,8 @@ def _summarize_vehicle_categories(results):
 			"loading": 0,
 			"ready_for_dispatch": 0,
 			"in_trip": 0,
+			"under_maintenance": 0,
+			"compliance_blocked": 0,
 			"unavailable": 0,
 		}
 	)
@@ -539,6 +541,8 @@ def _summarize_vehicle_categories(results):
 		)
 		summary["total"] += 1
 		summary[result.operational_state.lower().replace(" ", "_")] += 1
+		if getattr(result, "compliance_status", "Compliant") == "Blocked":
+			summary["compliance_blocked"] += 1
 	return list(summaries.values())
 
 

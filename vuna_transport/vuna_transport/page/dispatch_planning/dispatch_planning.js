@@ -384,7 +384,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 
 	render_fleet(data) {
 		const rows = data.categories || [];
-		this.$root.find(".dp-fleet").toggleClass("dp-empty", !rows.length).html(rows.length ? rows.map((row) => `<button class="dp-availability-row dp-fleet-category" data-category="${this.escape(row.vehicle_category)}"><strong>${this.escape(row.vehicle_category_label || row.vehicle_category)}</strong><span>${row.available}/${row.total} ${__("available")}</span><small>${row.allocated} ${__("allocated")} · ${row.in_trip} ${__("in trip")} · ${row.unavailable} ${__("unavailable")}</small></button>`).join("") : __("No transport-enabled fleet is configured for this company."));
+		this.$root.find(".dp-fleet").toggleClass("dp-empty", !rows.length).html(rows.length ? rows.map((row) => `<button class="dp-availability-row dp-fleet-category" data-category="${this.escape(row.vehicle_category)}"><strong>${this.escape(row.vehicle_category_label || row.vehicle_category)}</strong><span>${row.available}/${row.total} ${__("available")}</span><small>${row.allocated} ${__("allocated")} · ${row.in_trip} ${__("in trip")} · ${row.under_maintenance} ${__("maintenance")} · ${row.compliance_blocked} ${__("compliance blocked")} · ${row.unavailable} ${__("unavailable")}</small></button>`).join("") : __("No transport-enabled fleet is configured for this company."));
 	}
 
 	render_drivers(data) {
@@ -411,7 +411,10 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 
 	show_availability_dialog(title, rows, label_field) {
 		const dialog = new frappe.ui.Dialog({ title, size: "large" });
-		dialog.$body.html(`<div class="dp-dialog-list">${rows.map((row) => `<div class="dp-dialog-row"><strong>${this.escape(row[label_field])}</strong><span class="indicator-pill ${row.dispatch_eligible ? "green" : "red"}">${this.escape(row.operational_state)}</span><span>${this.escape(row.primary_reason || __("Available for this window"))}</span></div>`).join("")}</div>`);
+		dialog.$body.html(`<div class="dp-dialog-list">${rows.map((row) => {
+			const reasons = (row.reasons || []).map((reason) => `<li>${this.escape(reason.message)}</li>`).join("");
+			return `<div class="dp-dialog-row"><strong>${this.escape(row[label_field])}</strong><span class="indicator-pill ${row.dispatch_eligible ? "green" : "red"}">${this.escape(row.operational_state)}</span><span>${this.escape(row.primary_reason || __("Available for this window"))}</span>${reasons.length > 0 ? `<details><summary>${__("View all blockers")}</summary><ul>${reasons}</ul></details>` : ""}</div>`;
+		}).join("")}</div>`);
 		dialog.show();
 	}
 
