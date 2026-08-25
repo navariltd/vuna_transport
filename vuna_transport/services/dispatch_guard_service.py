@@ -120,6 +120,9 @@ def set_delivery_load_status(load, status, reason=None, force=False):
 	if reason:
 		message = _("{0} Reason: {1}").format(message, reason)
 	load.add_comment("Info", message)
+	from vuna_transport.services.fleet_service import sync_related_vehicle_snapshots
+
+	sync_related_vehicle_snapshots(load)
 
 
 def is_load_status_transition_allowed(current, target):

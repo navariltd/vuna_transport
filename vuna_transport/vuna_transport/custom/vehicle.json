@@ -60,10 +60,21 @@
    "options": "Company Owned\nLeased\nSubcontracted"
   },
   {
+   "description": "ERPNext Asset used as the maintenance and repair authority for this physical vehicle.",
+   "dt": "Vehicle",
+   "fieldname": "vuna_asset",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "insert_after": "vuna_ownership_type",
+   "label": "Asset",
+   "module": "Vuna Transport",
+   "options": "Asset"
+  },
+  {
    "dt": "Vehicle",
    "fieldname": "vuna_supplier",
    "fieldtype": "Link",
-   "insert_after": "vuna_ownership_type",
+   "insert_after": "vuna_asset",
    "label": "Supplier",
    "mandatory_depends_on": "eval:doc.vuna_ownership_type == 'Leased' || doc.vuna_ownership_type == 'Subcontracted'",
    "module": "Vuna Transport",
@@ -79,7 +90,6 @@
    "options": "Address"
   },
   {
-   "collapsible": 1,
    "dt": "Vehicle",
    "fieldname": "vuna_operational_status_section",
    "fieldtype": "Section Break",
@@ -89,9 +99,56 @@
   },
   {
    "dt": "Vehicle",
+   "fieldname": "vuna_operational_status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "insert_after": "vuna_operational_status_section",
+   "label": "Operational Status",
+   "module": "Vuna Transport",
+   "options": "\nAvailable\nAllocated\nLoading\nReady for Dispatch\nIn Trip\nUnder Maintenance\nUnavailable",
+   "read_only": 1
+  },
+  {
+   "dt": "Vehicle",
+   "fieldname": "vuna_dispatch_eligible",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "insert_after": "vuna_operational_status",
+   "label": "Dispatch Eligible",
+   "module": "Vuna Transport",
+   "read_only": 1
+  },
+  {
+   "dt": "Vehicle",
+   "fieldname": "vuna_operational_status_column",
+   "fieldtype": "Column Break",
+   "insert_after": "vuna_dispatch_eligible",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Vehicle",
+   "fieldname": "vuna_status_updated_at",
+   "fieldtype": "Datetime",
+   "insert_after": "vuna_operational_status_column",
+   "label": "Status Last Evaluated At",
+   "module": "Vuna Transport",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "dt": "Vehicle",
+   "fieldname": "vuna_operational_details_section",
+   "fieldtype": "Section Break",
+   "insert_after": "vuna_status_updated_at",
+   "label": "Operational Status Details",
+   "module": "Vuna Transport"
+  },
+  {
+   "dt": "Vehicle",
    "fieldname": "vuna_operational_status_html",
    "fieldtype": "HTML",
-   "insert_after": "vuna_operational_status_section",
+   "insert_after": "vuna_operational_details_section",
    "label": "Operational Status",
    "module": "Vuna Transport"
   }

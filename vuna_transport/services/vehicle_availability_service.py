@@ -7,6 +7,9 @@ from frappe import _
 from frappe.utils import add_days, add_to_date, get_datetime, now_datetime
 
 from vuna_transport.services.resource_scheduling_service import interval_overlaps
+from vuna_transport.services.vehicle_compliance_service import (
+	get_vehicle_compliance_map,
+)
 
 
 ACTIVE_ALLOCATION_STATUSES = ("Allocated", "Accepted")
@@ -17,8 +20,18 @@ VEHICLE_STATES = (
 	"Loading",
 	"Ready for Dispatch",
 	"In Trip",
+	"Under Maintenance",
 	"Unavailable",
 )
+
+NON_OPERATIONAL_ASSET_STATUSES = (
+	"Draft",
+	"Cancelled",
+	"Sold",
+	"Scrapped",
+	"Work In Progress",
+)
+MAINTENANCE_ASSET_STATUSES = ("In Maintenance", "Out of Order")
 
 
 def get_vehicle_status(vehicle, at_time=None):
@@ -115,6 +128,8 @@ def get_vehicle_category_availability(
 		summary["vehicle_category_label"] = result.vehicle_category_label
 		summary["total"] += 1
 		summary[_state_key(result.operational_state)] += 1
+		if result.compliance_status == "Blocked":
+			summary["compliance_blocked"] += 1
 		summary["vehicles"].append(result)
 	return {
 		"categories": dict(summaries),
@@ -155,6 +170,11 @@ def get_vehicle_availability_map(
 			"company",
 			"vuna_vehicle_category",
 			"vuna_transport_enabled",
+			"vuna_ownership_type",
+			"vuna_asset",
+			"policy_no",
+			"start_date",
+			"end_date",
 		],
 		order_by="license_plate asc, name asc",
 	)
@@ -162,6 +182,51 @@ def get_vehicle_availability_map(
 		return {}
 
 	vehicle_names = [vehicle.name for vehicle in vehicles]
+	asset_names = {vehicle.vuna_asset for vehicle in vehicles if vehicle.vuna_asset}
+	assets = {
+		asset.name: asset
+		for asset in frappe.get_all(
+			"Asset",
+			filters={"name": ["in", list(asset_names)]},
+			fields=["name", "company", "status", "docstatus"],
+		)
+	} if asset_names else {}
+	asset_repairs = frappe.get_all(
+		"Asset Repair",
+		filters={
+			"asset": ["in", list(asset_names)],
+			"docstatus": ["!=", 2],
+			"repair_status": "Pending",
+		},
+		fields=["name", "asset", "repair_status", "failure_date"],
+	) if asset_names else []
+	repairs_by_asset = defaultdict(list)
+	for repair in asset_repairs:
+		repairs_by_asset[repair.asset].append(repair)
+	compliance_by_vehicle = get_vehicle_compliance_map(vehicles, to_time)
+	availability_blocks = frappe.get_all(
+		"Vehicle Availability Block",
+		filters={
+			"vehicle": ["in", vehicle_names],
+			"docstatus": 1,
+			"from_datetime": ["<", to_time],
+			"to_datetime": [">", from_time],
+		},
+		fields=[
+			"name",
+			"vehicle",
+			"from_datetime",
+			"to_datetime",
+			"reason",
+			"reference_doctype",
+			"reference_name",
+		],
+		order_by="from_datetime asc",
+	)
+	blocks_by_vehicle = defaultdict(list)
+	for block in availability_blocks:
+		blocks_by_vehicle[block.vehicle].append(block)
+
 	allocations = frappe.get_all(
 		"Vehicle Allocation",
 		filters={
@@ -230,6 +295,10 @@ def get_vehicle_availability_map(
 	results = {
 		vehicle.name: _evaluate_vehicle(
 			vehicle,
+			assets.get(vehicle.vuna_asset),
+			repairs_by_asset.get(vehicle.vuna_asset, []),
+			compliance_by_vehicle.get(vehicle.name),
+			blocks_by_vehicle.get(vehicle.name, []),
 			allocations_by_vehicle.get(vehicle.name, []),
 			trips_by_vehicle.get(vehicle.name, []),
 			loads,
@@ -260,6 +329,10 @@ def get_vehicle_availability_map(
 
 def _evaluate_vehicle(
 	vehicle,
+	asset,
+	asset_repairs,
+	compliance,
+	availability_blocks,
 	allocations,
 	trips,
 	loads,
@@ -295,6 +368,91 @@ def _evaluate_vehicle(
 			)
 		)
 
+	asset_name = getattr(vehicle, "vuna_asset", None)
+	ownership_type = getattr(vehicle, "vuna_ownership_type", None)
+	if vehicle.vuna_transport_enabled and ownership_type == "Company Owned" and not asset_name:
+		reasons.append(
+			_reason(
+				"ASSET_REQUIRED",
+				_("Company-owned transport Vehicle must be linked to an ERPNext Asset."),
+			)
+		)
+	elif asset_name and not asset:
+		reasons.append(
+			_reason(
+				"ASSET_NOT_FOUND",
+				_("Linked Asset {0} does not exist.").format(asset_name),
+				"Asset",
+				asset_name,
+			)
+		)
+	elif asset:
+		if vehicle.company and asset.company and vehicle.company != asset.company:
+			reasons.append(
+				_reason(
+					"ASSET_COMPANY_MISMATCH",
+					_("Linked Asset {0} belongs to Company {1}.").format(
+						asset.name, asset.company
+					),
+					"Asset",
+					asset.name,
+				)
+			)
+		if asset.docstatus != 1 or asset.status in NON_OPERATIONAL_ASSET_STATUSES:
+			reasons.append(
+				_reason(
+					"ASSET_NOT_OPERATIONAL",
+					_("Linked Asset {0} is {1}.").format(
+						asset.name, asset.status or _("not submitted")
+					),
+					"Asset",
+					asset.name,
+				)
+			)
+		elif asset.status in MAINTENANCE_ASSET_STATUSES:
+			reasons.append(
+				_reason(
+					"ASSET_IN_MAINTENANCE"
+					if asset.status == "In Maintenance"
+					else "ASSET_OUT_OF_ORDER",
+					_("Linked Asset {0} is {1}.").format(asset.name, asset.status),
+					"Asset",
+					asset.name,
+				)
+			)
+		for repair in asset_repairs:
+			reasons.append(
+				_reason(
+					"ASSET_REPAIR_PENDING",
+					_("Pending Asset Repair {0}.").format(repair.name),
+					"Asset Repair",
+					repair.name,
+				)
+			)
+
+	master_blocked = any(
+		reason.code in {
+			"TRANSPORT_DISABLED",
+			"COMPANY_MISMATCH",
+			"CATEGORY_MISSING",
+			"CATEGORY_INCOMPATIBLE",
+			"ASSET_REQUIRED",
+			"ASSET_NOT_FOUND",
+			"ASSET_COMPANY_MISMATCH",
+			"ASSET_NOT_OPERATIONAL",
+		}
+		for reason in reasons
+	)
+	maintenance_blocked = any(
+		reason.code
+		in {"ASSET_IN_MAINTENANCE", "ASSET_OUT_OF_ORDER", "ASSET_REPAIR_PENDING"}
+		for reason in reasons
+	)
+	if master_blocked:
+		state = "Unavailable"
+	elif maintenance_blocked:
+		state = "Under Maintenance"
+
 	for trip in trips:
 		load = loads.get(trip.vuna_delivery_load)
 		trip_from, trip_to = _trip_window(trip, load)
@@ -303,7 +461,8 @@ def _evaluate_vehicle(
 		):
 			continue
 		current_trip = current_trip or trip.name
-		state = "In Trip"
+		if not master_blocked:
+			state = "In Trip"
 		reasons.append(
 			_reason(
 				"ACTIVE_TRIP",
@@ -315,6 +474,21 @@ def _evaluate_vehicle(
 		if trip.status != "In Transit":
 			next_available_at = _latest_datetime(next_available_at, trip_to)
 
+	for block in availability_blocks:
+		if state == "Available":
+			state = "Unavailable"
+		reasons.append(
+			_reason(
+				"AVAILABILITY_BLOCK",
+				_("Vehicle is blocked for {0} until {1}.").format(
+					block.reason, block.to_datetime
+				),
+				"Vehicle Availability Block",
+				block.name,
+			)
+		)
+		next_available_at = _latest_datetime(next_available_at, block.to_datetime)
+
 	for allocation in allocations:
 		load = loads.get(allocation.delivery_load)
 		allocation_from = load.planned_departure if load else allocation.effective_from
@@ -324,7 +498,7 @@ def _evaluate_vehicle(
 		):
 			continue
 		current_allocation = current_allocation or allocation.name
-		if state != "In Trip":
+		if state == "Available":
 			state = _allocation_state(load)
 		reasons.append(
 			_reason(
@@ -338,6 +512,11 @@ def _evaluate_vehicle(
 		)
 		next_available_at = _latest_datetime(next_available_at, allocation_to)
 
+	if compliance and not compliance.compliant:
+		reasons.extend(compliance.reasons)
+		if state == "Available":
+			state = "Unavailable"
+
 	if reasons and state == "Available":
 		state = "Unavailable"
 	return frappe._dict(
@@ -345,6 +524,15 @@ def _evaluate_vehicle(
 		license_plate=vehicle.license_plate or vehicle.name,
 		vehicle_category=vehicle.vuna_vehicle_category,
 		vehicle_category_label=vehicle.vuna_vehicle_category,
+		linked_asset=asset_name,
+		asset_status=getattr(asset, "status", None),
+		active_asset_repair=asset_repairs[0].name if asset_repairs else None,
+		current_availability_block=(
+			availability_blocks[0].name if availability_blocks else None
+		),
+		compliance_status=compliance.status if compliance else "Compliant",
+		compliance_reasons=compliance.reasons if compliance else [],
+		compliance_warnings=compliance.warnings if compliance else [],
 		operational_state=state,
 		dispatch_eligible=not reasons,
 		primary_reason=_primary_reason(reasons, state),
@@ -360,6 +548,7 @@ def _primary_reason(reasons, state):
 		return None
 	preferred_code = {
 		"In Trip": "ACTIVE_TRIP",
+		"Under Maintenance": "ASSET_REPAIR_PENDING",
 		"Allocated": "ACTIVE_ALLOCATION",
 		"Loading": "ACTIVE_ALLOCATION",
 		"Ready for Dispatch": "ACTIVE_ALLOCATION",
@@ -441,6 +630,13 @@ def _missing_vehicle_result(vehicle):
 		license_plate=vehicle,
 		vehicle_category=None,
 		vehicle_category_label=None,
+		linked_asset=None,
+		asset_status=None,
+		active_asset_repair=None,
+		current_availability_block=None,
+		compliance_status="Blocked",
+		compliance_reasons=[reason],
+		compliance_warnings=[],
 		operational_state="Unavailable",
 		dispatch_eligible=False,
 		primary_reason=reason.message,
@@ -461,6 +657,8 @@ def _empty_category_summary():
 		"loading": 0,
 		"ready_for_dispatch": 0,
 		"in_trip": 0,
+		"under_maintenance": 0,
+		"compliance_blocked": 0,
 		"unavailable": 0,
 		"vehicles": [],
 	}

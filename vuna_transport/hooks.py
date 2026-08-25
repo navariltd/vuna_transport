@@ -155,16 +155,59 @@ doc_events = {
 	},
 	"Delivery Trip": {
 		"validate": "vuna_transport.services.lineage_service.validate_delivery_trip",
-		"on_update": "vuna_transport.services.lineage_service.link_delivery_trip",
-		"on_submit": "vuna_transport.services.lineage_service.submit_delivery_trip",
+		"on_update": [
+			"vuna_transport.services.lineage_service.link_delivery_trip",
+			"vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		],
+		"on_submit": [
+			"vuna_transport.services.lineage_service.submit_delivery_trip",
+			"vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		],
 		"on_cancel": [
 			"vuna_transport.services.lineage_service.cancel_delivery_trip",
 			"vuna_transport.services.lineage_service.unlink_delivery_trip",
+			"vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
 		],
-		"on_trash": "vuna_transport.services.lineage_service.unlink_delivery_trip",
+		"on_trash": [
+			"vuna_transport.services.lineage_service.unlink_delivery_trip",
+		],
+		"after_delete": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
 	},
 	"Vehicle": {
 		"validate": "vuna_transport.services.fleet_service.validate_vehicle",
+		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+	},
+	"Vehicle Allocation": {
+		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_submit": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_cancel": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+	},
+	"Delivery Load": {
+		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+	},
+	"Asset": {
+		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+	},
+	"Asset Repair": {
+		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_submit": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_cancel": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"after_delete": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+	},
+	"Asset Maintenance Log": {
+		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_submit": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_cancel": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"after_delete": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+	},
+	"Vehicle Document": {
+		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"after_delete": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+	},
+	"Vehicle Availability Block": {
+		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_submit": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_cancel": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
 	},
 }
 
@@ -172,6 +215,10 @@ doctype_js = {
 	"Address": "public/js/address.js",
 	"Delivery Trip": "public/js/delivery_trip.js",
 	"Vehicle": "public/js/vehicle.js",
+}
+
+override_doctype_dashboards = {
+	"Vehicle": "vuna_transport.overrides.vehicle_dashboard.get_data",
 }
 
 fixtures = [
@@ -188,6 +235,7 @@ fixtures = [
 
 after_migrate = [
 	"vuna_transport.services.location_service.backfill_address_coordinates",
+	"vuna_transport.services.fleet_service.sync_vehicle_operational_snapshots",
 ]
 
 # doc_events = {
@@ -201,23 +249,23 @@ after_migrate = [
 # Scheduled Tasks
 # ---------------
 
-# scheduler_events = {
-# 	"all": [
-# 		"vuna_transport.tasks.all"
-# 	],
-# 	"daily": [
-# 		"vuna_transport.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"vuna_transport.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"vuna_transport.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"vuna_transport.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"hourly": [
+		"vuna_transport.services.fleet_service.sync_vehicle_operational_snapshots",
+	],
+	# "all": [
+	# 	"vuna_transport.tasks.all"
+	# ],
+	# "daily": [
+	# 	"vuna_transport.tasks.daily"
+	# ],
+	# "weekly": [
+	# 	"vuna_transport.tasks.weekly"
+	# ],
+	# "monthly": [
+	# 	"vuna_transport.tasks.monthly"
+	# ],
+}
 
 # Testing
 # -------

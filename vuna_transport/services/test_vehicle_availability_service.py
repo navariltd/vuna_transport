@@ -25,6 +25,20 @@ class TestVehicleAvailabilityService(UnitTestCase):
 			company="Vuna Foods",
 			vuna_vehicle_category="8 Ton Truck",
 			vuna_transport_enabled=1,
+			vuna_ownership_type="Company Owned",
+			vuna_asset="ASSET-1",
+		)
+		self.asset = SimpleNamespace(
+			name="ASSET-1",
+			company="Vuna Foods",
+			status="Submitted",
+			docstatus=1,
+		)
+		self.compliance = SimpleNamespace(
+			compliant=True,
+			status="Compliant",
+			reasons=[],
+			warnings=[],
 		)
 		self.from_time = "2026-08-24 08:00:00"
 		self.to_time = "2026-08-24 12:00:00"
@@ -41,6 +55,71 @@ class TestVehicleAvailabilityService(UnitTestCase):
 		self.assertFalse(result.dispatch_eligible)
 		self.assertEqual(result.operational_state, "Unavailable")
 		self.assertEqual(result.reasons[0].code, "TRANSPORT_DISABLED")
+
+	def test_company_owned_transport_vehicle_requires_asset(self):
+		self.vehicle.vuna_asset = None
+		result = self._evaluate(asset=None)
+		self.assertFalse(result.dispatch_eligible)
+		self.assertEqual(result.operational_state, "Unavailable")
+		self.assertIn("ASSET_REQUIRED", [reason.code for reason in result.reasons])
+
+	def test_subcontracted_vehicle_does_not_require_asset(self):
+		self.vehicle.vuna_ownership_type = "Subcontracted"
+		self.vehicle.vuna_asset = None
+		result = self._evaluate(asset=None)
+		self.assertTrue(result.dispatch_eligible)
+
+	def test_asset_in_maintenance_blocks_dispatch(self):
+		self.asset.status = "In Maintenance"
+		result = self._evaluate()
+		self.assertFalse(result.dispatch_eligible)
+		self.assertEqual(result.operational_state, "Under Maintenance")
+		self.assertIn("ASSET_IN_MAINTENANCE", [reason.code for reason in result.reasons])
+
+	def test_pending_asset_repair_is_explainable(self):
+		repair = SimpleNamespace(name="AR-1", asset="ASSET-1")
+		result = self._evaluate(asset_repairs=[repair])
+		self.assertFalse(result.dispatch_eligible)
+		self.assertEqual(result.operational_state, "Under Maintenance")
+		self.assertEqual(result.active_asset_repair, "AR-1")
+		self.assertIn("AR-1", result.primary_reason)
+
+	def test_overlapping_availability_block_is_explainable(self):
+		block = SimpleNamespace(
+			name="VAB-1",
+			reason="Operational Assignment",
+			to_datetime="2026-08-24 11:00:00",
+		)
+		result = self._evaluate(availability_blocks=[block])
+		self.assertFalse(result.dispatch_eligible)
+		self.assertEqual(result.operational_state, "Unavailable")
+		self.assertEqual(result.current_availability_block, "VAB-1")
+		self.assertEqual(result.reasons[0].code, "AVAILABILITY_BLOCK")
+
+	def test_compliance_block_is_included_in_availability(self):
+		reason = SimpleNamespace(
+			code="DOCUMENT_MISSING",
+			message="Mandatory Inspection Certificate is missing.",
+			reference_doctype=None,
+			reference_name=None,
+		)
+		compliance = SimpleNamespace(
+			compliant=False,
+			status="Blocked",
+			reasons=[reason],
+			warnings=[],
+		)
+		result = self._evaluate(compliance=compliance)
+		self.assertFalse(result.dispatch_eligible)
+		self.assertEqual(result.operational_state, "Unavailable")
+		self.assertEqual(result.compliance_status, "Blocked")
+
+	def test_non_operational_asset_blocks_dispatch(self):
+		self.asset.status = "Sold"
+		result = self._evaluate()
+		self.assertFalse(result.dispatch_eligible)
+		self.assertEqual(result.operational_state, "Unavailable")
+		self.assertIn("ASSET_NOT_OPERATIONAL", [reason.code for reason in result.reasons])
 
 	def test_overlapping_allocation_uses_delivery_load_state(self):
 		allocation = SimpleNamespace(
@@ -99,6 +178,28 @@ class TestVehicleAvailabilityService(UnitTestCase):
 		self.assertEqual(result.current_trip, "DT-1")
 		self.assertIn("DT-1", result.primary_reason)
 
+	def test_active_trip_keeps_maintenance_reason(self):
+		self.asset.status = "Out of Order"
+		trip = SimpleNamespace(
+			name="DT-1",
+			vuna_delivery_load="DL-1",
+			departure_time="2026-08-24 08:00:00",
+			status="In Transit",
+		)
+		loads = {
+			"DL-1": SimpleNamespace(
+				planned_departure="2026-08-24 08:00:00",
+				planned_arrival="2026-08-24 12:00:00",
+				status="Dispatched",
+			)
+		}
+		result = self._evaluate(trips=[trip], loads=loads)
+		self.assertEqual(result.operational_state, "In Trip")
+		self.assertEqual(
+			{"ASSET_OUT_OF_ORDER", "ACTIVE_TRIP"},
+			{reason.code for reason in result.reasons},
+		)
+
 	def test_adjacent_windows_do_not_overlap(self):
 		self.assertFalse(
 			interval_overlaps(
@@ -113,9 +214,22 @@ class TestVehicleAvailabilityService(UnitTestCase):
 		with self.assertRaises(ValidationError):
 			normalize_vehicle_interval("undefined 00:00:00", "2026-08-25 00:00:00")
 
-	def _evaluate(self, allocations=None, trips=None, loads=None):
+	def _evaluate(
+		self,
+		allocations=None,
+		trips=None,
+		loads=None,
+		asset="default",
+		asset_repairs=None,
+		compliance="default",
+		availability_blocks=None,
+	):
 		return _evaluate_vehicle(
 			self.vehicle,
+			self.asset if asset == "default" else asset,
+			asset_repairs or [],
+			self.compliance if compliance == "default" else compliance,
+			availability_blocks or [],
 			allocations or [],
 			trips or [],
 			loads or {},
