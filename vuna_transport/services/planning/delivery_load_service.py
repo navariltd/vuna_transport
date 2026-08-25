@@ -4,23 +4,23 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
-from vuna_transport.services.delivery_method_service import (
+from vuna_transport.services.demand.delivery_method_service import (
 	canonical_delivery_method,
 	delivery_methods_are_compatible,
 )
-from vuna_transport.services.measurement_service import get_transport_uoms
-from vuna_transport.services.load_validation_service import (
+from vuna_transport.services.shared.measurement_service import get_transport_uoms
+from vuna_transport.services.planning.load_validation_service import (
 	calculate_allocated_measurements,
 	get_available_quantity,
 	sync_delivery_order_allocations,
 	validate_load_allocations,
 )
-from vuna_transport.services.security_service import (
+from vuna_transport.services.shared.security_service import (
 	require_company_access,
 	require_doctype_permission,
 	require_document_permission,
 )
-from vuna_transport.services.vehicle_category_service import (
+from vuna_transport.services.fleet.vehicle_category_service import (
 	evaluate_vehicle_category,
 	get_effective_capacities,
 	get_vehicle_categories,

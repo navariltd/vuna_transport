@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 from frappe.tests import UnitTestCase
 
-from vuna_transport.services.route_service import validate_transport_route
+from vuna_transport.services.routing.route_service import validate_transport_route
 
 
 # On IntegrationTestCase, the doctype test records and all

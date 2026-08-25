@@ -4,7 +4,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
-from vuna_transport.services.location_service import get_address_planning_data
+from vuna_transport.services.routing.location_service import get_address_planning_data
 
 
 def validate_transport_route(route):

@@ -54,7 +54,7 @@ frappe.ui.form.on("Delivery Load", {
 					},
 					get_query() {
 						return {
-							query: "vuna_transport.services.delivery_load_service.get_available_delivery_orders",
+							query: "vuna_transport.services.planning.delivery_load_service.get_available_delivery_orders",
 							filters: {
 								docstatus: 1,
 								status: ["in", ["Open", "Partially Allocated"]],
@@ -67,7 +67,7 @@ frappe.ui.form.on("Delivery Load", {
 							return;
 						}
 						frappe.call({
-							method: "vuna_transport.services.delivery_load_service.get_delivery_order_items",
+							method: "vuna_transport.services.planning.delivery_load_service.get_delivery_order_items",
 							args: { delivery_order_names: selections },
 						}).then((response) => {
 							const result = response.message;
@@ -120,7 +120,7 @@ frappe.ui.form.on("Delivery Load", {
 	async load_execution_progress(frm) {
 		try {
 			const response = await frappe.call({
-				method: "vuna_transport.services.execution_service.get_load_execution_summary",
+				method: "vuna_transport.services.execution.execution_service.get_load_execution_summary",
 				args: { load: frm.doc.name },
 			});
 			if (!response.message) return;
@@ -175,7 +175,7 @@ function add_execution_actions(frm, summary) {
 	) {
 		frm.add_custom_button(__("Reallocate Vehicle"), () => {
 			frappe.model.open_mapped_doc({
-				method: "vuna_transport.services.vehicle_allocation_service.make_replacement_allocation_from_load",
+				method: "vuna_transport.services.fleet.vehicle_allocation_service.make_replacement_allocation_from_load",
 				frm,
 				freeze_message: __("Preparing replacement allocation..."),
 			});
@@ -195,7 +195,7 @@ function run_next_action(frm, summary) {
 	switch (summary.next_action.key) {
 		case "create_vehicle_allocation":
 			return frappe.model.open_mapped_doc({
-				method: "vuna_transport.services.vehicle_allocation_service.make_vehicle_allocation_from_load",
+				method: "vuna_transport.services.fleet.vehicle_allocation_service.make_vehicle_allocation_from_load",
 				frm,
 				freeze_message: __("Preparing Vehicle Allocation..."),
 			});
@@ -224,7 +224,7 @@ function run_next_action(frm, summary) {
 			return open_delivery_notes(summary.delivery_notes.names);
 		case "create_delivery_trip":
 			return frappe.model.open_mapped_doc({
-				method: "vuna_transport.services.erpnext_integration.make_delivery_trip_from_load",
+				method: "vuna_transport.services.integrations.erpnext_integration.make_delivery_trip_from_load",
 				frm,
 				freeze_message: __("Preparing Delivery Trip..."),
 			});
@@ -375,7 +375,7 @@ function update_allocation_preview(frm, cdt, cdn, use_available_quantity) {
 		: flt(row.allocated_quantity);
 
 	frappe.call({
-		method: "vuna_transport.services.delivery_load_service.get_delivery_order_item_allocation_preview",
+		method: "vuna_transport.services.planning.delivery_load_service.get_delivery_order_item_allocation_preview",
 		args: {
 			delivery_order_item: row.delivery_order_item,
 			allocated_quantity: requested_quantity,

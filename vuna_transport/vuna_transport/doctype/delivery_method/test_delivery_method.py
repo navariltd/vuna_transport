@@ -7,7 +7,7 @@ from unittest.mock import patch
 from frappe.exceptions import ValidationError
 from frappe.tests import IntegrationTestCase, UnitTestCase
 
-from vuna_transport.services.delivery_method_service import (
+from vuna_transport.services.demand.delivery_method_service import (
 	canonical_delivery_method,
 	delivery_methods_are_compatible,
 	validate_delivery_method_allows_vehicle_allocation,
@@ -39,7 +39,7 @@ class TestDeliveryMethodSemantics(UnitTestCase):
 			delivery_methods_are_compatible("Customer Pickup", "Company Delivery")
 		)
 
-	@patch("vuna_transport.services.delivery_method_service.frappe.get_cached_doc")
+	@patch("vuna_transport.services.demand.delivery_method_service.frappe.get_cached_doc")
 	def test_company_delivery_allows_owned_or_subcontracted_allocation(self, get_method):
 		get_method.return_value = SimpleNamespace(
 			name="Company Delivery",
@@ -54,7 +54,7 @@ class TestDeliveryMethodSemantics(UnitTestCase):
 			)
 			self.assertTrue(workflow.requires_vehicle_allocation, allocation_type)
 
-	@patch("vuna_transport.services.delivery_method_service.frappe.get_cached_doc")
+	@patch("vuna_transport.services.demand.delivery_method_service.frappe.get_cached_doc")
 	def test_customer_pickup_rejects_vehicle_allocation(self, get_method):
 		get_method.return_value = SimpleNamespace(
 			name="Customer Pickup",

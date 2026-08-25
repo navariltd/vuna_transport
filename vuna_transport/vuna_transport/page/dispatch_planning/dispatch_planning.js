@@ -328,7 +328,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		if (!filters.company) return;
 		this.$root.find(".dp-suggestions").html(this.loading());
 		const selected_names = [...new Set([...this.allocations.values()].map((row) => row.delivery_order))];
-		const response = await frappe.call({ method: "vuna_transport.services.load_suggestion_service.suggest_delivery_loads", args: { company: filters.company, source_warehouse: filters.source_warehouse || null, delivery_date_from: filters.required_delivery_date_from || null, delivery_date_to: filters.required_delivery_date_to || null, delivery_order_names: selected_names.length ? selected_names : null }, freeze: true, freeze_message: __("Building load suggestions...") });
+		const response = await frappe.call({ method: "vuna_transport.services.planning.load_suggestion_service.suggest_delivery_loads", args: { company: filters.company, source_warehouse: filters.source_warehouse || null, delivery_date_from: filters.required_delivery_date_from || null, delivery_date_to: filters.required_delivery_date_to || null, delivery_order_names: selected_names.length ? selected_names : null }, freeze: true, freeze_message: __("Building load suggestions...") });
 		const result = response.message || {};
 		this.suggestions = result.suggestions || [];
 		this.render_suggestions(result);
@@ -394,7 +394,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 
 	async create_from_suggestion(event) {
 		const suggestion = this.suggestions[cint($(event.currentTarget).data("index"))];
-		const response = await frappe.call({ method: "vuna_transport.services.load_suggestion_service.create_delivery_load_from_suggestion", args: { suggestion }, freeze: true, freeze_message: __("Revalidating and creating Delivery Load...") });
+		const response = await frappe.call({ method: "vuna_transport.services.planning.load_suggestion_service.create_delivery_load_from_suggestion", args: { suggestion }, freeze: true, freeze_message: __("Revalidating and creating Delivery Load...") });
 		frappe.set_route("Form", "Delivery Load", response.message);
 	}
 
@@ -457,7 +457,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	async call(method, args, freeze = false) {
-		const response = await frappe.call({ method: `vuna_transport.services.dispatch_planning_service.${method}`, args, freeze, freeze_message: freeze ? __("Validating plan...") : undefined });
+		const response = await frappe.call({ method: `vuna_transport.services.planning.dispatch_planning_service.${method}`, args, freeze, freeze_message: freeze ? __("Validating plan...") : undefined });
 		return response.message;
 	}
 

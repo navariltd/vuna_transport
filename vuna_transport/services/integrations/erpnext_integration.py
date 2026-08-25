@@ -8,17 +8,17 @@ from frappe import _
 from frappe.contacts.doctype.address.address import get_address_display
 from frappe.utils import flt, get_datetime, now_datetime
 
-from vuna_transport.services.vehicle_allocation_service import get_active_allocation
-from vuna_transport.services.dispatch_guard_service import (
+from vuna_transport.services.fleet.vehicle_allocation_service import get_active_allocation
+from vuna_transport.services.execution.dispatch_guard_service import (
 	get_locked_delivery_load,
 	set_delivery_load_status,
 	validate_load_is_operational,
 )
-from vuna_transport.services.security_service import (
+from vuna_transport.services.shared.security_service import (
 	require_doctype_permission,
 	require_document_permission,
 )
-from vuna_transport.services.workflow_policy_service import (
+from vuna_transport.services.shared.workflow_policy_service import (
 	allocation_is_required_before_delivery_notes,
 )
 

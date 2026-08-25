@@ -6,7 +6,7 @@ import frappe
 from frappe.contacts.doctype.address.address import get_address_display
 from frappe.utils import add_days, flt, nowdate, nowtime
 
-from vuna_transport.services.location_service import set_delivery_order_location_snapshots
+from vuna_transport.services.routing.location_service import set_delivery_order_location_snapshots
 
 
 DEMO_PREFIX = "VT-DEMO"

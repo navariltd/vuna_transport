@@ -6,7 +6,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate
 
-from vuna_transport.services.delivery_method_service import (
+from vuna_transport.services.demand.delivery_method_service import (
 	canonical_delivery_method,
 	delivery_methods_are_compatible,
 )

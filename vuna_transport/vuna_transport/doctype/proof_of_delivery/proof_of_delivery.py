@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
 
-from vuna_transport.services.pod_service import (
+from vuna_transport.services.execution.pod_service import (
 	derive_pod_status,
 	reset_delivery_stop_from_pod,
 	update_delivery_stop_from_pod,

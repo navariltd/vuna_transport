@@ -4,8 +4,8 @@ import frappe
 from frappe import _
 from frappe.utils import flt, now_datetime
 
-from vuna_transport.services.dispatch_guard_service import set_delivery_load_status
-from vuna_transport.services.security_service import (
+from vuna_transport.services.execution.dispatch_guard_service import set_delivery_load_status
+from vuna_transport.services.shared.security_service import (
 	require_doctype_permission,
 	require_document_permission,
 )

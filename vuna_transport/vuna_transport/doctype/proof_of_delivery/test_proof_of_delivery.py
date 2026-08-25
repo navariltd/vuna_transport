@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 from frappe.tests import UnitTestCase
 
-from vuna_transport.services.pod_service import (
+from vuna_transport.services.execution.pod_service import (
 	derive_delivery_order_execution_status,
 	derive_pod_status,
 )

@@ -3,8 +3,8 @@
 import frappe
 from frappe import _
 
-from vuna_transport.services.security_service import require_document_permission
-from vuna_transport.services.workflow_policy_service import (
+from vuna_transport.services.shared.security_service import require_document_permission
+from vuna_transport.services.shared.workflow_policy_service import (
 	ALLOCATION_AFTER_DELIVERY_NOTES,
 	get_vehicle_allocation_timing,
 )

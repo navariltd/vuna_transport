@@ -6,7 +6,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, getdate
 
-from vuna_transport.services.delivery_load_service import (
+from vuna_transport.services.planning.delivery_load_service import (
 	build_delivery_load_from_allocations,
 	calculate_load_totals,
 	create_delivery_load_from_plan as _create_delivery_load_from_plan,
@@ -14,19 +14,19 @@ from vuna_transport.services.delivery_load_service import (
 	get_compatible_vehicle_category_names,
 	recommend_vehicle_category,
 )
-from vuna_transport.services.driver_availability_service import (
+from vuna_transport.services.fleet.driver_availability_service import (
 	get_driver_availability_map,
 )
-from vuna_transport.services.load_validation_service import validate_load_allocations
-from vuna_transport.services.security_service import (
+from vuna_transport.services.planning.load_validation_service import validate_load_allocations
+from vuna_transport.services.shared.security_service import (
 	require_company_access,
 	require_doctype_permission,
 	require_document_permission,
 )
-from vuna_transport.services.vehicle_availability_service import (
+from vuna_transport.services.fleet.vehicle_availability_service import (
 	get_vehicle_availability_map,
 )
-from vuna_transport.services.vehicle_category_service import (
+from vuna_transport.services.fleet.vehicle_category_service import (
 	evaluate_vehicle_category,
 	get_vehicle_categories,
 )

@@ -6,26 +6,26 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, getdate
 
-from vuna_transport.services.delivery_load_service import get_capacity_buffer_percentage
-from vuna_transport.services.delivery_load_service import (
+from vuna_transport.services.planning.delivery_load_service import get_capacity_buffer_percentage
+from vuna_transport.services.planning.delivery_load_service import (
 	build_delivery_load_from_allocations,
 )
-from vuna_transport.services.delivery_method_service import (
+from vuna_transport.services.demand.delivery_method_service import (
 	canonical_delivery_method,
 	delivery_methods_are_compatible,
 )
-from vuna_transport.services.geography_service import (
+from vuna_transport.services.routing.geography_service import (
 	calculate_delivery_window_compatibility,
 	calculate_geographic_cohesion,
 )
-from vuna_transport.services.load_validation_service import PLANNABLE_DELIVERY_ORDER_STATUSES
-from vuna_transport.services.measurement_service import get_transport_uoms
-from vuna_transport.services.security_service import (
+from vuna_transport.services.planning.load_validation_service import PLANNABLE_DELIVERY_ORDER_STATUSES
+from vuna_transport.services.shared.measurement_service import get_transport_uoms
+from vuna_transport.services.shared.security_service import (
 	require_company_access,
 	require_doctype_permission,
 	require_document_permission,
 )
-from vuna_transport.services.vehicle_category_service import (
+from vuna_transport.services.fleet.vehicle_category_service import (
 	CAPACITY_DIMENSIONS,
 	evaluate_vehicle_category,
 	get_available_vehicle_category_counts,

@@ -27,7 +27,7 @@ frappe.listview_settings["Delivery Order"] = {
 			}
 
 			frappe.call({
-				method: "vuna_transport.services.delivery_load_service.create_delivery_load",
+				method: "vuna_transport.services.planning.delivery_load_service.create_delivery_load",
 				args: { delivery_order_names: names },
 			}).then((response) => {
 				if (response.message) {
@@ -105,7 +105,7 @@ function generate_load_suggestions(dialog, values, selected_names) {
 	const wrapper = dialog.get_field("suggestion_results").$wrapper;
 	wrapper.html(`<div class="text-muted">${__("Evaluating compatible orders and vehicle categories...")}</div>`);
 	frappe.call({
-		method: "vuna_transport.services.load_suggestion_service.suggest_delivery_loads",
+		method: "vuna_transport.services.planning.load_suggestion_service.suggest_delivery_loads",
 		args: {
 			company: values.company,
 			source_warehouse: values.source_warehouse,
@@ -182,7 +182,7 @@ function render_load_suggestions(wrapper, result) {
 
 function create_load_from_suggestion(dialog, suggestion) {
 	frappe.call({
-		method: "vuna_transport.services.load_suggestion_service.create_delivery_load_from_suggestion",
+		method: "vuna_transport.services.planning.load_suggestion_service.create_delivery_load_from_suggestion",
 		args: { suggestion },
 		freeze: true,
 		freeze_message: __("Revalidating and creating Delivery Load..."),

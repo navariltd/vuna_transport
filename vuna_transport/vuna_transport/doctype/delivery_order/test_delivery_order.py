@@ -8,14 +8,14 @@ import frappe
 from frappe.utils import flt
 from frappe.tests import UnitTestCase
 
-from vuna_transport.services.delivery_order_service import (
+from vuna_transport.services.demand.delivery_order_service import (
 	_get_group_key,
 	_get_group_transport_requirements,
 	_get_item_measure,
 	_requires_transport_planning,
 	_get_transport_quantity,
 )
-from vuna_transport.services.location_service import (
+from vuna_transport.services.routing.location_service import (
 	get_point_coordinates,
 	make_point_geojson,
 	synchronize_address_location,
@@ -56,7 +56,7 @@ class TestDeliveryOrder(UnitTestCase):
 		item = SimpleNamespace(weight=None, weight_per_unit=2.5)
 		self.assertEqual(flt(_get_item_measure(item, "weight", 4)), 10)
 
-	@patch("vuna_transport.services.delivery_order_service.frappe.get_cached_doc")
+	@patch("vuna_transport.services.demand.delivery_order_service.frappe.get_cached_doc")
 	def test_explicit_item_transport_requirements_are_aggregated(self, get_cached_doc):
 		get_cached_doc.side_effect = [
 			SimpleNamespace(
@@ -111,7 +111,7 @@ class TestDeliveryOrder(UnitTestCase):
 		with self.assertRaises(frappe.ValidationError):
 			validate_point_coordinates(-1.2921, 181)
 
-	@patch("vuna_transport.services.delivery_order_service.frappe.get_cached_doc")
+	@patch("vuna_transport.services.demand.delivery_order_service.frappe.get_cached_doc")
 	def test_customer_pickup_can_skip_transport_planning(self, get_cached_doc):
 		get_cached_doc.return_value = SimpleNamespace(
 			name="Customer Pickup",

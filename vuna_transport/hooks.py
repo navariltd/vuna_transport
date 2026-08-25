@@ -143,71 +143,71 @@ add_to_apps_screen = [
 
 doc_events = {
 	"Address": {
-		"validate": "vuna_transport.services.location_service.synchronize_address_location",
+		"validate": "vuna_transport.services.routing.location_service.synchronize_address_location",
 	},
 	"Sales Order": {
-		"on_submit": "vuna_transport.services.delivery_order_service.create_delivery_orders_for_sales_order",
+		"on_submit": "vuna_transport.services.demand.delivery_order_service.create_delivery_orders_for_sales_order",
 	},
 	"Delivery Note": {
-		"validate": "vuna_transport.services.lineage_service.populate_delivery_note_delivery_links",
-		"on_submit": "vuna_transport.services.lineage_service.complete_load_without_trip",
-		"on_cancel": "vuna_transport.services.lineage_service.reconcile_load_after_delivery_note_cancel",
+		"validate": "vuna_transport.services.execution.lineage_service.populate_delivery_note_delivery_links",
+		"on_submit": "vuna_transport.services.execution.lineage_service.complete_load_without_trip",
+		"on_cancel": "vuna_transport.services.execution.lineage_service.reconcile_load_after_delivery_note_cancel",
 	},
 	"Delivery Trip": {
-		"validate": "vuna_transport.services.lineage_service.validate_delivery_trip",
+		"validate": "vuna_transport.services.execution.lineage_service.validate_delivery_trip",
 		"on_update": [
-			"vuna_transport.services.lineage_service.link_delivery_trip",
-			"vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+			"vuna_transport.services.execution.lineage_service.link_delivery_trip",
+			"vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 		],
 		"on_submit": [
-			"vuna_transport.services.lineage_service.submit_delivery_trip",
-			"vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+			"vuna_transport.services.execution.lineage_service.submit_delivery_trip",
+			"vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 		],
 		"on_cancel": [
-			"vuna_transport.services.lineage_service.cancel_delivery_trip",
-			"vuna_transport.services.lineage_service.unlink_delivery_trip",
-			"vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+			"vuna_transport.services.execution.lineage_service.cancel_delivery_trip",
+			"vuna_transport.services.execution.lineage_service.unlink_delivery_trip",
+			"vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 		],
 		"on_trash": [
-			"vuna_transport.services.lineage_service.unlink_delivery_trip",
+			"vuna_transport.services.execution.lineage_service.unlink_delivery_trip",
 		],
-		"after_delete": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"after_delete": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 	"Vehicle": {
-		"validate": "vuna_transport.services.fleet_service.validate_vehicle",
-		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"validate": "vuna_transport.services.fleet.fleet_service.validate_vehicle",
+		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 	"Vehicle Allocation": {
-		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
-		"on_submit": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
-		"on_cancel": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+		"on_submit": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+		"on_cancel": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 	"Delivery Load": {
-		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 	"Asset": {
-		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 	"Asset Repair": {
-		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
-		"on_submit": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
-		"on_cancel": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
-		"after_delete": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+		"on_submit": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+		"on_cancel": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+		"after_delete": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 	"Asset Maintenance Log": {
-		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
-		"on_submit": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
-		"on_cancel": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
-		"after_delete": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+		"on_submit": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+		"on_cancel": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+		"after_delete": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 	"Vehicle Document": {
-		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
-		"after_delete": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+		"after_delete": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 	"Vehicle Availability Block": {
-		"on_update": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
-		"on_submit": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
-		"on_cancel": "vuna_transport.services.fleet_service.sync_related_vehicle_snapshots",
+		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+		"on_submit": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+		"on_cancel": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 }
 
@@ -234,8 +234,8 @@ fixtures = [
 ]
 
 after_migrate = [
-	"vuna_transport.services.location_service.backfill_address_coordinates",
-	"vuna_transport.services.fleet_service.sync_vehicle_operational_snapshots",
+	"vuna_transport.services.routing.location_service.backfill_address_coordinates",
+	"vuna_transport.services.fleet.fleet_service.sync_vehicle_operational_snapshots",
 ]
 
 # doc_events = {
@@ -251,7 +251,7 @@ after_migrate = [
 
 scheduler_events = {
 	"hourly": [
-		"vuna_transport.services.fleet_service.sync_vehicle_operational_snapshots",
+		"vuna_transport.services.fleet.fleet_service.sync_vehicle_operational_snapshots",
 	],
 	# "all": [
 	# 	"vuna_transport.tasks.all"

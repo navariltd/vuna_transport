@@ -4,7 +4,7 @@
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
-from vuna_transport.services.vehicle_allocation_service import (
+from vuna_transport.services.fleet.vehicle_allocation_service import (
 	activate_allocation,
 	restore_previous_allocation,
 	validate_allocation,

@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from frappe.tests import UnitTestCase
 from frappe.utils import getdate
 
-from vuna_transport.services.vehicle_compliance_service import (
+from vuna_transport.services.fleet.vehicle_compliance_service import (
 	_evaluate_vehicle_compliance,
 )
 

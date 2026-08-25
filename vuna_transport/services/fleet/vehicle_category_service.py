@@ -4,7 +4,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, flt, get_datetime
 
-from vuna_transport.services.measurement_service import convert_measurement
+from vuna_transport.services.shared.measurement_service import convert_measurement
 
 
 CAPACITY_DIMENSIONS = ("weight", "volume", "pallets", "cases", "crates")
@@ -148,7 +148,7 @@ def get_available_vehicle_category_counts(
 	company, dispatch_date, from_time=None, to_time=None
 ):
 	"""Return canonical available counts while preserving the existing API shape."""
-	from vuna_transport.services.vehicle_availability_service import (
+	from vuna_transport.services.fleet.vehicle_availability_service import (
 		get_vehicle_category_availability,
 	)
 

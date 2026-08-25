@@ -4,12 +4,12 @@
 import frappe
 from frappe import _
 
-from vuna_transport.services.erpnext_integration import (
+from vuna_transport.services.integrations.erpnext_integration import (
 	create_delivery_notes_for_load,
 	create_delivery_trip_for_load,
 	create_pick_list_for_load,
 )
-from vuna_transport.services.delivery_load_service import (
+from vuna_transport.services.planning.delivery_load_service import (
 	add_delivery_orders_to_load,
 	calculate_load_totals,
 	recommend_vehicle_category,
@@ -18,9 +18,9 @@ from vuna_transport.services.delivery_load_service import (
 	validate_load_allocations,
 )
 from frappe.model.document import Document
-from vuna_transport.services.execution_service import get_load_execution_summary
-from vuna_transport.services.route_service import apply_route_defaults
-from vuna_transport.services.dispatch_guard_service import (
+from vuna_transport.services.execution.execution_service import get_load_execution_summary
+from vuna_transport.services.routing.route_service import apply_route_defaults
+from vuna_transport.services.execution.dispatch_guard_service import (
 	set_delivery_load_status,
 	validate_load_can_be_cancelled,
 )

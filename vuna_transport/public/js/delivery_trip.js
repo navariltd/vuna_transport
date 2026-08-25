@@ -29,7 +29,7 @@ frappe.ui.form.on("Delivery Trip", {
 		) {
 			frm.add_custom_button(__("Reallocate Vehicle"), () => {
 				frappe.model.open_mapped_doc({
-					method: "vuna_transport.services.vehicle_allocation_service.make_replacement_allocation_from_trip",
+					method: "vuna_transport.services.fleet.vehicle_allocation_service.make_replacement_allocation_from_trip",
 					frm,
 					freeze_message: __("Preparing replacement allocation..."),
 				});
@@ -60,7 +60,7 @@ frappe.ui.form.on("Delivery Trip", {
 						primary_action(values) {
 							dialog.disable_primary_action();
 							frappe.call({
-								method: "vuna_transport.services.pod_service.create_proof_of_delivery",
+								method: "vuna_transport.services.execution.pod_service.create_proof_of_delivery",
 								args: {
 									delivery_trip: frm.doc.name,
 									delivery_stop: values.delivery_stop,

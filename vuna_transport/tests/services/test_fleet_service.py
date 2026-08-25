@@ -8,7 +8,7 @@ import frappe
 from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
 
-from vuna_transport.services.fleet_service import (
+from vuna_transport.services.fleet.fleet_service import (
 	_validate_vehicle_asset,
 	sync_vehicle_operational_snapshots,
 )
@@ -26,8 +26,8 @@ class TestVehicleAssetValidation(UnitTestCase):
 			company="Vuna Foods",
 		)
 
-	@patch("vuna_transport.services.fleet_service.frappe.db.get_value")
-	@patch("vuna_transport.services.fleet_service.frappe.get_cached_doc")
+	@patch("vuna_transport.services.fleet.fleet_service.frappe.db.get_value")
+	@patch("vuna_transport.services.fleet.fleet_service.frappe.get_cached_doc")
 	def test_matching_asset_can_be_linked(self, get_cached_doc, get_value):
 		get_cached_doc.return_value = self.asset
 		get_value.return_value = None
@@ -36,7 +36,7 @@ class TestVehicleAssetValidation(UnitTestCase):
 
 		get_value.assert_called_once()
 
-	@patch("vuna_transport.services.fleet_service.frappe.get_cached_doc")
+	@patch("vuna_transport.services.fleet.fleet_service.frappe.get_cached_doc")
 	def test_asset_company_mismatch_is_rejected(self, get_cached_doc):
 		self.asset.company = "Other Company"
 		get_cached_doc.return_value = self.asset
@@ -44,8 +44,8 @@ class TestVehicleAssetValidation(UnitTestCase):
 		with self.assertRaises(ValidationError):
 			_validate_vehicle_asset(self.vehicle)
 
-	@patch("vuna_transport.services.fleet_service.frappe.db.get_value")
-	@patch("vuna_transport.services.fleet_service.frappe.get_cached_doc")
+	@patch("vuna_transport.services.fleet.fleet_service.frappe.db.get_value")
+	@patch("vuna_transport.services.fleet.fleet_service.frappe.get_cached_doc")
 	def test_asset_sets_missing_vehicle_company(self, get_cached_doc, get_value):
 		self.vehicle.company = None
 		get_cached_doc.return_value = self.asset
@@ -55,8 +55,8 @@ class TestVehicleAssetValidation(UnitTestCase):
 
 		self.assertEqual(self.vehicle.company, "Vuna Foods")
 
-	@patch("vuna_transport.services.fleet_service.frappe.db.get_value")
-	@patch("vuna_transport.services.fleet_service.frappe.get_cached_doc")
+	@patch("vuna_transport.services.fleet.fleet_service.frappe.db.get_value")
+	@patch("vuna_transport.services.fleet.fleet_service.frappe.get_cached_doc")
 	def test_asset_cannot_link_to_multiple_vehicles(self, get_cached_doc, get_value):
 		get_cached_doc.return_value = self.asset
 		get_value.return_value = "KDB 456B"
@@ -66,10 +66,10 @@ class TestVehicleAssetValidation(UnitTestCase):
 
 
 class TestVehicleStatusSnapshot(UnitTestCase):
-	@patch("vuna_transport.services.fleet_service.get_vehicle_availability_map")
-	@patch("vuna_transport.services.fleet_service.frappe.db.set_value")
-	@patch("vuna_transport.services.fleet_service.frappe.get_meta")
-	@patch("vuna_transport.services.fleet_service.frappe.db.table_exists")
+	@patch("vuna_transport.services.fleet.fleet_service.get_vehicle_availability_map")
+	@patch("vuna_transport.services.fleet.fleet_service.frappe.db.set_value")
+	@patch("vuna_transport.services.fleet.fleet_service.frappe.get_meta")
+	@patch("vuna_transport.services.fleet.fleet_service.frappe.db.table_exists")
 	def test_snapshot_uses_canonical_availability(
 		self, table_exists, get_meta, set_value, get_availability
 	):

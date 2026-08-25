@@ -6,8 +6,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, add_to_date, get_datetime, getdate, now_datetime
 
-from vuna_transport.services.resource_scheduling_service import interval_overlaps
-from vuna_transport.services.vehicle_availability_service import (
+from vuna_transport.services.shared.resource_scheduling_service import interval_overlaps
+from vuna_transport.services.fleet.vehicle_availability_service import (
 	ACTIVE_ALLOCATION_STATUSES,
 	ACTIVE_TRIP_STATUSES,
 )

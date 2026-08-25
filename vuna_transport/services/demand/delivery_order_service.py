@@ -6,9 +6,9 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate
 
-from vuna_transport.services.measurement_service import convert_measurement, get_transport_uoms
-from vuna_transport.services.location_service import get_address_planning_data
-from vuna_transport.services.delivery_method_service import canonical_delivery_method
+from vuna_transport.services.shared.measurement_service import convert_measurement, get_transport_uoms
+from vuna_transport.services.routing.location_service import get_address_planning_data
+from vuna_transport.services.demand.delivery_method_service import canonical_delivery_method
 
 
 GROUPING_FIELDS = (

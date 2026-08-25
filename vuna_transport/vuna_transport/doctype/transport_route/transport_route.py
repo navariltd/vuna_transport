@@ -3,7 +3,7 @@
 
 from frappe.model.document import Document
 
-from vuna_transport.services.route_service import validate_transport_route
+from vuna_transport.services.routing.route_service import validate_transport_route
 
 
 class TransportRoute(Document):

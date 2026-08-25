@@ -51,7 +51,7 @@ function render_operational_status(frm) {
 
 	field.$wrapper.html(`<div class="text-muted">${__("Loading operational status...")}</div>`);
 	frappe.call({
-		method: "vuna_transport.services.fleet_service.get_vehicle_operational_status",
+		method: "vuna_transport.services.fleet.fleet_service.get_vehicle_operational_status",
 		args: { vehicle: frm.doc.name },
 	}).then(({ message }) => {
 		if (!message || frm.doc.name !== message.vehicle) return;

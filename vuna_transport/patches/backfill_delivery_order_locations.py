@@ -2,7 +2,7 @@
 
 import frappe
 
-from vuna_transport.services.location_service import set_delivery_order_location_snapshots
+from vuna_transport.services.routing.location_service import set_delivery_order_location_snapshots
 
 
 SNAPSHOT_FIELDS = (

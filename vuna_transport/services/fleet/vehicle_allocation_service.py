@@ -4,26 +4,26 @@ import frappe
 from frappe import _
 from frappe.utils import get_datetime, now_datetime
 
-from vuna_transport.services.dispatch_guard_service import (
+from vuna_transport.services.execution.dispatch_guard_service import (
 	lock_document,
 	set_delivery_load_status,
 	validate_load_is_operational,
 )
-from vuna_transport.services.delivery_method_service import (
+from vuna_transport.services.demand.delivery_method_service import (
 	validate_delivery_method_allows_vehicle_allocation,
 )
-from vuna_transport.services.security_service import (
+from vuna_transport.services.shared.security_service import (
 	require_doctype_permission,
 	require_document_permission,
 )
-from vuna_transport.services.driver_availability_service import (
+from vuna_transport.services.fleet.driver_availability_service import (
 	evaluate_driver_availability,
 )
-from vuna_transport.services.resource_scheduling_service import time_windows_overlap
-from vuna_transport.services.vehicle_availability_service import (
+from vuna_transport.services.shared.resource_scheduling_service import time_windows_overlap
+from vuna_transport.services.fleet.vehicle_availability_service import (
 	evaluate_vehicle_availability,
 )
-from vuna_transport.services.workflow_policy_service import (
+from vuna_transport.services.shared.workflow_policy_service import (
 	allocation_is_required_before_delivery_notes,
 )
 
@@ -250,7 +250,7 @@ def _validate_initial_allocation_sequence(load, allocation=None):
 def _validate_vehicle_category_for_load(load, vehicle_category):
 	if not vehicle_category:
 		frappe.throw(_("Select a Vehicle Category for the allocated vehicle."))
-	from vuna_transport.services.delivery_load_service import validate_capacity
+	from vuna_transport.services.planning.delivery_load_service import validate_capacity
 
 	validate_capacity(load, vehicle_category)
 

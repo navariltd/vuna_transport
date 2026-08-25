@@ -1,11 +1,11 @@
 import frappe
 
-from vuna_transport.services.security_service import require_document_permission
-from vuna_transport.services.delivery_load_service import get_compatible_vehicle_category_names
-from vuna_transport.services.driver_availability_service import (
+from vuna_transport.services.shared.security_service import require_document_permission
+from vuna_transport.services.planning.delivery_load_service import get_compatible_vehicle_category_names
+from vuna_transport.services.fleet.driver_availability_service import (
 	get_driver_availability_map,
 )
-from vuna_transport.services.vehicle_availability_service import (
+from vuna_transport.services.fleet.vehicle_availability_service import (
 	get_vehicle_availability_map,
 )
 

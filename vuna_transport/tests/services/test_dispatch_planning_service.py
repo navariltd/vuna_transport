@@ -5,7 +5,7 @@ from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
 from frappe.utils import getdate
 
-from vuna_transport.services.dispatch_planning_service import (
+from vuna_transport.services.planning.dispatch_planning_service import (
 	_delivery_date_filter,
 	_filter_allocation_state,
 	_planning_filters,

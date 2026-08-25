@@ -6,11 +6,11 @@ from frappe import _
 from frappe.utils import flt
 from frappe.model.document import Document
 
-from vuna_transport.services.measurement_service import get_transport_uoms
+from vuna_transport.services.shared.measurement_service import get_transport_uoms
 
-from vuna_transport.services.delivery_load_service import create_delivery_load
-from vuna_transport.services.location_service import set_delivery_order_location_snapshots
-from vuna_transport.services.security_service import require_doctype_permission
+from vuna_transport.services.planning.delivery_load_service import create_delivery_load
+from vuna_transport.services.routing.location_service import set_delivery_order_location_snapshots
+from vuna_transport.services.shared.security_service import require_doctype_permission
 
 
 class DeliveryOrder(Document):

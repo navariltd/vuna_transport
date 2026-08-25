@@ -6,8 +6,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, add_to_date, get_datetime, now_datetime
 
-from vuna_transport.services.resource_scheduling_service import interval_overlaps
-from vuna_transport.services.vehicle_compliance_service import (
+from vuna_transport.services.shared.resource_scheduling_service import interval_overlaps
+from vuna_transport.services.fleet.vehicle_compliance_service import (
 	get_vehicle_compliance_map,
 )
 
@@ -562,7 +562,7 @@ def _primary_reason(reasons, state):
 
 def _get_compatible_categories(required_vehicle_category, delivery_load):
 	if delivery_load:
-		from vuna_transport.services.delivery_load_service import (
+		from vuna_transport.services.planning.delivery_load_service import (
 			get_compatible_vehicle_category_names,
 		)
 

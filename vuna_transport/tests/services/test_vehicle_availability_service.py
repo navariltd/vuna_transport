@@ -6,12 +6,12 @@ from types import SimpleNamespace
 from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
 
-from vuna_transport.services.driver_availability_service import (
+from vuna_transport.services.fleet.driver_availability_service import (
 	_evaluate_driver,
 	_normalize_interval as normalize_driver_interval,
 )
-from vuna_transport.services.resource_scheduling_service import interval_overlaps
-from vuna_transport.services.vehicle_availability_service import (
+from vuna_transport.services.shared.resource_scheduling_service import interval_overlaps
+from vuna_transport.services.fleet.vehicle_availability_service import (
 	_evaluate_vehicle,
 	_normalize_interval as normalize_vehicle_interval,
 )

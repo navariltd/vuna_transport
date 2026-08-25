@@ -4,12 +4,12 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
-from vuna_transport.services.dispatch_guard_service import (
+from vuna_transport.services.execution.dispatch_guard_service import (
 	get_locked_delivery_load,
 	set_delivery_load_status,
 	validate_load_is_operational,
 )
-from vuna_transport.services.vehicle_allocation_service import get_active_allocation
+from vuna_transport.services.fleet.vehicle_allocation_service import get_active_allocation
 
 
 def populate_delivery_note_delivery_links(doc, method=None):
@@ -172,7 +172,7 @@ def validate_delivery_trip(doc, method=None):
 	execution_vehicle = doc.vuna_current_vehicle or doc.vehicle
 	if execution_vehicle and load.required_vehicle_category:
 		vehicle_category = frappe.db.get_value("Vehicle", execution_vehicle, "vuna_vehicle_category")
-		from vuna_transport.services.delivery_load_service import validate_capacity
+		from vuna_transport.services.planning.delivery_load_service import validate_capacity
 
 		validate_capacity(load, vehicle_category)
 
@@ -321,7 +321,7 @@ def reconcile_load_after_delivery_note_cancel(doc, method=None):
 
 
 def _recompute_delivery_order_statuses(delivery_load):
-	from vuna_transport.services.pod_service import recompute_delivery_order_status
+	from vuna_transport.services.execution.pod_service import recompute_delivery_order_status
 
 	for delivery_order in _get_delivery_orders(delivery_load):
 		recompute_delivery_order_status(delivery_order)
