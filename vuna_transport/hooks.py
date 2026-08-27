@@ -209,6 +209,10 @@ doc_events = {
 		"on_submit": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 		"on_cancel": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
+	"Vehicle Incident": {
+		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+		"after_delete": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+	},
 }
 
 doctype_js = {

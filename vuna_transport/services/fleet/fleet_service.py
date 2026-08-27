@@ -112,7 +112,11 @@ def sync_related_vehicle_snapshots(doc, method=None):
 	doctype = doc.doctype
 	if doctype == "Vehicle":
 		vehicle_names.add(doc.name)
-	elif doctype in ("Vehicle Document", "Vehicle Availability Block"):
+	elif doctype in (
+		"Vehicle Document",
+		"Vehicle Availability Block",
+		"Vehicle Incident",
+	):
 		_add_name(vehicle_names, getattr(doc, "vehicle", None))
 	elif doctype == "Vehicle Allocation":
 		_add_name(vehicle_names, getattr(doc, "vehicle", None))

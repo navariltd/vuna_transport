@@ -60,7 +60,7 @@ def make_vehicle_allocation_from_load(source_name):
 @frappe.whitelist()
 def make_replacement_allocation_from_load(source_name):
 	"""Prepare an auditable replacement for the load's current allocation."""
-	return _make_replacement_allocation(source_name)
+	return make_replacement_allocation(source_name)
 
 
 @frappe.whitelist()
@@ -69,7 +69,12 @@ def make_replacement_allocation_from_trip(source_name):
 	require_document_permission(trip, "read")
 	if not trip.vuna_delivery_load:
 		frappe.throw(_("Delivery Trip {0} is not linked to a Delivery Load.").format(trip.name))
-	return _make_replacement_allocation(trip.vuna_delivery_load)
+	return make_replacement_allocation(trip.vuna_delivery_load)
+
+
+def make_replacement_allocation(delivery_load):
+	"""Build a replacement through the canonical reallocation workflow."""
+	return _make_replacement_allocation(delivery_load)
 
 
 def _make_replacement_allocation(delivery_load):

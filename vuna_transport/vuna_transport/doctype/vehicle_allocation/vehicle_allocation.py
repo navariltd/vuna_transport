@@ -15,6 +15,18 @@ from vuna_transport.services.fleet.vehicle_allocation_service import (
 class VehicleAllocation(Document):
 	def validate(self):
 		validate_allocation(self)
+		from vuna_transport.services.fleet.vehicle_incident_service import (
+			validate_replacement_allocation_incident,
+		)
+
+		validate_replacement_allocation_incident(self)
+
+	def after_insert(self):
+		from vuna_transport.services.fleet.vehicle_incident_service import (
+			link_replacement_allocation_to_incident,
+		)
+
+		link_replacement_allocation_to_incident(self)
 
 	def before_submit(self):
 		self.status = "Allocated"

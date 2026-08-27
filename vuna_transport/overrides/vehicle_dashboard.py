@@ -9,6 +9,7 @@ def get_data(data):
 			"Vehicle Document": "vehicle",
 			"Vehicle Availability Block": "vehicle",
 			"Vehicle Allocation": "vehicle",
+			"Vehicle Incident": "vehicle",
 		}
 	)
 	data["transactions"].append(
@@ -18,6 +19,7 @@ def get_data(data):
 				"Vehicle Document",
 				"Vehicle Availability Block",
 				"Vehicle Allocation",
+				"Vehicle Incident",
 			],
 		}
 	)
