@@ -226,6 +226,28 @@ def get_vehicle_availability_map(
 	blocks_by_vehicle = defaultdict(list)
 	for block in availability_blocks:
 		blocks_by_vehicle[block.vehicle].append(block)
+	incidents = []
+	if frappe.db.table_exists("Vehicle Incident"):
+		incidents = frappe.get_all(
+			"Vehicle Incident",
+			filters={
+				"vehicle": ["in", vehicle_names],
+				"resolution_status": ["not in", ["Resolved", "Closed"]],
+			},
+			fields=[
+				"name",
+				"vehicle",
+				"incident_type",
+				"incident_datetime",
+				"severity",
+				"vehicle_immobilized",
+				"resolution_status",
+			],
+			order_by="incident_datetime desc",
+		)
+	incidents_by_vehicle = defaultdict(list)
+	for incident in incidents:
+		incidents_by_vehicle[incident.vehicle].append(incident)
 
 	allocations = frappe.get_all(
 		"Vehicle Allocation",
@@ -299,6 +321,7 @@ def get_vehicle_availability_map(
 			repairs_by_asset.get(vehicle.vuna_asset, []),
 			compliance_by_vehicle.get(vehicle.name),
 			blocks_by_vehicle.get(vehicle.name, []),
+			incidents_by_vehicle.get(vehicle.name, []),
 			allocations_by_vehicle.get(vehicle.name, []),
 			trips_by_vehicle.get(vehicle.name, []),
 			loads,
@@ -333,6 +356,7 @@ def _evaluate_vehicle(
 	asset_repairs,
 	compliance,
 	availability_blocks,
+	incidents,
 	allocations,
 	trips,
 	loads,
@@ -489,6 +513,26 @@ def _evaluate_vehicle(
 		)
 		next_available_at = _latest_datetime(next_available_at, block.to_datetime)
 
+	blocking_incidents = [
+		incident
+		for incident in incidents
+		if incident.vehicle_immobilized
+		and incident.resolution_status not in ("Resolved", "Closed")
+	]
+	for incident in blocking_incidents:
+		if state == "Available":
+			state = "Unavailable"
+		reasons.append(
+			_reason(
+				"IMMOBILIZING_INCIDENT",
+				_("Open immobilizing Vehicle Incident {0}: {1}.").format(
+					incident.name, incident.incident_type
+				),
+				"Vehicle Incident",
+				incident.name,
+			)
+		)
+
 	for allocation in allocations:
 		load = loads.get(allocation.delivery_load)
 		allocation_from = load.planned_departure if load else allocation.effective_from
@@ -529,6 +573,9 @@ def _evaluate_vehicle(
 		active_asset_repair=asset_repairs[0].name if asset_repairs else None,
 		current_availability_block=(
 			availability_blocks[0].name if availability_blocks else None
+		),
+		current_vehicle_incident=(
+			blocking_incidents[0].name if blocking_incidents else None
 		),
 		compliance_status=compliance.status if compliance else "Compliant",
 		compliance_reasons=compliance.reasons if compliance else [],
@@ -634,6 +681,7 @@ def _missing_vehicle_result(vehicle):
 		asset_status=None,
 		active_asset_repair=None,
 		current_availability_block=None,
+		current_vehicle_incident=None,
 		compliance_status="Blocked",
 		compliance_reasons=[reason],
 		compliance_warnings=[],

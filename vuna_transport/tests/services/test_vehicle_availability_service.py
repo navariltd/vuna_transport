@@ -96,6 +96,41 @@ class TestVehicleAvailabilityService(UnitTestCase):
 		self.assertEqual(result.current_availability_block, "VAB-1")
 		self.assertEqual(result.reasons[0].code, "AVAILABILITY_BLOCK")
 
+	def test_open_immobilizing_incident_blocks_vehicle(self):
+		incident = SimpleNamespace(
+			name="VI-2026-00001",
+			incident_type="Breakdown",
+			vehicle_immobilized=1,
+			resolution_status="Open",
+		)
+		result = self._evaluate(incidents=[incident])
+		self.assertFalse(result.dispatch_eligible)
+		self.assertEqual(result.operational_state, "Unavailable")
+		self.assertEqual(result.current_vehicle_incident, incident.name)
+		reason = next(
+			reason for reason in result.reasons if reason.code == "IMMOBILIZING_INCIDENT"
+		)
+		self.assertEqual(reason.reference_doctype, "Vehicle Incident")
+		self.assertEqual(reason.reference_name, incident.name)
+
+	def test_non_immobilizing_incident_does_not_block_vehicle(self):
+		incident = SimpleNamespace(
+			name="VI-2026-00002",
+			incident_type="Cargo Incident",
+			vehicle_immobilized=0,
+			resolution_status="Open",
+		)
+		self.assertTrue(self._evaluate(incidents=[incident]).dispatch_eligible)
+
+	def test_resolved_incident_releases_vehicle(self):
+		incident = SimpleNamespace(
+			name="VI-2026-00003",
+			incident_type="Breakdown",
+			vehicle_immobilized=1,
+			resolution_status="Resolved",
+		)
+		self.assertTrue(self._evaluate(incidents=[incident]).dispatch_eligible)
+
 	def test_compliance_block_is_included_in_availability(self):
 		reason = SimpleNamespace(
 			code="DOCUMENT_MISSING",
@@ -223,6 +258,7 @@ class TestVehicleAvailabilityService(UnitTestCase):
 		asset_repairs=None,
 		compliance="default",
 		availability_blocks=None,
+		incidents=None,
 	):
 		return _evaluate_vehicle(
 			self.vehicle,
@@ -230,6 +266,7 @@ class TestVehicleAvailabilityService(UnitTestCase):
 			asset_repairs or [],
 			self.compliance if compliance == "default" else compliance,
 			availability_blocks or [],
+			incidents or [],
 			allocations or [],
 			trips or [],
 			loads or {},
