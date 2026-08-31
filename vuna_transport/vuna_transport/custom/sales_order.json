@@ -14,21 +14,7 @@
  ],
  "custom_perms": [],
  "doctype": "Sales Order",
- "links": [
-  {
-   "custom": 1,
-   "group": "Transport",
-   "hidden": 0,
-   "is_child_table": 0,
-   "link_doctype": "Delivery Order",
-   "link_fieldname": "sales_order",
-   "parent": "Sales Order",
-   "parent_doctype": "DocType",
-   "parentfield": "links",
-   "parenttype": "DocType",
-   "table_fieldname": null
-  }
- ],
+ "links": [],
  "property_setters": [],
  "sync_on_migrate": 1
 }
