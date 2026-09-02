@@ -6,6 +6,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import getdate
 
+from vuna_transport.services.fleet.vehicle_owner_service import normalize_vehicle_owner
+
 
 class VehicleDocument(Document):
 	def validate(self):
@@ -55,7 +57,7 @@ class VehicleDocument(Document):
 		vehicle = frappe.db.get_value(
 			"Vehicle",
 			self.vehicle,
-			["vuna_vehicle_category", "vuna_ownership_type"],
+			["vuna_vehicle_category", "vuna_vehicle_owner"],
 			as_dict=True,
 		)
 		if (
@@ -68,12 +70,13 @@ class VehicleDocument(Document):
 				)
 			)
 		if (
-			document_type.ownership_type
-			and document_type.ownership_type != vehicle.vuna_ownership_type
+			document_type.vehicle_owner
+			and normalize_vehicle_owner(document_type.vehicle_owner)
+			!= normalize_vehicle_owner(vehicle.vuna_vehicle_owner)
 		):
 			frappe.throw(
 				_("Vehicle Document Type {0} applies to {1} Vehicles.").format(
-					document_type.name, document_type.ownership_type
+					document_type.name, document_type.vehicle_owner
 				)
 			)
 		if document_type.requires_expiry_date and not self.expiry_date:

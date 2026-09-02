@@ -49,15 +49,15 @@
    "module": "Vuna Transport"
   },
   {
-   "default": "Company Owned",
+   "default": "Company",
    "dt": "Vehicle",
-   "fieldname": "vuna_ownership_type",
+   "fieldname": "vuna_vehicle_owner",
    "fieldtype": "Select",
    "in_standard_filter": 1,
    "insert_after": "vuna_transport_enabled",
-   "label": "Ownership Type",
+   "label": "Vehicle Owner",
    "module": "Vuna Transport",
-   "options": "Company Owned\nLeased\nSubcontracted"
+   "options": "Company\nSupplier"
   },
   {
    "description": "ERPNext Asset used as the maintenance and repair authority for this physical vehicle.",
@@ -65,11 +65,12 @@
    "fieldname": "vuna_asset",
    "fieldtype": "Link",
    "in_standard_filter": 1,
-   "insert_after": "vuna_ownership_type",
+   "insert_after": "vuna_vehicle_owner",
    "label": "Asset",
    "module": "Vuna Transport",
    "options": "Asset",
-   "mandatory_depends_on": "eval:doc.vuna_transport_enabled && doc.vuna_ownership_type == 'Company Owned'"
+   "depends_on": "eval:doc.vuna_transport_enabled && doc.vuna_vehicle_owner == 'Company'",
+   "mandatory_depends_on": "eval:doc.vuna_transport_enabled && doc.vuna_vehicle_owner == 'Company'"
   },
   {
    "dt": "Vehicle",
@@ -77,24 +78,16 @@
    "fieldtype": "Link",
    "insert_after": "vuna_asset",
    "label": "Supplier",
-   "mandatory_depends_on": "eval:doc.vuna_ownership_type == 'Leased' || doc.vuna_ownership_type == 'Subcontracted'",
+   "depends_on": "eval:doc.vuna_vehicle_owner == 'Supplier'",
+   "mandatory_depends_on": "eval:doc.vuna_vehicle_owner == 'Supplier'",
    "module": "Vuna Transport",
    "options": "Supplier"
   },
   {
    "dt": "Vehicle",
-   "fieldname": "vuna_home_location",
-   "fieldtype": "Link",
-   "insert_after": "vuna_supplier",
-   "label": "Home Location",
-   "module": "Vuna Transport",
-   "options": "Address"
-  },
-  {
-   "dt": "Vehicle",
    "fieldname": "vuna_operational_status_section",
    "fieldtype": "Section Break",
-   "insert_after": "vuna_home_location",
+   "insert_after": "vuna_supplier",
    "label": "Operational Availability",
    "module": "Vuna Transport"
   },
@@ -157,6 +150,25 @@
  "custom_perms": [],
  "doctype": "Vehicle",
  "links": [],
- "property_setters": [],
+ "property_setters": [
+  {
+   "doctype_or_field": "DocField",
+   "doc_type": "Vehicle",
+   "field_name": "make",
+   "module": "Vuna Transport",
+   "property": "hidden",
+   "property_type": "Check",
+   "value": "1"
+  },
+  {
+   "doctype_or_field": "DocField",
+   "doc_type": "Vehicle",
+   "field_name": "model",
+   "module": "Vuna Transport",
+   "property": "hidden",
+   "property_type": "Check",
+   "value": "1"
+  }
+ ],
  "sync_on_migrate": 1
 }

@@ -16,6 +16,9 @@
   "model_year",
   "fuel_type",
   "disabled",
+  "media_section",
+  "image",
+  "description",
   "specifications_tab",
   "weight_section",
   "gross_vehicle_weight",
@@ -25,10 +28,7 @@
   "column_break_capacity",
   "default_volume",
   "volume_uom",
-  "refrigerated_supported",
-  "media_section",
-  "image",
-  "description"
+  "refrigerated_supported"
  ],
  "fields": [
   {
@@ -65,8 +65,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Vehicle Category",
-   "options": "Vehicle Category",
-   "reqd": 1
+   "options": "Vehicle Category"
   },
   {
    "fieldname": "column_break_identity",
@@ -170,7 +169,7 @@
    "link_fieldname": "vuna_vehicle_model"
   }
  ],
- "modified": "2026-08-16 15:50:49.666893",
+ "modified": "2026-09-02 13:33:32.886208",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Model",

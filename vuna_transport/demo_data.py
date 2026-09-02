@@ -286,7 +286,7 @@ def _ensure_vehicles(categories):
 		doc.uom = "Litre"
 		doc.vuna_vehicle_category = categories[category_label]
 		doc.vuna_transport_enabled = 1
-		doc.vuna_ownership_type = "Company Owned"
+		doc.vuna_vehicle_owner = "Company"
 		doc.save(ignore_permissions=True)
 		vehicles.append(doc.name)
 	return vehicles

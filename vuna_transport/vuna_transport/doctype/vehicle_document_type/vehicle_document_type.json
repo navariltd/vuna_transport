@@ -17,7 +17,8 @@
   "warning_days_before_expiry",
   "applicability_section",
   "vehicle_category",
-  "ownership_type"
+  "column_break_zfwr",
+  "vehicle_owner"
  ],
  "fields": [
   {
@@ -93,18 +94,22 @@
    "options": "Vehicle Category"
   },
   {
-   "description": "Leave blank to apply to every ownership type.",
-   "fieldname": "ownership_type",
+   "fieldname": "column_break_zfwr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Leave blank to apply to every Vehicle Owner.",
+   "fieldname": "vehicle_owner",
    "fieldtype": "Select",
    "in_standard_filter": 1,
-   "label": "Ownership Type",
-   "options": "\nCompany Owned\nLeased\nSubcontracted"
+   "label": "Vehicle Owner",
+   "options": "\nCompany\nSupplier"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-24 20:27:13.396379",
+ "modified": "2026-09-02 13:52:56.885811",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Document Type",

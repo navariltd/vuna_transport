@@ -9,6 +9,7 @@ from vuna_transport.services.fleet.vehicle_availability_service import (
 	get_vehicle_availability_map,
 	get_vehicle_status,
 )
+from vuna_transport.services.fleet.vehicle_owner_service import normalize_vehicle_owner
 
 
 def validate_vehicle(doc, method=None):
@@ -23,7 +24,8 @@ def validate_vehicle(doc, method=None):
 
 	doc.make = vehicle_model.manufacturer
 	doc.model = vehicle_model.model_name
-	doc.vuna_vehicle_category = vehicle_model.vehicle_category
+	if vehicle_model.vehicle_category:
+		doc.vuna_vehicle_category = vehicle_model.vehicle_category
 	if vehicle_model.fuel_type and vehicle_model.fuel_type in (
 		"Petrol",
 		"Diesel",
@@ -70,7 +72,7 @@ def _validate_vehicle_asset(doc):
 	if not asset_name:
 		if (
 			getattr(doc, "vuna_transport_enabled", 0)
-			and getattr(doc, "vuna_ownership_type", None) == "Company Owned"
+			and normalize_vehicle_owner(getattr(doc, "vuna_vehicle_owner", None)) == "Company"
 		):
 			frappe.throw(_("A company-owned transport Vehicle must have a linked Asset."))
 		return

@@ -113,6 +113,7 @@
    "fieldtype": "Link",
    "label": "Payload Weight UOM",
    "options": "UOM",
+   "default": "Kg",
    "reqd": 1
   },
   {
@@ -170,6 +171,7 @@
    "fieldtype": "Link",
    "label": "Volume UOM",
    "options": "UOM",
+   "default": "Cubic Meter",
    "reqd": 1
   },
   {

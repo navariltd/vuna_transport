@@ -6,6 +6,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, getdate, nowdate
 
+from vuna_transport.services.fleet.vehicle_owner_service import normalize_vehicle_owner
+
 
 STANDARD_INSURANCE_TYPE = "insurance"
 
@@ -19,7 +21,7 @@ def get_vehicle_compliance(vehicle, at_time=None):
 			"name",
 			"company",
 			"vuna_vehicle_category",
-			"vuna_ownership_type",
+			"vuna_vehicle_owner",
 			"policy_no",
 			"start_date",
 			"end_date",
@@ -46,7 +48,7 @@ def get_vehicle_compliance_map(vehicles, at_time=None):
 			"document_type_name",
 			"company",
 			"vehicle_category",
-			"ownership_type",
+			"vehicle_owner",
 			"mandatory_for_dispatch",
 			"requires_expiry_date",
 			"warning_days_before_expiry",
@@ -159,8 +161,9 @@ def _requirement_applies(requirement, vehicle):
 			or requirement.vehicle_category == vehicle.vuna_vehicle_category
 		)
 		and (
-			not requirement.ownership_type
-			or requirement.ownership_type == vehicle.vuna_ownership_type
+			not requirement.vehicle_owner
+			or normalize_vehicle_owner(requirement.vehicle_owner)
+			== normalize_vehicle_owner(vehicle.vuna_vehicle_owner)
 		)
 	)
 
