@@ -89,7 +89,7 @@ add_to_apps_screen = [
 # ------------
 
 # before_install = "vuna_transport.install.before_install"
-# after_install = "vuna_transport.install.after_install"
+after_install = "vuna_transport.install.after_install"
 
 # Uninstallation
 # ------------
@@ -242,6 +242,7 @@ fixtures = [
 ]
 
 after_migrate = [
+	"vuna_transport.install.ensure_transport_uoms",
 	"vuna_transport.services.routing.location_service.backfill_address_coordinates",
 	"vuna_transport.services.fleet.fleet_service.sync_vehicle_operational_snapshots",
 ]

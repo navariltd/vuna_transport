@@ -135,15 +135,13 @@
    "fieldname": "default_distance_uom",
    "fieldtype": "Link",
    "label": "Default Distance UOM",
-   "options": "UOM",
-   "default": "Kilometer"
+   "options": "UOM"
   },
   {
    "fieldname": "default_weight_uom",
    "fieldtype": "Link",
    "label": "Default Weight UOM",
    "options": "UOM",
-   "default": "Kg",
    "reqd": 1
   },
   {
@@ -151,7 +149,6 @@
    "fieldtype": "Link",
    "label": "Default Volume UOM",
    "options": "UOM",
-   "default": "Cubic Meter",
    "reqd": 1
   },
   {

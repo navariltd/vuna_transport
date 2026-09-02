@@ -163,11 +163,29 @@
   {
    "doctype_or_field": "DocField",
    "doc_type": "Vehicle",
+   "field_name": "make",
+   "module": "Vuna Transport",
+   "property": "reqd",
+   "property_type": "Check",
+   "value": "0"
+  },
+  {
+   "doctype_or_field": "DocField",
+   "doc_type": "Vehicle",
    "field_name": "model",
    "module": "Vuna Transport",
    "property": "hidden",
    "property_type": "Check",
    "value": "1"
+  },
+  {
+   "doctype_or_field": "DocField",
+   "doc_type": "Vehicle",
+   "field_name": "model",
+   "module": "Vuna Transport",
+   "property": "reqd",
+   "property_type": "Check",
+   "value": "0"
   }
  ],
  "sync_on_migrate": 1
