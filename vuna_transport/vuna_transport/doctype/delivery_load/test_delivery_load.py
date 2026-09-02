@@ -199,6 +199,31 @@ class TestDeliveryLoad(UnitTestCase):
 		with self.assertRaises(ValidationError):
 			validate_delivery_note_item_allocations(items, {"SOI-1": 50}, "LOAD-1")
 
+	@patch("vuna_transport.services.execution.lineage_service.frappe.db.sql")
+	def test_multiple_delivery_notes_cannot_exceed_cumulative_load_allocation(self, sql):
+		sql.return_value = [{"so_detail": "SOI-1", "quantity": 30}]
+		items = [SimpleNamespace(so_detail="SOI-1", item_code="ITEM-1", qty=21)]
+		with self.assertRaises(ValidationError):
+			validate_delivery_note_item_allocations(
+				items,
+				{"SOI-1": 50},
+				"LOAD-1",
+				delivery_order="DO-1",
+				current_name="DN-2",
+			)
+
+	@patch("vuna_transport.services.execution.lineage_service.frappe.db.sql")
+	def test_multiple_delivery_notes_within_load_allocation_are_allowed(self, sql):
+		sql.return_value = [{"so_detail": "SOI-1", "quantity": 30}]
+		items = [SimpleNamespace(so_detail="SOI-1", item_code="ITEM-1", qty=20)]
+		validate_delivery_note_item_allocations(
+			items,
+			{"SOI-1": 50},
+			"LOAD-1",
+			delivery_order="DO-1",
+			current_name="DN-2",
+		)
+
 	def test_delivery_trip_stops_must_match_submitted_delivery_notes(self):
 		validate_delivery_trip_note_set({"DN-1", "DN-2"}, ["DN-1", "DN-2"])
 		with self.assertRaises(ValidationError):
@@ -206,7 +231,8 @@ class TestDeliveryLoad(UnitTestCase):
 
 	def test_completed_load_cannot_return_to_planning(self):
 		self.assertFalse(is_load_status_transition_allowed("Completed", "Approved"))
-		self.assertTrue(is_load_status_transition_allowed("Completed", "Dispatched"))
+		self.assertFalse(is_load_status_transition_allowed("Completed", "Dispatched"))
+		self.assertTrue(is_load_status_transition_allowed("Completed", "Exception Resolution"))
 
 	def test_vehicle_category_rejects_any_exceeded_capacity_dimension(self):
 		category = SimpleNamespace(

@@ -93,27 +93,48 @@ def _validate_delivery_note_against_load(doc, load):
 	allocated_by_sales_order_item = {
 		row.sales_order_item: flt(item_allocations[row.name]) for row in order_items
 	}
-	validate_delivery_note_item_allocations(doc.items, allocated_by_sales_order_item, load.name)
-
-	duplicate = frappe.db.get_value(
-		"Delivery Note",
-		{
-			"name": ["!=", doc.name or ""],
-			"vuna_delivery_load": load.name,
-			"vuna_delivery_order": doc.vuna_delivery_order,
-			"docstatus": ["!=", 2],
-		},
-		"name",
+	validate_delivery_note_item_allocations(
+		doc.items, allocated_by_sales_order_item, load.name, doc.vuna_delivery_order, doc.name
 	)
-	if duplicate:
-		frappe.throw(
-			_("Delivery Note {0} already exists for this Delivery Order on Delivery Load {1}.").format(
-				duplicate, load.name
-			)
+
+
+def validate_delivery_note_item_allocations(
+	items, allocated_by_sales_order_item, load_name, delivery_order=None, current_name=None
+):
+	"""Validate cumulative Delivery Note quantities against one load allocation.
+
+	One Delivery Order may be fulfilled by multiple Delivery Notes. The sum of
+	active notes, excluding the note currently being validated, must stay within
+	the load's allocation.
+	"""
+	existing_quantities = {}
+	if delivery_order and allocated_by_sales_order_item:
+		existing_rows = frappe.db.sql(
+			"""
+				select dni.so_detail, coalesce(sum(coalesce(dni.stock_qty, dni.qty)), 0) as quantity
+				from `tabDelivery Note Item` dni
+				join `tabDelivery Note` dn on dn.name = dni.parent
+				where dn.vuna_delivery_load = %(load_name)s
+				and dn.vuna_delivery_order = %(delivery_order)s
+				and dn.docstatus != 2
+				and dn.name != %(current_name)s
+				group by dni.so_detail
+			""",
+			{
+				"load_name": load_name,
+				"delivery_order": delivery_order,
+				"current_name": current_name or "",
+			},
+			as_dict=True,
 		)
+		existing_quantities = {
+			(row.get("so_detail") if isinstance(row, dict) else row.so_detail): flt(
+				row.get("quantity") if isinstance(row, dict) else row.quantity
+			)
+			for row in existing_rows
+		}
 
-
-def validate_delivery_note_item_allocations(items, allocated_by_sales_order_item, load_name):
+	current_quantities = {}
 	for item in items:
 		if item.so_detail not in allocated_by_sales_order_item:
 			frappe.throw(
@@ -121,9 +142,15 @@ def validate_delivery_note_item_allocations(items, allocated_by_sales_order_item
 					item.item_code, load_name
 				)
 			)
-		if flt(item.qty) > flt(allocated_by_sales_order_item[item.so_detail]):
+		current_quantities[item.so_detail] = current_quantities.get(item.so_detail, 0) + flt(
+			getattr(item, "stock_qty", None) or getattr(item, "qty", None)
+		)
+	for so_detail, quantity in current_quantities.items():
+		if existing_quantities.get(so_detail, 0) + quantity > flt(allocated_by_sales_order_item[so_detail]):
 			frappe.throw(
-				_("Delivery Note quantity for {0} exceeds its load allocation.").format(item.item_code)
+				_(
+					"Cumulative Delivery Note quantity for Sales Order Item {0} exceeds its load allocation."
+				).format(so_detail)
 			)
 
 

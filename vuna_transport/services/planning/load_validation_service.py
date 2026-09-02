@@ -4,7 +4,7 @@ from collections import defaultdict
 
 import frappe
 from frappe import _
-from frappe.utils import flt, getdate
+from frappe.utils import flt
 
 from vuna_transport.services.demand.delivery_method_service import (
 	canonical_delivery_method,
@@ -129,8 +129,6 @@ def _validate_delivery_order_for_load(load, delivery_order, first_order):
 			_("Delivery Order {0} does not match the load's Delivery Method.").format(delivery_order.name)
 		)
 
-	if getdate(delivery_order.required_delivery_date) != getdate(first_order.required_delivery_date):
-		frappe.throw(_("All Delivery Orders in a load must have the same required delivery date."))
 	if (
 		delivery_order.transport_compatibility_group
 		and first_order.transport_compatibility_group

@@ -4,7 +4,7 @@ from collections import defaultdict
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, getdate
+from frappe.utils import add_days, cint, flt, getdate
 
 from vuna_transport.services.demand.delivery_method_service import (
 	canonical_delivery_method,
@@ -93,7 +93,15 @@ def suggest_delivery_loads(
 	candidates = []
 	exclusions = []
 	for pool in _partition_orders(orders).values():
-		availability = get_available_vehicle_category_counts(pool[0].company, pool[0].required_delivery_date)
+		pool_dates = [getdate(order.required_delivery_date) for order in pool if order.required_delivery_date]
+		first_date = min(pool_dates) if pool_dates else None
+		last_date = max(pool_dates) if pool_dates else first_date
+		availability = get_available_vehicle_category_counts(
+			pool[0].company,
+			first_date,
+			from_time=f"{first_date} 00:00:00" if first_date else None,
+			to_time=f"{add_days(last_date, 1)} 00:00:00" if last_date else None,
+		)
 		for category in categories:
 			available_count = cint(availability["counts"].get(category.name))
 			for strategy in STRATEGIES:
@@ -329,8 +337,6 @@ def _partition_orders(orders):
 	for order in orders:
 		key = (
 			order.company,
-			order.source_warehouse,
-			getdate(order.required_delivery_date),
 			canonical_delivery_method(order.delivery_method) or "",
 			(order.transport_compatibility_group or "").strip().lower(),
 			order.transport_zone or "",
@@ -399,12 +405,24 @@ def _build_candidate(pool, category, strategy):
 	result = evaluate_vehicle_category(totals, category, requirements)
 	if not result["compatible"]:
 		return None
+	source_warehouses = sorted(
+		{order.source_warehouse for order in included_orders if order.source_warehouse}
+	)
+	delivery_dates = sorted(
+		{
+			str(getdate(order.required_delivery_date))
+			for order in included_orders
+			if order.required_delivery_date
+		}
+	)
 	return {
 		"vehicle_category": category.name,
 		"vehicle_category_label": category.vehicle_category_name or category.name,
 		"company": pool[0].company,
-		"source_warehouse": pool[0].source_warehouse,
-		"delivery_date": pool[0].required_delivery_date,
+		"source_warehouse": source_warehouses[0] if len(source_warehouses) == 1 else None,
+		"source_warehouses": source_warehouses,
+		"delivery_date": delivery_dates[0] if len(delivery_dates) == 1 else None,
+		"delivery_dates": delivery_dates,
 		"delivery_method": canonical_delivery_method(pool[0].delivery_method),
 		"transport_zone": pool[0].transport_zone,
 		"transport_route": pool[0].preferred_route,
@@ -450,7 +468,7 @@ def _score_candidate(candidate):
 	)
 
 	reasons = [
-		_("Same company, source warehouse and delivery date."),
+		_("Same company and compatible fulfilment requirements."),
 		_("{0}% bottleneck capacity utilization.").format(round(utilization_score, 1)),
 	]
 	warnings = []
@@ -526,8 +544,6 @@ def _validate_acceptance_context(delivery_orders, first):
 			)
 		comparisons = (
 			("company", "company"),
-			("source_warehouse", "source warehouse"),
-			("required_delivery_date", "delivery date"),
 			("transport_zone", "Transport Zone"),
 			("transport_handling_profile", "handling profile"),
 			("transport_compatibility_group", "Transport Compatibility Group"),

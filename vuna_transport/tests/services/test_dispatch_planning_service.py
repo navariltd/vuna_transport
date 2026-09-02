@@ -12,6 +12,7 @@ from vuna_transport.services.planning.dispatch_planning_service import (
 	_summarize_vehicle_categories,
 	_warehouse_summaries,
 )
+from vuna_transport.services.planning.load_suggestion_service import _partition_orders
 
 
 class TestDispatchPlanningService(UnitTestCase):
@@ -91,6 +92,15 @@ class TestDispatchPlanningService(UnitTestCase):
 		self.assertEqual(summary["under_maintenance"], 1)
 		self.assertEqual(summary["compliance_blocked"], 1)
 
+	def test_suggestion_partition_allows_warehouse_and_date_variation(self):
+		orders = [
+			self._planning_order("DO-1", "Warehouse A", "2026-08-24"),
+			self._planning_order("DO-2", "Warehouse B", "2026-08-25"),
+		]
+		pools = _partition_orders(orders)
+		self.assertEqual(sum(len(pool) for pool in pools.values()), 2)
+		self.assertEqual(len(pools), 1)
+
 	@staticmethod
 	def _demand_row(warehouse, remaining, **dimensions):
 		return {
@@ -112,5 +122,25 @@ class TestDispatchPlanningService(UnitTestCase):
 				"vehicle_category": "8 Ton Truck",
 				"operational_state": state,
 				"compliance_status": compliance_status,
+			},
+		)()
+
+	@staticmethod
+	def _planning_order(name, warehouse, delivery_date):
+		return type(
+			"PlanningOrder",
+			(),
+			{
+				"name": name,
+				"company": "Vuna Foods",
+				"delivery_method": "Company Delivery",
+				"transport_compatibility_group": "Packed Dairy",
+				"transport_zone": "Nairobi East",
+				"refrigeration_required": False,
+				"tail_lift_required": False,
+				"required_body_type": None,
+				"special_equipment_required": None,
+				"source_warehouse": warehouse,
+				"required_delivery_date": delivery_date,
 			},
 		)()

@@ -75,14 +75,15 @@ def get_planning_demand(
 		filters=filters,
 		fields=_delivery_order_fields(),
 		order_by="required_delivery_date asc, priority desc, creation asc",
-		limit_start=start,
-		limit_page_length=page_length + 1,
+		limit_page_length=MAX_SUMMARY_ORDERS + 1,
 	)
-	has_more = len(page_orders) > page_length
-	page_orders = page_orders[:page_length]
+	page_pool_truncated = len(page_orders) > MAX_SUMMARY_ORDERS
+	page_orders = page_orders[:MAX_SUMMARY_ORDERS]
 	page_metrics = _get_order_metrics([row.name for row in page_orders])
-	rows = [_format_demand_row(order, page_metrics.get(order.name)) for order in page_orders]
-	rows = _filter_allocation_state(rows, allocation_state)
+	all_page_rows = [_format_demand_row(order, page_metrics.get(order.name)) for order in page_orders]
+	all_page_rows = _filter_allocation_state(all_page_rows, allocation_state)
+	has_more = page_pool_truncated or len(all_page_rows) > start + page_length
+	rows = all_page_rows[start : start + page_length]
 
 	summary_orders = frappe.get_list(
 		"Delivery Order",

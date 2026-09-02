@@ -294,7 +294,7 @@ def get_vehicle_availability_map(
 			row.name: row
 			for row in frappe.get_all(
 				"Delivery Load",
-				filters={"name": ["in", list(load_names)]},
+				filters={"name": ["in", list(load_names)], "docstatus": ["!=", 2]},
 				fields=[
 					"name",
 					"status",

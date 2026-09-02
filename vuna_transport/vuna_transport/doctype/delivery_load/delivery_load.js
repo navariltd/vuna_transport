@@ -34,6 +34,15 @@ frappe.ui.form.on("Delivery Load", {
 	},
 
 	refresh(frm) {
+		// Downstream documents retain their audit lineage. The server-side
+		// cancellation guard still blocks cancellation when submitted stock or
+		// execution documents make it unsafe.
+		frm.ignore_doctypes_on_cancel_all = [
+			"Vehicle Allocation",
+			"Pick List",
+			"Delivery Note",
+			"Delivery Trip",
+		];
 		if (frm.doc.docstatus === 0) {
 			frm.add_custom_button(
 				__("Get Items"),

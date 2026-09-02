@@ -377,8 +377,6 @@ def _validate_delivery_orders(delivery_orders):
 			frappe.throw(_("All Delivery Orders in a load must use the same Delivery Method."))
 		if delivery_order.transport_zone != first.transport_zone:
 			frappe.throw(_("All Delivery Orders in a load must use the same Transport Zone."))
-		if delivery_order.required_delivery_date != first.required_delivery_date:
-			frappe.throw(_("All Delivery Orders in a load must have the same required delivery date."))
 		if (delivery_order.transport_handling_profile or "").strip() != (
 			first.transport_handling_profile or ""
 		).strip():

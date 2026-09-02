@@ -63,18 +63,13 @@ ALLOWED_LOAD_STATUS_TRANSITIONS = {
 		"Cancelled",
 	},
 	"Dispatched": {
-		"Ready for Dispatch",
 		"Completed",
 		"Completed with Exceptions",
 		"Exception Resolution",
 	},
-	"Exception Resolution": {"Dispatched", "Completed", "Completed with Exceptions"},
-	"Completed": {"Dispatched", "Ready for Dispatch", "Exception Resolution"},
-	"Completed with Exceptions": {
-		"Dispatched",
-		"Ready for Dispatch",
-		"Exception Resolution",
-	},
+	"Exception Resolution": {"Dispatched", "Completed with Exceptions"},
+	"Completed": {"Exception Resolution"},
+	"Completed with Exceptions": {"Exception Resolution"},
 	"Cancelled": set(),
 }
 
@@ -132,10 +127,8 @@ def is_load_status_transition_allowed(current, target):
 
 def validate_load_can_be_cancelled(load):
 	linked_documents = (
-		("Delivery Trip", {"vuna_delivery_load": load.name, "docstatus": ["!=", 2]}),
-		("Delivery Note", {"vuna_delivery_load": load.name, "docstatus": ["!=", 2]}),
-		("Vehicle Allocation", {"delivery_load": load.name, "docstatus": ["!=", 2]}),
-		("Pick List", {"vuna_delivery_load": load.name, "docstatus": ["!=", 2]}),
+		("Delivery Trip", {"vuna_delivery_load": load.name, "docstatus": 1}),
+		("Delivery Note", {"vuna_delivery_load": load.name, "docstatus": 1}),
 	)
 	for doctype, filters in linked_documents:
 		linked_name = frappe.db.get_value(doctype, filters, "name")
