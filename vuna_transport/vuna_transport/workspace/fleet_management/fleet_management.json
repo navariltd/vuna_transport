@@ -2,7 +2,7 @@
  "app": "vuna_transport",
  "charts": [],
  "content": "[{\"id\":\"fleet-header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h3\\\"><b>Fleet Management</b></span>\",\"col\":12}},{\"id\":\"fleet-vehicle-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Vehicles\",\"col\":3}},{\"id\":\"fleet-setup-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Fleet Setup\",\"col\":3}},{\"id\":\"fleet-compliance-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Compliance\",\"col\":3}},{\"id\":\"fleet-operations-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Fleet Operations\",\"col\":3}}]",
- "creation": "2026-09-02 09:00:00",
+ "creation": "2026-09-02 19:44:46.358981",
  "custom_blocks": [],
  "docstatus": 0,
  "doctype": "Workspace",

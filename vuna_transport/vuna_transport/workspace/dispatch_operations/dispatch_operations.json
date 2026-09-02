@@ -2,7 +2,7 @@
  "app": "vuna_transport",
  "charts": [],
  "content": "[{\"id\":\"dispatch-header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h3\\\"><b>Dispatch Operations</b></span>\",\"col\":12}},{\"id\":\"dispatch-planning-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Planning\",\"col\":4}},{\"id\":\"dispatch-execution-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Execution\",\"col\":4}},{\"id\":\"dispatch-setup-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Dispatch Setup\",\"col\":4}}]",
- "creation": "2026-09-02 09:00:00.000000",
+ "creation": "2026-09-02 19:44:46.358981",
  "custom_blocks": [],
  "docstatus": 0,
  "doctype": "Workspace",
@@ -118,7 +118,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-02 09:00:00.000000",
+ "modified": "2026-09-02 19:44:46.358981",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Dispatch Operations",

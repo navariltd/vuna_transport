@@ -1,7 +1,7 @@
 {
  "app": "vuna_transport",
  "bg_color": "gray",
- "creation": "2026-09-02 09:00:00.000000",
+ "creation": "2026-09-02 19:44:46.358981",
  "docstatus": 0,
  "doctype": "Desktop Icon",
  "hidden": 0,
@@ -10,7 +10,8 @@
  "label": "Fleet Management",
  "link_to": "Fleet Management",
  "link_type": "Workspace Sidebar",
- "modified": "2026-09-02 09:00:00.000000",
+ "logo_url": "/assets/vuna_transport/images/fleet_management.png",
+ "modified": "2026-09-02 19:44:46.358981",
  "modified_by": "Administrator",
  "name": "Fleet Management",
  "owner": "Administrator",

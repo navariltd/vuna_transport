@@ -1,6 +1,6 @@
 {
  "app": "vuna_transport",
- "creation": "2026-09-02 09:00:00.000000",
+ "creation": "2026-09-02 19:44:46.358981",
  "docstatus": 0,
  "doctype": "Workspace Sidebar",
  "idx": 0,
@@ -238,7 +238,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-02 09:00:00.000000",
+ "modified": "2026-09-02 19:44:46.358981",
  "modified_by": "Administrator",
  "name": "Dispatch Operations",
  "owner": "Administrator",
