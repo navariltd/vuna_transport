@@ -183,9 +183,97 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Reports",
+   "link_count": 8,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Fleet Availability",
+   "link_count": 0,
+   "link_to": "Fleet Availability",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Vehicle Compliance",
+   "link_count": 0,
+   "link_to": "Vehicle Compliance",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Expiring Vehicle Documents",
+   "link_count": 0,
+   "link_to": "Expiring Vehicle Documents",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Vehicle Allocation History",
+   "link_count": 0,
+   "link_to": "Vehicle Allocation History",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Vehicles In Trip",
+   "link_count": 0,
+   "link_to": "Vehicles In Trip",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Vehicle Incident Register",
+   "link_count": 0,
+   "link_to": "Vehicle Incident Register",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Vehicle Category Capacity",
+   "link_count": 0,
+   "link_to": "Vehicle Category Capacity",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Dispatch Readiness",
+   "link_count": 0,
+   "link_to": "Dispatch Readiness",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-09-02 11:54:06.408660",
+ "modified": "2026-09-02 19:27:24.116301",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Fleet Management",
