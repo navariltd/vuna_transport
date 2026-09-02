@@ -2,6 +2,13 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Proof of Delivery", {
+	refresh(frm) {
+		// A Delivery Trip is the execution parent. Cancelling a POD must not
+		// offer to cancel the submitted trip; the server-side on_cancel handler
+		// resets only this POD's Delivery Stop outcome.
+		frm.ignore_doctypes_on_cancel_all = ["Delivery Trip"];
+	},
+
 	delivery_stop(frm) {
 		if (!frm.doc.delivery_stop) return;
 

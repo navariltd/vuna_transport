@@ -67,9 +67,15 @@ ALLOWED_LOAD_STATUS_TRANSITIONS = {
 		"Ready for Dispatch",
 		"Completed",
 		"Completed with Exceptions",
+		"Exception Resolution",
 	},
-	"Completed": {"Dispatched", "Ready for Dispatch"},
-	"Completed with Exceptions": {"Dispatched", "Ready for Dispatch"},
+	"Exception Resolution": {"Dispatched", "Completed", "Completed with Exceptions"},
+	"Completed": {"Dispatched", "Ready for Dispatch", "Exception Resolution"},
+	"Completed with Exceptions": {
+		"Dispatched",
+		"Ready for Dispatch",
+		"Exception Resolution",
+	},
 	"Cancelled": set(),
 }
 

@@ -69,6 +69,19 @@ def get_load_execution_summary(load):
 		order_by="creation asc",
 	)
 	submitted_pods = [pod for pod in pods if pod.docstatus == 1]
+	delivery_exceptions = []
+	if frappe.db.table_exists("Delivery Exception"):
+		delivery_exceptions = frappe.get_all(
+			"Delivery Exception",
+			filters={"delivery_load": load.name},
+			fields=["name", "resolution_status", "total_unresolved_quantity"],
+			order_by="creation asc",
+		)
+	open_exceptions = [
+		exception
+		for exception in delivery_exceptions
+		if exception.resolution_status in ("Open", "In Resolution")
+	]
 	vehicle_allocation_timing = get_vehicle_allocation_timing()
 
 	next_action = _get_next_action(
@@ -82,6 +95,7 @@ def get_load_execution_summary(load):
 		delivery_trip,
 		stops,
 		submitted_pods,
+		open_exceptions,
 		vehicle_allocation_timing,
 	)
 
@@ -117,6 +131,11 @@ def get_load_execution_summary(load):
 			"total": len(pods),
 			"submitted": len(submitted_pods),
 			"draft": len([pod for pod in pods if pod.docstatus == 0]),
+		},
+		"delivery_exceptions": {
+			"total": len(delivery_exceptions),
+			"open": len(open_exceptions),
+			"names": [exception.name for exception in open_exceptions],
 		},
 		"next_action": next_action,
 	}
@@ -203,12 +222,19 @@ def _get_next_action(
 	delivery_trip,
 	stops,
 	submitted_pods,
+	open_exceptions,
 	vehicle_allocation_timing,
 ):
 	if load.docstatus == 0:
 		return _action("submit_load", _("Submit Delivery Load"), _("Review capacity and submit this load."))
 	if load.docstatus == 2:
 		return _action("cancelled", _("Delivery Load Cancelled"), _("Amend the load to continue."))
+	if open_exceptions:
+		return _action(
+			"resolve_delivery_exceptions",
+			_("Resolve Delivery Exceptions"),
+			_("Confirm custody and complete the physical and commercial resolution."),
+		)
 	if load.status in ("Completed", "Completed with Exceptions"):
 		return _action("completed", _("Execution Completed"), _("This Delivery Load is closed."))
 	requires_vehicle_allocation = _requires_vehicle_allocation(load)
@@ -245,12 +271,6 @@ def _get_next_action(
 
 
 def _get_vehicle_allocation_action(load, vehicle_allocation):
-	if not load.planned_departure or not load.planned_arrival:
-		return _action(
-			"set_schedule",
-			_("Set Dispatch Schedule"),
-			_("Set Planned Departure and Planned Arrival before allocating a vehicle."),
-		)
 	if not vehicle_allocation or vehicle_allocation.docstatus == 2:
 		return _action(
 			"create_vehicle_allocation",

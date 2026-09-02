@@ -201,8 +201,13 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
- "links": [],
- "modified": "2026-08-16 15:50:49.666893",
+ "links": [
+  {
+   "link_doctype": "Delivery Exception",
+   "link_fieldname": "proof_of_delivery"
+  }
+ ],
+ "modified": "2026-08-27 08:40:13.001202",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Proof of Delivery",

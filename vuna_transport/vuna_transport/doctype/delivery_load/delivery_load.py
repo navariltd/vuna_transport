@@ -28,6 +28,7 @@ from vuna_transport.services.execution.dispatch_guard_service import (
 
 class DeliveryLoad(Document):
 	def validate(self):
+		_validate_source_warehouse_change(self)
 		apply_route_defaults(self)
 		if self.delivery_orders:
 			validate_load_allocations(self)
@@ -97,3 +98,21 @@ class DeliveryLoad(Document):
 	def get_execution_summary(self):
 		self.check_permission("read")
 		return get_load_execution_summary(self)
+
+
+def _validate_source_warehouse_change(load):
+	"""Allow dispatch-origin changes only before stock execution has started."""
+	previous = load.get_doc_before_save()
+	if not previous or previous.source_warehouse == load.source_warehouse:
+		return
+	if load.docstatus != 1:
+		return
+	if load.pick_list and frappe.db.get_value("Pick List", load.pick_list, "docstatus") != 2:
+		frappe.throw(_("Cancel the Pick List before changing the Delivery Load dispatch warehouse."))
+	if frappe.db.exists(
+		"Delivery Note",
+		{"vuna_delivery_load": load.name, "docstatus": ["!=", 2]},
+	):
+		frappe.throw(_("The Delivery Load dispatch warehouse cannot change after Delivery Notes exist."))
+	if load.delivery_trip:
+		frappe.throw(_("The Delivery Load dispatch warehouse cannot change after a Delivery Trip exists."))

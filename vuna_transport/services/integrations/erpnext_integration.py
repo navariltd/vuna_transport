@@ -109,6 +109,7 @@ def create_delivery_notes_for_load(load):
 		if not delivery_note or not delivery_note.items:
 			frappe.throw(_("No deliverable items were found for {0}.").format(delivery_order_name))
 
+		_set_delivery_note_source_warehouse(delivery_note, load.source_warehouse)
 		delivery_address = load_rows[0].delivery_address
 		delivery_note.shipping_address_name = delivery_address
 		delivery_note.shipping_address = get_address_display(
@@ -191,6 +192,7 @@ def _make_delivery_note_direct(delivery_order_name, load_rows, source_warehouse)
 		kwargs={"filtered_children": list(allocated_by_sales_order_item)},
 	)
 	apply_allocated_delivery_quantities(delivery_note, allocated_by_sales_order_item)
+	_set_delivery_note_source_warehouse(delivery_note, source_warehouse)
 	_validate_delivery_note_warehouses(delivery_note, source_warehouse)
 	delivery_note.calculate_taxes_and_totals()
 	return delivery_note
@@ -325,24 +327,31 @@ def _validate_delivery_orders_for_execution(load):
 			)
 		if delivery_order.company != load.company:
 			frappe.throw(_("Delivery Order {0} belongs to a different company.").format(delivery_order_name))
-		if delivery_order.source_warehouse != load.source_warehouse:
-			frappe.throw(
-				_("Delivery Order {0} uses a different source warehouse.").format(
-					delivery_order_name
-				)
-			)
 
 
 def _validate_delivery_note_warehouses(delivery_note, source_warehouse):
-	invalid_items = [
-		item.item_code for item in delivery_note.items if item.warehouse != source_warehouse
-	]
-	if invalid_items:
-		frappe.throw(
-			_("Delivery Note items must use source warehouse {0}: {1}.").format(
-				source_warehouse, ", ".join(sorted(set(invalid_items)))
-			)
-		)
+	companies = {
+		frappe.db.get_value("Warehouse", item.warehouse, "company")
+		for item in delivery_note.items
+		if item.warehouse
+	}
+	companies.discard(None)
+	if source_warehouse:
+		load_company = frappe.db.get_value("Warehouse", source_warehouse, "company")
+		if load_company and companies and companies != {load_company}:
+			frappe.throw(_("Delivery Note item warehouses must belong to the load company."))
+
+
+def _set_delivery_note_source_warehouse(delivery_note, source_warehouse):
+	"""Use the load's dispatch warehouse for generated stock rows.
+
+	Users may still change individual Delivery Note item warehouses afterwards;
+	ERPNext remains authoritative for the final stock movement.
+	"""
+	if not source_warehouse:
+		return
+	for item in delivery_note.items:
+		item.warehouse = source_warehouse
 
 
 def _group_load_rows(load):

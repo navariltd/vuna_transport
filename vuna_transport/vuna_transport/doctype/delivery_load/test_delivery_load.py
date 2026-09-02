@@ -80,6 +80,7 @@ class TestDeliveryLoad(UnitTestCase):
 			None,
 			[],
 			[],
+			[],
 			ALLOCATION_AFTER_DELIVERY_NOTES,
 		)
 		self.assertEqual(result["key"], "create_delivery_notes")
@@ -95,6 +96,7 @@ class TestDeliveryLoad(UnitTestCase):
 			[],
 			[],
 			None,
+			[],
 			[],
 			[],
 			ALLOCATION_BEFORE_DELIVERY_NOTES,
@@ -115,9 +117,29 @@ class TestDeliveryLoad(UnitTestCase):
 			None,
 			[],
 			[],
+			[],
 			ALLOCATION_AFTER_DELIVERY_NOTES,
 		)
 		self.assertEqual(result["key"], "create_vehicle_allocation")
+
+	def test_open_delivery_exception_is_the_next_action(self):
+		load = self._submitted_scheduled_load()
+		load.status = "Exception Resolution"
+		result = _get_next_action(
+			load,
+			None,
+			None,
+			{"DO-1"},
+			[],
+			[],
+			[],
+			None,
+			[],
+			[],
+			[SimpleNamespace(name="DEX-1")],
+			ALLOCATION_AFTER_DELIVERY_NOTES,
+		)
+		self.assertEqual(result["key"], "resolve_delivery_exceptions")
 
 	@staticmethod
 	def _submitted_scheduled_load():

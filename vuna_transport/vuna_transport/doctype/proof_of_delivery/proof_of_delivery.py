@@ -12,6 +12,10 @@ from vuna_transport.services.execution.pod_service import (
 	update_delivery_stop_from_pod,
 	validate_pod_items,
 )
+from vuna_transport.services.execution.delivery_exception_service import (
+	cancel_delivery_exception_from_pod,
+	sync_delivery_exception_from_pod,
+)
 
 
 class ProofofDelivery(Document):
@@ -48,11 +52,13 @@ class ProofofDelivery(Document):
 				item.ordered_qty = requirement_item.transport_qty
 
 	def validate_exception_reason(self):
-		if self.status in ("Rejected", "Failed") and not self.exception_reason:
+		if self.status in ("Partially Delivered", "Rejected", "Failed") and not self.exception_reason:
 			frappe.throw(_("An exception reason is required for {0} deliveries.").format(self.status.lower()))
 
 	def on_submit(self):
+		sync_delivery_exception_from_pod(self)
 		update_delivery_stop_from_pod(self, self.status)
 
 	def on_cancel(self):
+		cancel_delivery_exception_from_pod(self)
 		reset_delivery_stop_from_pod(self)

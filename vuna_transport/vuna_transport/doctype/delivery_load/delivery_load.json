@@ -136,9 +136,11 @@
   {
    "fieldname": "source_warehouse",
    "fieldtype": "Link",
+   "allow_on_submit": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Source Warehouse",
+   "description": "Dispatch warehouse for this load. It may be changed from the Delivery Order source warehouse before stock documents are created.",
    "options": "Warehouse",
    "reqd": 1
   },
@@ -187,7 +189,7 @@
    "fieldtype": "Select",
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nProposed\nUnder Review\nApproved\nAwaiting Vehicle\nAllocated\nReleased to Warehouse\nLoading\nReady for Dispatch\nDispatched\nCompleted\nCompleted with Exceptions\nCancelled",
+   "options": "Draft\nProposed\nUnder Review\nApproved\nAwaiting Vehicle\nAllocated\nReleased to Warehouse\nLoading\nReady for Dispatch\nDispatched\nException Resolution\nCompleted\nCompleted with Exceptions\nCancelled",
    "read_only": 1
   },
   {
@@ -386,9 +388,14 @@
    "group": "Dispatch Execution",
    "link_doctype": "Delivery Trip",
    "link_fieldname": "vuna_delivery_load"
+  },
+  {
+   "group": "Delivery Resolution",
+   "link_doctype": "Delivery Exception",
+   "link_fieldname": "delivery_load"
   }
  ],
- "modified": "2026-08-25 08:10:44.970164",
+ "modified": "2026-08-27 08:40:13.001202",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Delivery Load",

@@ -134,26 +134,11 @@ def update_delivery_stop_from_pod(pod, status):
 	)
 	trip = frappe.get_doc("Delivery Trip", pod.delivery_trip)
 	trip.update_status()
-	if all(stop.visited for stop in trip.delivery_stops):
-		pod_statuses = frappe.get_all(
-			"Proof of Delivery",
-			filters={
-				"delivery_load": pod.delivery_load,
-				"delivery_trip": pod.delivery_trip,
-				"docstatus": 1,
-			},
-			pluck="status",
-		)
-		load_status = (
-			"Completed"
-			if pod_statuses and all(pod_status == "Accepted" for pod_status in pod_statuses)
-			else "Completed with Exceptions"
-		)
-		set_delivery_load_status(
-			pod.delivery_load,
-			load_status,
-			_("Proofs of Delivery completed for Delivery Trip {0}").format(pod.delivery_trip),
-		)
+	from vuna_transport.services.execution.delivery_exception_service import (
+		recompute_delivery_load_completion,
+	)
+
+	recompute_delivery_load_completion(pod.delivery_load, pod.delivery_trip)
 	if pod.delivery_order:
 		recompute_delivery_order_status(pod.delivery_order)
 
@@ -209,12 +194,18 @@ def recompute_delivery_order_status(delivery_order_name):
 		filters={"delivery_order": delivery_order_name, "docstatus": 1},
 		fields=["delivery_load", "status"],
 	)
+	from vuna_transport.services.execution.delivery_exception_service import (
+		get_delivery_order_exception_outcomes,
+	)
+
+	exception_outcomes = get_delivery_order_exception_outcomes(delivery_order_name)
 	status = derive_delivery_order_execution_status(
 		requested_quantity=delivery_order.requested_quantity,
 		allocated_quantity=delivery_order.allocated_quantity,
 		reserved_quantity=delivery_order.reserved_quantity,
 		loads=loads,
 		pod_outcomes=pods,
+		delivery_exceptions=exception_outcomes,
 	)
 	frappe.db.set_value(
 		"Delivery Order", delivery_order_name, "status", status, update_modified=False
@@ -222,7 +213,12 @@ def recompute_delivery_order_status(delivery_order_name):
 
 
 def derive_delivery_order_execution_status(
-	requested_quantity, allocated_quantity, reserved_quantity, loads, pod_outcomes
+	requested_quantity,
+	allocated_quantity,
+	reserved_quantity,
+	loads,
+	pod_outcomes,
+	delivery_exceptions=None,
 ):
 	"""Pure status rule supporting one Delivery Order split across many loads."""
 	load_statuses = {load.name: load.status for load in loads}
@@ -242,17 +238,28 @@ def derive_delivery_order_execution_status(
 	)
 	positive = any(status in ("Accepted", "Partially Delivered") for status in outcomes.values())
 	exceptions = any(status in ("Rejected", "Failed") for status in outcomes.values())
+	delivery_exceptions = delivery_exceptions or []
+	all_exceptions_resolved = bool(delivery_exceptions) and all(
+		exception.resolution_status in ("Resolved", "Closed")
+		for exception in delivery_exceptions
+	)
 
 	if all_covered and fully_allocated:
 		if outcomes and all(status == "Accepted" for status in outcomes.values()):
 			return "Delivered"
+		if all_exceptions_resolved:
+			return "Resolved with Exceptions"
 		if positive:
 			return "Partially Delivered"
 		if exceptions:
 			return "Delivery Exception"
 	if positive:
+		if all_exceptions_resolved:
+			return "Resolved with Exceptions"
 		return "Partially Delivered"
 	if exceptions:
+		if all_exceptions_resolved:
+			return "Resolved with Exceptions"
 		return "Delivery Exception"
 	if any(
 		status in ("Dispatched", "Completed", "Completed with Exceptions")

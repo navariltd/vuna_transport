@@ -70,9 +70,14 @@ def _validate_delivery_note_against_load(doc, load):
 		)
 	if doc.company != load.company:
 		frappe.throw(_("Delivery Note and Delivery Load must belong to the same company."))
-	invalid_warehouses = {item.warehouse for item in doc.items if item.warehouse != load.source_warehouse}
-	if invalid_warehouses:
-		frappe.throw(_("Every Delivery Note item must use source warehouse {0}.").format(load.source_warehouse))
+	warehouse_companies = {
+		frappe.db.get_value("Warehouse", item.warehouse, "company")
+		for item in doc.items
+		if item.warehouse
+	}
+	warehouse_companies.discard(None)
+	if warehouse_companies and warehouse_companies != {load.company}:
+		frappe.throw(_("Every Delivery Note item warehouse must belong to the Delivery Load company."))
 
 	item_allocations = {
 		row.delivery_order_item: row.allocated_quantity for row in load_rows if row.delivery_order_item
