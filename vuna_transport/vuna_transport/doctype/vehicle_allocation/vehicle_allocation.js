@@ -7,7 +7,10 @@ frappe.ui.form.on("Vehicle Allocation", {
 			if (!frm.doc.delivery_load) return { filters: { name: "" } };
 			return {
 				query: "vuna_transport.api.get_vehicles_for_load",
-				filters: { delivery_load: frm.doc.delivery_load },
+				filters: {
+					delivery_load: frm.doc.delivery_load,
+					allocation_type: frm.doc.allocation_type,
+				},
 			};
 		});
 		frm.set_query("driver", () => {
@@ -32,6 +35,26 @@ frappe.ui.form.on("Vehicle Allocation", {
 		}
 	},
 
+	vehicle(frm) {
+		const vehicle_name = frm.doc.vehicle;
+		if (!vehicle_name) {
+			frm.set_value("subcontractor_vehicle_category", null);
+			return;
+		}
+		frm._vehicle_used_for_allocation_defaults = vehicle_name;
+		frappe.db.get_value(
+			"Vehicle",
+			vehicle_name,
+			["vuna_supplier", "vuna_vehicle_category"],
+		).then(({ message }) => {
+			if (!message || frm.doc.vehicle !== frm._vehicle_used_for_allocation_defaults) return;
+			frm.set_value("subcontractor_vehicle_category", message.vuna_vehicle_category || null);
+			if (frm.doc.allocation_type === "Subcontractor") {
+				frm.set_value("supplier", message.vuna_supplier || null);
+			}
+		});
+	},
+
 	delivery_load(frm) {
 		if (!frm.doc.delivery_load) return;
 		frappe.db.get_value(
@@ -46,5 +69,10 @@ frappe.ui.form.on("Vehicle Allocation", {
 				frm.set_value("planned_reporting_time", message.planned_departure);
 			}
 		});
+	},
+
+	allocation_type(frm) {
+		frm.toggle_reqd("vehicle", ["Owned Fleet", "Subcontractor"].includes(frm.doc.allocation_type));
+		frm.toggle_reqd("driver", frm.doc.allocation_type === "Owned Fleet");
 	},
 });

@@ -13,6 +13,7 @@
   "column_break_fleet",
   "logo",
   "disabled",
+  "logo_image",
   "details_section",
   "website"
  ],
@@ -63,6 +64,13 @@
    "fieldtype": "Data",
    "label": "Website",
    "options": "URL"
+  },
+  {
+   "fieldname": "logo_image",
+   "fieldtype": "Image",
+   "label": "Logo Image",
+   "options": "logo",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
@@ -73,7 +81,7 @@
    "link_fieldname": "manufacturer"
   }
  ],
- "modified": "2026-08-16 15:50:49.666893",
+ "modified": "2026-08-31 12:32:19.005631",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Manufacturer",

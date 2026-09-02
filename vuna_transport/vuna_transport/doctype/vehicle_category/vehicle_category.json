@@ -2,6 +2,7 @@
  "actions": [],
  "allow_bulk_edit": 1,
  "allow_rename": 1,
+ "autoname": "field:vehicle_category_name",
  "creation": "2026-08-10 07:26:50.918944",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -16,33 +17,37 @@
   "trailer",
   "open_body",
   "closed_body",
-  "capacity_section",
   "section_break_pbqv",
   "max_payload_weight",
   "max_payload_weight_uom",
+  "column_break_kuyt",
   "max_volume",
   "max_volume_uom",
-  "column_break_kuyt",
+  "section_break_dnkj",
   "max_pallets",
+  "column_break_pjok",
   "max_cases",
+  "column_break_ossn",
   "max_crates",
-  "equipment_section",
   "section_break_ymgh",
   "special_equipment",
   "tail_lift",
   "crane"
  ],
  "fields": [
-  {"fieldname":"identity_section","fieldtype":"Section Break","label":"Vehicle Identity"},
-  {"fieldname":"capacity_section","fieldtype":"Section Break","label":"Capacity Limits"},
-  {"fieldname":"equipment_section","fieldtype":"Section Break","label":"Equipment & Operating Conditions"},
+  {
+   "fieldname": "identity_section",
+   "fieldtype": "Section Break",
+   "label": "Vehicle Identity"
+  },
   {
    "fieldname": "vehicle_category_name",
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Vehicle Category Name",
-   "reqd": 1
+   "label": "Category Name",
+   "reqd": 1,
+   "unique": 1
   },
   {
    "fieldname": "body_type",
@@ -166,16 +171,30 @@
    "label": "Volume UOM",
    "options": "UOM",
    "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_dnkj",
+   "fieldtype": "Section Break",
+   "label": "Pallets"
+  },
+  {
+   "fieldname": "column_break_pjok",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_ossn",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-16 15:50:49.666893",
+ "modified": "2026-08-31 12:34:11.144233",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Category",
- "title_field": "vehicle_category_name",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
@@ -221,5 +240,6 @@
  "rows_threshold_for_grid_search": 20,
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "vehicle_category_name"
 }

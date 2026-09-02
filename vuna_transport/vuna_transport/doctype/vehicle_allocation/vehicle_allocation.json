@@ -182,12 +182,12 @@
    "label": "Execution Vehicle"
   },
   {
-   "description": "Required for owned fleet and for creating an ERPNext Delivery Trip.",
+   "description": "Select the physical ERPNext Vehicle for owned or subcontracted transport. Required for both allocation types.",
    "fieldname": "vehicle",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Vehicle",
-   "mandatory_depends_on": "eval:doc.allocation_type == 'Owned Fleet'",
+   "mandatory_depends_on": "eval:doc.allocation_type == 'Owned Fleet' || doc.allocation_type == 'Subcontractor'",
    "options": "Vehicle"
   },
   {
@@ -215,8 +215,8 @@
    "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
    "fieldname": "subcontractor_vehicle_registration",
    "fieldtype": "Data",
-   "label": "Vehicle Registration",
-   "mandatory_depends_on": "eval:doc.allocation_type == 'Subcontractor'"
+   "label": "External Vehicle Registration",
+   "description": "Optional external reference; the Vehicle link remains the system record for this physical subcontracted vehicle."
   },
   {
    "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
@@ -234,8 +234,8 @@
    "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
    "fieldname": "subcontractor_driver_name",
    "fieldtype": "Data",
-   "label": "Driver Name",
-   "mandatory_depends_on": "eval:doc.allocation_type == 'Subcontractor'"
+   "label": "External Driver Name",
+   "description": "Optional when the subcontractor driver is not maintained as an ERPNext Driver."
   },
   {
    "depends_on": "eval:doc.allocation_type == 'Subcontractor'",

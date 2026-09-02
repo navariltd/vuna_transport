@@ -33,9 +33,46 @@ def validate_vehicle(doc, method=None):
 		doc.fuel_type = vehicle_model.fuel_type
 
 
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_unlinked_assets(doctype, txt, searchfield, start, page_len, filters=None):
+	"""Return submitted, usable Assets not already linked to another Vehicle."""
+	filters = frappe.parse_json(filters or {})
+	company = filters.get("company")
+	current_vehicle = filters.get("current_vehicle") or ""
+	searchfield = searchfield if searchfield in ("name", "asset_name") else "name"
+	conditions = [
+		"a.docstatus = 1",
+		"a.status not in ('Sold', 'Scrapped', 'Cancelled')",
+		"not exists (select 1 from `tabVehicle` v where v.vuna_asset = a.name and v.name != %s)",
+	]
+	values = [current_vehicle]
+	if company:
+		conditions.append("a.company = %s")
+		values.append(company)
+	if txt:
+		conditions.append(f"a.`{searchfield}` like %s")
+		values.append(f"%{txt}%")
+	return frappe.db.sql(
+		f"""
+		select a.name, a.asset_name, a.company
+		from `tabAsset` a
+		where {' and '.join(conditions)}
+		order by a.asset_name asc, a.name asc
+		limit %s offset %s
+		""",
+		values + [page_len, start],
+	)
+
+
 def _validate_vehicle_asset(doc):
 	asset_name = getattr(doc, "vuna_asset", None)
 	if not asset_name:
+		if (
+			getattr(doc, "vuna_transport_enabled", 0)
+			and getattr(doc, "vuna_ownership_type", None) == "Company Owned"
+		):
+			frappe.throw(_("A company-owned transport Vehicle must have a linked Asset."))
 		return
 	asset = frappe.get_cached_doc("Asset", asset_name)
 	if not doc.company and asset.company:

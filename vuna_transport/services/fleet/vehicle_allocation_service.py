@@ -2,7 +2,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import get_datetime, now_datetime
+from frappe.utils import add_to_date, get_datetime, now_datetime
 
 from vuna_transport.services.execution.dispatch_guard_service import (
 	lock_document,
@@ -191,30 +191,47 @@ def _validate_owned_fleet(allocation, load):
 
 
 def _validate_subcontractor(allocation, load):
-	_validate_vehicle_category_for_load(load, allocation.subcontractor_vehicle_category)
-	if not allocation.vehicle and allocation.subcontractor_vehicle_registration:
-		allocation.vehicle = frappe.db.exists(
-			"Vehicle", allocation.subcontractor_vehicle_registration
+	if not allocation.vehicle:
+		frappe.throw(
+			_("Select the ERPNext Vehicle record for the subcontracted vehicle.")
 		)
-	if allocation.vehicle:
-		lock_document("Vehicle", allocation.vehicle)
-		vehicle = frappe.get_doc("Vehicle", allocation.vehicle)
-		_validate_vehicle_category_for_load(load, vehicle.vuna_vehicle_category)
-		_validate_vehicle_is_available(allocation, load)
+	lock_document("Vehicle", allocation.vehicle)
+	vehicle = frappe.get_doc("Vehicle", allocation.vehicle)
+	allocation.subcontractor_vehicle_category = vehicle.vuna_vehicle_category
+	if getattr(vehicle, "vuna_supplier", None):
+		allocation.supplier = vehicle.vuna_supplier
+	_validate_vehicle_category_for_load(load, vehicle.vuna_vehicle_category)
+	_validate_vehicle_is_available(allocation, load)
 	if allocation.driver:
 		lock_document("Driver", allocation.driver)
 		_validate_driver_is_available(allocation, load)
 
 
 def _validate_planning_window(load):
+	if not load.planned_departure and not load.planned_arrival:
+		return
 	if not load.planned_departure or not load.planned_arrival:
 		frappe.throw(
-			_("Set Planned Departure and Planned Arrival on Delivery Load {0} before allocation.").format(
+			_("Set both Planned Departure and Planned Arrival on Delivery Load {0}, or leave both blank.").format(
 				load.name
 			)
 		)
 	if get_datetime(load.planned_departure) >= get_datetime(load.planned_arrival):
 		frappe.throw(_("Planned Arrival must be after Planned Departure."))
+
+
+def get_load_resource_window(load):
+	"""Return the interval used for resource checks.
+
+	When no explicit planning window exists, resource lookups represent current
+	availability only. A future availability claim requires explicit times.
+	"""
+	if load.planned_departure and load.planned_arrival:
+		return load.planned_departure, load.planned_arrival
+	if load.planned_departure or load.planned_arrival:
+		_validate_planning_window(load)
+	now = now_datetime()
+	return now, add_to_date(now, seconds=1)
 
 
 def _validate_initial_allocation_sequence(load, allocation=None):
@@ -261,10 +278,11 @@ def _validate_vehicle_category_for_load(load, vehicle_category):
 
 
 def _validate_vehicle_is_available(allocation, load):
+	from_time, to_time = get_load_resource_window(load)
 	result = evaluate_vehicle_availability(
 		allocation.vehicle,
-		load.planned_departure,
-		load.planned_arrival,
+		from_time,
+		to_time,
 		delivery_load=load,
 		exclude_allocation=allocation.name,
 	)
@@ -277,10 +295,11 @@ def _validate_vehicle_is_available(allocation, load):
 
 
 def _validate_driver_is_available(allocation, load):
+	from_time, to_time = get_load_resource_window(load)
 	result = evaluate_driver_availability(
 		allocation.driver,
-		load.planned_departure,
-		load.planned_arrival,
+		from_time,
+		to_time,
 		exclude_allocation=allocation.name,
 		exclude_delivery_load=load.name,
 		expected_company=load.company,
@@ -336,9 +355,16 @@ def activate_allocation(allocation):
 		)
 
 
-def restore_previous_allocation(allocation):
+def prepare_allocation_cancellation(allocation):
+	"""Detach the active allocation before Frappe checks linked-document cancellation."""
 	load = frappe.get_doc("Delivery Load", allocation.delivery_load)
-	if load.active_vehicle_allocation != allocation.name:
+	if load.active_vehicle_allocation == allocation.name:
+		load.db_set("active_vehicle_allocation", None, update_modified=True)
+
+
+def restore_previous_allocation(allocation, active_link_cleared=False):
+	load = frappe.get_doc("Delivery Load", allocation.delivery_load)
+	if not active_link_cleared and load.active_vehicle_allocation != allocation.name:
 		return
 	previous_name = allocation.replacement_of
 	if previous_name:

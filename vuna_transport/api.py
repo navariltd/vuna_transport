@@ -8,6 +8,7 @@ from vuna_transport.services.fleet.driver_availability_service import (
 from vuna_transport.services.fleet.vehicle_availability_service import (
 	get_vehicle_availability_map,
 )
+from vuna_transport.services.fleet.vehicle_allocation_service import get_load_resource_window
 
 
 @frappe.whitelist()
@@ -15,9 +16,10 @@ from vuna_transport.services.fleet.vehicle_availability_service import (
 def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
 	load = frappe.get_doc("Delivery Load", filters.get("delivery_load"))
 	require_document_permission(load, "read")
-	if not load.planned_departure or not load.planned_arrival:
-		return []
+	from_time, to_time = get_load_resource_window(load)
 	vehicle_filters = {"docstatus": ["<", 2], "vuna_transport_enabled": 1}
+	if (filters or {}).get("allocation_type") == "Subcontractor":
+		vehicle_filters.pop("vuna_transport_enabled", None)
 	if load.company:
 		vehicle_filters["company"] = ["in", (load.company, "", None)]
 	compatible_categories = get_compatible_vehicle_category_names(load)
@@ -27,8 +29,8 @@ def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
 		return []
 	availability = get_vehicle_availability_map(
 		company=load.company,
-		from_time=load.planned_departure,
-		to_time=load.planned_arrival,
+		from_time=from_time,
+		to_time=to_time,
 		delivery_load=load,
 	)
 	available_names = {
@@ -56,8 +58,7 @@ def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
 def get_drivers_for_load(doctype, txt, searchfield, start, page_len, filters):
 	load = frappe.get_doc("Delivery Load", filters.get("delivery_load"))
 	require_document_permission(load, "read")
-	if not load.planned_departure or not load.planned_arrival:
-		return []
+	from_time, to_time = get_load_resource_window(load)
 	driver_names = frappe.get_list(
 		"Driver",
 		filters={"status": "Active"},
@@ -66,8 +67,8 @@ def get_drivers_for_load(doctype, txt, searchfield, start, page_len, filters):
 	)
 	availability = get_driver_availability_map(
 		driver_names=driver_names,
-		from_time=load.planned_departure,
-		to_time=load.planned_arrival,
+		from_time=from_time,
+		to_time=to_time,
 		company=load.company,
 		exclude_delivery_load=load.name,
 	)

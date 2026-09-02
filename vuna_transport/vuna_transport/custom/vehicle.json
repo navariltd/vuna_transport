@@ -68,7 +68,8 @@
    "insert_after": "vuna_ownership_type",
    "label": "Asset",
    "module": "Vuna Transport",
-   "options": "Asset"
+   "options": "Asset",
+   "mandatory_depends_on": "eval:doc.vuna_transport_enabled && doc.vuna_ownership_type == 'Company Owned'"
   },
   {
    "dt": "Vehicle",

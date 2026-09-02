@@ -4,10 +4,10 @@
 frappe.ui.form.on("Vehicle", {
 	setup(frm) {
 		frm.set_query("vuna_asset", () => ({
+			query: "vuna_transport.services.fleet.fleet_service.get_unlinked_assets",
 			filters: {
 				company: frm.doc.company,
-				docstatus: 1,
-				status: ["not in", ["Sold", "Scrapped", "Cancelled"]],
+				current_vehicle: frm.doc.name,
 			},
 		}));
 	},

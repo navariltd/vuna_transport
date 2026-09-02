@@ -64,6 +64,13 @@ class TestVehicleAssetValidation(UnitTestCase):
 		with self.assertRaises(ValidationError):
 			_validate_vehicle_asset(self.vehicle)
 
+	def test_company_owned_transport_vehicle_requires_an_asset(self):
+		self.vehicle.vuna_asset = None
+		self.vehicle.vuna_transport_enabled = 1
+		self.vehicle.vuna_ownership_type = "Company Owned"
+		with self.assertRaises(ValidationError):
+			_validate_vehicle_asset(self.vehicle)
+
 
 class TestVehicleStatusSnapshot(UnitTestCase):
 	@patch("vuna_transport.services.fleet.fleet_service.get_vehicle_availability_map")

@@ -37,7 +37,12 @@ class VehicleAllocation(Document):
 
 	def before_cancel(self):
 		validate_allocation_cancellation(self)
+		from vuna_transport.services.fleet.vehicle_allocation_service import (
+			prepare_allocation_cancellation,
+		)
+
+		prepare_allocation_cancellation(self)
 
 	def on_cancel(self):
 		self.db_set("status", "Cancelled", update_modified=False)
-		restore_previous_allocation(self)
+		restore_previous_allocation(self, active_link_cleared=True)
