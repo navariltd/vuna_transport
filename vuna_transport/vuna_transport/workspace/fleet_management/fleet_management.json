@@ -16,7 +16,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Vehicles",
-   "link_count": 4,
+   "link_count": 3,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -36,16 +36,6 @@
    "label": "Driver",
    "link_count": 0,
    "link_to": "Driver",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Vehicle Log",
-   "link_count": 0,
-   "link_to": "Vehicle Log",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -273,7 +263,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-02 19:27:24.116301",
+ "modified": "2026-09-02 20:14:32.633930",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Fleet Management",
