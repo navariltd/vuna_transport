@@ -1,0 +1,46 @@
+# Copyright (c) 2026, Yovuna Technologies Limited and contributors
+# For license information, please see license.txt
+
+import frappe
+from frappe import _
+
+
+def execute(filters=None):
+	filters = frappe._dict(filters or {})
+	conditions = ["docstatus = 1", "status = 'Awaiting Vehicle'"]
+	values = {}
+	for field in ("company", "source_warehouse", "required_vehicle_category"):
+		if filters.get(field):
+			conditions.append(f"{field} = %({field})s")
+			values[field] = filters[field]
+	rows = frappe.db.sql(
+		f"""select name, company, source_warehouse, dispatch_date, dispatch_wave,
+			required_vehicle_category, total_weight, weight_uom, total_volume, volume_uom,
+			total_stops, status from `tabDelivery Load`
+			where {" and ".join(conditions)} order by dispatch_date, creation limit 500""",
+		values,
+		as_dict=True,
+	)
+	columns = [
+		{"label": _("Delivery Load"), "fieldname": "name", "fieldtype": "Link", "options": "Delivery Load"},
+		{"label": _("Company"), "fieldname": "company", "fieldtype": "Link", "options": "Company"},
+		{
+			"label": _("Warehouse"),
+			"fieldname": "source_warehouse",
+			"fieldtype": "Link",
+			"options": "Warehouse",
+		},
+		{"label": _("Dispatch Date"), "fieldname": "dispatch_date", "fieldtype": "Date"},
+		{"label": _("Wave"), "fieldname": "dispatch_wave", "fieldtype": "Data"},
+		{
+			"label": _("Required Category"),
+			"fieldname": "required_vehicle_category",
+			"fieldtype": "Link",
+			"options": "Vehicle Category",
+		},
+		{"label": _("Weight"), "fieldname": "total_weight", "fieldtype": "Float"},
+		{"label": _("Volume"), "fieldname": "total_volume", "fieldtype": "Float"},
+		{"label": _("Stops"), "fieldname": "total_stops", "fieldtype": "Int"},
+		{"label": _("Status"), "fieldname": "status", "fieldtype": "Data"},
+	]
+	return columns, rows

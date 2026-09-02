@@ -1,7 +1,7 @@
 {
  "app": "vuna_transport",
  "charts": [],
- "content": "[{\"id\":\"dispatch-header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h3\\\"><b>Dispatch Operations</b></span>\",\"col\":12}},{\"id\":\"dispatch-planning-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Planning\",\"col\":4}},{\"id\":\"dispatch-execution-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Execution\",\"col\":4}},{\"id\":\"dispatch-setup-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Dispatch Setup\",\"col\":4}}]",
+ "content": "[{\"id\":\"dispatch-header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h3\\\"><b>Dispatch Operations</b></span>\",\"col\":12}},{\"id\":\"dispatch-planning-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Planning\",\"col\":4}},{\"id\":\"dispatch-execution-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Execution\",\"col\":4}},{\"id\":\"dispatch-setup-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Dispatch Setup\",\"col\":4}},{\"id\":\"dispatch-reports-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Reports\",\"col\":4}}]",
  "creation": "2026-09-02 19:44:46.358981",
  "custom_blocks": [],
  "docstatus": 0,
@@ -116,9 +116,57 @@
    "link_to": "Transport Settings",
    "link_type": "DocType",
    "type": "Link"
+  },
+  {
+   "label": "Reports",
+   "link_count": 6,
+   "is_query_report": 1,
+   "type": "Card Break"
+  },
+  {
+   "label": "Open Delivery Demand",
+   "link_to": "Open Delivery Demand",
+   "link_type": "Report",
+   "is_query_report": 1,
+   "type": "Link"
+  },
+  {
+   "label": "Unallocated Delivery Orders",
+   "link_to": "Unallocated Delivery Orders",
+   "link_type": "Report",
+   "is_query_report": 1,
+   "type": "Link"
+  },
+  {
+   "label": "Loads Awaiting Vehicle",
+   "link_to": "Loads Awaiting Vehicle",
+   "link_type": "Report",
+   "is_query_report": 1,
+   "type": "Link"
+  },
+  {
+   "label": "Delivery Notes Pending Submission",
+   "link_to": "Delivery Notes Pending Submission",
+   "link_type": "Report",
+   "is_query_report": 1,
+   "type": "Link"
+  },
+  {
+   "label": "Delivery Trips Pending POD",
+   "link_to": "Delivery Trips Pending POD",
+   "link_type": "Report",
+   "is_query_report": 1,
+   "type": "Link"
+  },
+  {
+   "label": "Open Delivery Exceptions",
+   "link_to": "Open Delivery Exceptions",
+   "link_type": "Report",
+   "is_query_report": 1,
+   "type": "Link"
   }
  ],
- "modified": "2026-09-02 19:44:46.358981",
+ "modified": "2026-09-02 21:14:07.908329",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Dispatch Operations",
