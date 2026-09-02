@@ -14,6 +14,7 @@
   "column_break_xyxh",
   "enabled",
   "auto_create_delivery_orders",
+  "auto_submit_delivery_orders",
   "require_sales_order_submission",
   "planning_section",
   "section_break_yskt",
@@ -76,6 +77,13 @@
    "fieldname": "auto_create_delivery_orders",
    "fieldtype": "Check",
    "label": "Auto Create Delivery Orders"
+  },
+  {
+   "default": "0",
+   "description": "Automatically submit newly generated Delivery Orders. Leave disabled if transport demand should be reviewed before submission.",
+   "fieldname": "auto_submit_delivery_orders",
+   "fieldtype": "Check",
+   "label": "Auto Submit Delivery Orders"
   },
   {
    "default": "1",

@@ -147,6 +147,7 @@ doc_events = {
 	},
 	"Sales Order": {
 		"on_submit": "vuna_transport.services.demand.delivery_order_service.create_delivery_orders_for_sales_order",
+		"on_update_after_submit": "vuna_transport.services.demand.delivery_order_service.sync_delivery_orders_for_sales_order",
 	},
 	"Delivery Note": {
 		"validate": "vuna_transport.services.execution.lineage_service.populate_delivery_note_delivery_links",

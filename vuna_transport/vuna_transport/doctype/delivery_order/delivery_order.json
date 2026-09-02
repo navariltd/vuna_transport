@@ -1,6 +1,7 @@
 {
  "actions": [],
  "allow_bulk_edit": 1,
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "naming_series:",
  "creation": "2026-08-10 10:39:33.315167",
@@ -22,6 +23,10 @@
   "sales_order",
   "delivery_address",
   "delivery_method",
+  "section_break_rrsi",
+  "items",
+  "section_break_bdbs",
+  "amended_from",
   "planning_tab",
   "section_break_ewyz",
   "source_warehouse",
@@ -34,6 +39,8 @@
   "delivery_from_time",
   "delivery_to_time",
   "transport_handling_profile",
+  "transport_compatibility_group",
+  "delivery_group",
   "requirements_section",
   "refrigeration_required",
   "tail_lift_required",
@@ -46,13 +53,14 @@
   "average_service_duration",
   "access_notes",
   "location_snapshot_section",
-  "destination_location",
-  "destination_latitude",
-  "destination_longitude",
   "column_break_location",
   "source_location",
   "source_latitude",
   "source_longitude",
+  "column_break_jsrj",
+  "destination_location",
+  "destination_latitude",
+  "destination_longitude",
   "planning_details_section",
   "total_quantity",
   "requested_quantity",
@@ -68,11 +76,7 @@
   "total_pallets",
   "total_cases",
   "total_crates",
-  "items_tab",
-  "section_break_rrsi",
-  "items",
-  "section_break_bdbs",
-  "amended_from"
+  "connections"
  ],
  "fields": [
   {
@@ -89,11 +93,6 @@
    "fieldname": "planning_tab",
    "fieldtype": "Tab Break",
    "label": "Delivery & Planning"
-  },
-  {
-   "fieldname": "items_tab",
-   "fieldtype": "Tab Break",
-   "label": "Items & Allocation"
   },
   {
    "fieldname": "section_break_bdbs",
@@ -177,7 +176,8 @@
    "in_standard_filter": 1,
    "label": "Sales Order",
    "options": "Sales Order",
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "delivery_address",
@@ -192,7 +192,8 @@
    "fieldtype": "Link",
    "in_standard_filter": 1,
    "label": "Delivery Method",
-   "options": "Delivery Method"
+   "options": "Delivery Method",
+   "search_index": 1
   },
   {
    "fieldname": "delivery_from_time",
@@ -245,6 +246,20 @@
    "fieldname": "transport_handling_profile",
    "fieldtype": "Data",
    "label": "Transport Handling Profile"
+  },
+  {
+   "fieldname": "transport_compatibility_group",
+   "fieldtype": "Link",
+   "label": "Transport Compatibility Group",
+   "options": "Transport Compatibility Group",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_group",
+   "fieldtype": "Link",
+   "label": "Delivery Group",
+   "options": "Delivery Group",
+   "read_only": 1
   },
   {
    "fieldname": "requirements_section",
@@ -372,12 +387,14 @@
   {
    "fieldname": "total_quantity",
    "fieldtype": "Float",
+   "allow_on_submit": 1,
    "label": "Total Quantity",
    "read_only": 1
   },
   {
    "fieldname": "requested_quantity",
    "fieldtype": "Float",
+   "allow_on_submit": 1,
    "label": "Requested Quantity",
    "read_only": 1
   },
@@ -388,18 +405,21 @@
   {
    "fieldname": "allocated_quantity",
    "fieldtype": "Float",
+   "allow_on_submit": 1,
    "label": "Allocated Quantity",
    "read_only": 1
   },
   {
    "fieldname": "reserved_quantity",
    "fieldtype": "Float",
+   "allow_on_submit": 1,
    "label": "Reserved Quantity",
    "read_only": 1
   },
   {
    "fieldname": "unallocated_quantity",
    "fieldtype": "Float",
+   "allow_on_submit": 1,
    "label": "Unallocated Quantity",
    "read_only": 1
   },
@@ -410,12 +430,14 @@
   {
    "fieldname": "total_weight",
    "fieldtype": "Float",
+   "allow_on_submit": 1,
    "label": "Total Weight",
    "read_only": 1
   },
   {
    "fieldname": "weight_uom",
    "fieldtype": "Link",
+   "allow_on_submit": 1,
    "label": "Weight UOM",
    "options": "UOM",
    "read_only": 1
@@ -423,12 +445,14 @@
   {
    "fieldname": "total_volume",
    "fieldtype": "Float",
+   "allow_on_submit": 1,
    "label": "Total Volume",
    "read_only": 1
   },
   {
    "fieldname": "volume_uom",
    "fieldtype": "Link",
+   "allow_on_submit": 1,
    "label": "Volume UOM",
    "options": "UOM",
    "read_only": 1
@@ -436,18 +460,21 @@
   {
    "fieldname": "total_pallets",
    "fieldtype": "Float",
+   "allow_on_submit": 1,
    "label": "Total Pallets",
    "read_only": 1
   },
   {
    "fieldname": "total_cases",
    "fieldtype": "Float",
+   "allow_on_submit": 1,
    "label": "Total Cases",
    "read_only": 1
   },
   {
    "fieldname": "total_crates",
    "fieldtype": "Float",
+   "allow_on_submit": 1,
    "label": "Total Crates",
    "read_only": 1
   },
@@ -457,12 +484,13 @@
    "fieldtype": "Select",
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nOpen\nPartially Allocated\nAllocated\nDispatched\nPartially Delivered\nDelivery Exception\nDelivered\nCancelled",
+   "options": "Draft\nOpen\nPartially Allocated\nAllocated\nDispatched\nPartially Delivered\nDelivery Exception\nResolved with Exceptions\nDelivered\nCancelled",
    "read_only": 1
   },
   {
    "fieldname": "section_break_rrsi",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "Items & Allocation"
   },
   {
    "fieldname": "items",
@@ -481,13 +509,28 @@
    "in_standard_filter": 1,
    "label": "Required Delivery Date",
    "reqd": 1
+  },
+  {
+   "fieldname": "column_break_jsrj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "connections",
+   "fieldtype": "Tab Break",
+   "label": "Connections",
+   "show_dashboard": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
- "links": [],
- "modified": "2026-08-25 08:10:44.970164",
+ "links": [
+  {
+   "link_doctype": "Delivery Exception",
+   "link_fieldname": "delivery_order"
+  }
+ ],
+ "modified": "2026-08-31 12:29:58.754531",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Delivery Order",
@@ -544,5 +587,7 @@
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],
- "title_field": "customer_name"
+ "title_field": "customer_name",
+ "track_changes": 1,
+ "track_seen": 1
 }

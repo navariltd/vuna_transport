@@ -114,10 +114,17 @@ def _validate_delivery_order_for_load(load, delivery_order, first_order):
 	for fieldname, value in defaults.items():
 		if not load.get(fieldname) and value:
 			load.set(fieldname, value)
+	if load.source_warehouse and load.company:
+		warehouse_company = frappe.db.get_value("Warehouse", load.source_warehouse, "company")
+		if warehouse_company and warehouse_company != load.company:
+			frappe.throw(
+				_("Dispatch warehouse {0} belongs to company {1}, not {2}.").format(
+					load.source_warehouse, warehouse_company, load.company
+				)
+			)
 
 	comparisons = (
 		("company", "company"),
-		("source_warehouse", "source warehouse"),
 		("transport_zone", "Transport Zone"),
 	)
 	for fieldname, label in comparisons:
@@ -138,10 +145,15 @@ def _validate_delivery_order_for_load(load, delivery_order, first_order):
 
 	if getdate(delivery_order.required_delivery_date) != getdate(first_order.required_delivery_date):
 		frappe.throw(_("All Delivery Orders in a load must have the same required delivery date."))
-	if (delivery_order.transport_handling_profile or "").strip() != (
-		first_order.transport_handling_profile or ""
-	).strip():
-		frappe.throw(_("All Delivery Orders in a load must have compatible handling profiles."))
+	if (
+		delivery_order.transport_compatibility_group
+		and first_order.transport_compatibility_group
+		and delivery_order.transport_compatibility_group
+		!= first_order.transport_compatibility_group
+	):
+		frappe.throw(
+			_("Delivery Orders in a load have incompatible Transport Compatibility Groups.")
+		)
 
 	canonical_method = canonical_delivery_method(delivery_order.delivery_method)
 	if canonical_method and frappe.db.get_value(

@@ -1,0 +1,30 @@
+{
+ "actions": [],
+ "autoname": "field:group_name",
+ "creation": "2026-09-01 11:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["group_name", "company", "disabled", "dedicated_transport", "description"],
+ "fields": [
+  {"fieldname":"group_name","fieldtype":"Data","in_list_view":1,"label":"Group Name","reqd":1,"unique":1},
+  {"fieldname":"company","fieldtype":"Link","in_list_view":1,"label":"Company","options":"Company"},
+  {"default":"0","fieldname":"disabled","fieldtype":"Check","in_list_view":1,"label":"Disabled"},
+  {"default":"0","fieldname":"dedicated_transport","fieldtype":"Check","label":"Dedicated Transport"},
+  {"fieldname":"description","fieldtype":"Small Text","label":"Description"}
+ ],
+ "links": [],
+ "modified": "2026-09-01 11:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Transport Compatibility Group",
+ "owner": "Administrator",
+ "permissions": [
+  {"create":1,"delete":1,"read":1,"write":1,"role":"Transport Manager"},
+  {"read":1,"role":"Transport Planner"},
+  {"read":1,"role":"Transport Dispatcher"},
+  {"create":1,"delete":1,"read":1,"write":1,"role":"System Manager"}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

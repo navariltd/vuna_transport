@@ -68,6 +68,26 @@
    "insert_after": "vuna_required_body_type",
    "label": "Special Equipment Required",
    "module": "Vuna Transport"
+  },
+  {
+   "dt": "Item",
+   "fieldname": "delivery_group",
+   "fieldtype": "Link",
+   "insert_after": "vuna_special_equipment_required",
+   "label": "Delivery Group",
+   "module": "Vuna Transport",
+   "options": "Delivery Group",
+   "description": "Items with the same Delivery Group may be grouped into the same Delivery Order."
+  },
+  {
+   "dt": "Item",
+   "fieldname": "vuna_transport_compatibility_group",
+   "fieldtype": "Link",
+   "insert_after": "delivery_group",
+   "label": "Transport Compatibility Group",
+   "module": "Vuna Transport",
+   "options": "Transport Compatibility Group",
+   "description": "Groups items that may share transport capacity; this is independent of Delivery Order grouping."
   }
  ],
  "custom_perms": [],

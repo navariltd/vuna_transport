@@ -59,6 +59,98 @@ def create_delivery_orders_for_sales_order(sales_order):
 	return created
 
 
+def sync_delivery_orders_for_sales_order(sales_order):
+	"""Refresh existing Delivery Orders after a submitted Sales Order changes."""
+	doc = _get_sales_order(sales_order)
+	_validate_sales_order(doc)
+
+	delivery_order_names = frappe.get_all(
+		"Delivery Order", filters={"sales_order": doc.name}, pluck="name"
+	)
+	for delivery_order_name in delivery_order_names:
+		delivery_order = frappe.get_doc("Delivery Order", delivery_order_name)
+		sync_delivery_order_quantities(delivery_order, persist=True)
+
+	# The existing generator remains responsible for newly-added Sales Order Items.
+	return create_delivery_orders_for_sales_order(doc)
+
+
+def sync_delivery_order_quantities(delivery_order, persist=False):
+	"""Refresh generated quantities from Sales Order Items without breaking allocations."""
+	if not delivery_order.sales_order:
+		return False
+
+	sales_order = _get_sales_order(delivery_order.sales_order)
+	sales_items = {row.name: row for row in sales_order.items}
+	changed = False
+	for row in delivery_order.items:
+		sales_item = sales_items.get(row.sales_order_item)
+		if not sales_item:
+			continue
+
+		ordered_qty, transport_qty = get_sales_order_item_quantities(sales_item)
+		reserved, allocated = _get_delivery_order_item_commitments(row.name)
+		if transport_qty + 1e-9 < reserved + allocated:
+			frappe.throw(
+				_(
+					"Sales Order quantity for item {0} cannot be reduced to {1}; "
+					"{2} is already reserved/allocated on Delivery Loads."
+				).format(row.item_code, transport_qty, reserved + allocated)
+			)
+
+		measurements = _get_item_transport_measurements(sales_item, transport_qty)
+		values = {
+			"ordered_qty": ordered_qty,
+			"transport_qty": transport_qty,
+			"weight": measurements.weight,
+			"weight_uom": measurements.weight_uom,
+			"volume": measurements.volume,
+			"volume_uom": measurements.volume_uom,
+			"pallets": _get_item_measure(sales_item, "pallets", transport_qty),
+			"cases": _get_item_measure(sales_item, "cases", transport_qty),
+			"crates": _get_item_measure(sales_item, "crates", transport_qty),
+		}
+		for field, value in values.items():
+			current = getattr(row, field, None)
+			if current != value:
+				setattr(row, field, value)
+				changed = True
+
+	if changed and persist:
+		delivery_order.save(ignore_permissions=True)
+		from vuna_transport.services.planning.load_validation_service import (
+			sync_delivery_order_allocations,
+		)
+
+		sync_delivery_order_allocations([delivery_order.name])
+	return changed
+
+
+def get_sales_order_item_quantities(sales_order_item):
+	"""Return authoritative ordered and outstanding transport quantities."""
+	ordered_qty = flt(getattr(sales_order_item, "qty", 0))
+	delivered_qty = flt(getattr(sales_order_item, "delivered_qty", 0))
+	return ordered_qty, max(ordered_qty - delivered_qty, 0)
+
+
+def _get_delivery_order_item_commitments(delivery_order_item):
+	row = frappe.db.sql(
+		"""
+		select
+			coalesce(sum(case when dl.docstatus = 0 then dlo.allocated_quantity else 0 end), 0) as reserved,
+			coalesce(sum(case when dl.docstatus = 1 then dlo.allocated_quantity else 0 end), 0) as allocated
+		from `tabDelivery Load Order` dlo
+		join `tabDelivery Load` dl on dl.name = dlo.parent
+		where dlo.delivery_order_item = %s
+		and dlo.parenttype = 'Delivery Load'
+		and dl.docstatus in (0, 1)
+		""",
+		delivery_order_item,
+		as_dict=True,
+	)[0]
+	return flt(row.reserved), flt(row.allocated)
+
+
 def _get_sales_order(sales_order):
 	if isinstance(sales_order, str):
 		return frappe.get_doc("Sales Order", sales_order)
@@ -78,9 +170,7 @@ def _validate_sales_order(sales_order):
 
 
 def _get_transport_quantity(item):
-	ordered_qty = flt(getattr(item, "qty", 0))
-	delivered_qty = flt(getattr(item, "delivered_qty", 0))
-	return max(ordered_qty - delivered_qty, 0)
+	return get_sales_order_item_quantities(item)[1]
 
 
 def _get_group_key(sales_order, item):
@@ -100,7 +190,8 @@ def _get_group_key(sales_order, item):
 		),
 	}
 
-	return tuple(_normalise_group_value(values[field]) for field in GROUPING_FIELDS)
+	delivery_group = _get_item_delivery_group(item, getattr(sales_order, "company", None))
+	return tuple(_normalise_group_value(values[field]) for field in GROUPING_FIELDS) + (delivery_group,)
 
 
 def _normalise_group_value(value):
@@ -109,6 +200,21 @@ def _normalise_group_value(value):
 	if hasattr(value, "isoformat"):
 		return getdate(value).isoformat()
 	return value
+
+
+def _get_item_delivery_group(sales_order_item, company=None):
+	if not getattr(sales_order_item, "item_code", None):
+		return None
+	item = frappe.get_cached_doc("Item", sales_order_item.item_code)
+	group_name = getattr(item, "delivery_group", None)
+	if not group_name:
+		return None
+	group = frappe.get_cached_doc("Delivery Group", group_name)
+	if group.disabled:
+		frappe.throw(_("Delivery Group {0} is disabled and cannot be used for new Delivery Orders.").format(group.name))
+	if group.company and company and group.company != company:
+		frappe.throw(_("Delivery Group {0} belongs to company {1}, not {2}.").format(group.name, group.company, company))
+	return group.name
 
 
 def _is_item_already_linked(sales_order_item):
@@ -130,6 +236,7 @@ def _create_delivery_order(sales_order, group_key, group_items):
 		preferred_route,
 		handling_profile,
 		delivery_method,
+		delivery_group,
 	) = group_key
 	_validate_group_key(delivery_date, source_warehouse)
 	delivery_order = frappe.new_doc("Delivery Order")
@@ -147,9 +254,11 @@ def _create_delivery_order(sales_order, group_key, group_items):
 	delivery_order.preferred_route = preferred_route
 	delivery_order.transport_handling_profile = handling_profile
 	delivery_order.delivery_method = delivery_method
+	delivery_order.delivery_group = delivery_group
 	delivery_order.status = "Open"
 	address_data = get_address_planning_data(delivery_address)
-	requirements = _get_group_transport_requirements(group_items, handling_profile)
+	requirements = _get_group_transport_requirements(group_items, handling_profile, sales_order.company)
+	delivery_order.transport_compatibility_group = requirements.transport_compatibility_group
 	delivery_order.delivery_from_time = address_data.delivery_from_time
 	delivery_order.delivery_to_time = address_data.delivery_to_time
 	delivery_order.average_service_duration = address_data.average_service_duration
@@ -169,7 +278,12 @@ def _create_delivery_order(sales_order, group_key, group_items):
 
 	totals = defaultdict(float)
 	for item, transport_qty in group_items:
-		row_values = _get_delivery_order_item_values(item, transport_qty)
+		row_values = _get_delivery_order_item_values(
+			item,
+			transport_qty,
+			requirements.transport_compatibility_group,
+			delivery_group,
+		)
 		delivery_order.append("items", row_values)
 		for field in ("transport_qty", "weight", "volume", "pallets", "cases", "crates"):
 			totals[field] += flt(row_values.get(field))
@@ -186,10 +300,17 @@ def _create_delivery_order(sales_order, group_key, group_items):
 	delivery_order.total_crates = totals["crates"]
 
 	delivery_order.insert(ignore_permissions=True)
+	if _should_auto_submit_delivery_orders():
+		delivery_order.flags.ignore_permissions = True
+		delivery_order.submit()
 	return delivery_order.name
 
 
-def _get_group_transport_requirements(group_items, handling_profile=None):
+def _should_auto_submit_delivery_orders():
+	return bool(frappe.db.get_single_value("Transport Settings", "auto_submit_delivery_orders"))
+
+
+def _get_group_transport_requirements(group_items, handling_profile=None, company=None):
 	items = [frappe.get_cached_doc("Item", row.item_code) for row, _quantity in group_items]
 	body_types = {
 		item.vuna_required_body_type
@@ -213,6 +334,11 @@ def _get_group_transport_requirements(group_items, handling_profile=None):
 		}
 	)
 	profile = (handling_profile or "").lower()
+	compatibility_groups = {
+		_get_transport_compatibility_group(item, company)
+		for item in items
+		if getattr(item, "vuna_transport_compatibility_group", None)
+	}
 	return frappe._dict(
 		refrigeration_required=any(
 			getattr(item, "vuna_refrigeration_required", 0) for item in items
@@ -222,7 +348,30 @@ def _get_group_transport_requirements(group_items, handling_profile=None):
 		) or "tail lift" in profile,
 		required_body_type=next(iter(body_types), None),
 		special_equipment_required=", ".join(equipment),
+		transport_compatibility_group=(
+			next(iter(compatibility_groups)) if len(compatibility_groups) == 1 else None
+		),
 	)
+
+
+def _get_transport_compatibility_group(item, company=None):
+	group_name = (getattr(item, "vuna_transport_compatibility_group", None) or "").strip()
+	if not group_name:
+		return None
+	group = frappe.get_cached_doc("Transport Compatibility Group", group_name)
+	if group.disabled:
+		frappe.throw(
+			_("Transport Compatibility Group {0} is disabled and cannot be used for new Delivery Orders.").format(
+				group.name
+			)
+		)
+	if group.company and company and group.company != company:
+		frappe.throw(
+			_("Transport Compatibility Group {0} belongs to company {1}, not {2}.").format(
+				group.name, group.company, company
+			)
+		)
+	return group.name
 
 
 def _requires_transport_planning(sales_order):
@@ -258,7 +407,9 @@ def _log_non_delivery_item(sales_order, item):
 	)
 
 
-def _get_delivery_order_item_values(item, transport_qty):
+def _get_delivery_order_item_values(
+	item, transport_qty, transport_compatibility_group=None, delivery_group=None
+):
 	measurements = _get_item_transport_measurements(item, transport_qty)
 	values = {
 		"sales_order_item": item.name,
@@ -277,6 +428,9 @@ def _get_delivery_order_item_values(item, transport_qty):
 		"cases": _get_item_measure(item, "cases", transport_qty),
 		"crates": _get_item_measure(item, "crates", transport_qty),
 		"transport_handling_profile": getattr(item, "transport_handling_profile", None),
+		"transport_compatibility_group": transport_compatibility_group
+			or getattr(item, "vuna_transport_compatibility_group", None),
+		"delivery_group": delivery_group,
 	}
 	return values
 

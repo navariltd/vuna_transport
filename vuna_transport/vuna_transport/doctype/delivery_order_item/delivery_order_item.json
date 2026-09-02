@@ -24,6 +24,8 @@
   "volume",
   "volume_uom",
   "transport_handling_profile",
+  "transport_compatibility_group",
+  "delivery_group",
   "column_break_indl",
   "pallets",
   "cases",
@@ -66,7 +68,10 @@
    "in_list_view": 1,
    "label": "Ordered Qty",
    "non_negative": 1,
-   "reqd": 1
+   "allow_on_submit": 1,
+   "read_only": 1,
+   "reqd": 1,
+   "description": "Fetched from the linked submitted Sales Order Item. Update the Sales Order instead."
   },
   {
    "fieldname": "transport_qty",
@@ -74,7 +79,10 @@
    "in_list_view": 1,
    "label": "Transport Qty",
    "non_negative": 1,
-   "reqd": 1
+   "allow_on_submit": 1,
+   "read_only": 1,
+   "reqd": 1,
+   "description": "Calculated from Sales Order quantity less delivered quantity. Update the Sales Order instead."
   },
   {
    "fieldname": "column_break_efmj",
@@ -105,6 +113,7 @@
    "fieldtype": "Float",
    "label": "Weight",
    "non_negative": 1,
+   "allow_on_submit": 1,
    "read_only": 1
   },
   {
@@ -112,6 +121,7 @@
    "fieldtype": "Link",
    "label": "Weight UOM",
    "options": "UOM",
+   "allow_on_submit": 1,
    "read_only": 1
   },
   {
@@ -119,6 +129,7 @@
    "fieldtype": "Float",
    "label": "Volume",
    "non_negative": 1,
+   "allow_on_submit": 1,
    "read_only": 1
   },
   {
@@ -126,6 +137,7 @@
    "fieldtype": "Link",
    "label": "Volume UOM",
    "options": "UOM",
+   "allow_on_submit": 1,
    "read_only": 1
   },
   {
@@ -139,26 +151,46 @@
    "label": "Transport Handling Profile"
   },
   {
+   "fieldname": "transport_compatibility_group",
+   "fieldtype": "Link",
+   "label": "Transport Compatibility Group",
+   "options": "Transport Compatibility Group",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_group",
+   "fieldtype": "Link",
+   "label": "Delivery Group",
+   "options": "Delivery Group",
+   "read_only": 1
+  },
+  {
    "fieldname": "column_break_indl",
    "fieldtype": "Column Break"
   },
   {
    "fieldname": "pallets",
    "fieldtype": "Float",
+   "allow_on_submit": 1,
    "label": "Pallets",
-   "non_negative": 1
+   "non_negative": 1,
+   "read_only": 1
   },
   {
    "fieldname": "cases",
    "fieldtype": "Float",
+   "allow_on_submit": 1,
    "label": "Cases",
-   "non_negative": 1
+   "non_negative": 1,
+   "read_only": 1
   },
   {
    "fieldname": "crates",
    "fieldtype": "Float",
+   "allow_on_submit": 1,
    "label": "Crates",
-   "non_negative": 1
+   "non_negative": 1,
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
