@@ -116,7 +116,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Transport",
-   "link_count": 9,
+   "link_count": 10,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -214,6 +214,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Delivery Exception",
+   "link_count": 0,
+   "link_to": "Delivery Exception",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Warehouse & Addresses",
    "link_count": 2,
    "link_type": "DocType",
@@ -290,7 +300,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-24 20:31:18.744210",
+ "modified": "2026-08-27 08:40:13.001202",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vuna Transport",

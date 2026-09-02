@@ -104,10 +104,22 @@
   {
    "child": 0,
    "collapsible": 1,
-   "icon": "setting",
+   "icon": "alert-triangle",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Setup",
+   "label": "Delivery Exception",
+   "link_to": "Delivery Exception",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "\ud83d\ude9b",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Fleet Management",
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Section Break"
@@ -115,14 +127,25 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "route",
+   "icon": "truck",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Delivery Method",
-   "link_to": "Delivery Method",
+   "label": "Vehicle",
+   "link_to": "Vehicle",
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "setting",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Fleet Setup",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Section Break"
   },
   {
    "child": 1,
@@ -132,18 +155,6 @@
    "keep_closed": 0,
    "label": "Vehicle Manufacturer",
    "link_to": "Vehicle Manufacturer",
-   "link_type": "DocType",
-   "show_arrow": 0,
-   "type": "Link"
-  },
-  {
-   "child": 1,
-   "collapsible": 1,
-   "icon": "truck",
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Vehicle Model",
-   "link_to": "Vehicle Model",
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
@@ -167,8 +178,31 @@
    "icon": "truck",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Vehicle",
-   "link_to": "Vehicle",
+   "label": "Vehicle Model",
+   "link_to": "Vehicle Model",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "setting",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Setup",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Section Break"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "route",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Delivery Method",
+   "link_to": "Delivery Method",
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
@@ -220,7 +254,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-18 08:28:19.061517",
+ "modified": "2026-08-31 12:42:35.210198",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vuna Transport",
