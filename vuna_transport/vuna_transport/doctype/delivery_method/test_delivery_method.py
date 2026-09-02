@@ -13,7 +13,6 @@ from vuna_transport.services.demand.delivery_method_service import (
 	validate_delivery_method_allows_vehicle_allocation,
 )
 
-
 EXTRA_TEST_RECORD_DEPENDENCIES = []
 IGNORE_TEST_RECORD_DEPENDENCIES = []
 
@@ -25,19 +24,11 @@ class IntegrationTestDeliveryMethod(IntegrationTestCase):
 class TestDeliveryMethodSemantics(UnitTestCase):
 	def test_legacy_transport_sources_normalize_to_company_delivery(self):
 		self.assertEqual(canonical_delivery_method("Company Fleet"), "Company Delivery")
-		self.assertEqual(
-			canonical_delivery_method("Subcontracted Transport"), "Company Delivery"
-		)
-		self.assertTrue(
-			delivery_methods_are_compatible(
-				"Company Fleet", "Subcontracted Transport"
-			)
-		)
+		self.assertEqual(canonical_delivery_method("Subcontracted Transport"), "Company Delivery")
+		self.assertTrue(delivery_methods_are_compatible("Company Fleet", "Subcontracted Transport"))
 
 	def test_customer_pickup_remains_incompatible_with_company_delivery(self):
-		self.assertFalse(
-			delivery_methods_are_compatible("Customer Pickup", "Company Delivery")
-		)
+		self.assertFalse(delivery_methods_are_compatible("Customer Pickup", "Company Delivery"))
 
 	@patch("vuna_transport.services.demand.delivery_method_service.frappe.get_cached_doc")
 	def test_company_delivery_allows_owned_or_subcontracted_allocation(self, get_method):
@@ -49,9 +40,7 @@ class TestDeliveryMethodSemantics(UnitTestCase):
 			requires_delivery_trip=1,
 		)
 		for allocation_type in ("Owned Fleet", "Subcontractor"):
-			workflow = validate_delivery_method_allows_vehicle_allocation(
-				"Company Delivery"
-			)
+			workflow = validate_delivery_method_allows_vehicle_allocation("Company Delivery")
 			self.assertTrue(workflow.requires_vehicle_allocation, allocation_type)
 
 	@patch("vuna_transport.services.demand.delivery_method_service.frappe.get_cached_doc")

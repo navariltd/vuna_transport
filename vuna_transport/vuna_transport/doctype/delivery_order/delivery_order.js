@@ -7,7 +7,10 @@ frappe.ui.form.on("Delivery Order", {
 			const button = frm.add_custom_button(__("Create"), () => {
 				frm.call("create_load").then((response) => {
 					if (response.message) {
-						frappe.show_alert({ message: __("Delivery Load {0} created", [response.message]), indicator: "green" });
+						frappe.show_alert({
+							message: __("Delivery Load {0} created", [response.message]),
+							indicator: "green",
+						});
 						frappe.set_route("Form", "Delivery Load", response.message);
 					}
 				});

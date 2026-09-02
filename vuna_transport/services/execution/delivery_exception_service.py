@@ -13,7 +13,6 @@ from vuna_transport.services.shared.security_service import (
 	require_document_permission,
 )
 
-
 EXCEPTION_POD_STATUSES = ("Partially Delivered", "Rejected", "Failed")
 OPEN_RESOLUTION_STATUSES = ("Open", "In Resolution")
 CLOSED_RESOLUTION_STATUSES = ("Resolved", "Closed")
@@ -42,9 +41,7 @@ def sync_delivery_exception_from_pod(pod):
 			"select name from `tabProof of Delivery` where name = %s for update",
 			pod.name,
 		)
-	existing = frappe.db.get_value(
-		"Delivery Exception", {"proof_of_delivery": pod.name}, "name"
-	)
+	existing = frappe.db.get_value("Delivery Exception", {"proof_of_delivery": pod.name}, "name")
 	if existing:
 		return existing
 	active_for_stop = frappe.db.get_value(
@@ -120,22 +117,22 @@ def populate_exception_from_pod(exception, pod=None):
 
 
 def _get_pod_exception_rows(pod):
-	delivery_order_item_names = [
-		row.delivery_order_item for row in pod.items if row.delivery_order_item
-	]
-	stock_uoms = dict(
-		frappe.get_all(
-			"Delivery Order Item",
-			filters={"name": ["in", delivery_order_item_names]},
-			fields=["name", "stock_uom"],
-			as_list=True,
+	delivery_order_item_names = [row.delivery_order_item for row in pod.items if row.delivery_order_item]
+	stock_uoms = (
+		dict(
+			frappe.get_all(
+				"Delivery Order Item",
+				filters={"name": ["in", delivery_order_item_names]},
+				fields=["name", "stock_uom"],
+				as_list=True,
+			)
 		)
-	) if delivery_order_item_names else {}
+		if delivery_order_item_names
+		else {}
+	)
 	rows = {}
 	for pod_item in pod.items:
-		values = get_exception_item_values(
-			pod_item, stock_uoms.get(pod_item.delivery_order_item)
-		)
+		values = get_exception_item_values(pod_item, stock_uoms.get(pod_item.delivery_order_item))
 		if values["unresolved_qty"] > 0:
 			rows[pod_item.delivery_note_item] = values
 	return rows
@@ -204,9 +201,7 @@ def _validate_resolution(exception):
 			or commercial == "Pending"
 		):
 			frappe.throw(
-				_("Set custody, responsible party, and resolutions for item {0}.").format(
-					row.item_code
-				)
+				_("Set custody, responsible party, and resolutions for item {0}.").format(row.item_code)
 			)
 		return_required = return_required or physical in RETURN_RESOLUTIONS
 		credit_required = credit_required or commercial == "Credit Note"
@@ -222,9 +217,7 @@ def _validate_resolution(exception):
 	for row in exception.items:
 		if flt(row.resolution_qty) != flt(row.unresolved_qty):
 			frappe.throw(
-				_("Resolve the full unresolved quantity for item {0} before closing.").format(
-					row.item_code
-				)
+				_("Resolve the full unresolved quantity for item {0} before closing.").format(row.item_code)
 			)
 	if return_required and not exception.return_document:
 		frappe.throw(_("Link the submitted return Delivery Note before resolving."))
@@ -240,9 +233,7 @@ def _validate_erpnext_links(exception):
 		return_document = frappe.get_doc("Delivery Note", exception.return_document)
 		if not return_document.is_return or return_document.return_against != exception.delivery_note:
 			frappe.throw(
-				_("Return Delivery Note must be a return against {0}.").format(
-					exception.delivery_note
-				)
+				_("Return Delivery Note must be a return against {0}.").format(exception.delivery_note)
 			)
 		_validate_company_customer(exception, return_document, _("Return Delivery Note"))
 		_validate_return_quantities(exception, return_document, require_submitted)
@@ -289,9 +280,9 @@ def _validate_return_quantities(exception, return_document, require_complete=Fal
 	for source_item, quantity in returned_by_delivery_note_item.items():
 		if quantity > allowed_by_delivery_note_item[source_item]:
 			frappe.throw(
-				_("Return quantity for Delivery Note Item {0} exceeds the approved exception quantity.").format(
-					source_item
-				)
+				_(
+					"Return quantity for Delivery Note Item {0} exceeds the approved exception quantity."
+				).format(source_item)
 			)
 	if require_complete:
 		for source_item, approved in allowed_by_delivery_note_item.items():
@@ -349,9 +340,7 @@ def _validate_follow_up_delivery(exception):
 
 
 def cancel_delivery_exception_from_pod(pod):
-	name = frappe.db.get_value(
-		"Delivery Exception", {"proof_of_delivery": pod.name}, "name"
-	)
+	name = frappe.db.get_value("Delivery Exception", {"proof_of_delivery": pod.name}, "name")
 	if not name:
 		return
 	frappe.db.set_value(
@@ -458,6 +447,4 @@ def has_open_delivery_exceptions(delivery_load):
 
 def validate_exception_deletion(exception):
 	if frappe.db.get_value("Proof of Delivery", exception.proof_of_delivery, "docstatus") == 1:
-		frappe.throw(
-			_("Cancel the submitted Proof of Delivery before deleting its Delivery Exception.")
-		)
+		frappe.throw(_("Cancel the submitted Proof of Delivery before deleting its Delivery Exception."))

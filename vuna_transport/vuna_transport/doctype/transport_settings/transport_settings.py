@@ -3,8 +3,8 @@
 
 import frappe
 from frappe import _
-from frappe.utils import flt
 from frappe.model.document import Document
+from frappe.utils import flt
 
 
 class TransportSettings(Document):

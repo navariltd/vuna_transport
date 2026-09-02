@@ -1,10 +1,9 @@
 """Helpers for normalising transport measurements into configured UOMs."""
 
 import frappe
+from erpnext.stock.doctype.item.item import get_uom_conv_factor
 from frappe import _
 from frappe.utils import flt
-
-from erpnext.stock.doctype.item.item import get_uom_conv_factor
 
 
 def get_transport_uoms():

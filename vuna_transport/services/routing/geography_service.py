@@ -11,9 +11,10 @@ def haversine_distance_km(first_latitude, first_longitude, second_latitude, seco
 	longitude_delta = radians(flt(second_longitude) - flt(first_longitude))
 	first_latitude = radians(flt(first_latitude))
 	second_latitude = radians(flt(second_latitude))
-	value = sin(latitude_delta / 2) ** 2 + cos(first_latitude) * cos(
-		second_latitude
-	) * sin(longitude_delta / 2) ** 2
+	value = (
+		sin(latitude_delta / 2) ** 2
+		+ cos(first_latitude) * cos(second_latitude) * sin(longitude_delta / 2) ** 2
+	)
 	return 6371 * 2 * asin(sqrt(value))
 
 
@@ -23,8 +24,7 @@ def calculate_geographic_cohesion(orders, distance_scale_km=50):
 	coordinates = [
 		(flt(order.destination_latitude), flt(order.destination_longitude))
 		for order in orders
-		if order.destination_latitude not in (None, "")
-		and order.destination_longitude not in (None, "")
+		if order.destination_latitude not in (None, "") and order.destination_longitude not in (None, "")
 	]
 	missing_count = len(orders) - len(coordinates)
 	if len(coordinates) < 2:

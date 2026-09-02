@@ -2,7 +2,6 @@
 
 from frappe.model.utils.rename_field import rename_field
 
-
 FIELD_RENAMES = (
 	("Transport Settings", "auto_create_transport_requirements", "auto_create_delivery_orders"),
 	("Delivery Load", "load_requirements", "delivery_orders"),

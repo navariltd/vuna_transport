@@ -19,17 +19,20 @@ def populate_delivery_note_delivery_links(doc, method=None):
 		pick_lists = {row.against_pick_list for row in doc.items if row.against_pick_list}
 		if not pick_lists:
 			pick_list_items = [row.pick_list_item for row in doc.items if row.pick_list_item]
-			pick_lists = set(
-				frappe.get_all(
-					"Pick List Item",
-					filters={"name": ["in", pick_list_items]},
-					pluck="parent",
+			pick_lists = (
+				set(
+					frappe.get_all(
+						"Pick List Item",
+						filters={"name": ["in", pick_list_items]},
+						pluck="parent",
+					)
 				)
-			) if pick_list_items else set()
+				if pick_list_items
+				else set()
+			)
 
 		loads = {
-			frappe.db.get_value("Pick List", pick_list, "vuna_delivery_load")
-			for pick_list in pick_lists
+			frappe.db.get_value("Pick List", pick_list, "vuna_delivery_load") for pick_list in pick_lists
 		}
 		loads.discard(None)
 		if len(loads) == 1:
@@ -56,7 +59,9 @@ def populate_delivery_note_delivery_links(doc, method=None):
 
 def _validate_delivery_note_against_load(doc, load):
 	if not doc.vuna_delivery_order:
-		frappe.throw(_("Delivery Note must identify its Delivery Order for Delivery Load {0}.").format(load.name))
+		frappe.throw(
+			_("Delivery Note must identify its Delivery Order for Delivery Load {0}.").format(load.name)
+		)
 	load_rows = frappe.get_all(
 		"Delivery Load Order",
 		filters={"parent": load.name, "delivery_order": doc.vuna_delivery_order},
@@ -71,9 +76,7 @@ def _validate_delivery_note_against_load(doc, load):
 	if doc.company != load.company:
 		frappe.throw(_("Delivery Note and Delivery Load must belong to the same company."))
 	warehouse_companies = {
-		frappe.db.get_value("Warehouse", item.warehouse, "company")
-		for item in doc.items
-		if item.warehouse
+		frappe.db.get_value("Warehouse", item.warehouse, "company") for item in doc.items if item.warehouse
 	}
 	warehouse_companies.discard(None)
 	if warehouse_companies and warehouse_companies != {load.company}:
@@ -90,9 +93,7 @@ def _validate_delivery_note_against_load(doc, load):
 	allocated_by_sales_order_item = {
 		row.sales_order_item: flt(item_allocations[row.name]) for row in order_items
 	}
-	validate_delivery_note_item_allocations(
-		doc.items, allocated_by_sales_order_item, load.name
-	)
+	validate_delivery_note_item_allocations(doc.items, allocated_by_sales_order_item, load.name)
 
 	duplicate = frappe.db.get_value(
 		"Delivery Note",
@@ -142,18 +143,14 @@ def validate_delivery_trip(doc, method=None):
 	)
 	if existing_trip:
 		frappe.throw(
-			_("Delivery Load {0} already has active Delivery Trip {1}.").format(
-				load.name, existing_trip
-			)
+			_("Delivery Load {0} already has active Delivery Trip {1}.").format(load.name, existing_trip)
 		)
 	if doc.company != load.company:
 		frappe.throw(_("Delivery Trip and Delivery Load must belong to the same company."))
 	requires_allocation = True
 	if load.delivery_method:
 		requires_allocation = bool(
-			frappe.db.get_value(
-				"Delivery Method", load.delivery_method, "requires_vehicle_allocation"
-			)
+			frappe.db.get_value("Delivery Method", load.delivery_method, "requires_vehicle_allocation")
 		)
 	allocation = get_active_allocation(load, required=requires_allocation)
 	if allocation:
@@ -163,16 +160,24 @@ def validate_delivery_trip(doc, method=None):
 			if doc.vuna_vehicle_allocation != allocation.name:
 				frappe.throw(_("Delivery Trip must use the active Vehicle Allocation for this load."))
 			if allocation.vehicle and doc.vehicle != allocation.vehicle:
-				frappe.throw(_("Delivery Trip vehicle must match Vehicle Allocation {0}.").format(allocation.name))
+				frappe.throw(
+					_("Delivery Trip vehicle must match Vehicle Allocation {0}.").format(allocation.name)
+				)
 			if allocation.driver and doc.driver != allocation.driver:
-				frappe.throw(_("Delivery Trip driver must match Vehicle Allocation {0}.").format(allocation.name))
+				frappe.throw(
+					_("Delivery Trip driver must match Vehicle Allocation {0}.").format(allocation.name)
+				)
 		else:
 			if doc.vuna_current_vehicle_allocation != allocation.name:
 				frappe.throw(_("Current Vehicle Allocation must match the load's active allocation."))
 			if doc.vuna_current_vehicle != allocation.vehicle:
-				frappe.throw(_("Current Execution Vehicle must match Vehicle Allocation {0}.").format(allocation.name))
+				frappe.throw(
+					_("Current Execution Vehicle must match Vehicle Allocation {0}.").format(allocation.name)
+				)
 			if doc.vuna_current_driver != allocation.driver:
-				frappe.throw(_("Current Execution Driver must match Vehicle Allocation {0}.").format(allocation.name))
+				frappe.throw(
+					_("Current Execution Driver must match Vehicle Allocation {0}.").format(allocation.name)
+				)
 
 	execution_vehicle = doc.vuna_current_vehicle or doc.vehicle
 	if execution_vehicle and load.required_vehicle_category:
@@ -237,7 +242,7 @@ def validate_delivery_trip_note_set(expected_delivery_notes, stop_delivery_notes
 			_("Delivery Trip stops must exactly match the load's submitted Delivery Notes ({0}).").format(
 				"; ".join(details) or _("no submitted Delivery Notes")
 			)
-			)
+		)
 
 
 def link_delivery_trip(doc, method=None):
@@ -303,9 +308,7 @@ def complete_load_without_trip(doc, method=None):
 		)
 	)
 	if expected and expected.issubset(submitted):
-		set_delivery_load_status(
-			load, "Completed", _("All required Delivery Notes were submitted")
-		)
+		set_delivery_load_status(load, "Completed", _("All required Delivery Notes were submitted"))
 		_recompute_delivery_order_statuses(load.name)
 
 

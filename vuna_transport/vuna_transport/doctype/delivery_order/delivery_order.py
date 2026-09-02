@@ -3,13 +3,12 @@
 
 import frappe
 from frappe import _
-from frappe.utils import flt
 from frappe.model.document import Document
-
-from vuna_transport.services.shared.measurement_service import get_transport_uoms
+from frappe.utils import flt
 
 from vuna_transport.services.planning.delivery_load_service import create_delivery_load
 from vuna_transport.services.routing.location_service import set_delivery_order_location_snapshots
+from vuna_transport.services.shared.measurement_service import get_transport_uoms
 from vuna_transport.services.shared.security_service import require_doctype_permission
 
 
@@ -38,9 +37,9 @@ class DeliveryOrder(Document):
 		if self.delivery_group and frappe.db.get_value("Delivery Group", self.delivery_group, "disabled"):
 			if self.is_new() or self.get_doc_before_save() is None:
 				frappe.throw(
-					_("Delivery Group {0} is disabled and cannot be assigned to a new Delivery Order.").format(
-						self.delivery_group
-					)
+					_(
+						"Delivery Group {0} is disabled and cannot be assigned to a new Delivery Order."
+					).format(self.delivery_group)
 				)
 
 	def validate_items(self):
@@ -49,10 +48,14 @@ class DeliveryOrder(Document):
 
 		for item in self.items:
 			if flt(item.transport_qty) <= 0 and self.is_new():
-				frappe.throw(_("Transport quantity must be greater than zero for item {0}.").format(item.item_code))
+				frappe.throw(
+					_("Transport quantity must be greater than zero for item {0}.").format(item.item_code)
+				)
 			if flt(item.ordered_qty) < flt(item.transport_qty):
 				frappe.throw(
-					_("Transport quantity cannot exceed ordered quantity for item {0}.").format(item.item_code)
+					_("Transport quantity cannot exceed ordered quantity for item {0}.").format(
+						item.item_code
+					)
 				)
 
 	def sync_quantities_from_sales_order(self):
@@ -67,8 +70,12 @@ class DeliveryOrder(Document):
 
 	def calculate_totals(self):
 		uoms = get_transport_uoms()
-		self.weight_uom = uoms.weight_uom or next((item.weight_uom for item in self.items if item.weight_uom), None)
-		self.volume_uom = uoms.volume_uom or next((item.volume_uom for item in self.items if item.volume_uom), None)
+		self.weight_uom = uoms.weight_uom or next(
+			(item.weight_uom for item in self.items if item.weight_uom), None
+		)
+		self.volume_uom = uoms.volume_uom or next(
+			(item.volume_uom for item in self.items if item.volume_uom), None
+		)
 		self.total_quantity = sum(flt(item.transport_qty) for item in self.items)
 		self.requested_quantity = self.total_quantity
 		self.total_weight = sum(flt(item.weight) for item in self.items)
@@ -77,9 +84,7 @@ class DeliveryOrder(Document):
 		self.total_cases = sum(flt(item.cases) for item in self.items)
 		self.total_crates = sum(flt(item.crates) for item in self.items)
 		self.unallocated_quantity = max(
-			flt(self.requested_quantity)
-			- flt(self.allocated_quantity)
-			- flt(self.reserved_quantity),
+			flt(self.requested_quantity) - flt(self.allocated_quantity) - flt(self.reserved_quantity),
 			0,
 		)
 

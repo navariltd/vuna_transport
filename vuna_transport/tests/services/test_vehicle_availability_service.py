@@ -8,13 +8,17 @@ from frappe.tests import UnitTestCase
 
 from vuna_transport.services.fleet.driver_availability_service import (
 	_evaluate_driver,
+)
+from vuna_transport.services.fleet.driver_availability_service import (
 	_normalize_interval as normalize_driver_interval,
 )
-from vuna_transport.services.shared.resource_scheduling_service import interval_overlaps
 from vuna_transport.services.fleet.vehicle_availability_service import (
 	_evaluate_vehicle,
+)
+from vuna_transport.services.fleet.vehicle_availability_service import (
 	_normalize_interval as normalize_vehicle_interval,
 )
+from vuna_transport.services.shared.resource_scheduling_service import interval_overlaps
 
 
 class TestVehicleAvailabilityService(UnitTestCase):
@@ -107,9 +111,7 @@ class TestVehicleAvailabilityService(UnitTestCase):
 		self.assertFalse(result.dispatch_eligible)
 		self.assertEqual(result.operational_state, "Unavailable")
 		self.assertEqual(result.current_vehicle_incident, incident.name)
-		reason = next(
-			reason for reason in result.reasons if reason.code == "IMMOBILIZING_INCIDENT"
-		)
+		reason = next(reason for reason in result.reasons if reason.code == "IMMOBILIZING_INCIDENT")
 		self.assertEqual(reason.reference_doctype, "Vehicle Incident")
 		self.assertEqual(reason.reference_name, incident.name)
 
@@ -189,9 +191,7 @@ class TestVehicleAvailabilityService(UnitTestCase):
 				status="Approved",
 			)
 		}
-		self.assertTrue(
-			self._evaluate(allocations=[allocation], loads=loads).dispatch_eligible
-		)
+		self.assertTrue(self._evaluate(allocations=[allocation], loads=loads).dispatch_eligible)
 
 	def test_active_trip_has_in_trip_state(self):
 		trip = SimpleNamespace(

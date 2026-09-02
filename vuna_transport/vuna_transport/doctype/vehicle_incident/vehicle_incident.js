@@ -24,26 +24,37 @@ frappe.ui.form.on("Vehicle Incident", {
 			frm.doc.vehicle_allocation &&
 			!frm.doc.replacement_vehicle_allocation
 		) {
-			frm.add_custom_button(__("Reallocate Vehicle"), () => {
-				frappe.model.open_mapped_doc({
-					method: "vuna_transport.services.fleet.vehicle_incident_service.make_replacement_allocation_from_incident",
-					frm,
-					freeze_message: __("Preparing replacement allocation..."),
-				});
-			}, __("Create"));
+			frm.add_custom_button(
+				__("Reallocate Vehicle"),
+				() => {
+					frappe.model.open_mapped_doc({
+						method: "vuna_transport.services.fleet.vehicle_incident_service.make_replacement_allocation_from_incident",
+						frm,
+						freeze_message: __("Preparing replacement allocation..."),
+					});
+				},
+				__("Create")
+			);
 		}
 
 		if (!frm.doc.asset_repair) {
-			frm.add_custom_button(__("Asset Repair"), () => {
-				frappe.call({
-					method: "vuna_transport.services.fleet.vehicle_incident_service.create_asset_repair",
-					args: { source_name: frm.doc.name },
-					freeze: true,
-					freeze_message: __("Creating Asset Repair..."),
-				}).then((response) => {
-					if (response.message) frappe.set_route("Form", "Asset Repair", response.message);
-				});
-			}, __("Create"));
+			frm.add_custom_button(
+				__("Asset Repair"),
+				() => {
+					frappe
+						.call({
+							method: "vuna_transport.services.fleet.vehicle_incident_service.create_asset_repair",
+							args: { source_name: frm.doc.name },
+							freeze: true,
+							freeze_message: __("Creating Asset Repair..."),
+						})
+						.then((response) => {
+							if (response.message)
+								frappe.set_route("Form", "Asset Repair", response.message);
+						});
+				},
+				__("Create")
+			);
 		}
 	},
 });
@@ -58,8 +69,12 @@ function add_view_buttons(frm) {
 		["asset_repair", "Asset Repair", __("Asset Repair")],
 	].forEach(([fieldname, doctype, label]) => {
 		if (!frm.doc[fieldname]) return;
-		frm.add_custom_button(label, () => {
-			frappe.set_route("Form", doctype, frm.doc[fieldname]);
-		}, __("View"));
+		frm.add_custom_button(
+			label,
+			() => {
+				frappe.set_route("Form", doctype, frm.doc[fieldname]);
+			},
+			__("View")
+		);
 	});
 }

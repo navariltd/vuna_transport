@@ -12,8 +12,8 @@ from vuna_transport.services.execution.delivery_exception_service import (
 	POD_EXCEPTION_TYPES,
 	_validate_erpnext_links,
 	_validate_follow_up_delivery,
-	_validate_return_quantities,
 	_validate_resolution,
+	_validate_return_quantities,
 	get_exception_item_values,
 	sync_delivery_exception_from_pod,
 )
@@ -21,9 +21,7 @@ from vuna_transport.services.execution.delivery_exception_service import (
 
 class TestDeliveryException(UnitTestCase):
 	def test_proof_of_delivery_is_unique_exception_context(self):
-		self.assertTrue(
-			frappe.get_meta("Delivery Exception").get_field("proof_of_delivery").unique
-		)
+		self.assertTrue(frappe.get_meta("Delivery Exception").get_field("proof_of_delivery").unique)
 
 	def test_partial_rejected_and_failed_pods_have_exception_types(self):
 		self.assertEqual(POD_EXCEPTION_TYPES["Partially Delivered"], "Partial Delivery")
@@ -116,11 +114,7 @@ class TestDeliveryException(UnitTestCase):
 	def test_return_quantity_cannot_exceed_exception_quantity(self):
 		exception = self._exception()
 		exception.physical_resolution = "Return to Nearest Depot"
-		return_document = SimpleNamespace(
-			items=[
-				SimpleNamespace(dn_detail="DNI-1", stock_qty=-31, qty=-31)
-			]
-		)
+		return_document = SimpleNamespace(items=[SimpleNamespace(dn_detail="DNI-1", stock_qty=-31, qty=-31)])
 		with self.assertRaises(ValidationError):
 			_validate_return_quantities(exception, return_document)
 

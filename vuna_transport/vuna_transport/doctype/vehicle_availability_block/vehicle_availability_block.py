@@ -20,9 +20,5 @@ class VehicleAvailabilityBlock(Document):
 			return
 		vehicle_company = frappe.db.get_value("Vehicle", self.vehicle, "company")
 		if self.company and vehicle_company and self.company != vehicle_company:
-			frappe.throw(
-				_("Vehicle {0} belongs to Company {1}.").format(
-					self.vehicle, vehicle_company
-				)
-			)
+			frappe.throw(_("Vehicle {0} belongs to Company {1}.").format(self.vehicle, vehicle_company))
 		self.company = vehicle_company or self.company

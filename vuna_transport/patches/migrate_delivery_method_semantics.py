@@ -3,7 +3,6 @@
 import frappe
 from frappe.model.utils.rename_field import rename_field
 
-
 COMPANY_DELIVERY = "Company Delivery"
 LEGACY_METHODS = ("Company Fleet", "Subcontracted Transport")
 REFERENCE_FIELDS = (
@@ -23,9 +22,7 @@ FULFILMENT_TYPE_MAP = {
 
 def execute():
 	if frappe.db.has_column("Delivery Method", "delivery_provider_type"):
-		rename_field(
-			"Delivery Method", "delivery_provider_type", "fulfilment_type"
-		)
+		rename_field("Delivery Method", "delivery_provider_type", "fulfilment_type")
 
 	_normalize_fulfilment_types()
 	_ensure_company_delivery()
@@ -42,9 +39,7 @@ def execute():
 
 
 def _normalize_fulfilment_types():
-	for method in frappe.get_all(
-		"Delivery Method", fields=["name", "fulfilment_type"]
-	):
+	for method in frappe.get_all("Delivery Method", fields=["name", "fulfilment_type"]):
 		normalized = FULFILMENT_TYPE_MAP.get(method.fulfilment_type)
 		if normalized and normalized != method.fulfilment_type:
 			frappe.db.set_value(

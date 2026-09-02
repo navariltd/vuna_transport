@@ -20,11 +20,7 @@ class VehicleDocument(Document):
 			return
 		vehicle_company = frappe.db.get_value("Vehicle", self.vehicle, "company")
 		if self.company and vehicle_company and self.company != vehicle_company:
-			frappe.throw(
-				_("Vehicle {0} belongs to Company {1}.").format(
-					self.vehicle, vehicle_company
-				)
-			)
+			frappe.throw(_("Vehicle {0} belongs to Company {1}.").format(self.vehicle, vehicle_company))
 		self.company = vehicle_company or self.company
 
 	def _validate_dates(self):
@@ -35,13 +31,9 @@ class VehicleDocument(Document):
 	def _validate_document_type(self):
 		if not self.document_type or not self.vehicle:
 			return
-		document_type = frappe.get_cached_doc(
-			"Vehicle Document Type", self.document_type
-		)
+		document_type = frappe.get_cached_doc("Vehicle Document Type", self.document_type)
 		if document_type.disabled:
-			frappe.throw(
-				_("Vehicle Document Type {0} is disabled.").format(document_type.name)
-			)
+			frappe.throw(_("Vehicle Document Type {0} is disabled.").format(document_type.name))
 		if document_type.company and self.company != document_type.company:
 			frappe.throw(
 				_("Vehicle Document Type {0} applies to Company {1}.").format(
@@ -60,26 +52,19 @@ class VehicleDocument(Document):
 			["vuna_vehicle_category", "vuna_vehicle_owner"],
 			as_dict=True,
 		)
-		if (
-			document_type.vehicle_category
-			and document_type.vehicle_category != vehicle.vuna_vehicle_category
-		):
+		if document_type.vehicle_category and document_type.vehicle_category != vehicle.vuna_vehicle_category:
 			frappe.throw(
 				_("Vehicle Document Type {0} applies to Vehicle Category {1}.").format(
 					document_type.name, document_type.vehicle_category
 				)
 			)
-		if (
+		if document_type.vehicle_owner and normalize_vehicle_owner(
 			document_type.vehicle_owner
-			and normalize_vehicle_owner(document_type.vehicle_owner)
-			!= normalize_vehicle_owner(vehicle.vuna_vehicle_owner)
-		):
+		) != normalize_vehicle_owner(vehicle.vuna_vehicle_owner):
 			frappe.throw(
 				_("Vehicle Document Type {0} applies to {1} Vehicles.").format(
 					document_type.name, document_type.vehicle_owner
 				)
 			)
 		if document_type.requires_expiry_date and not self.expiry_date:
-			frappe.throw(
-				_("Expiry Date is required for {0}.").format(document_type.name)
-			)
+			frappe.throw(_("Expiry Date is required for {0}.").format(document_type.name))

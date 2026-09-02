@@ -6,24 +6,9 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, getdate
 
-from vuna_transport.services.planning.delivery_load_service import get_capacity_buffer_percentage
-from vuna_transport.services.planning.delivery_load_service import (
-	build_delivery_load_from_allocations,
-)
 from vuna_transport.services.demand.delivery_method_service import (
 	canonical_delivery_method,
 	delivery_methods_are_compatible,
-)
-from vuna_transport.services.routing.geography_service import (
-	calculate_delivery_window_compatibility,
-	calculate_geographic_cohesion,
-)
-from vuna_transport.services.planning.load_validation_service import PLANNABLE_DELIVERY_ORDER_STATUSES
-from vuna_transport.services.shared.measurement_service import get_transport_uoms
-from vuna_transport.services.shared.security_service import (
-	require_company_access,
-	require_doctype_permission,
-	require_document_permission,
 )
 from vuna_transport.services.fleet.vehicle_category_service import (
 	CAPACITY_DIMENSIONS,
@@ -33,7 +18,21 @@ from vuna_transport.services.fleet.vehicle_category_service import (
 	maximum_fitting_fraction,
 	validate_vehicle_access_limit,
 )
-
+from vuna_transport.services.planning.delivery_load_service import (
+	build_delivery_load_from_allocations,
+	get_capacity_buffer_percentage,
+)
+from vuna_transport.services.planning.load_validation_service import PLANNABLE_DELIVERY_ORDER_STATUSES
+from vuna_transport.services.routing.geography_service import (
+	calculate_delivery_window_compatibility,
+	calculate_geographic_cohesion,
+)
+from vuna_transport.services.shared.measurement_service import get_transport_uoms
+from vuna_transport.services.shared.security_service import (
+	require_company_access,
+	require_doctype_permission,
+	require_document_permission,
+)
 
 PRIORITY_RANK = {"Urgent": 4, "High": 3, "Medium": 2, "Low": 1, None: 0, "": 0}
 MAX_CANDIDATE_ORDERS = 100
@@ -78,27 +77,23 @@ def suggest_delivery_loads(
 		return {
 			"suggestions": [],
 			"requested_option_count": requested_count,
-			"warnings": [_('No unallocated Delivery Orders match the planning filters.')],
+			"warnings": [_("No unallocated Delivery Orders match the planning filters.")],
 		}
 
 	uoms = get_transport_uoms()
 	load_uoms = {"weight_uom": uoms.weight_uom, "volume_uom": uoms.volume_uom}
-	categories = get_vehicle_categories(
-		load_uoms, get_capacity_buffer_percentage()
-	)
+	categories = get_vehicle_categories(load_uoms, get_capacity_buffer_percentage())
 	if not categories:
 		return {
 			"suggestions": [],
 			"requested_option_count": requested_count,
-			"warnings": [_('Configure at least one active Vehicle Category.')],
+			"warnings": [_("Configure at least one active Vehicle Category.")],
 		}
 
 	candidates = []
 	exclusions = []
 	for pool in _partition_orders(orders).values():
-		availability = get_available_vehicle_category_counts(
-			pool[0].company, pool[0].required_delivery_date
-		)
+		availability = get_available_vehicle_category_counts(pool[0].company, pool[0].required_delivery_date)
 		for category in categories:
 			available_count = cint(availability["counts"].get(category.name))
 			for strategy in STRATEGIES:
@@ -136,9 +131,9 @@ def suggest_delivery_loads(
 	warnings = []
 	if len(selected) < requested_count:
 		warnings.append(
-			_('Only {0} distinct valid configuration(s) exist for the current filters; {1} were requested.').format(
-				len(selected), requested_count
-			)
+			_(
+				"Only {0} distinct valid configuration(s) exist for the current filters; {1} were requested."
+			).format(len(selected), requested_count)
 		)
 	return {
 		"suggestions": selected,
@@ -164,9 +159,7 @@ def create_delivery_load_from_suggestion(suggestion):
 	delivery_order_names = sorted(
 		{row.get("delivery_order") for row in allocations if row.get("delivery_order")}
 	)
-	delivery_orders = {
-		name: frappe.get_doc("Delivery Order", name) for name in delivery_order_names
-	}
+	delivery_orders = {name: frappe.get_doc("Delivery Order", name) for name in delivery_order_names}
 	for delivery_order in delivery_orders.values():
 		require_document_permission(delivery_order, "read")
 	first = delivery_orders[delivery_order_names[0]]
@@ -177,9 +170,7 @@ def create_delivery_load_from_suggestion(suggestion):
 	load.insert()
 	load.add_comment(
 		"Info",
-		_("Created from ranked load suggestion using Vehicle Category {0}.").format(
-			vehicle_category
-		),
+		_("Created from ranked load suggestion using Vehicle Category {0}.").format(vehicle_category),
 	)
 	return load.name
 
@@ -198,11 +189,7 @@ def _get_plannable_orders(
 	}
 	if source_warehouse:
 		filters["source_warehouse"] = source_warehouse
-	if (
-		delivery_date_from
-		and delivery_date_to
-		and getdate(delivery_date_from) > getdate(delivery_date_to)
-	):
+	if delivery_date_from and delivery_date_to and getdate(delivery_date_from) > getdate(delivery_date_to):
 		frappe.throw(_("Delivery Date From cannot be after Delivery Date To."))
 	if delivery_date_from and delivery_date_to:
 		filters["required_delivery_date"] = [
@@ -216,13 +203,30 @@ def _get_plannable_orders(
 	if delivery_order_names:
 		filters["name"] = ["in", delivery_order_names]
 	fields = [
-		"name", "company", "source_warehouse", "required_delivery_date",
-		"delivery_method", "transport_zone", "preferred_route",
-		"transport_handling_profile", "priority", "customer", "customer_name",
-		"delivery_address", "destination_latitude", "destination_longitude",
-		"delivery_from_time", "delivery_to_time", "weight_uom", "volume_uom",
-		"refrigeration_required", "tail_lift_required", "required_body_type",
-		"special_equipment_required", "maximum_vehicle_category", "restricted_access",
+		"name",
+		"company",
+		"source_warehouse",
+		"required_delivery_date",
+		"delivery_method",
+		"transport_zone",
+		"preferred_route",
+		"transport_handling_profile",
+		"priority",
+		"customer",
+		"customer_name",
+		"delivery_address",
+		"destination_latitude",
+		"destination_longitude",
+		"delivery_from_time",
+		"delivery_to_time",
+		"weight_uom",
+		"volume_uom",
+		"refrigeration_required",
+		"tail_lift_required",
+		"required_body_type",
+		"special_equipment_required",
+		"maximum_vehicle_category",
+		"restricted_access",
 		"average_service_duration",
 	]
 	orders = frappe.get_list(
@@ -239,27 +243,25 @@ def _get_plannable_orders(
 	return [
 		order
 		for order in orders
-		if order.order_items
-		and not order.delivery_method_disabled
-		and order.requires_transport_planning
+		if order.order_items and not order.delivery_method_disabled and order.requires_transport_planning
 	]
 
 
 def _populate_delivery_method_workflows(orders):
 	methods = sorted({order.delivery_method for order in orders if order.delivery_method})
-	method_rows = frappe.get_all(
-		"Delivery Method",
-		filters={"name": ["in", methods]},
-		fields=["name", "requires_transport_planning", "disabled"],
-	) if methods else []
+	method_rows = (
+		frappe.get_all(
+			"Delivery Method",
+			filters={"name": ["in", methods]},
+			fields=["name", "requires_transport_planning", "disabled"],
+		)
+		if methods
+		else []
+	)
 	planning_methods = {
-		canonical_delivery_method(row.name)
-		for row in method_rows
-		if row.requires_transport_planning
+		canonical_delivery_method(row.name) for row in method_rows if row.requires_transport_planning
 	}
-	disabled_methods = {
-		canonical_delivery_method(row.name) for row in method_rows if row.disabled
-	}
+	disabled_methods = {canonical_delivery_method(row.name) for row in method_rows if row.disabled}
 	for order in orders:
 		order.delivery_method = canonical_delivery_method(order.delivery_method)
 		order.delivery_method_disabled = order.delivery_method in disabled_methods
@@ -274,14 +276,20 @@ def _populate_available_items(orders):
 		"Delivery Order Item",
 		filters={"parent": ["in", list(order_map)]},
 		fields=[
-			"name", "parent", "transport_qty", "weight", "volume", "pallets",
-			"cases", "crates", "weight_uom", "volume_uom",
+			"name",
+			"parent",
+			"transport_qty",
+			"weight",
+			"volume",
+			"pallets",
+			"cases",
+			"crates",
+			"weight_uom",
+			"volume_uom",
 		],
 		order_by="parent asc, idx asc",
 	)
-	active_loads = frappe.get_all(
-		"Delivery Load", filters={"docstatus": ["in", [0, 1]]}, pluck="name"
-	)
+	active_loads = frappe.get_all("Delivery Load", filters={"docstatus": ["in", [0, 1]]}, pluck="name")
 	allocated_by_item = defaultdict(float)
 	if active_loads:
 		allocation_rows = frappe.get_all(
@@ -342,12 +350,10 @@ def _build_candidate(pool, category, strategy):
 	included_orders = []
 	requirements = {
 		"refrigeration_required": bool(
-			pool[0].refrigeration_required
-			or _requires_refrigeration(pool[0].transport_handling_profile)
+			pool[0].refrigeration_required or _requires_refrigeration(pool[0].transport_handling_profile)
 		),
 		"tail_lift_required": bool(
-			pool[0].tail_lift_required
-			or _requires_tail_lift(pool[0].transport_handling_profile)
+			pool[0].tail_lift_required or _requires_tail_lift(pool[0].transport_handling_profile)
 		),
 		"required_body_type": pool[0].required_body_type,
 		"special_equipment_required": pool[0].special_equipment_required,
@@ -356,9 +362,7 @@ def _build_candidate(pool, category, strategy):
 	if not capability["compatible"]:
 		return None
 	if any(
-		not validate_vehicle_access_limit(
-			category, order.maximum_vehicle_category
-		)["compatible"]
+		not validate_vehicle_access_limit(category, order.maximum_vehicle_category)["compatible"]
 		for order in pool
 	):
 		return None
@@ -447,7 +451,7 @@ def _score_candidate(candidate):
 
 	reasons = [
 		_("Same company, source warehouse and delivery date."),
-		_('{0}% bottleneck capacity utilization.').format(round(utilization_score, 1)),
+		_("{0}% bottleneck capacity utilization.").format(round(utilization_score, 1)),
 	]
 	warnings = []
 	if len(zones) == 1:
@@ -456,15 +460,13 @@ def _score_candidate(candidate):
 		reasons.append(_("All configured orders share the same preferred route."))
 	if geography["average_distance_km"] is not None:
 		reasons.append(
-			_('Average destination separation is {0} km.').format(
-				geography["average_distance_km"]
-			)
+			_("Average destination separation is {0} km.").format(geography["average_distance_km"])
 		)
 	if geography["missing_coordinate_count"]:
 		warnings.append(
-			_('{0} order(s) have no destination coordinates; the geographic score uses zone fallback.').format(
-				geography["missing_coordinate_count"]
-			)
+			_(
+				"{0} order(s) have no destination coordinates; the geographic score uses zone fallback."
+			).format(geography["missing_coordinate_count"])
 		)
 	if windows["overlap"] is False:
 		warnings.append(_("Configured delivery windows do not overlap."))
@@ -474,12 +476,14 @@ def _score_candidate(candidate):
 		warnings.append(_("This configuration partially allocates at least one Delivery Order."))
 	if not any(flt(candidate["totals"][dimension]) for dimension in CAPACITY_DIMENSIONS):
 		warnings.append(
-			_("No weight, volume, pallet, case or crate values are available; capacity utilization cannot influence this ranking.")
+			_(
+				"No weight, volume, pallet, case or crate values are available; capacity utilization cannot influence this ranking."
+			)
 		)
 	if candidate["fleet_availability_tracked"]:
 		if candidate["available_vehicle_count"] > 0:
 			reasons.append(
-				_('{0} owned physical vehicle(s) currently available in this category.').format(
+				_("{0} owned physical vehicle(s) currently available in this category.").format(
 					candidate["available_vehicle_count"]
 				)
 			)
@@ -491,7 +495,9 @@ def _score_candidate(candidate):
 				)
 			)
 	else:
-		warnings.append(_("Physical fleet availability is not configured; capacity compatibility only was scored."))
+		warnings.append(
+			_("Physical fleet availability is not configured; capacity compatibility only was scored.")
+		)
 	if not candidate["delivery_method"]:
 		warnings.append(_("Delivery Method is not configured on these orders."))
 	if candidate["requirements"].get("refrigeration_required"):
@@ -515,7 +521,9 @@ def _score_candidate(candidate):
 def _validate_acceptance_context(delivery_orders, first):
 	for order in delivery_orders:
 		if order.docstatus != 1 or order.status not in PLANNABLE_DELIVERY_ORDER_STATUSES:
-			frappe.throw(_("Delivery Order {0} is no longer available. Refresh load suggestions.").format(order.name))
+			frappe.throw(
+				_("Delivery Order {0} is no longer available. Refresh load suggestions.").format(order.name)
+			)
 		comparisons = (
 			("company", "company"),
 			("source_warehouse", "source warehouse"),
@@ -531,22 +539,22 @@ def _validate_acceptance_context(delivery_orders, first):
 		for fieldname, label in comparisons:
 			if (order.get(fieldname) or None) != (first.get(fieldname) or None):
 				frappe.throw(_("Delivery Order {0} has an incompatible {1}.").format(order.name, label))
-		if not delivery_methods_are_compatible(
-			order.delivery_method, first.delivery_method
-		):
-			frappe.throw(
-				_("Delivery Order {0} has an incompatible Delivery Method.").format(
-					order.name
-				)
-			)
+		if not delivery_methods_are_compatible(order.delivery_method, first.delivery_method):
+			frappe.throw(_("Delivery Order {0} has an incompatible Delivery Method.").format(order.name))
 
 
 def _sort_orders(orders, strategy):
 	if strategy == "smallest":
-		return sorted(orders, key=lambda order: (_order_size(order), -PRIORITY_RANK.get(order.priority, 0), order.name))
+		return sorted(
+			orders, key=lambda order: (_order_size(order), -PRIORITY_RANK.get(order.priority, 0), order.name)
+		)
 	if strategy == "largest":
-		return sorted(orders, key=lambda order: (-_order_size(order), -PRIORITY_RANK.get(order.priority, 0), order.name))
-	return sorted(orders, key=lambda order: (-PRIORITY_RANK.get(order.priority, 0), -_order_size(order), order.name))
+		return sorted(
+			orders, key=lambda order: (-_order_size(order), -PRIORITY_RANK.get(order.priority, 0), order.name)
+		)
+	return sorted(
+		orders, key=lambda order: (-PRIORITY_RANK.get(order.priority, 0), -_order_size(order), order.name)
+	)
 
 
 def _order_size(order):
@@ -558,7 +566,9 @@ def _empty_totals():
 
 
 def _add_totals(first, second):
-	return {dimension: flt(first.get(dimension)) + flt(second.get(dimension)) for dimension in CAPACITY_DIMENSIONS}
+	return {
+		dimension: flt(first.get(dimension)) + flt(second.get(dimension)) for dimension in CAPACITY_DIMENSIONS
+	}
 
 
 def _scale_totals(totals, fraction):

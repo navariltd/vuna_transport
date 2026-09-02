@@ -3,7 +3,13 @@
 
 import frappe
 from frappe import _
+from frappe.model.document import Document
 
+from vuna_transport.services.execution.dispatch_guard_service import (
+	set_delivery_load_status,
+	validate_load_can_be_cancelled,
+)
+from vuna_transport.services.execution.execution_service import get_load_execution_summary
 from vuna_transport.services.integrations.erpnext_integration import (
 	create_delivery_notes_for_load,
 	create_delivery_trip_for_load,
@@ -17,13 +23,7 @@ from vuna_transport.services.planning.delivery_load_service import (
 	validate_capacity,
 	validate_load_allocations,
 )
-from frappe.model.document import Document
-from vuna_transport.services.execution.execution_service import get_load_execution_summary
 from vuna_transport.services.routing.route_service import apply_route_defaults
-from vuna_transport.services.execution.dispatch_guard_service import (
-	set_delivery_load_status,
-	validate_load_can_be_cancelled,
-)
 
 
 class DeliveryLoad(Document):
@@ -69,9 +69,7 @@ class DeliveryLoad(Document):
 		names = self.get_delivery_order_names()
 		previous = self.get_doc_before_save()
 		if previous:
-			names.update(
-				row.delivery_order for row in previous.delivery_orders if row.delivery_order
-			)
+			names.update(row.delivery_order for row in previous.delivery_orders if row.delivery_order)
 		return names
 
 	@frappe.whitelist()

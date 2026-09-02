@@ -30,9 +30,7 @@ class TestVehicleIncident(UnitTestCase):
 			resolution=None,
 			resolved_on=None,
 		)
-		self.vehicle = SimpleNamespace(
-			name="KDA 123A", company="Vuna Foods", vuna_asset="ASSET-1"
-		)
+		self.vehicle = SimpleNamespace(name="KDA 123A", company="Vuna Foods", vuna_asset="ASSET-1")
 		self.load = SimpleNamespace(name="DL-1", company="Vuna Foods")
 		self.trip = SimpleNamespace(
 			name="DT-1",

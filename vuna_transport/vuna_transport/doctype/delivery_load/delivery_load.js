@@ -19,94 +19,108 @@ frappe.ui.form.on("Delivery Load", {
 
 	transport_route(frm) {
 		if (!frm.doc.transport_route) return;
-		frappe.db.get_value(
-			"Transport Route",
-			frm.doc.transport_route,
-			["estimated_distance", "estimated_duration"],
-		).then(({ message }) => {
-			if (!message) return;
-			if (!frm.doc.estimated_distance) frm.set_value("estimated_distance", message.estimated_distance);
-			if (!frm.doc.estimated_duration) frm.set_value("estimated_duration", message.estimated_duration);
-		});
+		frappe.db
+			.get_value("Transport Route", frm.doc.transport_route, [
+				"estimated_distance",
+				"estimated_duration",
+			])
+			.then(({ message }) => {
+				if (!message) return;
+				if (!frm.doc.estimated_distance)
+					frm.set_value("estimated_distance", message.estimated_distance);
+				if (!frm.doc.estimated_duration)
+					frm.set_value("estimated_duration", message.estimated_duration);
+			});
 	},
 
 	refresh(frm) {
 		if (frm.doc.docstatus === 0) {
-			frm.add_custom_button(__("Get Items"), () => {
-				new frappe.ui.form.MultiSelectDialog({
-					doctype: "Delivery Order",
-					target: frm,
-					size: "extra-large",
-					add_filters_group: 1,
-					columns: [
-						"name",
-						"customer_name",
+			frm.add_custom_button(
+				__("Get Items"),
+				() => {
+					new frappe.ui.form.MultiSelectDialog({
+						doctype: "Delivery Order",
+						target: frm,
+						size: "extra-large",
+						add_filters_group: 1,
+						columns: [
+							"name",
+							"customer_name",
 							"required_delivery_date",
 							"requested_quantity",
 							"reserved_quantity",
 							"allocated_quantity",
-						"unallocated_quantity",
-					],
-					setters: {
-						company: frm.doc.company || null,
-						source_warehouse: frm.doc.source_warehouse || null,
-						transport_zone: frm.doc.transport_zone || null,
-					},
-					get_query() {
-						return {
-							query: "vuna_transport.services.planning.delivery_load_service.get_available_delivery_orders",
-							filters: {
-								docstatus: 1,
-								status: ["in", ["Open", "Partially Allocated"]],
-							},
-						};
-					},
-					action(selections) {
-						if (!selections.length) {
-							frappe.msgprint(__("Select at least one Delivery Order."));
-							return;
-						}
-						frappe.call({
-							method: "vuna_transport.services.planning.delivery_load_service.get_delivery_order_items",
-							args: { delivery_order_names: selections },
-						}).then((response) => {
-							const result = response.message;
-							if (!result) return;
+							"unallocated_quantity",
+						],
+						setters: {
+							company: frm.doc.company || null,
+							source_warehouse: frm.doc.source_warehouse || null,
+							transport_zone: frm.doc.transport_zone || null,
+						},
+						get_query() {
+							return {
+								query: "vuna_transport.services.planning.delivery_load_service.get_available_delivery_orders",
+								filters: {
+									docstatus: 1,
+									status: ["in", ["Open", "Partially Allocated"]],
+								},
+							};
+						},
+						action(selections) {
+							if (!selections.length) {
+								frappe.msgprint(__("Select at least one Delivery Order."));
+								return;
+							}
+							frappe
+								.call({
+									method: "vuna_transport.services.planning.delivery_load_service.get_delivery_order_items",
+									args: { delivery_order_names: selections },
+								})
+								.then((response) => {
+									const result = response.message;
+									if (!result) return;
 
-								[
-									"company",
-									"source_warehouse",
-									"delivery_method",
-									"transport_zone",
-									"transport_route",
-									"dispatch_date",
-									"weight_uom",
-									"volume_uom",
-								].forEach((field) => {
-								if (!frm.doc[field] && result[field]) frm.doc[field] = result[field];
-							});
+									[
+										"company",
+										"source_warehouse",
+										"delivery_method",
+										"transport_zone",
+										"transport_route",
+										"dispatch_date",
+										"weight_uom",
+										"volume_uom",
+									].forEach((field) => {
+										if (!frm.doc[field] && result[field])
+											frm.doc[field] = result[field];
+									});
 
-							const existing = new Set(
-								(frm.doc.delivery_orders || []).map(
-									(row) => `${row.delivery_order}::${row.delivery_order_item}`,
-								)
-							);
-							result.items.forEach((row) => {
-								const key = `${row.delivery_order}::${row.delivery_order_item}`;
-								if (existing.has(key)) return;
-								frm.add_child("delivery_orders", row);
-								existing.add(key);
-							});
+									const existing = new Set(
+										(frm.doc.delivery_orders || []).map(
+											(row) =>
+												`${row.delivery_order}::${row.delivery_order_item}`
+										)
+									);
+									result.items.forEach((row) => {
+										const key = `${row.delivery_order}::${row.delivery_order_item}`;
+										if (existing.has(key)) return;
+										frm.add_child("delivery_orders", row);
+										existing.add(key);
+									});
 
-								recalculate_load_totals(frm);
-								frm.refresh_fields();
-							frm.dirty();
-							frappe.show_alert({ message: __("Items added to the Delivery Load"), indicator: "green" });
-						});
-						cur_dialog.hide();
-					},
-				});
-			}, __("Planning"));
+									recalculate_load_totals(frm);
+									frm.refresh_fields();
+									frm.dirty();
+									frappe.show_alert({
+										message: __("Items added to the Delivery Load"),
+										indicator: "green",
+									});
+								});
+							cur_dialog.hide();
+						},
+					});
+				},
+				__("Planning")
+			);
 		}
 
 		if (frm.is_new()) {
@@ -130,7 +144,9 @@ frappe.ui.form.on("Delivery Load", {
 		} catch (error) {
 			console.error("Unable to load Delivery Load execution progress", error);
 			frm.get_field("execution_overview")?.$wrapper.html(
-				`<div class="alert alert-warning">${__("Execution progress could not be loaded. Reload the form or use the available action above.")}</div>`,
+				`<div class="alert alert-warning">${__(
+					"Execution progress could not be loaded. Reload the form or use the available action above."
+				)}</div>`
 			);
 		}
 	},
@@ -140,54 +156,80 @@ function add_execution_actions(frm, summary) {
 	const action = summary.next_action;
 	if (frm.doc.docstatus === 1 && !["completed", "cancelled"].includes(action.key)) {
 		frm.remove_custom_button(__(action.label));
-		const button = frm.add_custom_button(__(action.label), () => run_next_action(frm, summary));
+		const button = frm.add_custom_button(__(action.label), () =>
+			run_next_action(frm, summary)
+		);
 		button.addClass("btn-primary");
 	}
 
 	if (summary.pick_list?.name) {
-		frm.add_custom_button(__("Pick List"), () => {
-			frappe.set_route("Form", "Pick List", summary.pick_list.name);
-		}, __("View"));
+		frm.add_custom_button(
+			__("Pick List"),
+			() => {
+				frappe.set_route("Form", "Pick List", summary.pick_list.name);
+			},
+			__("View")
+		);
 	}
-	if (
-		frm.doc.docstatus === 1 &&
-		!summary.pick_list &&
-		!summary.delivery_notes.total
-	) {
-		frm.add_custom_button(__("Create Pick List (Optional)"), () => {
-			frm.call("create_pick_list").then((response) => {
-				if (response.message) frappe.set_route("Form", "Pick List", response.message);
-			});
-		}, __("Warehouse"));
+	if (frm.doc.docstatus === 1 && !summary.pick_list && !summary.delivery_notes.total) {
+		frm.add_custom_button(
+			__("Create Pick List (Optional)"),
+			() => {
+				frm.call("create_pick_list").then((response) => {
+					if (response.message) frappe.set_route("Form", "Pick List", response.message);
+				});
+			},
+			__("Warehouse")
+		);
 	}
 	if (summary.vehicle_allocation?.name) {
-		frm.add_custom_button(__("Vehicle Allocation"), () => {
-			frappe.set_route("Form", "Vehicle Allocation", summary.vehicle_allocation.name);
-		}, __("View"));
-		frm.add_custom_button(__("Allocation History"), () => {
-			frappe.set_route("List", "Vehicle Allocation", { delivery_load: frm.doc.name });
-		}, __("View"));
+		frm.add_custom_button(
+			__("Vehicle Allocation"),
+			() => {
+				frappe.set_route("Form", "Vehicle Allocation", summary.vehicle_allocation.name);
+			},
+			__("View")
+		);
+		frm.add_custom_button(
+			__("Allocation History"),
+			() => {
+				frappe.set_route("List", "Vehicle Allocation", { delivery_load: frm.doc.name });
+			},
+			__("View")
+		);
 	}
 	if (
 		frm.doc.docstatus === 1 &&
 		summary.vehicle_allocation?.docstatus === 1 &&
 		!["Completed", "Completed with Exceptions", "Cancelled"].includes(frm.doc.status)
 	) {
-		frm.add_custom_button(__("Reallocate Vehicle"), () => {
-			frappe.model.open_mapped_doc({
-				method: "vuna_transport.services.fleet.vehicle_allocation_service.make_replacement_allocation_from_load",
-				frm,
-				freeze_message: __("Preparing replacement allocation..."),
-			});
-		}, __("Dispatch"));
+		frm.add_custom_button(
+			__("Reallocate Vehicle"),
+			() => {
+				frappe.model.open_mapped_doc({
+					method: "vuna_transport.services.fleet.vehicle_allocation_service.make_replacement_allocation_from_load",
+					frm,
+					freeze_message: __("Preparing replacement allocation..."),
+				});
+			},
+			__("Dispatch")
+		);
 	}
 	if (summary.delivery_notes.names.length) {
-		frm.add_custom_button(__("Delivery Notes"), () => open_delivery_notes(summary.delivery_notes.names), __("View"));
+		frm.add_custom_button(
+			__("Delivery Notes"),
+			() => open_delivery_notes(summary.delivery_notes.names),
+			__("View")
+		);
 	}
 	if (summary.delivery_trip?.name) {
-		frm.add_custom_button(__("Delivery Trip"), () => {
-			frappe.set_route("Form", "Delivery Trip", summary.delivery_trip.name);
-		}, __("View"));
+		frm.add_custom_button(
+			__("Delivery Trip"),
+			() => {
+				frappe.set_route("Form", "Delivery Trip", summary.delivery_trip.name);
+			},
+			__("View")
+		);
 	}
 }
 
@@ -236,7 +278,9 @@ function open_delivery_notes(names) {
 
 function render_new_load_progress(frm) {
 	frm.get_field("execution_overview")?.$wrapper.html(
-		`<div class="text-muted">${__("Add Delivery Orders, review capacity, save and submit the load to begin execution.")}</div>`,
+		`<div class="text-muted">${__(
+			"Add Delivery Orders, review capacity, save and submit the load to begin execution."
+		)}</div>`
 	);
 }
 
@@ -251,68 +295,78 @@ function render_execution_progress(frm, summary) {
 		value: !summary.workflow.requires_vehicle_allocation
 			? __("Not Required")
 			: summary.vehicle_allocation
-				? __(summary.vehicle_allocation.document_status)
-				: __("Not Allocated"),
-		state:
-			!summary.workflow.requires_vehicle_allocation
-				? "complete"
-				: summary.vehicle_allocation?.docstatus === 1
-					? "complete"
-					: summary.vehicle_allocation
-						? "current"
-						: "pending",
+			? __(summary.vehicle_allocation.document_status)
+			: __("Not Allocated"),
+		state: !summary.workflow.requires_vehicle_allocation
+			? "complete"
+			: summary.vehicle_allocation?.docstatus === 1
+			? "complete"
+			: summary.vehicle_allocation
+			? "current"
+			: "pending",
 	};
 	const picking_step = {
 		label: __("Picking"),
 		value: summary.pick_list ? __(summary.pick_list.document_status) : __("Optional"),
-		state: summary.pick_list?.docstatus === 1 ? "complete" : summary.pick_list ? "current" : "pending",
+		state:
+			summary.pick_list?.docstatus === 1
+				? "complete"
+				: summary.pick_list
+				? "current"
+				: "pending",
 	};
 	const delivery_notes_step = {
 		label: __("Delivery Notes"),
-		value: __("{0} of {1} submitted", [summary.delivery_notes.submitted, summary.delivery_notes.expected]),
+		value: __("{0} of {1} submitted", [
+			summary.delivery_notes.submitted,
+			summary.delivery_notes.expected,
+		]),
 		state:
-			summary.delivery_notes.expected && summary.delivery_notes.submitted >= summary.delivery_notes.expected
+			summary.delivery_notes.expected &&
+			summary.delivery_notes.submitted >= summary.delivery_notes.expected
 				? "complete"
 				: summary.delivery_notes.total
-					? "current"
-					: "pending",
+				? "current"
+				: "pending",
 	};
 	const trip_step = {
 		label: __("Delivery Trip"),
 		value: !summary.workflow.requires_delivery_trip
 			? __("Not Required")
 			: summary.delivery_trip
-				? __(summary.delivery_trip.document_status)
-				: __("Not Created"),
+			? __(summary.delivery_trip.document_status)
+			: __("Not Created"),
 		state: !summary.workflow.requires_delivery_trip
 			? "complete"
 			: summary.delivery_trip?.docstatus === 1
-				? "complete"
-				: summary.delivery_trip
-					? "current"
-					: "pending",
+			? "complete"
+			: summary.delivery_trip
+			? "current"
+			: "pending",
 	};
 	const pod_step = {
 		label: __("Proof of Delivery"),
 		value: !summary.workflow.requires_delivery_trip
 			? __("Not Required")
-			: __("{0} of {1} submitted", [summary.proofs_of_delivery.submitted, summary.stops.total]),
-		state:
-			!summary.workflow.requires_delivery_trip
-				? "complete"
-				: summary.stops.total && summary.proofs_of_delivery.submitted >= summary.stops.total
-					? "complete"
-					: summary.proofs_of_delivery.total
-						? "current"
-						: "pending",
+			: __("{0} of {1} submitted", [
+					summary.proofs_of_delivery.submitted,
+					summary.stops.total,
+			  ]),
+		state: !summary.workflow.requires_delivery_trip
+			? "complete"
+			: summary.stops.total && summary.proofs_of_delivery.submitted >= summary.stops.total
+			? "complete"
+			: summary.proofs_of_delivery.total
+			? "current"
+			: "pending",
 	};
 	const exception_step = {
 		label: __("Exceptions"),
 		value: summary.delivery_exceptions.open
 			? __("{0} open", [summary.delivery_exceptions.open])
 			: summary.delivery_exceptions.total
-				? __("Resolved")
-				: __("None"),
+			? __("Resolved")
+			: __("None"),
 		state: summary.delivery_exceptions.open ? "current" : "complete",
 	};
 	const allocation_after_notes =
@@ -330,7 +384,7 @@ function render_execution_progress(frm, summary) {
 					<div class="text-muted small">${index + 1}. ${frappe.utils.escape_html(step.label)}</div>
 					<div style="font-weight:600; margin-top:4px;">${frappe.utils.escape_html(step.value)}</div>
 					<div class="indicator-pill ${colors[step.state]}" style="margin-top:8px;">${__(step.state)}</div>
-				</div>`,
+				</div>`
 		)
 		.join("");
 
@@ -375,38 +429,42 @@ frappe.ui.form.on("Delivery Load Order", {
 function update_allocation_preview(frm, cdt, cdn, use_available_quantity) {
 	const row = locals[cdt][cdn];
 	if (!row.delivery_order_item) return;
-	const requested_quantity = use_available_quantity || flt(row.allocated_quantity) <= 0
-		? null
-		: flt(row.allocated_quantity);
+	const requested_quantity =
+		use_available_quantity || flt(row.allocated_quantity) <= 0
+			? null
+			: flt(row.allocated_quantity);
 
-	frappe.call({
-		method: "vuna_transport.services.planning.delivery_load_service.get_delivery_order_item_allocation_preview",
-		args: {
-			delivery_order_item: row.delivery_order_item,
-			allocated_quantity: requested_quantity,
-			exclude_load: frm.is_new() ? null : frm.doc.name,
-		},
-	}).then(({ message }) => {
-		if (!message || locals[cdt][cdn].delivery_order_item !== row.delivery_order_item) return;
-		[
-			"delivery_order",
-			"sales_order",
-			"customer",
-			"delivery_address",
-			"available_quantity",
-			"allocated_quantity",
-			"weight",
-			"weight_uom",
-			"volume",
-			"volume_uom",
-			"pallets",
-			"cases",
-			"crates",
-		].forEach((fieldname) => {
-			frappe.model.set_value(cdt, cdn, fieldname, message[fieldname]);
+	frappe
+		.call({
+			method: "vuna_transport.services.planning.delivery_load_service.get_delivery_order_item_allocation_preview",
+			args: {
+				delivery_order_item: row.delivery_order_item,
+				allocated_quantity: requested_quantity,
+				exclude_load: frm.is_new() ? null : frm.doc.name,
+			},
+		})
+		.then(({ message }) => {
+			if (!message || locals[cdt][cdn].delivery_order_item !== row.delivery_order_item)
+				return;
+			[
+				"delivery_order",
+				"sales_order",
+				"customer",
+				"delivery_address",
+				"available_quantity",
+				"allocated_quantity",
+				"weight",
+				"weight_uom",
+				"volume",
+				"volume_uom",
+				"pallets",
+				"cases",
+				"crates",
+			].forEach((fieldname) => {
+				frappe.model.set_value(cdt, cdn, fieldname, message[fieldname]);
+			});
+			recalculate_load_totals(frm);
 		});
-		recalculate_load_totals(frm);
-	});
 }
 
 function recalculate_load_totals(frm) {

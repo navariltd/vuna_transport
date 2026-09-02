@@ -49,7 +49,9 @@ function sync_coordinates_from_map(frm) {
 	frappe.msgprint({
 		title: __("Delivery Map Pin Required"),
 		indicator: "orange",
-		message: __("Delivery Location must contain a point marker. Remove other shapes and place one pin."),
+		message: __(
+			"Delivery Location must contain a point marker. Remove other shapes and place one pin."
+		),
 	});
 }
 
@@ -75,21 +77,26 @@ function use_device_location(frm) {
 		},
 		(error) => {
 			const messages = {
-				1: __("Location permission was denied. Allow location access in the browser and try again."),
+				1: __(
+					"Location permission was denied. Allow location access in the browser and try again."
+				),
 				2: __("The device location is currently unavailable."),
-				3: __("The device location request timed out. Try again where GPS or network reception is stronger."),
+				3: __(
+					"The device location request timed out. Try again where GPS or network reception is stronger."
+				),
 			};
 			frappe.msgprint({
 				title: __("Unable to Pin Device Location"),
 				indicator: "orange",
-				message: messages[error.code] || __("The device location could not be determined."),
+				message:
+					messages[error.code] || __("The device location could not be determined."),
 			});
 		},
 		{
 			enableHighAccuracy: true,
 			timeout: 15000,
 			maximumAge: 60000,
-		},
+		}
 	);
 }
 
@@ -114,7 +121,9 @@ function coordinates_are_valid(latitude, longitude, show_message) {
 	const valid = latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
 	if (!valid && show_message) {
 		frappe.show_alert({
-			message: __("Latitude must be between -90 and 90, and longitude between -180 and 180."),
+			message: __(
+				"Latitude must be between -90 and 90, and longitude between -180 and 180."
+			),
 			indicator: "orange",
 		});
 	}
@@ -142,7 +151,7 @@ function point_coordinates(location) {
 	try {
 		const geojson = typeof location === "string" ? JSON.parse(location) : location;
 		const feature = (geojson.features || []).find(
-			(row) => row.geometry?.type === "Point" && row.geometry.coordinates?.length >= 2,
+			(row) => row.geometry?.type === "Point" && row.geometry.coordinates?.length >= 2
 		);
 		if (!feature) return null;
 		return {

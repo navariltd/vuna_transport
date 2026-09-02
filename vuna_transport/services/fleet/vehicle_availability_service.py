@@ -6,12 +6,11 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, add_to_date, get_datetime, now_datetime
 
-from vuna_transport.services.shared.resource_scheduling_service import interval_overlaps
 from vuna_transport.services.fleet.vehicle_compliance_service import (
 	get_vehicle_compliance_map,
 )
 from vuna_transport.services.fleet.vehicle_owner_service import normalize_vehicle_owner
-
+from vuna_transport.services.shared.resource_scheduling_service import interval_overlaps
 
 ACTIVE_ALLOCATION_STATUSES = ("Allocated", "Accepted")
 ACTIVE_TRIP_STATUSES = ("Scheduled", "In Transit")
@@ -184,23 +183,31 @@ def get_vehicle_availability_map(
 
 	vehicle_names = [vehicle.name for vehicle in vehicles]
 	asset_names = {vehicle.vuna_asset for vehicle in vehicles if vehicle.vuna_asset}
-	assets = {
-		asset.name: asset
-		for asset in frappe.get_all(
-			"Asset",
-			filters={"name": ["in", list(asset_names)]},
-			fields=["name", "company", "status", "docstatus"],
+	assets = (
+		{
+			asset.name: asset
+			for asset in frappe.get_all(
+				"Asset",
+				filters={"name": ["in", list(asset_names)]},
+				fields=["name", "company", "status", "docstatus"],
+			)
+		}
+		if asset_names
+		else {}
+	)
+	asset_repairs = (
+		frappe.get_all(
+			"Asset Repair",
+			filters={
+				"asset": ["in", list(asset_names)],
+				"docstatus": ["!=", 2],
+				"repair_status": "Pending",
+			},
+			fields=["name", "asset", "repair_status", "failure_date"],
 		)
-	} if asset_names else {}
-	asset_repairs = frappe.get_all(
-		"Asset Repair",
-		filters={
-			"asset": ["in", list(asset_names)],
-			"docstatus": ["!=", 2],
-			"repair_status": "Pending",
-		},
-		fields=["name", "asset", "repair_status", "failure_date"],
-	) if asset_names else []
+		if asset_names
+		else []
+	)
 	repairs_by_asset = defaultdict(list)
 	for repair in asset_repairs:
 		repairs_by_asset[repair.asset].append(repair)
@@ -278,27 +285,27 @@ def get_vehicle_availability_map(
 			"status",
 		],
 	)
-	trips = [
-		trip
-		for trip in trips
-		if (trip.vuna_current_vehicle or trip.vehicle) in vehicle_names
-	]
-	load_names = {
-		row.delivery_load for row in allocations if row.delivery_load
-	} | {row.vuna_delivery_load for row in trips if row.vuna_delivery_load}
-	loads = {
-		row.name: row
-		for row in frappe.get_all(
-			"Delivery Load",
-			filters={"name": ["in", list(load_names)]},
-			fields=[
-				"name",
-				"status",
-				"planned_departure",
-				"planned_arrival",
-			],
-		)
-	} if load_names else {}
+	trips = [trip for trip in trips if (trip.vuna_current_vehicle or trip.vehicle) in vehicle_names]
+	load_names = {row.delivery_load for row in allocations if row.delivery_load} | {
+		row.vuna_delivery_load for row in trips if row.vuna_delivery_load
+	}
+	loads = (
+		{
+			row.name: row
+			for row in frappe.get_all(
+				"Delivery Load",
+				filters={"name": ["in", list(load_names)]},
+				fields=[
+					"name",
+					"status",
+					"planned_departure",
+					"planned_arrival",
+				],
+			)
+		}
+		if load_names
+		else {}
+	)
 
 	allocations_by_vehicle = defaultdict(list)
 	for allocation in allocations:
@@ -313,9 +320,7 @@ def get_vehicle_availability_map(
 			continue
 		trips_by_vehicle[trip.vuna_current_vehicle or trip.vehicle].append(trip)
 
-	compatible_categories = _get_compatible_categories(
-		required_vehicle_category, delivery_load
-	)
+	compatible_categories = _get_compatible_categories(required_vehicle_category, delivery_load)
 	results = {
 		vehicle.name: _evaluate_vehicle(
 			vehicle,
@@ -334,17 +339,19 @@ def get_vehicle_availability_map(
 		)
 		for vehicle in vehicles
 	}
-	category_names = {
-		result.vehicle_category for result in results.values() if result.vehicle_category
-	}
-	category_labels = dict(
-		frappe.get_all(
-			"Vehicle Category",
-			filters={"name": ["in", list(category_names)]},
-			fields=["name", "vehicle_category_name"],
-			as_list=True,
+	category_names = {result.vehicle_category for result in results.values() if result.vehicle_category}
+	category_labels = (
+		dict(
+			frappe.get_all(
+				"Vehicle Category",
+				filters={"name": ["in", list(category_names)]},
+				fields=["name", "vehicle_category_name"],
+				as_list=True,
+			)
 		)
-	) if category_names else {}
+		if category_names
+		else {}
+	)
 	for result in results.values():
 		result.vehicle_category_label = (
 			category_labels.get(result.vehicle_category) or result.vehicle_category
@@ -417,9 +424,7 @@ def _evaluate_vehicle(
 			reasons.append(
 				_reason(
 					"ASSET_COMPANY_MISMATCH",
-					_("Linked Asset {0} belongs to Company {1}.").format(
-						asset.name, asset.company
-					),
+					_("Linked Asset {0} belongs to Company {1}.").format(asset.name, asset.company),
 					"Asset",
 					asset.name,
 				)
@@ -428,9 +433,7 @@ def _evaluate_vehicle(
 			reasons.append(
 				_reason(
 					"ASSET_NOT_OPERATIONAL",
-					_("Linked Asset {0} is {1}.").format(
-						asset.name, asset.status or _("not submitted")
-					),
+					_("Linked Asset {0} is {1}.").format(asset.name, asset.status or _("not submitted")),
 					"Asset",
 					asset.name,
 				)
@@ -438,9 +441,7 @@ def _evaluate_vehicle(
 		elif asset.status in MAINTENANCE_ASSET_STATUSES:
 			reasons.append(
 				_reason(
-					"ASSET_IN_MAINTENANCE"
-					if asset.status == "In Maintenance"
-					else "ASSET_OUT_OF_ORDER",
+					"ASSET_IN_MAINTENANCE" if asset.status == "In Maintenance" else "ASSET_OUT_OF_ORDER",
 					_("Linked Asset {0} is {1}.").format(asset.name, asset.status),
 					"Asset",
 					asset.name,
@@ -457,7 +458,8 @@ def _evaluate_vehicle(
 			)
 
 	master_blocked = any(
-		reason.code in {
+		reason.code
+		in {
 			"TRANSPORT_DISABLED",
 			"COMPANY_MISMATCH",
 			"CATEGORY_MISSING",
@@ -470,8 +472,7 @@ def _evaluate_vehicle(
 		for reason in reasons
 	)
 	maintenance_blocked = any(
-		reason.code
-		in {"ASSET_IN_MAINTENANCE", "ASSET_OUT_OF_ORDER", "ASSET_REPAIR_PENDING"}
+		reason.code in {"ASSET_IN_MAINTENANCE", "ASSET_OUT_OF_ORDER", "ASSET_REPAIR_PENDING"}
 		for reason in reasons
 	)
 	if master_blocked:
@@ -482,9 +483,7 @@ def _evaluate_vehicle(
 	for trip in trips:
 		load = loads.get(trip.vuna_delivery_load)
 		trip_from, trip_to = _trip_window(trip, load)
-		if trip.status != "In Transit" and not interval_overlaps(
-			from_time, to_time, trip_from, trip_to
-		):
+		if trip.status != "In Transit" and not interval_overlaps(from_time, to_time, trip_from, trip_to):
 			continue
 		current_trip = current_trip or trip.name
 		if not master_blocked:
@@ -506,9 +505,7 @@ def _evaluate_vehicle(
 		reasons.append(
 			_reason(
 				"AVAILABILITY_BLOCK",
-				_("Vehicle is blocked for {0} until {1}.").format(
-					block.reason, block.to_datetime
-				),
+				_("Vehicle is blocked for {0} until {1}.").format(block.reason, block.to_datetime),
 				"Vehicle Availability Block",
 				block.name,
 			)
@@ -518,8 +515,7 @@ def _evaluate_vehicle(
 	blocking_incidents = [
 		incident
 		for incident in incidents
-		if incident.vehicle_immobilized
-		and incident.resolution_status not in ("Resolved", "Closed")
+		if incident.vehicle_immobilized and incident.resolution_status not in ("Resolved", "Closed")
 	]
 	for incident in blocking_incidents:
 		if state == "Available":
@@ -539,9 +535,7 @@ def _evaluate_vehicle(
 		load = loads.get(allocation.delivery_load)
 		allocation_from = load.planned_departure if load else allocation.effective_from
 		allocation_to = load.planned_arrival if load else allocation.effective_to
-		if not interval_overlaps(
-			from_time, to_time, allocation_from, allocation_to
-		):
+		if not interval_overlaps(from_time, to_time, allocation_from, allocation_to):
 			continue
 		current_allocation = current_allocation or allocation.name
 		if state == "Available":
@@ -549,9 +543,7 @@ def _evaluate_vehicle(
 		reasons.append(
 			_reason(
 				"ACTIVE_ALLOCATION",
-				_("Vehicle is allocated to Delivery Load {0}.").format(
-					allocation.delivery_load
-				),
+				_("Vehicle is allocated to Delivery Load {0}.").format(allocation.delivery_load),
 				"Vehicle Allocation",
 				allocation.name,
 			)
@@ -573,12 +565,8 @@ def _evaluate_vehicle(
 		linked_asset=asset_name,
 		asset_status=getattr(asset, "status", None),
 		active_asset_repair=asset_repairs[0].name if asset_repairs else None,
-		current_availability_block=(
-			availability_blocks[0].name if availability_blocks else None
-		),
-		current_vehicle_incident=(
-			blocking_incidents[0].name if blocking_incidents else None
-		),
+		current_availability_block=(availability_blocks[0].name if availability_blocks else None),
+		current_vehicle_incident=(blocking_incidents[0].name if blocking_incidents else None),
 		compliance_status=compliance.status if compliance else "Compliant",
 		compliance_reasons=compliance.reasons if compliance else [],
 		compliance_warnings=compliance.warnings if compliance else [],

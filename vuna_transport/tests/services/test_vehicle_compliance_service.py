@@ -90,9 +90,7 @@ class TestVehicleComplianceService(UnitTestCase):
 	def _evaluate(self, requirements, documents):
 		by_vehicle_and_type = defaultdict(list)
 		for document in documents:
-			by_vehicle_and_type[(document.vehicle, document.document_type)].append(
-				document
-			)
+			by_vehicle_and_type[(document.vehicle, document.document_type)].append(document)
 		return _evaluate_vehicle_compliance(
 			self.vehicle,
 			requirements,

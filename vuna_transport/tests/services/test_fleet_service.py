@@ -10,8 +10,8 @@ from frappe.tests import UnitTestCase
 
 from vuna_transport.services.fleet.fleet_service import (
 	_validate_vehicle_asset,
-	validate_vehicle,
 	sync_vehicle_operational_snapshots,
+	validate_vehicle,
 )
 
 
@@ -96,9 +96,7 @@ class TestVehicleStatusSnapshot(UnitTestCase):
 	@patch("vuna_transport.services.fleet.fleet_service.frappe.db.set_value")
 	@patch("vuna_transport.services.fleet.fleet_service.frappe.get_meta")
 	@patch("vuna_transport.services.fleet.fleet_service.frappe.db.table_exists")
-	def test_snapshot_uses_canonical_availability(
-		self, table_exists, get_meta, set_value, get_availability
-	):
+	def test_snapshot_uses_canonical_availability(self, table_exists, get_meta, set_value, get_availability):
 		table_exists.return_value = True
 		get_meta.return_value.has_field.return_value = True
 		get_availability.return_value = {

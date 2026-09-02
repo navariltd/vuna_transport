@@ -6,10 +6,9 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate
 
-from vuna_transport.services.shared.measurement_service import convert_measurement, get_transport_uoms
-from vuna_transport.services.routing.location_service import get_address_planning_data
 from vuna_transport.services.demand.delivery_method_service import canonical_delivery_method
-
+from vuna_transport.services.routing.location_service import get_address_planning_data
+from vuna_transport.services.shared.measurement_service import convert_measurement, get_transport_uoms
 
 GROUPING_FIELDS = (
 	"delivery_date",
@@ -64,9 +63,7 @@ def sync_delivery_orders_for_sales_order(sales_order):
 	doc = _get_sales_order(sales_order)
 	_validate_sales_order(doc)
 
-	delivery_order_names = frappe.get_all(
-		"Delivery Order", filters={"sales_order": doc.name}, pluck="name"
-	)
+	delivery_order_names = frappe.get_all("Delivery Order", filters={"sales_order": doc.name}, pluck="name")
 	for delivery_order_name in delivery_order_names:
 		delivery_order = frappe.get_doc("Delivery Order", delivery_order_name)
 		sync_delivery_order_quantities(delivery_order, persist=True)
@@ -174,9 +171,11 @@ def _get_transport_quantity(item):
 
 
 def _get_group_key(sales_order, item):
-	delivery_address = getattr(item, "customer_address", None) or getattr(
-		sales_order, "customer_address", None
-	) or getattr(sales_order, "shipping_address_name", None)
+	delivery_address = (
+		getattr(item, "customer_address", None)
+		or getattr(sales_order, "customer_address", None)
+		or getattr(sales_order, "shipping_address_name", None)
+	)
 	address_data = get_address_planning_data(delivery_address)
 	values = {
 		"delivery_date": getattr(item, "delivery_date", None) or getattr(sales_order, "delivery_date", None),
@@ -185,13 +184,11 @@ def _get_group_key(sales_order, item):
 		"transport_zone": getattr(item, "transport_zone", None) or address_data.delivery_zone,
 		"preferred_route": getattr(item, "preferred_route", None),
 		"handling_profile": getattr(item, "transport_handling_profile", None),
-		"delivery_method": canonical_delivery_method(
-			getattr(sales_order, "vuna_delivery_method", None)
-		),
+		"delivery_method": canonical_delivery_method(getattr(sales_order, "vuna_delivery_method", None)),
 	}
 
 	delivery_group = _get_item_delivery_group(item, getattr(sales_order, "company", None))
-	return tuple(_normalise_group_value(values[field]) for field in GROUPING_FIELDS) + (delivery_group,)
+	return (*(_normalise_group_value(values[field]) for field in GROUPING_FIELDS), delivery_group)
 
 
 def _normalise_group_value(value):
@@ -211,9 +208,15 @@ def _get_item_delivery_group(sales_order_item, company=None):
 		return None
 	group = frappe.get_cached_doc("Delivery Group", group_name)
 	if group.disabled:
-		frappe.throw(_("Delivery Group {0} is disabled and cannot be used for new Delivery Orders.").format(group.name))
+		frappe.throw(
+			_("Delivery Group {0} is disabled and cannot be used for new Delivery Orders.").format(group.name)
+		)
 	if group.company and company and group.company != company:
-		frappe.throw(_("Delivery Group {0} belongs to company {1}, not {2}.").format(group.name, group.company, company))
+		frappe.throw(
+			_("Delivery Group {0} belongs to company {1}, not {2}.").format(
+				group.name, group.company, company
+			)
+		)
 	return group.name
 
 
@@ -313,9 +316,7 @@ def _should_auto_submit_delivery_orders():
 def _get_group_transport_requirements(group_items, handling_profile=None, company=None):
 	items = [frappe.get_cached_doc("Item", row.item_code) for row, _quantity in group_items]
 	body_types = {
-		item.vuna_required_body_type
-		for item in items
-		if getattr(item, "vuna_required_body_type", None)
+		item.vuna_required_body_type for item in items if getattr(item, "vuna_required_body_type", None)
 	}
 	if len(body_types) > 1:
 		frappe.throw(
@@ -327,9 +328,9 @@ def _get_group_transport_requirements(group_items, handling_profile=None, compan
 		{
 			value.strip()
 			for item in items
-			for value in (getattr(item, "vuna_special_equipment_required", None) or "").replace(
-				"\n", ","
-			).split(",")
+			for value in (getattr(item, "vuna_special_equipment_required", None) or "")
+			.replace("\n", ",")
+			.split(",")
 			if value.strip()
 		}
 	)
@@ -340,12 +341,10 @@ def _get_group_transport_requirements(group_items, handling_profile=None, compan
 		if getattr(item, "vuna_transport_compatibility_group", None)
 	}
 	return frappe._dict(
-		refrigeration_required=any(
-			getattr(item, "vuna_refrigeration_required", 0) for item in items
-		) or any(keyword in profile for keyword in ("refriger", "cold chain", "chilled", "frozen")),
-		tail_lift_required=any(
-			getattr(item, "vuna_tail_lift_required", 0) for item in items
-		) or "tail lift" in profile,
+		refrigeration_required=any(getattr(item, "vuna_refrigeration_required", 0) for item in items)
+		or any(keyword in profile for keyword in ("refriger", "cold chain", "chilled", "frozen")),
+		tail_lift_required=any(getattr(item, "vuna_tail_lift_required", 0) for item in items)
+		or "tail lift" in profile,
 		required_body_type=next(iter(body_types), None),
 		special_equipment_required=", ".join(equipment),
 		transport_compatibility_group=(
@@ -361,9 +360,9 @@ def _get_transport_compatibility_group(item, company=None):
 	group = frappe.get_cached_doc("Transport Compatibility Group", group_name)
 	if group.disabled:
 		frappe.throw(
-			_("Transport Compatibility Group {0} is disabled and cannot be used for new Delivery Orders.").format(
-				group.name
-			)
+			_(
+				"Transport Compatibility Group {0} is disabled and cannot be used for new Delivery Orders."
+			).format(group.name)
 		)
 	if group.company and company and group.company != company:
 		frappe.throw(
@@ -429,7 +428,7 @@ def _get_delivery_order_item_values(
 		"crates": _get_item_measure(item, "crates", transport_qty),
 		"transport_handling_profile": getattr(item, "transport_handling_profile", None),
 		"transport_compatibility_group": transport_compatibility_group
-			or getattr(item, "vuna_transport_compatibility_group", None),
+		or getattr(item, "vuna_transport_compatibility_group", None),
 		"delivery_group": delivery_group,
 	}
 	return values

@@ -8,7 +8,6 @@ from frappe.utils import add_days, flt, nowdate, nowtime
 
 from vuna_transport.services.routing.location_service import set_delivery_order_location_snapshots
 
-
 DEMO_PREFIX = "VT-DEMO"
 COMPANY = "Yovuna Technologies Limited (Demo)"
 NAIROBI_WAREHOUSE = "Nairobi Dispatch - YTLD"
@@ -59,9 +58,7 @@ def generate_dispatch_test_data():
 		"warehouses": [NAIROBI_WAREHOUSE, MERU_WAREHOUSE],
 		"zones": zones,
 		"customers": [record["customer"] for record in addresses.values()],
-		"addresses": {
-			label: record["address"] for label, record in addresses.items()
-		},
+		"addresses": {label: record["address"] for label, record in addresses.items()},
 		"items": list(items),
 		"vehicles": vehicles,
 		"stock_reconciliations_created": stock_reconciliations,
@@ -69,9 +66,9 @@ def generate_dispatch_test_data():
 		"generated_delivery_orders": delivery_orders,
 		"downstream_documents_created": {
 			"delivery_loads": _count_linked_documents("Delivery Load", "delivery_orders", sales_orders),
-			"delivery_notes": frappe.db.count(
-				"Delivery Note", {"po_no": ["like", f"{DEMO_PREFIX}%"]}
-			) if frappe.get_meta("Delivery Note").has_field("po_no") else 0,
+			"delivery_notes": frappe.db.count("Delivery Note", {"po_no": ["like", f"{DEMO_PREFIX}%"]})
+			if frappe.get_meta("Delivery Note").has_field("po_no")
+			else 0,
 			"delivery_trips": 0,
 		},
 	}
@@ -110,7 +107,11 @@ def _ensure_zones():
 
 def _ensure_delivery_method():
 	name = "Company Delivery"
-	doc = frappe.get_doc("Delivery Method", name) if frappe.db.exists("Delivery Method", name) else frappe.new_doc("Delivery Method")
+	doc = (
+		frappe.get_doc("Delivery Method", name)
+		if frappe.db.exists("Delivery Method", name)
+		else frappe.new_doc("Delivery Method")
+	)
 	doc.delivery_method_name = name
 	doc.fulfilment_type = "Company Delivery"
 	doc.requires_transport_planning = 1
@@ -126,8 +127,22 @@ def _ensure_customers_and_addresses(zones, vehicle_categories):
 		("VT Demo CBD Supermarket", "NBO-CENTRAL", "Moi Avenue", "Nairobi", -1.2833, 36.8219),
 		("VT Demo Westlands Mart", "NBO-CENTRAL", "Waiyaki Way, Westlands", "Nairobi", -1.2676, 36.8108),
 		("VT Demo Kilimani Foods", "NBO-CENTRAL", "Ngong Road, Kilimani", "Nairobi", -1.2921, 36.7839),
-		("VT Demo Embakasi Wholesalers", "NBO-EAST", "Airport North Road, Embakasi", "Nairobi", -1.3167, 36.8953),
-		("VT Demo Industrial Distributors", "NBO-EAST", "Enterprise Road, Industrial Area", "Nairobi", -1.3075, 36.8522),
+		(
+			"VT Demo Embakasi Wholesalers",
+			"NBO-EAST",
+			"Airport North Road, Embakasi",
+			"Nairobi",
+			-1.3167,
+			36.8953,
+		),
+		(
+			"VT Demo Industrial Distributors",
+			"NBO-EAST",
+			"Enterprise Road, Industrial Area",
+			"Nairobi",
+			-1.3075,
+			36.8522,
+		),
 		("VT Demo Mombasa Road Depot", "NBO-EAST", "Mombasa Road", "Nairobi", -1.3297, 36.8730),
 		("VT Demo Ruiru Retail", "KIAMBU-SOUTH", "Thika Road, Ruiru", "Ruiru", -1.1457, 36.9602),
 		("VT Demo Kiambu Cash & Carry", "KIAMBU-SOUTH", "Kiambu Road", "Kiambu", -1.1714, 36.8356),
@@ -167,9 +182,7 @@ def _ensure_customers_and_addresses(zones, vehicle_categories):
 		address.vuna_preferred_delivery_from = windows[zone_code][0]
 		address.vuna_preferred_delivery_to = windows[zone_code][1]
 		address.vuna_average_service_duration = 1800
-		address.vuna_maximum_vehicle_category = vehicle_categories[
-			maximum_categories[customer_name]
-		]
+		address.vuna_maximum_vehicle_category = vehicle_categories[maximum_categories[customer_name]]
 		address.vuna_requires_tail_lift = customer_name in (
 			"VT Demo Westlands Mart",
 			"VT Demo Kiambu Cash & Carry",
@@ -183,9 +196,7 @@ def _ensure_customers_and_addresses(zones, vehicle_categories):
 			"VT Demo Kilimani Foods",
 		)
 		address.vuna_access_notes = (
-			"Confirm access with receiving team before dispatch."
-			if address.vuna_restricted_access
-			else None
+			"Confirm access with receiving team before dispatch." if address.vuna_restricted_access else None
 		)
 		address.is_shipping_address = 1
 		address.is_primary_address = 1
@@ -214,7 +225,14 @@ def _ensure_customer(customer_name):
 
 def _ensure_warehouse_addresses():
 	definitions = (
-		(NAIROBI_WAREHOUSE, "VT Demo Nairobi Dispatch Warehouse", "Enterprise Road", "Nairobi", -1.3102, 36.8559),
+		(
+			NAIROBI_WAREHOUSE,
+			"VT Demo Nairobi Dispatch Warehouse",
+			"Enterprise Road",
+			"Nairobi",
+			-1.3102,
+			36.8559,
+		),
 		(MERU_WAREHOUSE, "VT Demo Meru Dispatch Warehouse", "Meru-Nanyuki Road", "Meru", 0.0515, 37.6456),
 	)
 	for warehouse, title, address_line, city, latitude, longitude in definitions:
@@ -276,7 +294,11 @@ def _ensure_vehicles(categories):
 	)
 	vehicles = []
 	for registration, category_label in definitions:
-		doc = frappe.get_doc("Vehicle", registration) if frappe.db.exists("Vehicle", registration) else frappe.new_doc("Vehicle")
+		doc = (
+			frappe.get_doc("Vehicle", registration)
+			if frappe.db.exists("Vehicle", registration)
+			else frappe.new_doc("Vehicle")
+		)
 		doc.license_plate = registration
 		doc.make = "Isuzu"
 		doc.model = category_label
@@ -302,7 +324,11 @@ def _ensure_items():
 	)
 	items = {}
 	for item_code, item_name, weight, volume, rate, refrigerated, tail_lift, equipment in definitions:
-		doc = frappe.get_doc("Item", item_code) if frappe.db.exists("Item", item_code) else frappe.new_doc("Item")
+		doc = (
+			frappe.get_doc("Item", item_code)
+			if frappe.db.exists("Item", item_code)
+			else frappe.new_doc("Item")
+		)
 		doc.item_code = item_code
 		doc.item_name = item_name
 		doc.item_group = "Products"
@@ -345,9 +371,7 @@ def _ensure_stock(items):
 	for warehouse in (NAIROBI_WAREHOUSE, MERU_WAREHOUSE):
 		for item_code, values in items.items():
 			actual = flt(
-				frappe.db.get_value(
-					"Bin", {"item_code": item_code, "warehouse": warehouse}, "actual_qty"
-				)
+				frappe.db.get_value("Bin", {"item_code": item_code, "warehouse": warehouse}, "actual_qty")
 			)
 			if actual < target_quantity:
 				rows.append(
@@ -380,15 +404,50 @@ def _ensure_sales_orders(addresses, items, delivery_method):
 	first_date = add_days(nowdate(), 2)
 	second_date = add_days(nowdate(), 3)
 	orders = (
-		("01", "VT Demo CBD Supermarket", first_date, (("VT-DEMO-WATER-CASE", 160, NAIROBI_WAREHOUSE), ("VT-DEMO-TISSUE-BALE", 40, NAIROBI_WAREHOUSE))),
-		("02", "VT Demo Westlands Mart", first_date, (("VT-DEMO-FLOUR-BOX", 100, NAIROBI_WAREHOUSE), ("VT-DEMO-OIL-BOX", 80, NAIROBI_WAREHOUSE))),
+		(
+			"01",
+			"VT Demo CBD Supermarket",
+			first_date,
+			(("VT-DEMO-WATER-CASE", 160, NAIROBI_WAREHOUSE), ("VT-DEMO-TISSUE-BALE", 40, NAIROBI_WAREHOUSE)),
+		),
+		(
+			"02",
+			"VT Demo Westlands Mart",
+			first_date,
+			(("VT-DEMO-FLOUR-BOX", 100, NAIROBI_WAREHOUSE), ("VT-DEMO-OIL-BOX", 80, NAIROBI_WAREHOUSE)),
+		),
 		("03", "VT Demo Kilimani Foods", first_date, (("VT-DEMO-JUICE-CRATE", 120, NAIROBI_WAREHOUSE),)),
-		("04", "VT Demo Embakasi Wholesalers", first_date, (("VT-DEMO-WATER-CASE", 240, NAIROBI_WAREHOUSE), ("VT-DEMO-TISSUE-BALE", 100, NAIROBI_WAREHOUSE))),
-		("05", "VT Demo Industrial Distributors", first_date, (("VT-DEMO-FLOUR-BOX", 150, NAIROBI_WAREHOUSE), ("VT-DEMO-OIL-BOX", 100, NAIROBI_WAREHOUSE))),
+		(
+			"04",
+			"VT Demo Embakasi Wholesalers",
+			first_date,
+			(("VT-DEMO-WATER-CASE", 240, NAIROBI_WAREHOUSE), ("VT-DEMO-TISSUE-BALE", 100, NAIROBI_WAREHOUSE)),
+		),
+		(
+			"05",
+			"VT Demo Industrial Distributors",
+			first_date,
+			(("VT-DEMO-FLOUR-BOX", 150, NAIROBI_WAREHOUSE), ("VT-DEMO-OIL-BOX", 100, NAIROBI_WAREHOUSE)),
+		),
 		("06", "VT Demo Mombasa Road Depot", first_date, (("VT-DEMO-JUICE-CRATE", 200, NAIROBI_WAREHOUSE),)),
-		("07", "VT Demo Ruiru Retail", second_date, (("VT-DEMO-WATER-CASE", 120, NAIROBI_WAREHOUSE), ("VT-DEMO-FLOUR-BOX", 80, NAIROBI_WAREHOUSE))),
-		("08", "VT Demo Kiambu Cash & Carry", second_date, (("VT-DEMO-OIL-BOX", 160, NAIROBI_WAREHOUSE), ("VT-DEMO-TISSUE-BALE", 50, NAIROBI_WAREHOUSE))),
-		("09", "VT Demo CBD Supermarket", second_date, (("VT-DEMO-WATER-CASE", 80, NAIROBI_WAREHOUSE), ("VT-DEMO-FLOUR-BOX", 60, MERU_WAREHOUSE))),
+		(
+			"07",
+			"VT Demo Ruiru Retail",
+			second_date,
+			(("VT-DEMO-WATER-CASE", 120, NAIROBI_WAREHOUSE), ("VT-DEMO-FLOUR-BOX", 80, NAIROBI_WAREHOUSE)),
+		),
+		(
+			"08",
+			"VT Demo Kiambu Cash & Carry",
+			second_date,
+			(("VT-DEMO-OIL-BOX", 160, NAIROBI_WAREHOUSE), ("VT-DEMO-TISSUE-BALE", 50, NAIROBI_WAREHOUSE)),
+		),
+		(
+			"09",
+			"VT Demo CBD Supermarket",
+			second_date,
+			(("VT-DEMO-WATER-CASE", 80, NAIROBI_WAREHOUSE), ("VT-DEMO-FLOUR-BOX", 60, MERU_WAREHOUSE)),
+		),
 	)
 	created = []
 	for sequence, customer, delivery_date, order_items in orders:
@@ -454,14 +513,8 @@ def _refresh_demo_draft_delivery_orders(sales_orders):
 	):
 		doc = frappe.get_doc("Delivery Order", name)
 		item_masters = [frappe.get_cached_doc("Item", row.item_code) for row in doc.items]
-		body_types = {
-			item.vuna_required_body_type
-			for item in item_masters
-			if item.vuna_required_body_type
-		}
-		doc.refrigeration_required = any(
-			item.vuna_refrigeration_required for item in item_masters
-		)
+		body_types = {item.vuna_required_body_type for item in item_masters if item.vuna_required_body_type}
+		doc.refrigeration_required = any(item.vuna_refrigeration_required for item in item_masters)
 		doc.tail_lift_required = any(item.vuna_tail_lift_required for item in item_masters)
 		doc.required_body_type = next(iter(body_types), None) if len(body_types) <= 1 else None
 		doc.special_equipment_required = ", ".join(
@@ -469,9 +522,7 @@ def _refresh_demo_draft_delivery_orders(sales_orders):
 				{
 					value.strip()
 					for item in item_masters
-					for value in (item.vuna_special_equipment_required or "").replace(
-						"\n", ","
-					).split(",")
+					for value in (item.vuna_special_equipment_required or "").replace("\n", ",").split(",")
 					if value.strip()
 				}
 			)

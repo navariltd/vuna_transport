@@ -14,12 +14,8 @@ def get_address_planning_data(address_name):
 	address = frappe.get_cached_doc("Address", address_name)
 	location = getattr(address, "vuna_location", None)
 	map_latitude, map_longitude = get_point_coordinates(location)
-	latitude = _coordinate_or_fallback(
-		getattr(address, "vuna_latitude", None), map_latitude
-	)
-	longitude = _coordinate_or_fallback(
-		getattr(address, "vuna_longitude", None), map_longitude
-	)
+	latitude = _coordinate_or_fallback(getattr(address, "vuna_latitude", None), map_latitude)
+	longitude = _coordinate_or_fallback(getattr(address, "vuna_longitude", None), map_longitude)
 	return frappe._dict(
 		address=address.name,
 		delivery_zone=getattr(address, "vuna_delivery_zone", None),
@@ -46,8 +42,7 @@ def synchronize_address_location(address, method=None):
 		return
 
 	coordinates_changed = address.is_new() or any(
-		address.has_value_changed(fieldname)
-		for fieldname in ("vuna_latitude", "vuna_longitude")
+		address.has_value_changed(fieldname) for fieldname in ("vuna_latitude", "vuna_longitude")
 	)
 	location_changed = address.is_new() or address.has_value_changed("vuna_location")
 	latitude = address.get("vuna_latitude")
@@ -69,9 +64,7 @@ def synchronize_address_location(address, method=None):
 			return
 		latitude, longitude = get_point_coordinates(address.vuna_location)
 		if latitude is None or longitude is None:
-			frappe.throw(
-				_("Delivery Location must contain a point marker rather than a line or area.")
-			)
+			frappe.throw(_("Delivery Location must contain a point marker rather than a line or area."))
 		address.vuna_latitude = latitude
 		address.vuna_longitude = longitude
 		return
@@ -101,9 +94,7 @@ def backfill_address_coordinates():
 		filters={"vuna_location": ["is", "set"]},
 		fields=["name", "vuna_location", "vuna_latitude", "vuna_longitude"],
 	):
-		if _has_coordinate(address.vuna_latitude) and _has_coordinate(
-			address.vuna_longitude
-		):
+		if _has_coordinate(address.vuna_latitude) and _has_coordinate(address.vuna_longitude):
 			continue
 		latitude, longitude = get_point_coordinates(address.vuna_location)
 		if latitude is None or longitude is None:
@@ -137,16 +128,10 @@ def set_delivery_order_location_snapshots(delivery_order, overwrite=False):
 	_set_if_empty(delivery_order, "destination_longitude", destination.longitude, overwrite)
 	_set_if_empty(delivery_order, "delivery_from_time", destination.delivery_from_time, overwrite)
 	_set_if_empty(delivery_order, "delivery_to_time", destination.delivery_to_time, overwrite)
-	_set_if_empty(
-		delivery_order, "average_service_duration", destination.average_service_duration, overwrite
-	)
-	_set_if_empty(
-		delivery_order, "maximum_vehicle_category", destination.maximum_vehicle_category, overwrite
-	)
+	_set_if_empty(delivery_order, "average_service_duration", destination.average_service_duration, overwrite)
+	_set_if_empty(delivery_order, "maximum_vehicle_category", destination.maximum_vehicle_category, overwrite)
 	_set_if_empty(delivery_order, "tail_lift_required", destination.requires_tail_lift, overwrite)
-	_set_if_empty(
-		delivery_order, "loading_dock_available", destination.loading_dock_available, overwrite
-	)
+	_set_if_empty(delivery_order, "loading_dock_available", destination.loading_dock_available, overwrite)
 	_set_if_empty(delivery_order, "restricted_access", destination.restricted_access, overwrite)
 	_set_if_empty(delivery_order, "access_notes", destination.access_notes, overwrite)
 	_set_if_empty(delivery_order, "source_address", source.address, overwrite)

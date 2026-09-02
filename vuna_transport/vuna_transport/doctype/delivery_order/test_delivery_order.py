@@ -4,18 +4,17 @@
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from frappe.exceptions import ValidationError
-
 import frappe
-from frappe.utils import flt
+from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
+from frappe.utils import flt
 
 from vuna_transport.services.demand.delivery_order_service import (
 	_get_group_key,
 	_get_group_transport_requirements,
 	_get_item_measure,
-	_requires_transport_planning,
 	_get_transport_quantity,
+	_requires_transport_planning,
 	get_sales_order_item_quantities,
 	sync_delivery_order_quantities,
 )
@@ -26,13 +25,11 @@ from vuna_transport.services.routing.location_service import (
 	validate_point_coordinates,
 )
 
-
 # On IntegrationTestCase, the doctype test records and all
 # link-field test record dependencies are recursively loaded
 # Use these module variables to add/remove to/from that list
 EXTRA_TEST_RECORD_DEPENDENCIES = []  # eg. ["User"]
 IGNORE_TEST_RECORD_DEPENDENCIES = []  # eg. ["User"]
-
 
 
 class TestDeliveryOrder(UnitTestCase):
@@ -71,7 +68,10 @@ class TestDeliveryOrder(UnitTestCase):
 
 		self.assertTrue(_should_auto_submit_delivery_orders())
 
-	@patch("vuna_transport.services.demand.delivery_order_service._get_delivery_order_item_commitments", return_value=(0, 0))
+	@patch(
+		"vuna_transport.services.demand.delivery_order_service._get_delivery_order_item_commitments",
+		return_value=(0, 0),
+	)
 	@patch("vuna_transport.services.demand.delivery_order_service._get_item_transport_measurements")
 	@patch("vuna_transport.services.demand.delivery_order_service._get_sales_order")
 	def test_submitted_sales_order_quantity_refreshes_delivery_order_item(
@@ -93,7 +93,9 @@ class TestDeliveryOrder(UnitTestCase):
 			crates=1,
 		)
 		get_sales_order.return_value = SimpleNamespace(items=[sales_item])
-		get_measurements.return_value = SimpleNamespace(weight=75, weight_uom="Kg", volume=7.5, volume_uom="m3")
+		get_measurements.return_value = SimpleNamespace(
+			weight=75, weight_uom="Kg", volume=7.5, volume_uom="m3"
+		)
 		delivery_order = SimpleNamespace(sales_order="SO-1", items=[row])
 
 		self.assertTrue(sync_delivery_order_quantities(delivery_order))
@@ -102,7 +104,10 @@ class TestDeliveryOrder(UnitTestCase):
 		self.assertEqual(row.weight, 75)
 		self.assertEqual(row.volume, 7.5)
 
-	@patch("vuna_transport.services.demand.delivery_order_service._get_delivery_order_item_commitments", return_value=(10, 40))
+	@patch(
+		"vuna_transport.services.demand.delivery_order_service._get_delivery_order_item_commitments",
+		return_value=(10, 40),
+	)
 	@patch("vuna_transport.services.demand.delivery_order_service._get_sales_order")
 	def test_sales_order_quantity_cannot_drop_below_active_load_commitments(
 		self, get_sales_order, _get_commitments
@@ -148,7 +153,6 @@ class TestDeliveryOrder(UnitTestCase):
 		key_b = _get_group_key(sales_order, item_b)
 		self.assertNotEqual(key_a, key_b)
 		self.assertEqual(key_a[-1], "Packed")
-
 
 	def test_item_measure_uses_per_unit_value(self):
 		item = SimpleNamespace(weight=None, weight_per_unit=2.5)

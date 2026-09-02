@@ -1,14 +1,14 @@
 import frappe
 
-from vuna_transport.services.shared.security_service import require_document_permission
-from vuna_transport.services.planning.delivery_load_service import get_compatible_vehicle_category_names
 from vuna_transport.services.fleet.driver_availability_service import (
 	get_driver_availability_map,
 )
+from vuna_transport.services.fleet.vehicle_allocation_service import get_load_resource_window
 from vuna_transport.services.fleet.vehicle_availability_service import (
 	get_vehicle_availability_map,
 )
-from vuna_transport.services.fleet.vehicle_allocation_service import get_load_resource_window
+from vuna_transport.services.planning.delivery_load_service import get_compatible_vehicle_category_names
+from vuna_transport.services.shared.security_service import require_document_permission
 
 
 @frappe.whitelist()
@@ -36,8 +36,7 @@ def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
 	available_names = {
 		result.vehicle
 		for result in availability.values()
-		if result.dispatch_eligible
-		and result.vehicle_category in compatible_categories
+		if result.dispatch_eligible and result.vehicle_category in compatible_categories
 	}
 	if not available_names:
 		return []
@@ -72,9 +71,7 @@ def get_drivers_for_load(doctype, txt, searchfield, start, page_len, filters):
 		company=load.company,
 		exclude_delivery_load=load.name,
 	)
-	available_names = [
-		result.driver for result in availability.values() if result.dispatch_eligible
-	]
+	available_names = [result.driver for result in availability.values() if result.dispatch_eligible]
 	if not available_names:
 		return []
 	return frappe.get_list(

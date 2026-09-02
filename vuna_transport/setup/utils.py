@@ -2,6 +2,7 @@ import frappe
 from erpnext.setup.utils import enable_all_roles_and_domains
 from frappe.utils import now_datetime
 
+
 def before_tests():
 	frappe.clear_cache()
 	# complete setup if missing

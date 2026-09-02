@@ -20,7 +20,7 @@ add_to_apps_screen = [
 		"logo": app_logo_url,
 		"title": app_title,
 		"route": "/desk/vuna_transport",
-		"has_permission": "vuna_transport.permissions.has_app_permission"
+		"has_permission": "vuna_transport.permissions.has_app_permission",
 	}
 ]
 

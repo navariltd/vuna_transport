@@ -9,7 +9,6 @@ from vuna_transport.services.shared.workflow_policy_service import (
 	get_vehicle_allocation_timing,
 )
 
-
 DOCSTATUS_LABELS = {0: "Draft", 1: "Submitted", 2: "Cancelled"}
 
 
@@ -18,9 +17,7 @@ def get_load_execution_summary(load):
 	"""Return downstream execution progress and the single recommended next action."""
 	load = frappe.get_doc("Delivery Load", load) if isinstance(load, str) else load
 	require_document_permission(load, "read")
-	delivery_orders = {
-		row.delivery_order for row in load.delivery_orders if row.delivery_order
-	}
+	delivery_orders = {row.delivery_order for row in load.delivery_orders if row.delivery_order}
 
 	pick_list = _get_pick_list(load)
 	vehicle_allocation = _get_vehicle_allocation(load)
@@ -58,7 +55,14 @@ def get_load_execution_summary(load):
 		stops = frappe.get_all(
 			"Delivery Stop",
 			filters={"parent": delivery_trip.name, "parenttype": "Delivery Trip"},
-			fields=["name", "customer", "delivery_note", "visited", "vuna_delivery_status", "vuna_proof_of_delivery"],
+			fields=[
+				"name",
+				"customer",
+				"delivery_note",
+				"visited",
+				"vuna_delivery_status",
+				"vuna_proof_of_delivery",
+			],
 			order_by="idx asc",
 		)
 
@@ -144,9 +148,7 @@ def get_load_execution_summary(load):
 def _get_pick_list(load):
 	if not load.pick_list:
 		return None
-	value = frappe.db.get_value(
-		"Pick List", load.pick_list, ["name", "docstatus", "status"], as_dict=True
-	)
+	value = frappe.db.get_value("Pick List", load.pick_list, ["name", "docstatus", "status"], as_dict=True)
 	return value
 
 
@@ -238,36 +240,64 @@ def _get_next_action(
 	if load.status in ("Completed", "Completed with Exceptions"):
 		return _action("completed", _("Execution Completed"), _("This Delivery Load is closed."))
 	requires_vehicle_allocation = _requires_vehicle_allocation(load)
-	allocation_after_notes = (
-		vehicle_allocation_timing == ALLOCATION_AFTER_DELIVERY_NOTES
-	)
+	allocation_after_notes = vehicle_allocation_timing == ALLOCATION_AFTER_DELIVERY_NOTES
 	if requires_vehicle_allocation and not allocation_after_notes:
 		action = _get_vehicle_allocation_action(load, vehicle_allocation)
 		if action:
 			return action
 	if pick_list and pick_list.docstatus == 0:
-		return _action("open_pick_list", _("Complete Pick List"), _("Pick and submit the warehouse document."))
+		return _action(
+			"open_pick_list", _("Complete Pick List"), _("Pick and submit the warehouse document.")
+		)
 	if len(active_notes) < len(delivery_orders):
-		return _action("create_delivery_notes", _("Create Delivery Notes"), _("Create one stock movement per delivery stop."))
+		return _action(
+			"create_delivery_notes",
+			_("Create Delivery Notes"),
+			_("Create one stock movement per delivery stop."),
+		)
 	if requires_vehicle_allocation and allocation_after_notes:
 		action = _get_vehicle_allocation_action(load, vehicle_allocation)
 		if action:
 			return action
 	if draft_notes:
-		return _action("review_delivery_notes", _("Review Delivery Notes"), _("Review and submit every Delivery Note."))
+		return _action(
+			"review_delivery_notes", _("Review Delivery Notes"), _("Review and submit every Delivery Note.")
+		)
 	if len(submitted_notes) < len(delivery_orders):
-		return _action("create_delivery_notes", _("Replace Missing Delivery Notes"), _("Create Delivery Notes for unresolved Delivery Orders."))
+		return _action(
+			"create_delivery_notes",
+			_("Replace Missing Delivery Notes"),
+			_("Create Delivery Notes for unresolved Delivery Orders."),
+		)
 	if not _requires_delivery_trip(load):
-		return _action("completed", _("Fulfilment Completed"), _("This Delivery Method does not require a Delivery Trip."))
+		return _action(
+			"completed",
+			_("Fulfilment Completed"),
+			_("This Delivery Method does not require a Delivery Trip."),
+		)
 	if not delivery_trip or delivery_trip.docstatus == 2:
-		return _action("create_delivery_trip", _("Create Delivery Trip"), _("Assign the actual vehicle and driver."))
+		return _action(
+			"create_delivery_trip", _("Create Delivery Trip"), _("Assign the actual vehicle and driver.")
+		)
 	if delivery_trip.docstatus == 0:
-		return _action("open_delivery_trip", _("Complete Delivery Trip"), _("Assign vehicle and driver, then submit the trip."))
+		return _action(
+			"open_delivery_trip",
+			_("Complete Delivery Trip"),
+			_("Assign vehicle and driver, then submit the trip."),
+		)
 	if not stops:
-		return _action("open_delivery_trip", _("Review Delivery Trip"), _("The submitted trip has no delivery stops."))
+		return _action(
+			"open_delivery_trip", _("Review Delivery Trip"), _("The submitted trip has no delivery stops.")
+		)
 	if len(submitted_pods) < len(stops):
-		return _action("open_delivery_trip", _("Capture Proofs of Delivery"), _("Record the outcome for every delivery stop."))
-	return _action("completed", _("Execution Completed"), _("Every delivery stop has a submitted Proof of Delivery."))
+		return _action(
+			"open_delivery_trip",
+			_("Capture Proofs of Delivery"),
+			_("Record the outcome for every delivery stop."),
+		)
+	return _action(
+		"completed", _("Execution Completed"), _("Every delivery stop has a submitted Proof of Delivery.")
+	)
 
 
 def _get_vehicle_allocation_action(load, vehicle_allocation):
@@ -289,9 +319,7 @@ def _get_vehicle_allocation_action(load, vehicle_allocation):
 def _requires_vehicle_allocation(load):
 	if not load.delivery_method:
 		return True
-	return bool(
-		frappe.db.get_value("Delivery Method", load.delivery_method, "requires_vehicle_allocation")
-	)
+	return bool(frappe.db.get_value("Delivery Method", load.delivery_method, "requires_vehicle_allocation"))
 
 
 def _requires_delivery_trip(load):

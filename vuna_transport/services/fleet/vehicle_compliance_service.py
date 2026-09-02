@@ -8,7 +8,6 @@ from frappe.utils import add_days, getdate, nowdate
 
 from vuna_transport.services.fleet.vehicle_owner_service import normalize_vehicle_owner
 
-
 STANDARD_INSURANCE_TYPE = "insurance"
 
 
@@ -71,9 +70,7 @@ def get_vehicle_compliance_map(vehicles, at_time=None):
 	)
 	documents_by_vehicle_and_type = defaultdict(list)
 	for document in documents:
-		documents_by_vehicle_and_type[(document.vehicle, document.document_type)].append(
-			document
-		)
+		documents_by_vehicle_and_type[(document.vehicle, document.document_type)].append(document)
 
 	return {
 		vehicle.name: _evaluate_vehicle_compliance(
@@ -116,9 +113,7 @@ def get_expiring_vehicle_documents(days=30):
 	)
 
 
-def _evaluate_vehicle_compliance(
-	vehicle, requirements, documents_by_vehicle_and_type, evaluation_date
-):
+def _evaluate_vehicle_compliance(vehicle, requirements, documents_by_vehicle_and_type, evaluation_date):
 	reasons = []
 	warnings = []
 	document_results = []
@@ -126,16 +121,10 @@ def _evaluate_vehicle_compliance(
 		if not _requirement_applies(requirement, vehicle):
 			continue
 		if _is_standard_insurance(requirement):
-			result = _evaluate_standard_insurance(
-				vehicle, requirement, evaluation_date
-			)
+			result = _evaluate_standard_insurance(vehicle, requirement, evaluation_date)
 		else:
-			candidates = documents_by_vehicle_and_type.get(
-				(vehicle.name, requirement.name), []
-			)
-			result = _select_document_result(
-				requirement, candidates, evaluation_date
-			)
+			candidates = documents_by_vehicle_and_type.get((vehicle.name, requirement.name), [])
+			result = _select_document_result(requirement, candidates, evaluation_date)
 		document_results.append(result)
 		if result.blocking_reason:
 			reasons.append(result.blocking_reason)
@@ -157,8 +146,7 @@ def _requirement_applies(requirement, vehicle):
 	return (
 		(not requirement.company or requirement.company == vehicle.company)
 		and (
-			not requirement.vehicle_category
-			or requirement.vehicle_category == vehicle.vuna_vehicle_category
+			not requirement.vehicle_category or requirement.vehicle_category == vehicle.vuna_vehicle_category
 		)
 		and (
 			not requirement.vehicle_owner
@@ -176,9 +164,7 @@ def _evaluate_standard_insurance(vehicle, requirement, evaluation_date):
 	status = "Valid"
 	reason = None
 	warning = None
-	if not vehicle.policy_no or (
-		requirement.requires_expiry_date and not vehicle.end_date
-	):
+	if not vehicle.policy_no or (requirement.requires_expiry_date and not vehicle.end_date):
 		status = "Missing"
 		if requirement.mandatory_for_dispatch:
 			reason = _reason(
@@ -201,9 +187,7 @@ def _evaluate_standard_insurance(vehicle, requirement, evaluation_date):
 		if requirement.mandatory_for_dispatch:
 			reason = _reason(
 				"INSURANCE_EXPIRED",
-				_("Mandatory Vehicle insurance expired on {0}.").format(
-					vehicle.end_date
-				),
+				_("Mandatory Vehicle insurance expired on {0}.").format(vehicle.end_date),
 				"Vehicle",
 				vehicle.name,
 			)
@@ -229,10 +213,7 @@ def _evaluate_standard_insurance(vehicle, requirement, evaluation_date):
 
 
 def _select_document_result(requirement, documents, evaluation_date):
-	results = [
-		_evaluate_document(document, requirement, evaluation_date)
-		for document in documents
-	]
+	results = [_evaluate_document(document, requirement, evaluation_date) for document in documents]
 	usable = next(
 		(result for result in results if result.status in ("Valid", "Expiring Soon")),
 		None,
@@ -255,18 +236,14 @@ def _select_document_result(requirement, documents, evaluation_date):
 	):
 		selected.blocking_reason = _reason(
 			"DOCUMENT_MISSING" if selected.status == "Missing" else "DOCUMENT_INVALID",
-			_("Mandatory {0} is {1}.").format(
-				requirement.document_type_name, selected.status.lower()
-			),
+			_("Mandatory {0} is {1}.").format(requirement.document_type_name, selected.status.lower()),
 			"Vehicle Document" if selected.document else None,
 			selected.document,
 		)
 	if selected.status == "Expiring Soon":
 		selected.warning = _reason(
 			"DOCUMENT_EXPIRING_SOON",
-			_("{0} expires on {1}.").format(
-				requirement.document_type_name, selected.expiry_date
-			),
+			_("{0} expires on {1}.").format(requirement.document_type_name, selected.expiry_date),
 			"Vehicle Document",
 			selected.document,
 		)
@@ -310,9 +287,7 @@ def _reason(code, message, reference_doctype=None, reference_name=None):
 
 
 def _missing_vehicle_compliance(vehicle):
-	reason = _reason(
-		"VEHICLE_NOT_FOUND", _("Vehicle {0} does not exist.").format(vehicle)
-	)
+	reason = _reason("VEHICLE_NOT_FOUND", _("Vehicle {0} does not exist.").format(vehicle))
 	return frappe._dict(
 		vehicle=vehicle,
 		compliant=False,

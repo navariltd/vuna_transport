@@ -9,9 +9,9 @@ def time_windows_overlap(first, second):
 	second_start, second_end = _window_values(second)
 	if not all((first_start, first_end, second_start, second_end)):
 		return False
-	return get_datetime(first_start) < get_datetime(second_end) and get_datetime(
-		second_start
-	) < get_datetime(first_end)
+	return get_datetime(first_start) < get_datetime(second_end) and get_datetime(second_start) < get_datetime(
+		first_end
+	)
 
 
 def interval_overlaps(from_time, to_time, other_from, other_to):
@@ -24,6 +24,4 @@ def interval_overlaps(from_time, to_time, other_from, other_to):
 def _window_values(value):
 	if isinstance(value, dict):
 		return value.get("planned_departure"), value.get("planned_arrival")
-	return getattr(value, "planned_departure", None), getattr(
-		value, "planned_arrival", None
-	)
+	return getattr(value, "planned_departure", None), getattr(value, "planned_arrival", None)

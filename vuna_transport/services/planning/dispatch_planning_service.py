@@ -6,22 +6,8 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, getdate
 
-from vuna_transport.services.planning.delivery_load_service import (
-	build_delivery_load_from_allocations,
-	calculate_load_totals,
-	create_delivery_load_from_plan as _create_delivery_load_from_plan,
-	get_capacity_buffer_percentage,
-	get_compatible_vehicle_category_names,
-	recommend_vehicle_category,
-)
 from vuna_transport.services.fleet.driver_availability_service import (
 	get_driver_availability_map,
-)
-from vuna_transport.services.planning.load_validation_service import validate_load_allocations
-from vuna_transport.services.shared.security_service import (
-	require_company_access,
-	require_doctype_permission,
-	require_document_permission,
 )
 from vuna_transport.services.fleet.vehicle_availability_service import (
 	get_vehicle_availability_map,
@@ -30,7 +16,22 @@ from vuna_transport.services.fleet.vehicle_category_service import (
 	evaluate_vehicle_category,
 	get_vehicle_categories,
 )
-
+from vuna_transport.services.planning.delivery_load_service import (
+	build_delivery_load_from_allocations,
+	calculate_load_totals,
+	get_capacity_buffer_percentage,
+	get_compatible_vehicle_category_names,
+	recommend_vehicle_category,
+)
+from vuna_transport.services.planning.delivery_load_service import (
+	create_delivery_load_from_plan as _create_delivery_load_from_plan,
+)
+from vuna_transport.services.planning.load_validation_service import validate_load_allocations
+from vuna_transport.services.shared.security_service import (
+	require_company_access,
+	require_doctype_permission,
+	require_document_permission,
+)
 
 MAX_PAGE_LENGTH = 100
 MAX_SUMMARY_ORDERS = 500
@@ -80,10 +81,7 @@ def get_planning_demand(
 	has_more = len(page_orders) > page_length
 	page_orders = page_orders[:page_length]
 	page_metrics = _get_order_metrics([row.name for row in page_orders])
-	rows = [
-		_format_demand_row(order, page_metrics.get(order.name))
-		for order in page_orders
-	]
+	rows = [_format_demand_row(order, page_metrics.get(order.name)) for order in page_orders]
 	rows = _filter_allocation_state(rows, allocation_state)
 
 	summary_orders = frappe.get_list(
@@ -96,10 +94,7 @@ def get_planning_demand(
 	summary_truncated = len(summary_orders) > MAX_SUMMARY_ORDERS
 	summary_orders = summary_orders[:MAX_SUMMARY_ORDERS]
 	summary_metrics = _get_order_metrics([row.name for row in summary_orders])
-	summary_rows = [
-		_format_demand_row(order, summary_metrics.get(order.name))
-		for order in summary_orders
-	]
+	summary_rows = [_format_demand_row(order, summary_metrics.get(order.name)) for order in summary_orders]
 	summary_rows = _filter_allocation_state(summary_rows, allocation_state)
 	return {
 		"orders": rows,
@@ -157,9 +152,7 @@ def evaluate_manual_load_plan(allocations, vehicle_category=None):
 	for category in categories:
 		if category.name not in compatible_names:
 			continue
-		result = evaluate_vehicle_category(
-			_load_totals(load), category, _load_requirements(load)
-		)
+		result = evaluate_vehicle_category(_load_totals(load), category, _load_requirements(load))
 		category_rows.append(
 			{
 				"name": category.name,
@@ -220,14 +213,10 @@ def get_fleet_availability_summary(company, from_time, to_time):
 
 
 @frappe.whitelist()
-def get_vehicle_availability_details(
-	company, vehicle_category, from_time, to_time
-):
+def get_vehicle_availability_details(company, vehicle_category, from_time, to_time):
 	require_doctype_permission("Vehicle", "read")
 	require_company_access(company)
-	results = _permitted_vehicle_availability(
-		company, from_time, to_time, vehicle_category
-	)
+	results = _permitted_vehicle_availability(company, from_time, to_time, vehicle_category)
 	return list(results.values())
 
 
@@ -241,9 +230,7 @@ def get_driver_availability_summary(company, from_time, to_time):
 		states[result.operational_state] += 1
 	return {
 		"total": len(results),
-		"active": sum(
-			1 for result in results.values() if result.driver_status == "Active"
-		),
+		"active": sum(1 for result in results.values() if result.driver_status == "Active"),
 		"available": states["Available"],
 		"allocated": states["Allocated"],
 		"in_trip": states["In Trip"],
@@ -273,9 +260,7 @@ def _planning_filters(
 		"docstatus": 1,
 		"status": ["in", PLANNABLE_STATUSES],
 	}
-	date_filter = _delivery_date_filter(
-		required_delivery_date_from, required_delivery_date_to
-	)
+	date_filter = _delivery_date_filter(required_delivery_date_from, required_delivery_date_to)
 	if date_filter:
 		filters["required_delivery_date"] = date_filter
 	for fieldname, value in {
@@ -478,8 +463,7 @@ def _filter_allocation_state(rows, allocation_state):
 		return [
 			row
 			for row in rows
-			if row["unallocated_quantity"] > 0
-			and (row["allocated_quantity"] or row["reserved_quantity"])
+			if row["unallocated_quantity"] > 0 and (row["allocated_quantity"] or row["reserved_quantity"])
 		]
 	return [row for row in rows if row["unallocated_quantity"] > 0]
 
@@ -503,9 +487,7 @@ def _warehouse_summaries(rows):
 	return list(summaries.values())
 
 
-def _permitted_vehicle_availability(
-	company, from_time, to_time, vehicle_category=None
-):
+def _permitted_vehicle_availability(company, from_time, to_time, vehicle_category=None):
 	filters = {"company": ["in", [company, ""]]}
 	if vehicle_category:
 		filters["vuna_vehicle_category"] = vehicle_category
@@ -524,9 +506,7 @@ def _permitted_vehicle_availability(
 
 
 def _permitted_driver_availability(from_time, to_time, company=None):
-	driver_names = frappe.get_list(
-		"Driver", pluck="name", limit_page_length=1000
-	)
+	driver_names = frappe.get_list("Driver", pluck="name", limit_page_length=1000)
 	return get_driver_availability_map(
 		driver_names=driver_names,
 		from_time=from_time,

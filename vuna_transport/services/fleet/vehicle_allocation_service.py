@@ -4,29 +4,28 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, get_datetime, now_datetime
 
+from vuna_transport.services.demand.delivery_method_service import (
+	validate_delivery_method_allows_vehicle_allocation,
+)
 from vuna_transport.services.execution.dispatch_guard_service import (
 	lock_document,
 	set_delivery_load_status,
 	validate_load_is_operational,
 )
-from vuna_transport.services.demand.delivery_method_service import (
-	validate_delivery_method_allows_vehicle_allocation,
+from vuna_transport.services.fleet.driver_availability_service import (
+	evaluate_driver_availability,
 )
+from vuna_transport.services.fleet.vehicle_availability_service import (
+	evaluate_vehicle_availability,
+)
+from vuna_transport.services.shared.resource_scheduling_service import time_windows_overlap
 from vuna_transport.services.shared.security_service import (
 	require_doctype_permission,
 	require_document_permission,
 )
-from vuna_transport.services.fleet.driver_availability_service import (
-	evaluate_driver_availability,
-)
-from vuna_transport.services.shared.resource_scheduling_service import time_windows_overlap
-from vuna_transport.services.fleet.vehicle_availability_service import (
-	evaluate_vehicle_availability,
-)
 from vuna_transport.services.shared.workflow_policy_service import (
 	allocation_is_required_before_delivery_notes,
 )
-
 
 ACTIVE_STATUSES = ("Allocated", "Accepted")
 
@@ -147,9 +146,9 @@ def _set_assignment_context(allocation, load, trip):
 	if active_name and active_name != allocation.name:
 		if allocation.replacement_of and allocation.replacement_of != active_name:
 			frappe.throw(
-				_("The active Vehicle Allocation changed from {0} to {1}. Refresh and prepare a new replacement.").format(
-					allocation.replacement_of, active_name
-				)
+				_(
+					"The active Vehicle Allocation changed from {0} to {1}. Refresh and prepare a new replacement."
+				).format(allocation.replacement_of, active_name)
 			)
 		allocation.assignment_event = "Reallocation"
 		allocation.replacement_of = active_name
@@ -192,9 +191,7 @@ def _validate_owned_fleet(allocation, load):
 
 def _validate_subcontractor(allocation, load):
 	if not allocation.vehicle:
-		frappe.throw(
-			_("Select the ERPNext Vehicle record for the subcontracted vehicle.")
-		)
+		frappe.throw(_("Select the ERPNext Vehicle record for the subcontracted vehicle."))
 	lock_document("Vehicle", allocation.vehicle)
 	vehicle = frappe.get_doc("Vehicle", allocation.vehicle)
 	allocation.subcontractor_vehicle_category = vehicle.vuna_vehicle_category
@@ -212,9 +209,9 @@ def _validate_planning_window(load):
 		return
 	if not load.planned_departure or not load.planned_arrival:
 		frappe.throw(
-			_("Set both Planned Departure and Planned Arrival on Delivery Load {0}, or leave both blank.").format(
-				load.name
-			)
+			_(
+				"Set both Planned Departure and Planned Arrival on Delivery Load {0}, or leave both blank."
+			).format(load.name)
 		)
 	if get_datetime(load.planned_departure) >= get_datetime(load.planned_arrival):
 		frappe.throw(_("Planned Arrival must be after Planned Departure."))
@@ -238,18 +235,14 @@ def _validate_initial_allocation_sequence(load, allocation=None):
 	"""Enforce the configured order for the first assignment, not replacements."""
 	if allocation_is_required_before_delivery_notes():
 		return
-	if load.active_vehicle_allocation or (
-		allocation and getattr(allocation, "replacement_of", None)
-	):
+	if load.active_vehicle_allocation or (allocation and getattr(allocation, "replacement_of", None)):
 		return
 	if load.delivery_method and not frappe.db.get_value(
 		"Delivery Method", load.delivery_method, "requires_vehicle_allocation"
 	):
 		return
 
-	expected_orders = {
-		row.delivery_order for row in load.delivery_orders if row.delivery_order
-	}
+	expected_orders = {row.delivery_order for row in load.delivery_orders if row.delivery_order}
 	covered_orders = set(
 		frappe.get_all(
 			"Delivery Note",
@@ -287,11 +280,7 @@ def _validate_vehicle_is_available(allocation, load):
 		exclude_allocation=allocation.name,
 	)
 	if not result.dispatch_eligible:
-		frappe.throw(
-			_("Vehicle {0} is unavailable: {1}").format(
-				allocation.vehicle, result.primary_reason
-			)
-		)
+		frappe.throw(_("Vehicle {0} is unavailable: {1}").format(allocation.vehicle, result.primary_reason))
 
 
 def _validate_driver_is_available(allocation, load):
@@ -305,11 +294,7 @@ def _validate_driver_is_available(allocation, load):
 		expected_company=load.company,
 	)
 	if not result.dispatch_eligible:
-		frappe.throw(
-			_("Driver {0} is unavailable: {1}").format(
-				allocation.driver, result.primary_reason
-			)
-		)
+		frappe.throw(_("Driver {0} is unavailable: {1}").format(allocation.driver, result.primary_reason))
 
 
 def activate_allocation(allocation):
@@ -319,7 +304,11 @@ def activate_allocation(allocation):
 	if previous and previous != allocation.name:
 		_lock_allocation(previous)
 		if allocation.replacement_of != previous:
-			frappe.throw(_("The active allocation changed while this replacement was being prepared. Refresh and try again."))
+			frappe.throw(
+				_(
+					"The active allocation changed while this replacement was being prepared. Refresh and try again."
+				)
+			)
 		effective_from = allocation.effective_from or now_datetime()
 		frappe.db.set_value(
 			"Vehicle Allocation",
@@ -406,7 +395,9 @@ def validate_allocation_cancellation(allocation):
 	trip = _get_active_trip(load)
 	if trip and trip.docstatus == 1:
 		frappe.throw(
-			_("An allocation used by an active trip cannot be cancelled. Create another reallocation instead.")
+			_(
+				"An allocation used by an active trip cannot be cancelled. Create another reallocation instead."
+			)
 		)
 
 
@@ -418,14 +409,14 @@ def _get_active_trip(load):
 	)
 	if not name:
 		return None
-	return frappe.db.get_value(
-		"Delivery Trip", name, ["name", "docstatus", "status"], as_dict=True
-	)
+	return frappe.db.get_value("Delivery Trip", name, ["name", "docstatus", "status"], as_dict=True)
 
 
 def _validate_trip_allows_reallocation(trip):
 	if trip and (trip.docstatus == 2 or trip.status in ("Completed", "Cancelled")):
-		frappe.throw(_("Vehicle reallocation is not allowed after the Delivery Trip is completed or cancelled."))
+		frappe.throw(
+			_("Vehicle reallocation is not allowed after the Delivery Trip is completed or cancelled.")
+		)
 
 
 def _get_replacement_stage(trip):
@@ -449,9 +440,7 @@ def _sync_trip_execution_allocation(load, allocation, rollback=False):
 				"vuna_vehicle_allocation": allocation.name,
 			}
 		)
-	current_count = frappe.db.get_value(
-		"Delivery Trip", trip.name, "vuna_reallocation_count"
-	) or 0
+	current_count = frappe.db.get_value("Delivery Trip", trip.name, "vuna_reallocation_count") or 0
 	if allocation.assignment_event == "Reallocation" or rollback:
 		values["vuna_reallocation_count"] = max(current_count + (-1 if rollback else 1), 0)
 	frappe.db.set_value("Delivery Trip", trip.name, values, update_modified=True)
@@ -466,9 +455,7 @@ def _sync_trip_execution_allocation(load, allocation, rollback=False):
 
 
 def _lock_allocation(name):
-	frappe.db.sql(
-		"select name from `tabVehicle Allocation` where name = %s for update", name
-	)
+	frappe.db.sql("select name from `tabVehicle Allocation` where name = %s for update", name)
 
 
 def get_active_allocation(load, required=False):

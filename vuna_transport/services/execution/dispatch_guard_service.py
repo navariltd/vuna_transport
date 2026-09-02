@@ -3,7 +3,6 @@
 import frappe
 from frappe import _
 
-
 CLOSED_LOAD_STATUSES = ("Completed", "Completed with Exceptions", "Cancelled")
 LOCKABLE_DOCTYPES = {"Delivery Load", "Vehicle", "Driver"}
 
@@ -115,11 +114,7 @@ def set_delivery_load_status(load, status, reason=None, force=False):
 	if current == status:
 		return
 	if not force and not is_load_status_transition_allowed(current, status):
-		frappe.throw(
-			_("Delivery Load {0} cannot move from {1} to {2}.").format(
-				load.name, current, status
-			)
-		)
+		frappe.throw(_("Delivery Load {0} cannot move from {1} to {2}.").format(load.name, current, status))
 	load.db_set("status", status, update_modified=False)
 	load.status = status
 	message = _("Delivery Load status changed from {0} to {1}.").format(current, status)

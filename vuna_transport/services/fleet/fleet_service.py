@@ -4,12 +4,12 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, cint, now_datetime
 
-from vuna_transport.services.shared.security_service import require_document_permission
 from vuna_transport.services.fleet.vehicle_availability_service import (
 	get_vehicle_availability_map,
 	get_vehicle_status,
 )
 from vuna_transport.services.fleet.vehicle_owner_service import normalize_vehicle_owner
+from vuna_transport.services.shared.security_service import require_document_permission
 
 
 def validate_vehicle(doc, method=None):
@@ -59,11 +59,11 @@ def get_unlinked_assets(doctype, txt, searchfield, start, page_len, filters=None
 		f"""
 		select a.name, a.asset_name, a.company
 		from `tabAsset` a
-		where {' and '.join(conditions)}
+		where {" and ".join(conditions)}
 		order by a.asset_name asc, a.name asc
 		limit %s offset %s
 		""",
-		values + [page_len, start],
+		[*values, page_len, start],
 	)
 
 
@@ -94,11 +94,7 @@ def _validate_vehicle_asset(doc):
 		"name",
 	)
 	if duplicate:
-		frappe.throw(
-			_("Asset {0} is already linked to Vehicle {1}.").format(
-				asset.name, duplicate
-			)
-		)
+		frappe.throw(_("Asset {0} is already linked to Vehicle {1}.").format(asset.name, duplicate))
 
 
 @frappe.whitelist()

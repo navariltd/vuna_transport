@@ -6,7 +6,6 @@ from frappe.utils import add_days, flt, get_datetime
 
 from vuna_transport.services.shared.measurement_service import convert_measurement
 
-
 CAPACITY_DIMENSIONS = ("weight", "volume", "pallets", "cases", "crates")
 
 
@@ -31,9 +30,7 @@ def get_vehicle_categories(load_uoms, capacity_buffer_percentage=0):
 		],
 	)
 	for category in rows:
-		category.capacities = get_effective_capacities(
-			category, load_uoms, capacity_buffer_percentage
-		)
+		category.capacities = get_effective_capacities(category, load_uoms, capacity_buffer_percentage)
 	return rows
 
 
@@ -73,16 +70,12 @@ def evaluate_vehicle_category(totals, category, requirements=None):
 	if requirements.get("required_body_type") and getattr(category, "body_type", None) != requirements.get(
 		"required_body_type"
 	):
-		rejections.append(
-			_("Vehicle body type {0} is required.").format(requirements["required_body_type"])
-		)
+		rejections.append(_("Vehicle body type {0} is required.").format(requirements["required_body_type"]))
 	required_equipment = _normalise_equipment(requirements.get("special_equipment_required"))
 	available_equipment = _normalise_equipment(getattr(category, "special_equipment", None))
 	missing_equipment = sorted(required_equipment - available_equipment)
 	if missing_equipment:
-		rejections.append(
-			_("Missing special equipment: {0}.").format(", ".join(missing_equipment))
-		)
+		rejections.append(_("Missing special equipment: {0}.").format(", ".join(missing_equipment)))
 
 	utilization = {}
 	for dimension in CAPACITY_DIMENSIONS:
@@ -91,10 +84,10 @@ def evaluate_vehicle_category(totals, category, requirements=None):
 		utilization[dimension] = round(required / capacity * 100, 2) if capacity else None
 		if capacity and required > capacity:
 			rejections.append(
-			_('{0} capacity exceeded: {1:.2f} required, {2:.2f} available.').format(
-				dimension.title(), required, capacity
+				_("{0} capacity exceeded: {1:.2f} required, {2:.2f} available.").format(
+					dimension.title(), required, capacity
+				)
 			)
-		)
 	return {
 		"compatible": not rejections,
 		"utilization": utilization,
@@ -119,9 +112,8 @@ def validate_vehicle_access_limit(category, maximum_vehicle_category):
 		category.max_volume_uom,
 		_("maximum access vehicle volume"),
 	)
-	compatible = (
-		(not maximum_weight or flt(category.max_payload_weight) <= flt(maximum_weight))
-		and (not maximum_volume or flt(category.max_volume) <= flt(maximum_volume))
+	compatible = (not maximum_weight or flt(category.max_payload_weight) <= flt(maximum_weight)) and (
+		not maximum_volume or flt(category.max_volume) <= flt(maximum_volume)
 	)
 	return {
 		"compatible": compatible,
@@ -144,9 +136,7 @@ def maximum_fitting_fraction(totals, category):
 	return min([1, *ratios]) if ratios else 1
 
 
-def get_available_vehicle_category_counts(
-	company, dispatch_date, from_time=None, to_time=None
-):
+def get_available_vehicle_category_counts(company, dispatch_date, from_time=None, to_time=None):
 	"""Return canonical available counts while preserving the existing API shape."""
 	from vuna_transport.services.fleet.vehicle_availability_service import (
 		get_vehicle_category_availability,
@@ -157,8 +147,7 @@ def get_available_vehicle_category_counts(
 	availability = get_vehicle_category_availability(company, from_time, to_time)
 	return {
 		"counts": {
-			category: summary["available"]
-			for category, summary in availability["categories"].items()
+			category: summary["available"] for category, summary in availability["categories"].items()
 		},
 		"fleet_tracked": availability["fleet_tracked"],
 		"categories": availability["categories"],
@@ -166,8 +155,4 @@ def get_available_vehicle_category_counts(
 
 
 def _normalise_equipment(value):
-	return {
-		item.strip().lower()
-		for item in (value or "").replace("\n", ",").split(",")
-		if item.strip()
-	}
+	return {item.strip().lower() for item in (value or "").replace("\n", ",").split(",") if item.strip()}

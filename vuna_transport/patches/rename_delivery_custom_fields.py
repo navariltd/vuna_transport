@@ -3,7 +3,6 @@
 import frappe
 from frappe.custom.doctype.custom_field.custom_field import rename_fieldname
 
-
 CUSTOM_FIELD_RENAMES = (
 	("Pick List", "vuna_transport_load", "vuna_delivery_load"),
 	("Delivery Note", "vuna_transport_load", "vuna_delivery_load"),

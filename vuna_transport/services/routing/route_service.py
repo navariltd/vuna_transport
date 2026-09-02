@@ -28,9 +28,7 @@ def validate_transport_route(route):
 			flt(stop.estimated_distance_from_previous) for stop in route.route_stops
 		)
 	if not route.estimated_duration:
-		route.estimated_duration = sum(
-			flt(stop.estimated_travel_time) for stop in route.route_stops
-		)
+		route.estimated_duration = sum(flt(stop.estimated_travel_time) for stop in route.route_stops)
 
 
 def apply_route_defaults(delivery_load):
@@ -41,9 +39,7 @@ def apply_route_defaults(delivery_load):
 		frappe.throw(_("Transport Route {0} is disabled.").format(route.name))
 	if route.transport_zone and delivery_load.transport_zone != route.transport_zone:
 		frappe.throw(
-			_("Transport Route {0} serves Transport Zone {1}.").format(
-				route.name, route.transport_zone
-			)
+			_("Transport Route {0} serves Transport Zone {1}.").format(route.name, route.transport_zone)
 		)
 	delivery_load.estimated_distance = delivery_load.estimated_distance or route.estimated_distance
 	delivery_load.estimated_duration = delivery_load.estimated_duration or route.estimated_duration

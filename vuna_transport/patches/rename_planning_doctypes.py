@@ -2,7 +2,6 @@
 
 import frappe
 
-
 DOCTYPE_RENAMES = (
 	("Transport Requirement Item", "Delivery Order Item"),
 	("Transport Load Requirement", "Delivery Load Order"),

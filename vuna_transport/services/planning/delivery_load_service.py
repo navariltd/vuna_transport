@@ -8,25 +8,24 @@ from vuna_transport.services.demand.delivery_method_service import (
 	canonical_delivery_method,
 	delivery_methods_are_compatible,
 )
-from vuna_transport.services.shared.measurement_service import get_transport_uoms
-from vuna_transport.services.planning.load_validation_service import (
-	calculate_allocated_measurements,
-	get_available_quantity,
-	sync_delivery_order_allocations,
-	validate_load_allocations,
-)
-from vuna_transport.services.shared.security_service import (
-	require_company_access,
-	require_doctype_permission,
-	require_document_permission,
-)
 from vuna_transport.services.fleet.vehicle_category_service import (
 	evaluate_vehicle_category,
 	get_effective_capacities,
 	get_vehicle_categories,
 	validate_vehicle_access_limit,
 )
-
+from vuna_transport.services.planning.load_validation_service import (
+	calculate_allocated_measurements,
+	get_available_quantity,
+	sync_delivery_order_allocations,
+	validate_load_allocations,
+)
+from vuna_transport.services.shared.measurement_service import get_transport_uoms
+from vuna_transport.services.shared.security_service import (
+	require_company_access,
+	require_doctype_permission,
+	require_document_permission,
+)
 
 MAX_PLANNING_ALLOCATION_ROWS = 500
 
@@ -138,9 +137,7 @@ def build_delivery_load_from_allocations(allocations, vehicle_category=None):
 	)
 	if not delivery_order_names:
 		frappe.throw(_("Every planning row must reference a Delivery Order."))
-	delivery_orders = {
-		name: frappe.get_doc("Delivery Order", name) for name in delivery_order_names
-	}
+	delivery_orders = {name: frappe.get_doc("Delivery Order", name) for name in delivery_order_names}
 	for delivery_order in delivery_orders.values():
 		require_document_permission(delivery_order, "read")
 	_validate_delivery_orders(list(delivery_orders.values()))
@@ -166,14 +163,10 @@ def build_delivery_load_from_allocations(allocations, vehicle_category=None):
 		if delivery_order_name not in delivery_orders or not item_name or quantity <= 0:
 			frappe.throw(_("Planning allocations are incomplete or invalid."))
 		if item_name in seen_items:
-			frappe.throw(
-				_("Delivery Order Item {0} appears more than once.").format(item_name)
-			)
+			frappe.throw(_("Delivery Order Item {0} appears more than once.").format(item_name))
 		seen_items.add(item_name)
 		delivery_order = delivery_orders[delivery_order_name]
-		stop_sequences.setdefault(
-			delivery_order.delivery_address, len(stop_sequences) + 1
-		)
+		stop_sequences.setdefault(delivery_order.delivery_address, len(stop_sequences) + 1)
 		load.append(
 			"delivery_orders",
 			{
@@ -226,10 +219,7 @@ def add_delivery_orders_to_load(load, delivery_order_names):
 	if any(order.transport_zone != load.transport_zone for order in delivery_orders):
 		frappe.throw(_("All Delivery Orders in a load must use the same Transport Zone."))
 
-	existing_items = {
-		(row.delivery_order, row.delivery_order_item)
-		for row in load.delivery_orders
-	}
+	existing_items = {(row.delivery_order, row.delivery_order_item) for row in load.delivery_orders}
 	stop_sequences = {
 		row.delivery_address: row.stop_sequence
 		for row in load.delivery_orders
@@ -349,17 +339,13 @@ def get_delivery_order_item_allocation_preview(
 	item = frappe.get_doc("Delivery Order Item", delivery_order_item)
 	delivery_order = frappe.get_doc("Delivery Order", item.parent)
 	require_document_permission(delivery_order, "read")
-	available_quantity = get_available_quantity(
-		delivery_order.name, item.name, exclude_load=exclude_load
-	)
+	available_quantity = get_available_quantity(delivery_order.name, item.name, exclude_load=exclude_load)
 	quantity = available_quantity if allocated_quantity in (None, "") else flt(allocated_quantity)
 	if quantity <= 0:
 		frappe.throw(_("Allocated quantity must be greater than zero."))
 	if quantity > available_quantity:
 		frappe.throw(
-			_("Allocated quantity exceeds the available quantity of {0}.").format(
-				available_quantity
-			)
+			_("Allocated quantity exceeds the available quantity of {0}.").format(available_quantity)
 		)
 	return {
 		"delivery_order": delivery_order.name,
@@ -382,12 +368,12 @@ def _validate_delivery_orders(delivery_orders):
 				)
 			)
 		if delivery_order.status not in ("Open", "Partially Allocated"):
-			frappe.throw(_("Delivery Order {0} is not available for load planning.").format(delivery_order.name))
+			frappe.throw(
+				_("Delivery Order {0} is not available for load planning.").format(delivery_order.name)
+			)
 		if delivery_order.company != first.company:
 			frappe.throw(_("All Delivery Orders in a load must belong to the same company."))
-		if not delivery_methods_are_compatible(
-			delivery_order.delivery_method, first.delivery_method
-		):
+		if not delivery_methods_are_compatible(delivery_order.delivery_method, first.delivery_method):
 			frappe.throw(_("All Delivery Orders in a load must use the same Delivery Method."))
 		if delivery_order.transport_zone != first.transport_zone:
 			frappe.throw(_("All Delivery Orders in a load must use the same Transport Zone."))
@@ -447,7 +433,11 @@ def validate_capacity(load, vehicle_category=None):
 	if not vehicle_category:
 		return {"valid": True, "utilization": {}}
 
-	vehicle = frappe.get_doc("Vehicle Category", vehicle_category) if isinstance(vehicle_category, str) else vehicle_category
+	vehicle = (
+		frappe.get_doc("Vehicle Category", vehicle_category)
+		if isinstance(vehicle_category, str)
+		else vehicle_category
+	)
 	if vehicle.disabled:
 		frappe.throw(_("Vehicle Category {0} is disabled.").format(vehicle.name))
 
@@ -475,9 +465,7 @@ def validate_capacity(load, vehicle_category=None):
 	)
 	if not result["compatible"]:
 		frappe.throw(
-			_("Vehicle Category {0} is incompatible: {1}").format(
-				vehicle.name, result["rejections"][0]
-			)
+			_("Vehicle Category {0} is incompatible: {1}").format(vehicle.name, result["rejections"][0])
 		)
 	_validate_load_vehicle_access_limits(load, vehicle)
 
@@ -558,12 +546,8 @@ def get_compatible_vehicle_category_names(load):
 
 
 def _validate_load_vehicle_access_limits(load, vehicle):
-	for delivery_order in {
-		row.delivery_order for row in load.delivery_orders if row.delivery_order
-	}:
-		maximum_category = frappe.db.get_value(
-			"Delivery Order", delivery_order, "maximum_vehicle_category"
-		)
+	for delivery_order in {row.delivery_order for row in load.delivery_orders if row.delivery_order}:
+		maximum_category = frappe.db.get_value("Delivery Order", delivery_order, "maximum_vehicle_category")
 		result = validate_vehicle_access_limit(vehicle, maximum_category)
 		if not result["compatible"]:
 			frappe.throw(
@@ -574,12 +558,8 @@ def _validate_load_vehicle_access_limits(load, vehicle):
 
 
 def _vehicle_meets_load_access_limits(load, vehicle):
-	for delivery_order in {
-		row.delivery_order for row in load.delivery_orders if row.delivery_order
-	}:
-		maximum_category = frappe.db.get_value(
-			"Delivery Order", delivery_order, "maximum_vehicle_category"
-		)
+	for delivery_order in {row.delivery_order for row in load.delivery_orders if row.delivery_order}:
+		maximum_category = frappe.db.get_value("Delivery Order", delivery_order, "maximum_vehicle_category")
 		if not validate_vehicle_access_limit(vehicle, maximum_category)["compatible"]:
 			return False
 	return True
@@ -590,9 +570,7 @@ def _fits(required, capacity):
 
 
 def get_capacity_buffer_percentage():
-	return flt(
-		frappe.get_cached_doc("Transport Settings").default_capacity_buffer_percentage
-	)
+	return flt(frappe.get_cached_doc("Transport Settings").default_capacity_buffer_percentage)
 
 
 def apply_capacity_buffer(capacity, buffer_percentage):

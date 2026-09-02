@@ -29,36 +29,58 @@ frappe.ui.form.on("Delivery Exception", {
 		if (frm.is_new()) return;
 
 		if (requires_stock_return(frm.doc) && !frm.doc.return_document) {
-			frm.add_custom_button(__("Prepare Stock Return"), () => {
-				frappe.show_alert({
-					message: __("Use Create > Sales Return on the original Delivery Note, then link the submitted return here."),
-					indicator: "blue",
-				}, 8);
-				frappe.set_route("Form", "Delivery Note", frm.doc.delivery_note);
-			}, __("Resolve"));
+			frm.add_custom_button(
+				__("Prepare Stock Return"),
+				() => {
+					frappe.show_alert(
+						{
+							message: __(
+								"Use Create > Sales Return on the original Delivery Note, then link the submitted return here."
+							),
+							indicator: "blue",
+						},
+						8
+					);
+					frappe.set_route("Form", "Delivery Note", frm.doc.delivery_note);
+				},
+				__("Resolve")
+			);
 		}
 
 		if (has_commercial_resolution(frm.doc, "Credit Note") && !frm.doc.credit_note) {
-			frm.add_custom_button(__("Find Credit Note"), () => {
-				frappe.set_route("List", "Sales Invoice", {
-					customer: frm.doc.customer,
-					is_return: 1,
-				});
-			}, __("Resolve"));
+			frm.add_custom_button(
+				__("Find Credit Note"),
+				() => {
+					frappe.set_route("List", "Sales Invoice", {
+						customer: frm.doc.customer,
+						is_return: 1,
+					});
+				},
+				__("Resolve")
+			);
 		}
 
 		if (
 			["Replacement", "Re-delivery"].some((resolution) =>
-				has_commercial_resolution(frm.doc, resolution),
+				has_commercial_resolution(frm.doc, resolution)
 			)
 		) {
-			frm.add_custom_button(__("Link Follow-up Delivery"), () => {
-				frm.scroll_to_field("replacement_delivery_reference");
-				frappe.show_alert({
-					message: __("Create the legitimate replacement or re-delivery demand through the normal Sales Order flow, then link its Delivery Order here."),
-					indicator: "blue",
-				}, 8);
-			}, __("Resolve"));
+			frm.add_custom_button(
+				__("Link Follow-up Delivery"),
+				() => {
+					frm.scroll_to_field("replacement_delivery_reference");
+					frappe.show_alert(
+						{
+							message: __(
+								"Create the legitimate replacement or re-delivery demand through the normal Sales Order flow, then link its Delivery Order here."
+							),
+							indicator: "blue",
+						},
+						8
+					);
+				},
+				__("Resolve")
+			);
 		}
 	},
 });
@@ -74,9 +96,13 @@ function add_view_buttons(frm) {
 		["replacement_delivery_reference", "Delivery Order", __("Follow-up Delivery")],
 	].forEach(([fieldname, doctype, label]) => {
 		if (!frm.doc[fieldname]) return;
-		frm.add_custom_button(label, () => {
-			frappe.set_route("Form", doctype, frm.doc[fieldname]);
-		}, __("View"));
+		frm.add_custom_button(
+			label,
+			() => {
+				frappe.set_route("Form", doctype, frm.doc[fieldname]);
+			},
+			__("View")
+		);
 	});
 }
 

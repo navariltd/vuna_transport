@@ -26,6 +26,7 @@
 	"root": true,
 	"globals": {
 		"frappe": true,
+		"vuna_transport": true,
 		"Vue": true,
 		"SetVueGlobals": true,
 		"__": true,

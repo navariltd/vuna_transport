@@ -41,9 +41,7 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 	pod.delivery_trip = trip.name
 	pod.delivery_stop = stop.name
 	pod.delivery_load = trip.vuna_delivery_load
-	pod.delivery_order = (
-		stop.vuna_delivery_order or delivery_note.vuna_delivery_order
-	)
+	pod.delivery_order = stop.vuna_delivery_order or delivery_note.vuna_delivery_order
 	pod.delivery_note = delivery_note.name
 	pod.customer = stop.customer
 	pod.delivery_address = stop.address
@@ -84,9 +82,7 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 		pod.insert()
 	else:
 		pod.save()
-	frappe.db.set_value(
-		"Delivery Stop", stop.name, "vuna_proof_of_delivery", pod.name, update_modified=False
-	)
+	frappe.db.set_value("Delivery Stop", stop.name, "vuna_proof_of_delivery", pod.name, update_modified=False)
 	return pod.name
 
 
@@ -207,9 +203,7 @@ def recompute_delivery_order_status(delivery_order_name):
 		pod_outcomes=pods,
 		delivery_exceptions=exception_outcomes,
 	)
-	frappe.db.set_value(
-		"Delivery Order", delivery_order_name, "status", status, update_modified=False
-	)
+	frappe.db.set_value("Delivery Order", delivery_order_name, "status", status, update_modified=False)
 
 
 def derive_delivery_order_execution_status(
@@ -240,8 +234,7 @@ def derive_delivery_order_execution_status(
 	exceptions = any(status in ("Rejected", "Failed") for status in outcomes.values())
 	delivery_exceptions = delivery_exceptions or []
 	all_exceptions_resolved = bool(delivery_exceptions) and all(
-		exception.resolution_status in ("Resolved", "Closed")
-		for exception in delivery_exceptions
+		exception.resolution_status in ("Resolved", "Closed") for exception in delivery_exceptions
 	)
 
 	if all_covered and fully_allocated:

@@ -6,11 +6,11 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, add_to_date, get_datetime, getdate, now_datetime
 
-from vuna_transport.services.shared.resource_scheduling_service import interval_overlaps
 from vuna_transport.services.fleet.vehicle_availability_service import (
 	ACTIVE_ALLOCATION_STATUSES,
 	ACTIVE_TRIP_STATUSES,
 )
+from vuna_transport.services.shared.resource_scheduling_service import interval_overlaps
 
 
 def get_driver_status(driver, at_time=None):
@@ -84,14 +84,18 @@ def get_driver_availability_map(
 	if not drivers:
 		return {}
 	employee_names = {driver.employee for driver in drivers if driver.employee}
-	employee_companies = dict(
-		frappe.get_all(
-			"Employee",
-			filters={"name": ["in", list(employee_names)]},
-			fields=["name", "company"],
-			as_list=True,
+	employee_companies = (
+		dict(
+			frappe.get_all(
+				"Employee",
+				filters={"name": ["in", list(employee_names)]},
+				fields=["name", "company"],
+				as_list=True,
+			)
 		)
-	) if employee_names else {}
+		if employee_names
+		else {}
+	)
 	for driver in drivers:
 		driver.company = employee_companies.get(driver.employee)
 	if company:
@@ -127,20 +131,22 @@ def get_driver_availability_map(
 			"status",
 		],
 	)
-	trips = [
-		trip for trip in trips if (trip.vuna_current_driver or trip.driver) in driver_names
-	]
-	load_names = {
-		row.delivery_load for row in allocations if row.delivery_load
-	} | {row.vuna_delivery_load for row in trips if row.vuna_delivery_load}
-	loads = {
-		row.name: row
-		for row in frappe.get_all(
-			"Delivery Load",
-			filters={"name": ["in", list(load_names)]},
-			fields=["name", "planned_departure", "planned_arrival"],
-		)
-	} if load_names else {}
+	trips = [trip for trip in trips if (trip.vuna_current_driver or trip.driver) in driver_names]
+	load_names = {row.delivery_load for row in allocations if row.delivery_load} | {
+		row.vuna_delivery_load for row in trips if row.vuna_delivery_load
+	}
+	loads = (
+		{
+			row.name: row
+			for row in frappe.get_all(
+				"Delivery Load",
+				filters={"name": ["in", list(load_names)]},
+				fields=["name", "planned_departure", "planned_arrival"],
+			)
+		}
+		if load_names
+		else {}
+	)
 
 	allocations_by_driver = defaultdict(list)
 	for allocation in allocations:
@@ -169,9 +175,7 @@ def get_driver_availability_map(
 	}
 
 
-def _evaluate_driver(
-	driver, allocations, trips, loads, from_time, to_time, expected_company=None
-):
+def _evaluate_driver(driver, allocations, trips, loads, from_time, to_time, expected_company=None):
 	reasons = []
 	state = "Available"
 	current_allocation = None
@@ -204,9 +208,7 @@ def _evaluate_driver(
 	for trip in trips:
 		load = loads.get(trip.vuna_delivery_load)
 		trip_from, trip_to = _trip_window(trip, load)
-		if trip.status != "In Transit" and not interval_overlaps(
-			from_time, to_time, trip_from, trip_to
-		):
+		if trip.status != "In Transit" and not interval_overlaps(from_time, to_time, trip_from, trip_to):
 			continue
 		state = "In Trip"
 		current_trip = current_trip or trip.name
@@ -233,9 +235,7 @@ def _evaluate_driver(
 		reasons.append(
 			_reason(
 				"ACTIVE_ALLOCATION",
-				_("Driver is allocated to Delivery Load {0}.").format(
-					allocation.delivery_load
-				),
+				_("Driver is allocated to Delivery Load {0}.").format(allocation.delivery_load),
 				"Vehicle Allocation",
 				allocation.name,
 			)

@@ -20,13 +20,21 @@ from vuna_transport.services.fleet.vehicle_allocation_service import (
 
 class TestVehicleAllocation(UnitTestCase):
 	def test_overlapping_time_windows(self):
-		first = SimpleNamespace(planned_departure="2026-08-15 08:00:00", planned_arrival="2026-08-15 12:00:00")
-		second = SimpleNamespace(planned_departure="2026-08-15 11:00:00", planned_arrival="2026-08-15 14:00:00")
+		first = SimpleNamespace(
+			planned_departure="2026-08-15 08:00:00", planned_arrival="2026-08-15 12:00:00"
+		)
+		second = SimpleNamespace(
+			planned_departure="2026-08-15 11:00:00", planned_arrival="2026-08-15 14:00:00"
+		)
 		self.assertTrue(time_windows_overlap(first, second))
 
 	def test_non_overlapping_time_windows(self):
-		first = SimpleNamespace(planned_departure="2026-08-15 08:00:00", planned_arrival="2026-08-15 10:00:00")
-		second = SimpleNamespace(planned_departure="2026-08-15 10:00:00", planned_arrival="2026-08-15 14:00:00")
+		first = SimpleNamespace(
+			planned_departure="2026-08-15 08:00:00", planned_arrival="2026-08-15 10:00:00"
+		)
+		second = SimpleNamespace(
+			planned_departure="2026-08-15 10:00:00", planned_arrival="2026-08-15 14:00:00"
+		)
 		self.assertFalse(time_windows_overlap(first, second))
 
 	def test_vehicle_allocation_allows_date_only_planning(self):

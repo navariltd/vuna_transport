@@ -24,7 +24,8 @@ function sync_incident_map_from_coordinates(frm) {
 	if (latitude === null || longitude === null) return;
 	if (!coordinates_are_valid(latitude, longitude, true)) return;
 	const current = point_coordinates(frm.doc.location);
-	if (current && coordinates_match(current.latitude, current.longitude, latitude, longitude)) return;
+	if (current && coordinates_match(current.latitude, current.longitude, latitude, longitude))
+		return;
 	set_incident_location_fields(frm, latitude, longitude, point_geojson(latitude, longitude));
 }
 
@@ -57,7 +58,12 @@ function use_incident_device_location(frm) {
 			const latitude = position.coords.latitude;
 			const longitude = position.coords.longitude;
 			if (!coordinates_are_valid(latitude, longitude, false)) return;
-			set_incident_location_fields(frm, latitude, longitude, point_geojson(latitude, longitude));
+			set_incident_location_fields(
+				frm,
+				latitude,
+				longitude,
+				point_geojson(latitude, longitude)
+			);
 			frappe.show_alert({
 				message: __("Incident location pinned (accuracy approximately {0} metres).", [
 					Math.round(position.coords.accuracy || 0),
@@ -67,17 +73,22 @@ function use_incident_device_location(frm) {
 		},
 		(error) => {
 			const messages = {
-				1: __("Location permission was denied. Allow location access in the browser and try again."),
+				1: __(
+					"Location permission was denied. Allow location access in the browser and try again."
+				),
 				2: __("The device location is currently unavailable."),
-				3: __("The device location request timed out. Try again where GPS or network reception is stronger."),
+				3: __(
+					"The device location request timed out. Try again where GPS or network reception is stronger."
+				),
 			};
 			frappe.msgprint({
 				title: __("Unable to Pin Device Location"),
 				indicator: "orange",
-				message: messages[error.code] || __("The device location could not be determined."),
+				message:
+					messages[error.code] || __("The device location could not be determined."),
 			});
 		},
-		{ enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 },
+		{ enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
 	);
 }
 
@@ -102,7 +113,9 @@ function coordinates_are_valid(latitude, longitude, show_message) {
 	const valid = latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
 	if (!valid && show_message) {
 		frappe.show_alert({
-			message: __("Latitude must be between -90 and 90, and longitude between -180 and 180."),
+			message: __(
+				"Latitude must be between -90 and 90, and longitude between -180 and 180."
+			),
 			indicator: "orange",
 		});
 	}
@@ -112,7 +125,13 @@ function coordinates_are_valid(latitude, longitude, show_message) {
 function point_geojson(latitude, longitude) {
 	return JSON.stringify({
 		type: "FeatureCollection",
-		features: [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [longitude, latitude] } }],
+		features: [
+			{
+				type: "Feature",
+				properties: {},
+				geometry: { type: "Point", coordinates: [longitude, latitude] },
+			},
+		],
 	});
 }
 
@@ -121,15 +140,21 @@ function point_coordinates(location) {
 	try {
 		const geojson = typeof location === "string" ? JSON.parse(location) : location;
 		const feature = (geojson.features || []).find(
-			(row) => row.geometry?.type === "Point" && row.geometry.coordinates?.length >= 2,
+			(row) => row.geometry?.type === "Point" && row.geometry.coordinates?.length >= 2
 		);
 		if (!feature) return null;
-		return { latitude: Number(feature.geometry.coordinates[1]), longitude: Number(feature.geometry.coordinates[0]) };
+		return {
+			latitude: Number(feature.geometry.coordinates[1]),
+			longitude: Number(feature.geometry.coordinates[0]),
+		};
 	} catch (error) {
 		return null;
 	}
 }
 
 function coordinates_match(first_latitude, first_longitude, second_latitude, second_longitude) {
-	return Math.abs(first_latitude - second_latitude) < 0.00000001 && Math.abs(first_longitude - second_longitude) < 0.00000001;
+	return (
+		Math.abs(first_latitude - second_latitude) < 0.00000001 &&
+		Math.abs(first_longitude - second_longitude) < 0.00000001
+	);
 }

@@ -8,7 +8,6 @@ and migrate safely.
 import frappe
 from frappe import _
 
-
 COMPANY_DELIVERY = "Company Delivery"
 LEGACY_DELIVERY_METHOD_ALIASES = {
 	"Company Fleet": COMPANY_DELIVERY,
@@ -22,9 +21,7 @@ def canonical_delivery_method(delivery_method):
 
 def delivery_methods_are_compatible(first, second):
 	"""Compare business fulfilment methods, normalizing legacy sourcing labels."""
-	return (canonical_delivery_method(first) or None) == (
-		canonical_delivery_method(second) or None
-	)
+	return (canonical_delivery_method(first) or None) == (canonical_delivery_method(second) or None)
 
 
 def get_delivery_method_workflow(delivery_method):
@@ -55,8 +52,6 @@ def validate_delivery_method_allows_vehicle_allocation(delivery_method):
 		frappe.throw(_("Delivery Method {0} is disabled.").format(workflow.name))
 	if not workflow.requires_transport_planning or not workflow.requires_vehicle_allocation:
 		frappe.throw(
-			_("Delivery Method {0} does not permit Vehicle Allocation.").format(
-				workflow.name or _("Not Set")
-			)
+			_("Delivery Method {0} does not permit Vehicle Allocation.").format(workflow.name or _("Not Set"))
 		)
 	return workflow

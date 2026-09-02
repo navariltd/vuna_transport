@@ -11,7 +11,6 @@ from vuna_transport.services.shared.security_service import (
 	require_document_permission,
 )
 
-
 RESOLVED_STATUSES = ("Resolved", "Closed")
 
 
@@ -26,20 +25,14 @@ def validate_incident(incident):
 		frappe.throw(_("Vehicle {0} does not exist.").format(incident.vehicle))
 
 	if incident.company and vehicle.company and incident.company != vehicle.company:
-		frappe.throw(
-			_("Vehicle {0} belongs to Company {1}.").format(
-				incident.vehicle, vehicle.company
-			)
-		)
+		frappe.throw(_("Vehicle {0} belongs to Company {1}.").format(incident.vehicle, vehicle.company))
 	incident.company = vehicle.company or incident.company
 
 	allocation = _get_optional_doc("Vehicle Allocation", incident.vehicle_allocation)
 	trip = _get_optional_doc("Delivery Trip", incident.delivery_trip)
 	allocation = _load_context_from_references(incident, allocation, trip)
 	load = _get_optional_doc("Delivery Load", incident.delivery_load)
-	replacement = _get_optional_doc(
-		"Vehicle Allocation", incident.replacement_vehicle_allocation
-	)
+	replacement = _get_optional_doc("Vehicle Allocation", incident.replacement_vehicle_allocation)
 	repair = _get_optional_doc("Asset Repair", incident.asset_repair)
 	_validate_incident_context(
 		incident,
@@ -55,17 +48,13 @@ def validate_incident(incident):
 
 def _load_context_from_references(incident, allocation=None, trip=None):
 	if trip:
-		incident.delivery_load = incident.delivery_load or getattr(
-			trip, "vuna_delivery_load", None
-		)
+		incident.delivery_load = incident.delivery_load or getattr(trip, "vuna_delivery_load", None)
 		incident.vehicle_allocation = incident.vehicle_allocation or (
 			getattr(trip, "vuna_current_vehicle_allocation", None)
 			or getattr(trip, "vuna_vehicle_allocation", None)
 		)
 		if not allocation and incident.vehicle_allocation:
-			allocation = frappe.get_doc(
-				"Vehicle Allocation", incident.vehicle_allocation
-			)
+			allocation = frappe.get_doc("Vehicle Allocation", incident.vehicle_allocation)
 	if allocation:
 		incident.delivery_load = incident.delivery_load or allocation.delivery_load
 		incident.driver = incident.driver or allocation.driver
@@ -87,46 +76,30 @@ def _validate_incident_context(
 		(trip, _("Delivery Trip")),
 		(allocation, _("Vehicle Allocation")),
 	):
-		if reference and getattr(reference, "company", None) and (
-			reference.company != incident.company
-		):
-			frappe.throw(
-				_("{0} {1} belongs to a different Company.").format(
-					label, reference.name
-				)
-			)
+		if reference and getattr(reference, "company", None) and (reference.company != incident.company):
+			frappe.throw(_("{0} {1} belongs to a different Company.").format(label, reference.name))
 
 	if trip:
-		if incident.delivery_load and (
-			getattr(trip, "vuna_delivery_load", None) != incident.delivery_load
-		):
+		if incident.delivery_load and (getattr(trip, "vuna_delivery_load", None) != incident.delivery_load):
 			frappe.throw(_("The Delivery Trip does not belong to the selected Delivery Load."))
 		if allocation and allocation.name not in {
 			getattr(trip, "vuna_vehicle_allocation", None),
 			getattr(trip, "vuna_current_vehicle_allocation", None),
 		}:
-			frappe.throw(
-				_("The Vehicle Allocation is not linked to the selected Delivery Trip.")
-			)
+			frappe.throw(_("The Vehicle Allocation is not linked to the selected Delivery Trip."))
 
 	if allocation:
 		if incident.delivery_load and allocation.delivery_load != incident.delivery_load:
 			frappe.throw(_("The Vehicle Allocation belongs to a different Delivery Load."))
 		if not allocation.vehicle:
-			frappe.throw(
-				_("The Vehicle Allocation does not reference a physical ERPNext Vehicle.")
-			)
+			frappe.throw(_("The Vehicle Allocation does not reference a physical ERPNext Vehicle."))
 		if allocation.vehicle and allocation.vehicle != incident.vehicle:
 			frappe.throw(_("The Vehicle Allocation belongs to a different Vehicle."))
 		if incident.driver and allocation.driver and allocation.driver != incident.driver:
 			frappe.throw(_("The selected Driver does not match the Vehicle Allocation."))
 	elif trip:
-		trip_vehicle = getattr(trip, "vuna_current_vehicle", None) or getattr(
-			trip, "vehicle", None
-		)
-		trip_driver = getattr(trip, "vuna_current_driver", None) or getattr(
-			trip, "driver", None
-		)
+		trip_vehicle = getattr(trip, "vuna_current_vehicle", None) or getattr(trip, "vehicle", None)
+		trip_driver = getattr(trip, "vuna_current_driver", None) or getattr(trip, "driver", None)
 		if trip_vehicle and trip_vehicle != incident.vehicle:
 			frappe.throw(_("The selected Vehicle does not match the Delivery Trip."))
 		if incident.driver and trip_driver and trip_driver != incident.driver:
@@ -147,13 +120,8 @@ def _validate_replacement_context(incident, replacement):
 	if replacement.assignment_event != "Reallocation":
 		frappe.throw(_("The linked Vehicle Allocation is not a replacement allocation."))
 	if incident.vehicle_allocation and replacement.replacement_of != incident.vehicle_allocation:
-		frappe.throw(
-			_("The Replacement Allocation does not replace the incident allocation.")
-		)
-	if (
-		getattr(replacement, "vehicle_incident", None)
-		and replacement.vehicle_incident != incident.name
-	):
+		frappe.throw(_("The Replacement Allocation does not replace the incident allocation."))
+	if getattr(replacement, "vehicle_incident", None) and replacement.vehicle_incident != incident.name:
 		frappe.throw(_("The Replacement Allocation belongs to another Vehicle Incident."))
 
 
@@ -161,9 +129,7 @@ def _validate_asset_repair_context(incident, vehicle, repair):
 	if not vehicle.vuna_asset:
 		frappe.throw(_("Vehicle {0} is not linked to an ERPNext Asset.").format(vehicle.name))
 	if repair.asset != vehicle.vuna_asset:
-		frappe.throw(
-			_("Asset Repair {0} belongs to a different Asset.").format(repair.name)
-		)
+		frappe.throw(_("Asset Repair {0} belongs to a different Asset.").format(repair.name))
 
 
 def _validate_resolution(incident):
@@ -193,13 +159,9 @@ def make_replacement_allocation_from_incident(source_name):
 	if not incident.replacement_required:
 		frappe.throw(_("Mark Replacement Required before initiating reallocation."))
 	if not incident.delivery_load or not incident.vehicle_allocation:
-		frappe.throw(
-			_("Link the Delivery Load and affected Vehicle Allocation before reallocation.")
-		)
+		frappe.throw(_("Link the Delivery Load and affected Vehicle Allocation before reallocation."))
 	if incident.replacement_vehicle_allocation:
-		return frappe.get_doc(
-			"Vehicle Allocation", incident.replacement_vehicle_allocation
-		)
+		return frappe.get_doc("Vehicle Allocation", incident.replacement_vehicle_allocation)
 
 	allocation = make_replacement_allocation(incident.delivery_load)
 	if allocation.replacement_of != incident.vehicle_allocation:
@@ -208,10 +170,7 @@ def make_replacement_allocation_from_incident(source_name):
 				"The active Vehicle Allocation has changed since this incident was recorded. Refresh the incident."
 			)
 		)
-	if (
-		getattr(allocation, "vehicle_incident", None)
-		and allocation.vehicle_incident != incident.name
-	):
+	if getattr(allocation, "vehicle_incident", None) and allocation.vehicle_incident != incident.name:
 		frappe.throw(
 			_("The draft Replacement Allocation already belongs to Vehicle Incident {0}.").format(
 				allocation.vehicle_incident
@@ -242,18 +201,13 @@ def link_replacement_allocation_to_incident(allocation):
 	incident = frappe.get_doc("Vehicle Incident", allocation.vehicle_incident)
 	require_document_permission(incident, "write")
 	_validate_replacement_context(incident, allocation)
-	if (
-		incident.replacement_vehicle_allocation
-		and incident.replacement_vehicle_allocation != allocation.name
-	):
+	if incident.replacement_vehicle_allocation and incident.replacement_vehicle_allocation != allocation.name:
 		frappe.throw(
 			_("Vehicle Incident {0} already has Replacement Allocation {1}.").format(
 				incident.name, incident.replacement_vehicle_allocation
 			)
 		)
-	incident.db_set(
-		"replacement_vehicle_allocation", allocation.name, update_modified=True
-	)
+	incident.db_set("replacement_vehicle_allocation", allocation.name, update_modified=True)
 
 
 @frappe.whitelist()
@@ -274,14 +228,10 @@ def create_asset_repair(source_name):
 	repair.asset = asset.name
 	repair.failure_date = incident.incident_datetime
 	repair.repair_status = "Pending"
-	repair.description = _("Vehicle Incident {0}: {1}").format(
-		incident.name, incident.description
-	)
+	repair.description = _("Vehicle Incident {0}: {1}").format(incident.name, incident.description)
 	repair.insert()
 	incident.db_set("asset_repair", repair.name, update_modified=True)
-	repair.add_comment(
-		"Info", _("Created from Vehicle Incident {0}.").format(incident.name)
-	)
+	repair.add_comment("Info", _("Created from Vehicle Incident {0}.").format(incident.name))
 	return repair.name
 
 
