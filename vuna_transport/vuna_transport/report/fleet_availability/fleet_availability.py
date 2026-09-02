@@ -23,6 +23,7 @@ def execute(filters: dict | None = None):
 
 	return columns, data
 
+
 def execute_snapshot_report(filters: dict | None = None):
 	"""Return columns and data for the report.
 
@@ -40,20 +41,55 @@ def execute_snapshot_report(filters: dict | None = None):
 
 	return columns, data
 
+
 def get_columns() -> list[dict]:
 	"""Return columns for the report.
 
 	One field definition per column, just like a DocType field definition.
 	"""
 	return [
-		{"label": _("Vehicle"), "fieldname": "vehicle", "fieldtype": "Link", "options": "Vehicle", "width": 130},
+		{
+			"label": _("Vehicle"),
+			"fieldname": "vehicle",
+			"fieldtype": "Link",
+			"options": "Vehicle",
+			"width": 130,
+		},
 		{"label": _("License Plate"), "fieldname": "license_plate", "fieldtype": "Data", "width": 120},
-		{"label": _("Category"), "fieldname": "vehicle_category", "fieldtype": "Link", "options": "Vehicle Category", "width": 140},
-		{"label": _("Operational State"), "fieldname": "operational_state", "fieldtype": "Data", "width": 140},
-		{"label": _("Dispatch Eligible"), "fieldname": "dispatch_eligible", "fieldtype": "Check", "width": 110},
+		{
+			"label": _("Category"),
+			"fieldname": "vehicle_category",
+			"fieldtype": "Link",
+			"options": "Vehicle Category",
+			"width": 140,
+		},
+		{
+			"label": _("Operational State"),
+			"fieldname": "operational_state",
+			"fieldtype": "Data",
+			"width": 140,
+		},
+		{
+			"label": _("Dispatch Eligible"),
+			"fieldname": "dispatch_eligible",
+			"fieldtype": "Check",
+			"width": 110,
+		},
 		{"label": _("Primary Reason"), "fieldname": "primary_reason", "fieldtype": "Data", "width": 260},
-		{"label": _("Current Allocation"), "fieldname": "current_allocation", "fieldtype": "Link", "options": "Vehicle Allocation", "width": 140},
-		{"label": _("Current Trip"), "fieldname": "current_trip", "fieldtype": "Link", "options": "Delivery Trip", "width": 140},
+		{
+			"label": _("Current Allocation"),
+			"fieldname": "current_allocation",
+			"fieldtype": "Link",
+			"options": "Vehicle Allocation",
+			"width": 140,
+		},
+		{
+			"label": _("Current Trip"),
+			"fieldname": "current_trip",
+			"fieldtype": "Link",
+			"options": "Delivery Trip",
+			"width": 140,
+		},
 	]
 
 
@@ -72,7 +108,15 @@ def get_data(filters, start, end):
 		vehicle_category=filters.vehicle_category,
 	)
 	return [
-		[result.vehicle, result.license_plate, result.vehicle_category, result.operational_state,
-		 int(result.dispatch_eligible), result.primary_reason, result.current_allocation, result.current_trip]
+		[
+			result.vehicle,
+			result.license_plate,
+			result.vehicle_category,
+			result.operational_state,
+			int(result.dispatch_eligible),
+			result.primary_reason,
+			result.current_allocation,
+			result.current_trip,
+		]
 		for result in results.values()
 	]
