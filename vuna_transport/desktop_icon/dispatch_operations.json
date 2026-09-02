@@ -1,0 +1,21 @@
+{
+ "app": "vuna_transport",
+ "bg_color": "gray",
+ "creation": "2026-09-02 09:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Desktop Icon",
+ "hidden": 0,
+ "icon_type": "Link",
+ "idx": 2,
+ "label": "Dispatch Operations",
+ "link_to": "Dispatch Operations",
+ "link_type": "Workspace Sidebar",
+ "modified": "2026-09-02 09:00:00.000000",
+ "modified_by": "Administrator",
+ "name": "Dispatch Operations",
+ "owner": "Administrator",
+ "parent_icon": "Vuna Transport",
+ "restrict_removal": 0,
+ "roles": [],
+ "standard": 1
+}

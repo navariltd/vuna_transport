@@ -1,0 +1,147 @@
+{
+ "app": "vuna_transport",
+ "charts": [],
+ "content": "[{\"id\":\"dispatch-header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h3\\\"><b>Dispatch Operations</b></span>\",\"col\":12}},{\"id\":\"dispatch-planning-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Planning\",\"col\":4}},{\"id\":\"dispatch-execution-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Execution\",\"col\":4}},{\"id\":\"dispatch-setup-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Dispatch Setup\",\"col\":4}}]",
+ "creation": "2026-09-02 09:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "hide_custom": 0,
+ "icon": "truck",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "Dispatch Operations",
+ "links": [
+  {
+   "label": "Planning",
+   "link_count": 4,
+   "type": "Card Break"
+  },
+  {
+   "label": "Dispatch Planning",
+   "link_to": "dispatch-planning",
+   "link_type": "Page",
+   "type": "Link"
+  },
+  {
+   "label": "Delivery Order",
+   "link_to": "Delivery Order",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Delivery Load",
+   "link_to": "Delivery Load",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Vehicle Allocation",
+   "link_to": "Vehicle Allocation",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Execution",
+   "link_count": 5,
+   "type": "Card Break"
+  },
+  {
+   "label": "Pick List",
+   "link_to": "Pick List",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Delivery Note",
+   "link_to": "Delivery Note",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Delivery Trip",
+   "link_to": "Delivery Trip",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Proof of Delivery",
+   "link_to": "Proof of Delivery",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Delivery Exception",
+   "link_to": "Delivery Exception",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Dispatch Setup",
+   "link_count": 6,
+   "type": "Card Break"
+  },
+  {
+   "label": "Delivery Method",
+   "link_to": "Delivery Method",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Delivery Group",
+   "link_to": "Delivery Group",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Transport Compatibility Group",
+   "link_to": "Transport Compatibility Group",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Transport Zone",
+   "link_to": "Transport Zone",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Transport Route",
+   "link_to": "Transport Route",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Transport Settings",
+   "link_to": "Transport Settings",
+   "link_type": "DocType",
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-09-02 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Dispatch Operations",
+ "number_cards": [],
+ "owner": "Administrator",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Transport Planner"
+  },
+  {
+   "role": "Transport Dispatcher"
+  },
+  {
+   "role": "Transport Manager"
+  }
+ ],
+ "sequence_id": 2,
+ "shortcuts": [],
+ "title": "Dispatch Operations",
+ "type": "Workspace"
+}

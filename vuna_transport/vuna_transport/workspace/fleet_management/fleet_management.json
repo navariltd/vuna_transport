@@ -1,0 +1,146 @@
+{
+ "app": "vuna_transport",
+ "charts": [],
+ "content": "[{\"id\":\"fleet-header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h3\\\"><b>Fleet Management</b></span>\",\"col\":12}},{\"id\":\"fleet-vehicle-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Vehicles\",\"col\":4}},{\"id\":\"fleet-compliance-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Compliance\",\"col\":4}},{\"id\":\"fleet-operations-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Fleet Operations\",\"col\":4}}]",
+ "creation": "2026-09-02 09:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "hide_custom": 0,
+ "icon": "truck",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "Fleet Management",
+ "links": [
+  {
+   "label": "Vehicles",
+   "link_count": 4,
+   "type": "Card Break"
+  },
+  {
+   "label": "Vehicle",
+   "link_to": "Vehicle",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Driver",
+   "link_to": "Driver",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Vehicle Log",
+   "link_to": "Vehicle Log",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Asset",
+   "link_to": "Asset",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Fleet Setup",
+   "link_count": 5,
+   "type": "Card Break"
+  },
+  {
+   "label": "Vehicle Manufacturer",
+   "link_to": "Vehicle Manufacturer",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Vehicle Model",
+   "link_to": "Vehicle Model",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Vehicle Category",
+   "link_to": "Vehicle Category",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Vehicle Document Type",
+   "link_to": "Vehicle Document Type",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Vehicle Documents",
+   "link_to": "Vehicle Document",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Compliance",
+   "link_count": 3,
+   "type": "Card Break"
+  },
+  {
+   "label": "Vehicle Availability Block",
+   "link_to": "Vehicle Availability Block",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Vehicle Incident",
+   "link_to": "Vehicle Incident",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Asset Repair",
+   "link_to": "Asset Repair",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Fleet Operations",
+   "link_count": 2,
+   "type": "Card Break"
+  },
+  {
+   "label": "Vehicle Allocation",
+   "link_to": "Vehicle Allocation",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Delivery Trip",
+   "link_to": "Delivery Trip",
+   "link_type": "DocType",
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-09-02 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Fleet Management",
+ "number_cards": [],
+ "owner": "Administrator",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Transport Planner"
+  },
+  {
+   "role": "Transport Dispatcher"
+  },
+  {
+   "role": "Transport Manager"
+  }
+ ],
+ "sequence_id": 1,
+ "shortcuts": [],
+ "title": "Fleet Management",
+ "type": "Workspace"
+}
