@@ -217,8 +217,7 @@ def add_delivery_orders_to_load(load, delivery_order_names):
 
 	if any(order.company != load.company for order in delivery_orders):
 		frappe.throw(_("All Delivery Orders in a load must belong to the same company."))
-	if any(order.source_warehouse != load.source_warehouse for order in delivery_orders):
-		frappe.throw(_("All Delivery Orders in a load must use the same source warehouse."))
+	_validate_dispatch_warehouse(load)
 	if any(
 		not delivery_methods_are_compatible(order.delivery_method, load.delivery_method)
 		for order in delivery_orders
@@ -386,8 +385,6 @@ def _validate_delivery_orders(delivery_orders):
 			frappe.throw(_("Delivery Order {0} is not available for load planning.").format(delivery_order.name))
 		if delivery_order.company != first.company:
 			frappe.throw(_("All Delivery Orders in a load must belong to the same company."))
-		if delivery_order.source_warehouse != first.source_warehouse:
-			frappe.throw(_("All Delivery Orders in a load must use the same source warehouse."))
 		if not delivery_methods_are_compatible(
 			delivery_order.delivery_method, first.delivery_method
 		):
@@ -428,6 +425,19 @@ def calculate_load_totals(load):
 	load.total_crates = sum(flt(row.crates) for row in load.delivery_orders)
 	load.total_stops = len({row.delivery_address for row in load.delivery_orders if row.delivery_address})
 	load.minimum_payload = load.total_weight
+
+
+def _validate_dispatch_warehouse(load):
+	"""Validate the selected dispatch warehouse independently of demand origin."""
+	if not load.source_warehouse or not load.company:
+		return
+	warehouse_company = frappe.db.get_value("Warehouse", load.source_warehouse, "company")
+	if warehouse_company and warehouse_company != load.company:
+		frappe.throw(
+			_("Dispatch warehouse {0} belongs to company {1}, not {2}.").format(
+				load.source_warehouse, warehouse_company, load.company
+			)
+		)
 	load.minimum_volume = load.total_volume
 
 
