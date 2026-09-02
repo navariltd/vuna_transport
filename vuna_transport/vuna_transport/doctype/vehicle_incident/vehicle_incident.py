@@ -3,9 +3,15 @@
 
 from frappe.model.document import Document
 
-from vuna_transport.services.fleet.vehicle_incident_service import validate_incident
+from vuna_transport.services.fleet.vehicle_incident_service import (
+	validate_incident,
+	validate_incident_submission,
+)
 
 
 class VehicleIncident(Document):
 	def validate(self):
 		validate_incident(self)
+
+	def before_submit(self):
+		validate_incident_submission(self)

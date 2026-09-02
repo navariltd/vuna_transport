@@ -26,18 +26,25 @@
   "replacement_vehicle_allocation",
   "details_section",
   "description",
-  "location",
   "impact_section",
   "vehicle_immobilized",
   "cargo_affected",
   "driver_affected",
+  "resolution_section",
+  "resolution",
+  "resolved_on",
   "repair_section",
   "asset_repair",
   "police_reference",
   "insurance_reference",
-  "resolution_section",
-  "resolution",
-  "resolved_on",
+  "location_tab",
+  "location_section",
+  "latitude",
+  "location_column",
+  "longitude",
+  "use_device_location",
+  "section_break_sdnu",
+  "location",
   "connections_tab"
  ],
  "fields": [
@@ -122,8 +129,8 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Status",
-   "options": "Open\nResolved\nClosed",
+   "label": "Repair / Resolution Status",
+   "options": "Open\nIn Resolution\nResolved\nClosed",
    "reqd": 1
   },
   {
@@ -183,6 +190,40 @@
    "reqd": 1
   },
   {
+   "fieldname": "location_tab",
+   "fieldtype": "Tab Break",
+   "label": "Location"
+  },
+  {
+   "fieldname": "location_section",
+   "fieldtype": "Section Break",
+   "label": "Incident Location"
+  },
+  {
+   "description": "Latitude must be between -90 and 90.",
+   "fieldname": "latitude",
+   "fieldtype": "Float",
+   "label": "Latitude",
+   "precision": "8"
+  },
+  {
+   "fieldname": "location_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Longitude must be between -180 and 180.",
+   "fieldname": "longitude",
+   "fieldtype": "Float",
+   "label": "Longitude",
+   "precision": "8"
+  },
+  {
+   "fieldname": "use_device_location",
+   "fieldtype": "Button",
+   "label": "Use Device Location"
+  },
+  {
+   "description": "The map pin and coordinates are synchronized automatically.",
    "fieldname": "location",
    "fieldtype": "Geolocation",
    "label": "Incident Location"
@@ -257,17 +298,22 @@
    "fieldtype": "Tab Break",
    "label": "Connections",
    "show_dashboard": 1
+  },
+  {
+   "fieldname": "section_break_sdnu",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
+ "is_submittable": 1,
  "links": [
   {
    "link_doctype": "Vehicle Allocation",
    "link_fieldname": "vehicle_incident"
   }
  ],
- "modified": "2026-08-25 13:02:49.409434",
+ "modified": "2026-09-02 14:24:57.559263",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Incident",
@@ -275,6 +321,7 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -283,7 +330,9 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
+   "cancel": 1,
    "share": 1,
+   "submit": 1,
    "write": 1
   },
   {
@@ -301,9 +350,11 @@
    "read": 1,
    "report": 1,
    "role": "Transport Dispatcher",
+   "submit": 1,
    "write": 1
   },
   {
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -313,6 +364,7 @@
    "report": 1,
    "role": "Transport Manager",
    "share": 1,
+   "submit": 1,
    "write": 1
   }
  ],

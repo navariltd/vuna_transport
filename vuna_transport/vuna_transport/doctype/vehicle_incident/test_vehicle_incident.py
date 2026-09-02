@@ -11,6 +11,7 @@ from vuna_transport.services.fleet.vehicle_incident_service import (
 	_validate_incident_context,
 	_validate_replacement_context,
 	_validate_resolution,
+	validate_incident_submission,
 )
 
 
@@ -25,6 +26,7 @@ class TestVehicleIncident(UnitTestCase):
 			delivery_trip="DT-1",
 			vehicle_allocation="VA-1",
 			resolution_status="Open",
+			vehicle_immobilized=1,
 			resolution=None,
 			resolved_on=None,
 		)
@@ -97,6 +99,20 @@ class TestVehicleIncident(UnitTestCase):
 			_validate_resolution(self.incident)
 		self.incident.resolved_on = "2026-08-25 10:00:00"
 		_validate_resolution(self.incident)
+
+	def test_immobilizing_incident_must_be_resolved_before_submission(self):
+		with self.assertRaises(ValidationError):
+			validate_incident_submission(self.incident)
+		self.incident.resolution_status = "In Resolution"
+		with self.assertRaises(ValidationError):
+			validate_incident_submission(self.incident)
+		self.incident.resolution_status = "Resolved"
+		validate_incident_submission(self.incident)
+
+	def test_non_immobilizing_incident_also_requires_resolution_before_submission(self):
+		self.incident.vehicle_immobilized = 0
+		with self.assertRaises(ValidationError):
+			validate_incident_submission(self.incident)
 
 	def test_replacement_allocation_linkage(self):
 		replacement = SimpleNamespace(

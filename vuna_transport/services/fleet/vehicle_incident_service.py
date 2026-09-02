@@ -173,6 +173,17 @@ def _validate_resolution(incident):
 		frappe.throw(_("Resolved On is required for a resolved or closed incident."))
 
 
+def validate_incident_submission(incident):
+	"""Require every incident to be resolved before it is frozen by submission."""
+	if incident.resolution_status not in RESOLVED_STATUSES:
+		frappe.throw(
+			_(
+				"Resolve the Vehicle Incident before submitting it. "
+				"An incident must be Resolved or Closed before it can be submitted."
+			)
+		)
+
+
 @frappe.whitelist()
 def make_replacement_allocation_from_incident(source_name):
 	incident = frappe.get_doc("Vehicle Incident", source_name)

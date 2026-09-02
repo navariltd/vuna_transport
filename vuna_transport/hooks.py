@@ -212,6 +212,8 @@ doc_events = {
 	},
 	"Vehicle Incident": {
 		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+		"on_submit": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+		"on_cancel": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 		"after_delete": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 }
@@ -220,6 +222,7 @@ doctype_js = {
 	"Address": "public/js/address.js",
 	"Delivery Trip": "public/js/delivery_trip.js",
 	"Vehicle": "public/js/vehicle.js",
+	"Vehicle Incident": "public/js/vehicle_incident_location.js",
 }
 
 override_doctype_dashboards = {

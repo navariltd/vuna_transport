@@ -10,6 +10,7 @@ from vuna_transport.services.shared.resource_scheduling_service import interval_
 from vuna_transport.services.fleet.vehicle_compliance_service import (
 	get_vehicle_compliance_map,
 )
+from vuna_transport.services.fleet.vehicle_owner_service import normalize_vehicle_owner
 
 
 ACTIVE_ALLOCATION_STATUSES = ("Allocated", "Accepted")
@@ -170,7 +171,7 @@ def get_vehicle_availability_map(
 			"company",
 			"vuna_vehicle_category",
 			"vuna_transport_enabled",
-			"vuna_ownership_type",
+			"vuna_vehicle_owner",
 			"vuna_asset",
 			"policy_no",
 			"start_date",
@@ -232,6 +233,7 @@ def get_vehicle_availability_map(
 			"Vehicle Incident",
 			filters={
 				"vehicle": ["in", vehicle_names],
+				"docstatus": ["!=", 2],
 				"resolution_status": ["not in", ["Resolved", "Closed"]],
 			},
 			fields=[
@@ -393,8 +395,8 @@ def _evaluate_vehicle(
 		)
 
 	asset_name = getattr(vehicle, "vuna_asset", None)
-	ownership_type = getattr(vehicle, "vuna_ownership_type", None)
-	if vehicle.vuna_transport_enabled and ownership_type == "Company Owned" and not asset_name:
+	vehicle_owner = normalize_vehicle_owner(getattr(vehicle, "vuna_vehicle_owner", None))
+	if vehicle.vuna_transport_enabled and vehicle_owner == "Company" and not asset_name:
 		reasons.append(
 			_reason(
 				"ASSET_REQUIRED",

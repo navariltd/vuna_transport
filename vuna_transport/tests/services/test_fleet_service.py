@@ -10,6 +10,7 @@ from frappe.tests import UnitTestCase
 
 from vuna_transport.services.fleet.fleet_service import (
 	_validate_vehicle_asset,
+	validate_vehicle,
 	sync_vehicle_operational_snapshots,
 )
 
@@ -67,9 +68,27 @@ class TestVehicleAssetValidation(UnitTestCase):
 	def test_company_owned_transport_vehicle_requires_an_asset(self):
 		self.vehicle.vuna_asset = None
 		self.vehicle.vuna_transport_enabled = 1
-		self.vehicle.vuna_ownership_type = "Company Owned"
+		self.vehicle.vuna_vehicle_owner = "Company"
 		with self.assertRaises(ValidationError):
 			_validate_vehicle_asset(self.vehicle)
+
+	@patch("vuna_transport.services.fleet.fleet_service.frappe.get_cached_doc")
+	def test_model_without_category_does_not_clear_vehicle_category(self, get_cached_doc):
+		vehicle = SimpleNamespace(
+			vuna_vehicle_model="Isuzu Hatchback",
+			vuna_vehicle_category="Refrigerated Van",
+		)
+		get_cached_doc.return_value = SimpleNamespace(
+			disabled=0,
+			manufacturer="Isuzu",
+			model_name="Hatchback",
+			vehicle_category=None,
+			fuel_type=None,
+		)
+
+		validate_vehicle(vehicle)
+
+		self.assertEqual(vehicle.vuna_vehicle_category, "Refrigerated Van")
 
 
 class TestVehicleStatusSnapshot(UnitTestCase):

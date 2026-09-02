@@ -18,7 +18,7 @@ class TestVehicleComplianceService(UnitTestCase):
 			name="KDA 123A",
 			company="Vuna Foods",
 			vuna_vehicle_category="8 Ton Reefer",
-			vuna_ownership_type="Company Owned",
+			vuna_vehicle_owner="Company",
 			policy_no="POL-1",
 			start_date="2026-01-01",
 			end_date="2027-01-01",
@@ -28,7 +28,7 @@ class TestVehicleComplianceService(UnitTestCase):
 			document_type_name="Inspection Certificate",
 			company=None,
 			vehicle_category=None,
-			ownership_type=None,
+			vehicle_owner=None,
 			mandatory_for_dispatch=1,
 			requires_expiry_date=1,
 			warning_days_before_expiry=30,
@@ -67,7 +67,7 @@ class TestVehicleComplianceService(UnitTestCase):
 		self.assertFalse(result.documents)
 
 	def test_ownership_specific_requirement_is_enforced(self):
-		self.requirement.ownership_type = "Company Owned"
+		self.requirement.vehicle_owner = "Company"
 		result = self._evaluate([self.requirement], [])
 		self.assertFalse(result.compliant)
 		self.assertEqual(result.reasons[0].code, "DOCUMENT_MISSING")

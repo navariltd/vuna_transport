@@ -25,7 +25,7 @@ class TestVehicleAvailabilityService(UnitTestCase):
 			company="Vuna Foods",
 			vuna_vehicle_category="8 Ton Truck",
 			vuna_transport_enabled=1,
-			vuna_ownership_type="Company Owned",
+			vuna_vehicle_owner="Company",
 			vuna_asset="ASSET-1",
 		)
 		self.asset = SimpleNamespace(
@@ -64,7 +64,7 @@ class TestVehicleAvailabilityService(UnitTestCase):
 		self.assertIn("ASSET_REQUIRED", [reason.code for reason in result.reasons])
 
 	def test_subcontracted_vehicle_does_not_require_asset(self):
-		self.vehicle.vuna_ownership_type = "Subcontracted"
+		self.vehicle.vuna_vehicle_owner = "Supplier"
 		self.vehicle.vuna_asset = None
 		result = self._evaluate(asset=None)
 		self.assertTrue(result.dispatch_eligible)
