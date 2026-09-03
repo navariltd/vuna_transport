@@ -9,36 +9,19 @@
  "field_order": [
   "load_tab",
   "load_identity_section",
-  "naming_series",
   "company",
-  "planning_tab",
-  "section_break_dfkk",
-  "source_warehouse",
-  "delivery_method",
+  "naming_series",
+  "column_break_npju",
   "dispatch_date",
+  "source_warehouse",
+  "section_break_dfkk",
+  "delivery_method",
   "dispatch_wave",
+  "pick_list",
   "column_break_cxkp",
   "transport_zone",
   "transport_route",
-  "status",
-  "pick_list",
   "delivery_trip",
-  "capacity_section",
-  "total_weight",
-  "weight_uom",
-  "total_volume",
-  "volume_uom",
-  "total_stops",
-  "column_break_bkuo",
-  "total_pallets",
-  "total_cases",
-  "total_crates",
-  "column_break_fymq",
-  "minimum_payload",
-  "minimum_volume",
-  "execution_tab",
-  "execution_overview_section",
-  "execution_overview",
   "section_break_sgfs",
   "required_vehicle_category",
   "active_vehicle_allocation",
@@ -52,11 +35,32 @@
   "tail_lift_required",
   "required_body_type",
   "special_equipment_required",
-  "delivery_orders_section",
+  "capacity_section",
+  "total_weight",
+  "weight_uom",
+  "total_stops",
+  "column_break_bkuo",
+  "total_volume",
+  "volume_uom",
+  "column_break_fymq",
+  "minimum_payload",
+  "minimum_volume",
+  "pallets_section",
+  "total_pallets",
+  "column_break_lonb",
+  "total_cases",
+  "column_break_xplm",
+  "total_crates",
+  "execution_tab",
+  "execution_overview_section",
+  "execution_overview",
   "section_break_ksai",
   "delivery_orders",
+  "more_info_section",
+  "status",
   "section_break_lydc",
-  "amended_from"
+  "amended_from",
+  "connections_tab"
  ],
  "fields": [
   {
@@ -68,11 +72,6 @@
    "fieldname": "load_identity_section",
    "fieldtype": "Section Break",
    "label": "Load Identity"
-  },
-  {
-   "fieldname": "planning_tab",
-   "fieldtype": "Tab Break",
-   "label": "Planning"
   },
   {
    "fieldname": "capacity_section",
@@ -92,11 +91,6 @@
   {
    "fieldname": "execution_overview",
    "fieldtype": "HTML"
-  },
-  {
-   "fieldname": "delivery_orders_section",
-   "fieldtype": "Section Break",
-   "label": "Demand Lines"
   },
   {
    "fieldname": "section_break_lydc",
@@ -134,23 +128,22 @@
    "label": "Dispatch Context"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "source_warehouse",
    "fieldtype": "Link",
-   "allow_on_submit": 1,
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Source Warehouse",
-   "description": "Dispatch warehouse for this load. It may be changed from the Delivery Order source warehouse before stock documents are created.",
    "options": "Warehouse",
    "reqd": 1
   },
   {
-   "description": "Business fulfilment method inherited from the Delivery Orders; transport sourcing is selected on Vehicle Allocation.",
    "fieldname": "delivery_method",
    "fieldtype": "Link",
    "in_standard_filter": 1,
    "label": "Delivery Method",
-   "options": "Delivery Method"
+   "options": "Delivery Method",
+   "search_index": 1
   },
   {
    "fieldname": "dispatch_date",
@@ -196,7 +189,7 @@
    "fieldname": "pick_list",
    "fieldtype": "Link",
    "in_standard_filter": 1,
-   "label": "ERPNext Pick List",
+   "label": "Pick List",
    "options": "Pick List",
    "read_only": 1
   },
@@ -204,14 +197,9 @@
    "fieldname": "delivery_trip",
    "fieldtype": "Link",
    "in_standard_filter": 1,
-   "label": "ERPNext Delivery Trip",
+   "label": "Delivery Trip",
    "options": "Delivery Trip",
    "read_only": 1
-  },
-  {
-   "fieldname": "planning_details",
-   "fieldtype": "Section Break",
-   "label": "Capacity Totals"
   },
   {
    "fieldname": "total_weight",
@@ -363,6 +351,35 @@
    "fieldtype": "Float",
    "label": "Minimum Payload",
    "read_only": 1
+  },
+  {
+   "fieldname": "connections_tab",
+   "fieldtype": "Tab Break",
+   "label": "Connections",
+   "show_dashboard": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "pallets_section",
+   "fieldtype": "Section Break",
+   "label": "Pallets"
+  },
+  {
+   "fieldname": "column_break_lonb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_xplm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_npju",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "more_info_section",
+   "fieldtype": "Section Break",
+   "label": "More Info"
   }
  ],
  "grid_page_length": 50,
@@ -395,11 +412,10 @@
    "link_fieldname": "delivery_load"
   }
  ],
- "modified": "2026-08-27 08:40:13.001202",
+ "modified": "2026-09-03 07:03:54.457863",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Delivery Load",
- "title_field": "dispatch_date",
  "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
@@ -458,5 +474,6 @@
  "rows_threshold_for_grid_search": 20,
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "dispatch_date"
 }
