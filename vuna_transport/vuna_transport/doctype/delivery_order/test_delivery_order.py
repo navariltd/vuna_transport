@@ -14,6 +14,7 @@ from vuna_transport.services.demand.delivery_order_service import (
 	_get_group_transport_requirements,
 	_get_item_measure,
 	_get_transport_quantity,
+	_is_stock_item,
 	_requires_transport_planning,
 	get_sales_order_item_quantities,
 	sync_delivery_order_quantities,
@@ -45,6 +46,61 @@ class TestDeliveryOrder(UnitTestCase):
 	def test_transport_quantity_never_becomes_negative(self):
 		item = SimpleNamespace(qty=4, delivered_qty=8)
 		self.assertEqual(_get_transport_quantity(item), 0)
+
+	@patch("vuna_transport.services.demand.delivery_order_service.frappe.get_cached_doc")
+	def test_service_item_is_not_transportable(self, get_cached_doc):
+		get_cached_doc.return_value = SimpleNamespace(is_stock_item=0)
+
+		self.assertFalse(_is_stock_item(SimpleNamespace(item_code="INSTALLATION-SERVICE")))
+
+	@patch("vuna_transport.services.demand.delivery_order_service._create_delivery_order")
+	@patch(
+		"vuna_transport.services.demand.delivery_order_service._is_item_already_linked", return_value=False
+	)
+	@patch("vuna_transport.services.demand.delivery_order_service._get_group_key")
+	@patch("vuna_transport.services.demand.delivery_order_service._get_transport_quantity", return_value=1)
+	@patch("vuna_transport.services.demand.delivery_order_service._is_stock_item")
+	@patch(
+		"vuna_transport.services.demand.delivery_order_service._requires_transport_planning",
+		return_value=True,
+	)
+	@patch("vuna_transport.services.demand.delivery_order_service._validate_sales_order")
+	@patch("vuna_transport.services.demand.delivery_order_service._get_sales_order")
+	def test_service_items_are_excluded_when_sales_order_contains_stock_items(
+		self,
+		get_sales_order,
+		_validate_sales_order,
+		_requires_transport_planning,
+		is_stock_item,
+		_get_transport_quantity,
+		_get_group_key,
+		_is_item_already_linked,
+		_create_delivery_order,
+	):
+		stock_item = SimpleNamespace(name="SOI-STOCK", item_code="MILK")
+		service_item = SimpleNamespace(name="SOI-SERVICE", item_code="DELIVERY-SERVICE")
+		sales_order = SimpleNamespace(doctype="Sales Order", name="SO-TEST", items=[stock_item, service_item])
+		get_sales_order.return_value = sales_order
+		is_stock_item.side_effect = lambda item: item is stock_item
+		_get_group_key.return_value = (
+			"2026-08-12",
+			"ADDR-1",
+			"WH-1",
+			None,
+			None,
+			None,
+			"Company Delivery",
+			None,
+		)
+		_create_delivery_order.return_value = "DO-TEST"
+
+		from vuna_transport.services.demand.delivery_order_service import (
+			create_delivery_orders_for_sales_order,
+		)
+
+		self.assertEqual(create_delivery_orders_for_sales_order(sales_order), ["DO-TEST"])
+		_create_delivery_order.assert_called_once()
+		self.assertEqual(_create_delivery_order.call_args.args[2], [(stock_item, 1)])
 
 	def test_sales_order_quantities_are_authoritative(self):
 		item = SimpleNamespace(qty=100, delivered_qty=30)
@@ -138,9 +194,9 @@ class TestDeliveryOrder(UnitTestCase):
 	@patch("vuna_transport.services.demand.delivery_order_service.frappe.get_cached_doc")
 	def test_delivery_group_is_used_in_group_key(self, get_cached_doc):
 		get_cached_doc.side_effect = [
-			SimpleNamespace(delivery_group="Packed"),
+			SimpleNamespace(vuna_delivery_group="Packed"),
 			SimpleNamespace(name="Packed", disabled=0, company=None),
-			SimpleNamespace(delivery_group="Bulk"),
+			SimpleNamespace(vuna_delivery_group="Bulk"),
 			SimpleNamespace(name="Bulk", disabled=0, company=None),
 		]
 		sales_order = SimpleNamespace(

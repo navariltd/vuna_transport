@@ -41,6 +41,12 @@ def create_delivery_orders_for_sales_order(sales_order):
 
 	groups = defaultdict(list)
 	for item in doc.items:
+		# ERPNext Sales Orders can contain both stock and non-stock/service items.
+		# Only stock items represent goods that Vuna can plan and dispatch.
+		if not _is_stock_item(item):
+			_log_non_stock_item(doc, item)
+			continue
+
 		transport_qty = _get_transport_quantity(item)
 		if transport_qty <= 0 or _is_item_already_linked(item.name):
 			continue
@@ -170,6 +176,21 @@ def _get_transport_quantity(item):
 	return get_sales_order_item_quantities(item)[1]
 
 
+def _is_stock_item(sales_order_item):
+	"""Return whether a Sales Order item represents transportable stock.
+
+	``is_stock_item`` is authoritative on the ERPNext Item master.  The default
+	keeps this helper tolerant of lightweight test doubles and older integrations;
+	actual ERPNext Item documents always provide the field.
+	"""
+	item_code = getattr(sales_order_item, "item_code", None)
+	if not item_code:
+		return False
+
+	item = frappe.get_cached_doc("Item", item_code)
+	return bool(getattr(item, "is_stock_item", 1))
+
+
 def _get_group_key(sales_order, item):
 	delivery_address = (
 		getattr(item, "customer_address", None)
@@ -203,7 +224,7 @@ def _get_item_delivery_group(sales_order_item, company=None):
 	if not getattr(sales_order_item, "item_code", None):
 		return None
 	item = frappe.get_cached_doc("Item", sales_order_item.item_code)
-	group_name = getattr(item, "delivery_group", None)
+	group_name = getattr(item, "vuna_delivery_group", None)
 	if not group_name:
 		return None
 	group = frappe.get_cached_doc("Delivery Group", group_name)
@@ -403,6 +424,15 @@ def _log_non_delivery_item(sales_order, item):
 		"Skipped Delivery Order for Sales Order %s item %s because no delivery address was provided.",
 		sales_order.name,
 		item.name,
+	)
+
+
+def _log_non_stock_item(sales_order, item):
+	frappe.logger("vuna_transport").info(
+		"Skipped Delivery Order generation for Sales Order %s item %s because item %s is non-stock/service.",
+		sales_order.name,
+		item.name,
+		getattr(item, "item_code", None),
 	)
 
 
