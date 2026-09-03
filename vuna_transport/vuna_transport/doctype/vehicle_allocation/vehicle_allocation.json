@@ -25,11 +25,10 @@
   "replacement_details",
   "owned_fleet_section",
   "vehicle",
+  "column_break_zvtf",
   "driver",
   "subcontractor_section",
   "supplier",
-  "subcontractor_vehicle_registration",
-  "subcontractor_vehicle_category",
   "column_break_subcontractor",
   "subcontractor_driver_name",
   "subcontractor_driver_phone",
@@ -71,7 +70,8 @@
    "in_standard_filter": 1,
    "label": "Delivery Load",
    "options": "Delivery Load",
-   "reqd": 1
+   "reqd": 1,
+   "search_index": 1
   },
   {
    "fetch_from": "delivery_load.company",
@@ -155,7 +155,8 @@
    "in_standard_filter": 1,
    "label": "Vehicle Incident",
    "options": "Vehicle Incident",
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "column_break_replacement",
@@ -182,12 +183,10 @@
    "label": "Execution Vehicle"
   },
   {
-   "description": "Select the physical ERPNext Vehicle for owned or subcontracted transport. Required for both allocation types.",
    "fieldname": "vehicle",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Vehicle",
-   "mandatory_depends_on": "eval:doc.allocation_type == 'Owned Fleet' || doc.allocation_type == 'Subcontractor'",
    "options": "Vehicle"
   },
   {
@@ -212,21 +211,6 @@
    "options": "Supplier"
   },
   {
-   "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
-   "fieldname": "subcontractor_vehicle_registration",
-   "fieldtype": "Data",
-   "label": "External Vehicle Registration",
-   "description": "Optional external reference; the Vehicle link remains the system record for this physical subcontracted vehicle."
-  },
-  {
-   "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
-   "fieldname": "subcontractor_vehicle_category",
-   "fieldtype": "Link",
-   "label": "Vehicle Category",
-   "mandatory_depends_on": "eval:doc.allocation_type == 'Subcontractor'",
-   "options": "Vehicle Category"
-  },
-  {
    "fieldname": "column_break_subcontractor",
    "fieldtype": "Column Break"
   },
@@ -234,8 +218,7 @@
    "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
    "fieldname": "subcontractor_driver_name",
    "fieldtype": "Data",
-   "label": "External Driver Name",
-   "description": "Optional when the subcontractor driver is not maintained as an ERPNext Driver."
+   "label": "Driver"
   },
   {
    "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
@@ -310,6 +293,10 @@
    "options": "Vehicle Allocation",
    "print_hide": 1,
    "read_only": 1
+  },
+  {
+   "fieldname": "column_break_zvtf",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
@@ -325,7 +312,7 @@
    "link_fieldname": "vuna_current_vehicle_allocation"
   }
  ],
- "modified": "2026-08-25 13:02:49.409434",
+ "modified": "2026-09-03 07:27:41.333444",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Allocation",

@@ -102,12 +102,11 @@ class TestVehicleAllocation(UnitTestCase):
 	@patch("vuna_transport.services.fleet.vehicle_allocation_service._validate_vehicle_category_for_load")
 	@patch("vuna_transport.services.fleet.vehicle_allocation_service.lock_document")
 	@patch("vuna_transport.services.fleet.vehicle_allocation_service.frappe.get_doc")
-	def test_subcontractor_vehicle_populates_category_and_supplier_server_side(
+	def test_subcontractor_vehicle_populates_supplier_server_side(
 		self, get_doc, lock_document, validate_category, validate_vehicle
 	):
 		allocation = SimpleNamespace(
 			vehicle="KDA 123A",
-			subcontractor_vehicle_category="Stale Category",
 			supplier=None,
 			driver=None,
 		)
@@ -119,7 +118,6 @@ class TestVehicleAllocation(UnitTestCase):
 
 		_validate_subcontractor(allocation, load)
 
-		self.assertEqual(allocation.subcontractor_vehicle_category, "8 Ton Truck")
 		self.assertEqual(allocation.supplier, "ABC Logistics")
 
 	@patch("vuna_transport.services.fleet.vehicle_allocation_service.frappe.get_doc")

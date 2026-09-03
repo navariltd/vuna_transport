@@ -14,8 +14,16 @@ from vuna_transport.services.shared.security_service import require_document_per
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
+	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
 	load = frappe.get_doc("Delivery Load", filters.get("delivery_load"))
 	require_document_permission(load, "read")
+	if filters.get("company") and filters.get("company") != load.company:
+		return []
+	if (
+		filters.get("required_vehicle_category")
+		and filters.get("required_vehicle_category") != load.required_vehicle_category
+	):
+		return []
 	from_time, to_time = get_load_resource_window(load)
 	vehicle_filters = {"docstatus": ["<", 2], "vuna_transport_enabled": 1}
 	if (filters or {}).get("allocation_type") == "Subcontractor":
@@ -23,6 +31,8 @@ def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
 	if load.company:
 		vehicle_filters["company"] = ["in", (load.company, "", None)]
 	compatible_categories = get_compatible_vehicle_category_names(load)
+	if load.required_vehicle_category:
+		compatible_categories = {load.required_vehicle_category}
 	if compatible_categories:
 		vehicle_filters["vuna_vehicle_category"] = ["in", compatible_categories]
 	else:

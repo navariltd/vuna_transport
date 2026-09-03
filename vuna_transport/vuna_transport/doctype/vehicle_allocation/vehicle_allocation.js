@@ -9,6 +9,8 @@ frappe.ui.form.on("Vehicle Allocation", {
 				query: "vuna_transport.api.get_vehicles_for_load",
 				filters: {
 					delivery_load: frm.doc.delivery_load,
+					company: frm.doc.company,
+					required_vehicle_category: frm.doc.required_vehicle_category,
 					allocation_type: frm.doc.allocation_type,
 				},
 			};
@@ -45,24 +47,14 @@ frappe.ui.form.on("Vehicle Allocation", {
 
 	vehicle(frm) {
 		const vehicle_name = frm.doc.vehicle;
-		if (!vehicle_name) {
-			frm.set_value("subcontractor_vehicle_category", null);
-			return;
-		}
+		if (!vehicle_name) return;
 		frm._vehicle_used_for_allocation_defaults = vehicle_name;
-		frappe.db
-			.get_value("Vehicle", vehicle_name, ["vuna_supplier", "vuna_vehicle_category"])
-			.then(({ message }) => {
-				if (!message || frm.doc.vehicle !== frm._vehicle_used_for_allocation_defaults)
-					return;
-				frm.set_value(
-					"subcontractor_vehicle_category",
-					message.vuna_vehicle_category || null
-				);
-				if (frm.doc.allocation_type === "Subcontractor") {
-					frm.set_value("supplier", message.vuna_supplier || null);
-				}
-			});
+		frappe.db.get_value("Vehicle", vehicle_name, ["vuna_supplier"]).then(({ message }) => {
+			if (!message || frm.doc.vehicle !== frm._vehicle_used_for_allocation_defaults) return;
+			if (frm.doc.allocation_type === "Subcontractor") {
+				frm.set_value("supplier", message.vuna_supplier || null);
+			}
+		});
 	},
 
 	delivery_load(frm) {

@@ -110,7 +110,6 @@ def _make_replacement_allocation(delivery_load):
 	allocation.replacement_stage = _get_replacement_stage(trip)
 	if previous.allocation_type == "Subcontractor":
 		allocation.supplier = previous.supplier
-		allocation.subcontractor_vehicle_category = previous.subcontractor_vehicle_category
 	return allocation
 
 
@@ -194,7 +193,6 @@ def _validate_subcontractor(allocation, load):
 		frappe.throw(_("Select the ERPNext Vehicle record for the subcontracted vehicle."))
 	lock_document("Vehicle", allocation.vehicle)
 	vehicle = frappe.get_doc("Vehicle", allocation.vehicle)
-	allocation.subcontractor_vehicle_category = vehicle.vuna_vehicle_category
 	if getattr(vehicle, "vuna_supplier", None):
 		allocation.supplier = vehicle.vuna_supplier
 	_validate_vehicle_category_for_load(load, vehicle.vuna_vehicle_category)
@@ -265,6 +263,15 @@ def _validate_initial_allocation_sequence(load, allocation=None):
 def _validate_vehicle_category_for_load(load, vehicle_category):
 	if not vehicle_category:
 		frappe.throw(_("Select a Vehicle Category for the allocated vehicle."))
+	if (
+		getattr(load, "required_vehicle_category", None)
+		and vehicle_category != load.required_vehicle_category
+	):
+		frappe.throw(
+			_("Vehicle Category {0} does not match the Delivery Load's required category {1}.").format(
+				vehicle_category, load.required_vehicle_category
+			)
+		)
 	from vuna_transport.services.planning.delivery_load_service import validate_capacity
 
 	validate_capacity(load, vehicle_category)
@@ -448,7 +455,7 @@ def _sync_trip_execution_allocation(load, allocation, rollback=False):
 		"Info",
 		_("Execution allocation changed to {0}: vehicle {1}, driver {2}.").format(
 			allocation.name,
-			allocation.vehicle or allocation.subcontractor_vehicle_registration,
+			allocation.vehicle,
 			allocation.driver or allocation.subcontractor_driver_name,
 		),
 	)
