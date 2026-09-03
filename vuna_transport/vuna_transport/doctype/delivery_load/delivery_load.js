@@ -3,6 +3,25 @@
 
 frappe.ui.form.on("Delivery Load", {
 	setup(frm) {
+		frm.set_query("required_vehicle_category", () => ({
+			query: "vuna_transport.services.planning.delivery_load_service.get_compatible_vehicle_categories",
+			filters: {
+				total_weight: frm.doc.total_weight || 0,
+				total_volume: frm.doc.total_volume || 0,
+				total_pallets: frm.doc.total_pallets || 0,
+				total_cases: frm.doc.total_cases || 0,
+				total_crates: frm.doc.total_crates || 0,
+				weight_uom: frm.doc.weight_uom || null,
+				volume_uom: frm.doc.volume_uom || null,
+				refrigeration_required: frm.doc.refrigeration_required ? 1 : 0,
+				tail_lift_required: frm.doc.tail_lift_required ? 1 : 0,
+				required_body_type: frm.doc.required_body_type || null,
+				special_equipment_required: frm.doc.special_equipment_required || null,
+				delivery_order_names: (frm.doc.delivery_orders || [])
+					.map((row) => row.delivery_order)
+					.filter(Boolean),
+			},
+		}));
 		frm.set_query("transport_route", () => ({
 			filters: {
 				disabled: 0,

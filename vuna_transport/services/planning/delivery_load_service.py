@@ -2,7 +2,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import cint, flt
 
 from vuna_transport.services.demand.delivery_method_service import (
 	canonical_delivery_method,
@@ -72,6 +72,51 @@ def get_available_delivery_orders(
 	if as_dict:
 		return available_delivery_orders
 	return [tuple(delivery_order.values()) for delivery_order in available_delivery_orders]
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def get_compatible_vehicle_categories(doctype, txt, searchfield, start, page_len, filters, **kwargs):
+	"""Filter Vehicle Category choices using the current load requirements.
+
+	This query improves the form experience only; Delivery Load validation remains
+	the final authority when the document is saved or submitted.
+	"""
+	require_doctype_permission("Vehicle Category", "read")
+	filters = frappe.parse_json(filters) if isinstance(filters, str) else dict(filters or {})
+	load_uoms = {
+		"weight_uom": filters.get("weight_uom"),
+		"volume_uom": filters.get("volume_uom"),
+	}
+	totals = {
+		dimension: flt(filters.get(f"total_{dimension}"))
+		for dimension in ("weight", "volume", "pallets", "cases", "crates")
+	}
+	requirements = {
+		"refrigeration_required": bool(flt(filters.get("refrigeration_required"))),
+		"tail_lift_required": bool(flt(filters.get("tail_lift_required"))),
+		"required_body_type": filters.get("required_body_type"),
+		"special_equipment_required": filters.get("special_equipment_required"),
+	}
+	delivery_order_names = filters.get("delivery_order_names") or []
+	if isinstance(delivery_order_names, str):
+		delivery_order_names = frappe.parse_json(delivery_order_names) or []
+
+	compatible = []
+	for category in get_vehicle_categories(load_uoms, get_capacity_buffer_percentage()):
+		result = evaluate_vehicle_category(totals, category, requirements)
+		if not result["compatible"] or not _vehicle_meets_delivery_order_access_limits(
+			category, delivery_order_names
+		):
+			continue
+		label = category.vehicle_category_name or category.name
+		if txt and txt.lower() not in f"{category.name} {label}".lower():
+			continue
+		compatible.append((category.name, label))
+
+	start = cint(start)
+	page_len = min(cint(page_len) or 20, 50)
+	return compatible[start : start + page_len]
 
 
 @frappe.whitelist()
@@ -557,6 +602,15 @@ def _validate_load_vehicle_access_limits(load, vehicle):
 
 def _vehicle_meets_load_access_limits(load, vehicle):
 	for delivery_order in {row.delivery_order for row in load.delivery_orders if row.delivery_order}:
+		maximum_category = frappe.db.get_value("Delivery Order", delivery_order, "maximum_vehicle_category")
+		if not validate_vehicle_access_limit(vehicle, maximum_category)["compatible"]:
+			return False
+	return True
+
+
+def _vehicle_meets_delivery_order_access_limits(vehicle, delivery_order_names):
+	"""Apply each selected Delivery Order's maximum vehicle restriction."""
+	for delivery_order in set(delivery_order_names or []):
 		maximum_category = frappe.db.get_value("Delivery Order", delivery_order, "maximum_vehicle_category")
 		if not validate_vehicle_access_limit(vehicle, maximum_category)["compatible"]:
 			return False
