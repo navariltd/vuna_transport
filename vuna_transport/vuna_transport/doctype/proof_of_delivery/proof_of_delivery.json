@@ -9,193 +9,202 @@
  "field_order": [
   "delivery_tab",
   "delivery_context_section",
-  "naming_series",
   "company",
+  "naming_series",
   "delivery_load",
   "delivery_trip",
+  "column_break_eehr",
   "delivery_stop",
   "delivery_order",
   "delivery_note",
   "recipient_section",
   "customer",
-  "delivery_address",
   "delivery_datetime",
   "received_by",
   "receiver_phone",
+  "column_break_dbvk",
+  "delivery_address",
   "status",
-  "outcome_tab",
-  "exception_details",
-  "exception_reason",
-  "notes",
   "signature",
   "delivery_photo",
   "items_tab",
   "items",
+  "exception_details",
+  "exception_reason",
+  "notes",
+  "section_break_kaie",
   "amended_from"
  ],
  "fields": [
   {
-    "fieldname": "delivery_tab",
-    "fieldtype": "Tab Break",
-    "label": "Delivery"
+   "fieldname": "delivery_tab",
+   "fieldtype": "Tab Break",
+   "label": "Delivery"
   },
   {
-    "fieldname": "delivery_context_section",
-    "fieldtype": "Section Break",
-    "label": "Delivery Context"
+   "fieldname": "delivery_context_section",
+   "fieldtype": "Section Break",
+   "label": "Delivery Context"
   },
   {
-    "fieldname": "recipient_section",
-    "fieldtype": "Section Break",
-    "label": "Recipient & Timing"
+   "fieldname": "recipient_section",
+   "fieldtype": "Section Break",
+   "label": "Recipient & Timing"
   },
   {
-    "fieldname": "outcome_tab",
-    "fieldtype": "Tab Break",
-    "label": "Outcome & Evidence"
+   "fieldname": "items_tab",
+   "fieldtype": "Section Break",
+   "label": "Delivered Items"
   },
   {
-    "fieldname": "items_tab",
-    "fieldtype": "Section Break",
-    "label": "Delivered Items"
+   "default": "POD-.DD.-.MM.-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "POD-.DD.-.MM.-.YYYY.-",
+   "reqd": 1
   },
   {
-    "default": "POD-.DD.-.MM.-.YYYY.-",
-    "fieldname": "naming_series",
-    "fieldtype": "Select",
-    "label": "Naming Series",
-    "options": "POD-.DD.-.MM.-.YYYY.-",
-    "reqd": 1
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
   },
   {
-    "fieldname": "company",
-    "fieldtype": "Link",
-    "in_list_view": 1,
-    "in_standard_filter": 1,
-    "label": "Company",
-    "options": "Company",
-    "reqd": 1
+   "fieldname": "delivery_load",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Delivery Load",
+   "options": "Delivery Load",
+   "reqd": 1
   },
   {
-    "fieldname": "delivery_load",
-    "fieldtype": "Link",
-    "in_standard_filter": 1,
-    "label": "Delivery Load",
-    "options": "Delivery Load",
-    "reqd": 1
+   "fieldname": "delivery_trip",
+   "fieldtype": "Link",
+   "label": "Delivery Trip",
+   "options": "Delivery Trip",
+   "reqd": 1
   },
   {
-    "fieldname": "delivery_trip",
-    "fieldtype": "Link",
-    "label": "Delivery Trip",
-    "options": "Delivery Trip",
-    "reqd": 1
+   "fieldname": "delivery_stop",
+   "fieldtype": "Link",
+   "label": "Delivery Stop",
+   "options": "Delivery Stop",
+   "reqd": 1
   },
   {
-    "fieldname": "delivery_stop",
-    "fieldtype": "Link",
-    "label": "Delivery Stop",
-    "options": "Delivery Stop",
-    "reqd": 1
+   "fieldname": "delivery_order",
+   "fieldtype": "Link",
+   "label": "Delivery Order",
+   "options": "Delivery Order",
+   "read_only": 1
   },
   {
-    "fieldname": "delivery_order",
-    "fieldtype": "Link",
-    "label": "Delivery Order",
-    "options": "Delivery Order",
-    "read_only": 1
+   "fieldname": "delivery_note",
+   "fieldtype": "Link",
+   "label": "Delivery Note",
+   "options": "Delivery Note"
   },
   {
-    "fieldname": "delivery_note",
-    "fieldtype": "Link",
-    "label": "Delivery Note",
-    "options": "Delivery Note"
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Customer",
+   "options": "Customer",
+   "reqd": 1
   },
   {
-    "fieldname": "customer",
-    "fieldtype": "Link",
-    "in_list_view": 1,
-    "in_standard_filter": 1,
-    "label": "Customer",
-    "options": "Customer",
-    "reqd": 1
+   "fieldname": "delivery_address",
+   "fieldtype": "Link",
+   "label": "Delivery Address",
+   "options": "Address",
+   "reqd": 1
   },
   {
-    "fieldname": "delivery_address",
-    "fieldtype": "Link",
-    "label": "Delivery Address",
-    "options": "Address",
-    "reqd": 1
+   "fieldname": "delivery_datetime",
+   "fieldtype": "Datetime",
+   "label": "Delivery Date and Time",
+   "reqd": 1
   },
   {
-    "fieldname": "delivery_datetime",
-    "fieldtype": "Datetime",
-    "label": "Delivery Date and Time",
-    "reqd": 1
+   "fieldname": "received_by",
+   "fieldtype": "Data",
+   "label": "Received By",
+   "reqd": 1
   },
   {
-    "fieldname": "received_by",
-    "fieldtype": "Data",
-    "label": "Received By",
-    "reqd": 1
+   "fieldname": "receiver_phone",
+   "fieldtype": "Data",
+   "label": "Receiver Phone"
   },
   {
-    "fieldname": "receiver_phone",
-    "fieldtype": "Data",
-    "label": "Receiver Phone"
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nAccepted\nPartially Delivered\nRejected\nFailed",
+   "read_only": 1
   },
   {
-    "default": "Pending",
-    "fieldname": "status",
-    "fieldtype": "Select",
-    "in_list_view": 1,
-    "in_standard_filter": 1,
-    "label": "Status",
-    "options": "Pending\nAccepted\nPartially Delivered\nRejected\nFailed",
-    "read_only": 1
+   "fieldname": "exception_details",
+   "fieldtype": "Section Break",
+   "label": "Delivery Exception"
   },
   {
-    "fieldname": "exception_details",
-    "fieldtype": "Section Break",
-    "label": "Delivery Exception"
+   "depends_on": "eval:doc.status in ['Partially Delivered', 'Rejected', 'Failed']",
+   "fieldname": "exception_reason",
+   "fieldtype": "Select",
+   "label": "Exception Reason",
+   "options": "Customer Closed\nCustomer Unavailable\nWrong Address\nProduct Rejected\nProduct Damaged\nQuantity Shortage\nTemperature Breach\nPayment Unavailable\nVehicle Breakdown\nRoad or Weather Disruption\nOther"
   },
   {
-    "depends_on": "eval:doc.status in ['Partially Delivered', 'Rejected', 'Failed']",
-    "fieldname": "exception_reason",
-    "fieldtype": "Select",
-    "label": "Exception Reason",
-    "options": "Customer Closed\nCustomer Unavailable\nWrong Address\nProduct Rejected\nProduct Damaged\nQuantity Shortage\nTemperature Breach\nPayment Unavailable\nVehicle Breakdown\nRoad or Weather Disruption\nOther"
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
   },
   {
-    "fieldname": "notes",
-    "fieldtype": "Small Text",
-    "label": "Notes"
+   "fieldname": "signature",
+   "fieldtype": "Attach Image",
+   "label": "Receiver Signature"
   },
   {
-    "fieldname": "signature",
-    "fieldtype": "Attach Image",
-    "label": "Receiver Signature"
+   "fieldname": "delivery_photo",
+   "fieldtype": "Attach Image",
+   "label": "Delivery Photo"
   },
   {
-    "fieldname": "delivery_photo",
-    "fieldtype": "Attach Image",
-    "label": "Delivery Photo"
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Delivered Items",
+   "options": "Proof of Delivery Item",
+   "reqd": 1
   },
   {
-    "fieldname": "items",
-    "fieldtype": "Table",
-    "label": "Delivered Items",
-    "options": "Proof of Delivery Item",
-    "reqd": 1
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Proof of Delivery",
+   "print_hide": 1,
+   "read_only": 1
   },
   {
-    "fieldname": "amended_from",
-    "fieldtype": "Link",
-    "label": "Amended From",
-    "no_copy": 1,
-    "options": "Proof of Delivery",
-    "print_hide": 1,
-    "read_only": 1
+   "fieldname": "column_break_eehr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_dbvk",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_kaie",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
@@ -207,11 +216,10 @@
    "link_fieldname": "proof_of_delivery"
   }
  ],
- "modified": "2026-08-27 08:40:13.001202",
+ "modified": "2026-09-03 07:39:52.433813",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Proof of Delivery",
- "title_field": "customer",
  "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
@@ -266,5 +274,6 @@
  "rows_threshold_for_grid_search": 20,
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "customer"
 }
