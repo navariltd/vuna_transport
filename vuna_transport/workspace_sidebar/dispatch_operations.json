@@ -226,6 +226,98 @@
    "type": "Link"
   },
   {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "bar-chart-3",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Reports",
+   "show_arrow": 0,
+   "type": "Section Break"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "clipboard-list",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Open Delivery Demand",
+   "link_to": "Open Delivery Demand",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "clipboard-list",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Unallocated Delivery Orders",
+   "link_to": "Unallocated Delivery Orders",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "truck",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Loads Awaiting Vehicle",
+   "link_to": "Loads Awaiting Vehicle",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "file-text",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Delivery Notes Pending Submission",
+   "link_to": "Delivery Notes Pending Submission",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "map-pinned",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Delivery Trips Pending POD",
+   "link_to": "Delivery Trips Pending POD",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "alert-triangle",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Open Delivery Exceptions",
+   "link_to": "Open Delivery Exceptions",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
+   "icon": "settings",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Settings",
+   "show_arrow": 0,
+   "type": "Section Break"
+  },
+  {
    "child": 1,
    "collapsible": 1,
    "icon": "settings",
@@ -238,7 +330,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-02 19:44:46.358981",
+ "modified": "2026-09-03 06:08:33.750490",
  "modified_by": "Administrator",
  "name": "Dispatch Operations",
  "owner": "Administrator",

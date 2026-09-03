@@ -13,10 +13,13 @@
 	box-shadow: var(--card-shadow);
 }
 
-.dp-toolbar { padding: var(--padding-md); }
+.dp-toolbar { padding: 10px var(--padding-md); }
+.dp-toolbar-header { align-items: center; display: flex; justify-content: space-between; min-height: 34px; }
+.dp-filter-title { color: var(--text-muted); font-size: var(--text-sm); font-weight: 600; }
 .dp-filter-grid { display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: 8px 14px; }
 .dp-filter-grid .frappe-control { margin-bottom: 0; }
-.dp-toolbar-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.dp-filter-grid-collapsed { display: none; }
+.dp-toolbar-actions { display: flex; gap: 8px; }
 .dp-section { margin-top: 12px; padding: var(--padding-md); }
 .dp-section-title { font-size: var(--text-lg); font-weight: 600; }
 .dp-section-heading { align-items: center; display: flex; justify-content: space-between; }

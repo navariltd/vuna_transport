@@ -24,6 +24,8 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.allocations = new Map();
 		this.plan = null;
 		this.suggestions = [];
+		this.plan_evaluation_timer = null;
+		this.plan_evaluation_id = 0;
 		this.make_layout();
 		this.make_filters();
 		this.bind_events();
@@ -33,11 +35,15 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.$root = $(
 			`<div class="dispatch-planning">
 				<div class="dp-toolbar">
-					<div class="dp-filter-grid"></div>
-					<div class="dp-toolbar-actions">
+					<div class="dp-toolbar-header">
+						<div class="dp-filter-title">${__("Planning Filters")}</div>
+						<div class="dp-toolbar-actions">
+							<button class="btn btn-default btn-sm btn-toggle-filters">${__("Show Filters")}</button>
 						<button class="btn btn-default btn-refresh">${__("Refresh")}</button>
 						<button class="btn btn-default btn-suggest">${__("Suggest Loads")}</button>
+						</div>
 					</div>
+					<div class="dp-filter-grid dp-filter-grid-collapsed"></div>
 				</div>
 				<div class="dp-section dp-warehouse-section">
 					<div class="dp-section-title">${__("Warehouse Demand")}</div>
@@ -123,6 +129,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	bind_events() {
+		this.$root.on("click", ".btn-toggle-filters", () => this.toggle_filters());
 		this.$root.on("click", ".btn-refresh", () => this.refresh(true));
 		this.$root.on("click", ".btn-suggest", () => this.load_suggestions());
 		this.$root.on("click", ".btn-evaluate", () => this.evaluate_plan());
@@ -132,12 +139,23 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.$root.on("change", ".dp-order-select", (event) => this.toggle_order(event));
 		this.$root.on("click", ".dp-expand-order", (event) => this.toggle_details(event));
 		this.$root.on("change", ".dp-allocation-qty", (event) => this.change_quantity(event));
+		this.$root.on("change", ".dp-category-select", () => this.evaluate_plan());
 		this.$root.on("click", ".dp-use-suggestion", (event) => this.use_suggestion(event));
 		this.$root.on("click", ".dp-create-suggestion", (event) =>
 			this.create_from_suggestion(event)
 		);
 		this.$root.on("click", ".dp-fleet-category", (event) => this.show_vehicle_details(event));
 		this.$root.on("click", ".dp-driver-details", () => this.show_driver_details());
+	}
+
+	toggle_filters() {
+		const $filters = this.$root.find(".dp-filter-grid");
+		const collapsed = $filters
+			.toggleClass("dp-filter-grid-collapsed")
+			.hasClass("dp-filter-grid-collapsed");
+		this.$root
+			.find(".btn-toggle-filters")
+			.text(collapsed ? __("Show Filters") : __("Hide Filters"));
 	}
 
 	filters_changed() {
@@ -358,9 +376,11 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			for (const [key, row] of this.allocations)
 				if (row.delivery_order === name) this.allocations.delete(key);
 		}
+		this.plan_evaluation_id += 1;
 		this.plan = null;
 		this.clear_suggestions();
 		this.render_plan();
+		this.schedule_plan_evaluation();
 	}
 
 	async toggle_details(event) {
@@ -430,9 +450,11 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				allocated_quantity: quantity,
 			});
 		else this.allocations.delete(item);
+		this.plan_evaluation_id += 1;
 		this.plan = null;
 		this.clear_suggestions();
 		this.render_plan();
+		this.schedule_plan_evaluation();
 	}
 
 	render_plan() {
@@ -451,7 +473,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					`<strong>${__("{0} item allocations selected", [
 						rows.length,
 					])}</strong><p class="text-muted">${__(
-						"Evaluate to recalculate capacity and compatible categories on the server."
+						"Capacity and compatible vehicle categories are calculated automatically."
 					)}</p>`
 				);
 		const totals = this.plan.totals;
@@ -488,16 +510,31 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	async evaluate_plan() {
+		clearTimeout(this.plan_evaluation_timer);
+		const evaluation_id = ++this.plan_evaluation_id;
+		const rows = [...this.allocations.values()];
+		if (!rows.length) return;
+		this.$root.find(".dp-plan-content").html(this.loading());
 		try {
-			this.plan = await this.call("evaluate_manual_load_plan", {
-				allocations: [...this.allocations.values()],
+			const plan = await this.call("evaluate_manual_load_plan", {
+				allocations: rows,
 				vehicle_category: this.$root.find(".dp-category-select").val() || null,
 			});
+			if (evaluation_id !== this.plan_evaluation_id) return;
+			this.plan = plan;
 			this.render_plan();
 		} catch (error) {
+			if (evaluation_id !== this.plan_evaluation_id) return;
 			this.plan = null;
 			this.$root.find(".dp-plan-content").html(this.error_message(error));
 		}
+	}
+
+	schedule_plan_evaluation() {
+		clearTimeout(this.plan_evaluation_timer);
+		if (!this.allocations.size) return;
+		this.$root.find(".dp-plan-content").html(this.loading());
+		this.plan_evaluation_timer = setTimeout(() => this.evaluate_plan(), 300);
 	}
 
 	async create_load() {
@@ -617,9 +654,9 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		return `<div class="dp-suggestion-card">
 			<div><strong>#${suggestion.rank} · ${this.escape(
 			suggestion.vehicle_category_label || suggestion.vehicle_category
-		)}</strong><span class="indicator-pill ${suggestion.recommended ? "green" : "blue"}">${
-			suggestion.score
-		}/100</span></div>
+		)}</strong><span class="indicator-pill ${
+			suggestion.recommended ? "green" : "blue"
+		}">${this.number(suggestion.score)}%</span></div>
 			<div>${orders.length} ${__("orders")} · ${suggestion.total_stops || 0} ${__("stops")}</div>
 			<div class="small text-muted">${this.escape(
 				(suggestion.positive_factors || []).slice(0, 3).join(" · ")
@@ -783,6 +820,8 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	clear_plan() {
+		clearTimeout(this.plan_evaluation_timer);
+		this.plan_evaluation_id += 1;
 		this.allocations.clear();
 		this.details = {};
 		this.plan = null;
