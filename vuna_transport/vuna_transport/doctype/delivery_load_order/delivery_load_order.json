@@ -13,6 +13,8 @@
   "customer",
   "column_break_spvq",
   "delivery_address",
+  "delivery_group",
+  "transport_compatibility_group",
   "stop_sequence",
   "section_break_peej",
   "available_quantity",
@@ -67,6 +69,22 @@
    "fieldtype": "Link",
    "label": "Delivery Address",
    "options": "Address",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_group",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Delivery Group",
+   "options": "Delivery Group",
+   "read_only": 1
+  },
+  {
+   "fieldname": "transport_compatibility_group",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Transport Compatibility Group",
+   "options": "Transport Compatibility Group",
    "read_only": 1
   },
   {

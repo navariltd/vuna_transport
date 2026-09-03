@@ -134,7 +134,7 @@ def _validate_delivery_order_for_load(load, delivery_order, first_order):
 		and first_order.transport_compatibility_group
 		and delivery_order.transport_compatibility_group != first_order.transport_compatibility_group
 	):
-		frappe.throw(_("Delivery Orders in a load have incompatible Transport Compatibility Groups."))
+		_raise_incompatible_transport_groups(first_order, delivery_order)
 
 	canonical_method = canonical_delivery_method(delivery_order.delivery_method)
 	if canonical_method and frappe.db.get_value("Delivery Method", canonical_method, "disabled"):
@@ -158,11 +158,41 @@ def _validate_delivery_order_for_load(load, delivery_order, first_order):
 	load.special_equipment_required = ", ".join(sorted(equipment))
 
 
+def _raise_incompatible_transport_groups(first_order, delivery_order):
+	first_group = first_order.transport_compatibility_group or _("Not specified")
+	current_group = delivery_order.transport_compatibility_group or _("Not specified")
+	frappe.throw(
+		_("Incompatible Transport Compatibility Groups: '{0}' and '{1}'.").format(first_group, current_group)
+	)
+
+
+def validate_transport_compatibility_groups(delivery_orders):
+	"""Reject incompatible populated groups with an actionable error message."""
+	first = next(
+		(order for order in delivery_orders if order.transport_compatibility_group),
+		delivery_orders[0] if delivery_orders else None,
+	)
+	if not first or not first.transport_compatibility_group:
+		return
+	for delivery_order in delivery_orders:
+		if (
+			delivery_order.transport_compatibility_group
+			and delivery_order.transport_compatibility_group != first.transport_compatibility_group
+		):
+			_raise_incompatible_transport_groups(first, delivery_order)
+
+
 def _populate_load_row(row, delivery_order, delivery_order_item, available_quantity):
 	metrics = calculate_allocated_measurements(delivery_order_item, row.allocated_quantity)
 	row.sales_order = delivery_order.sales_order
 	row.customer = delivery_order.customer
 	row.delivery_address = delivery_order.delivery_address
+	row.delivery_group = getattr(delivery_order_item, "delivery_group", None) or getattr(
+		delivery_order, "delivery_group", None
+	)
+	row.transport_compatibility_group = getattr(
+		delivery_order_item, "transport_compatibility_group", None
+	) or getattr(delivery_order, "transport_compatibility_group", None)
 	row.available_quantity = available_quantity
 	for fieldname, value in metrics.items():
 		row.set(fieldname, value)

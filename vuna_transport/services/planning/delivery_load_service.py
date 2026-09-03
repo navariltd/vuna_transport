@@ -19,6 +19,7 @@ from vuna_transport.services.planning.load_validation_service import (
 	get_available_quantity,
 	sync_delivery_order_allocations,
 	validate_load_allocations,
+	validate_transport_compatibility_groups,
 )
 from vuna_transport.services.shared.measurement_service import get_transport_uoms
 from vuna_transport.services.shared.security_service import (
@@ -53,6 +54,8 @@ def get_available_delivery_orders(
 		fields=[
 			"name",
 			"customer_name",
+			"delivery_group",
+			"transport_compatibility_group",
 			"required_delivery_date",
 			"requested_quantity",
 			"reserved_quantity",
@@ -293,6 +296,11 @@ def add_delivery_orders_to_load(load, delivery_order_names):
 					"sales_order": delivery_order.sales_order,
 					"customer": delivery_order.customer,
 					"delivery_address": delivery_order.delivery_address,
+					"delivery_group": delivery_order_item.delivery_group or delivery_order.delivery_group,
+					"transport_compatibility_group": (
+						delivery_order_item.transport_compatibility_group
+						or delivery_order.transport_compatibility_group
+					),
 					"allocated_quantity": available_quantity,
 					"available_quantity": available_quantity,
 					"weight": flt(delivery_order_item.weight) * ratio,
@@ -347,6 +355,11 @@ def get_delivery_order_items(delivery_order_names):
 					"sales_order": delivery_order.sales_order,
 					"customer": delivery_order.customer,
 					"delivery_address": delivery_order.delivery_address,
+					"delivery_group": delivery_order_item.delivery_group or delivery_order.delivery_group,
+					"transport_compatibility_group": (
+						delivery_order_item.transport_compatibility_group
+						or delivery_order.transport_compatibility_group
+					),
 					"allocated_quantity": available_quantity,
 					"available_quantity": available_quantity,
 					"weight": flt(delivery_order_item.weight) * ratio,
@@ -426,6 +439,7 @@ def _validate_delivery_orders(delivery_orders):
 			first.transport_handling_profile or ""
 		).strip():
 			frappe.throw(_("All Delivery Orders in a load must have compatible handling profiles."))
+	validate_transport_compatibility_groups(delivery_orders)
 
 
 def calculate_load_totals(load):

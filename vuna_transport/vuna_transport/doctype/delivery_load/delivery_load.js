@@ -74,6 +74,8 @@ frappe.ui.form.on("Delivery Load", {
 						columns: [
 							"name",
 							"customer_name",
+							"delivery_group",
+							"transport_compatibility_group",
 							"required_delivery_date",
 							"requested_quantity",
 							"reserved_quantity",
@@ -84,6 +86,9 @@ frappe.ui.form.on("Delivery Load", {
 							company: frm.doc.company || null,
 							source_warehouse: frm.doc.source_warehouse || null,
 							transport_zone: frm.doc.transport_zone || null,
+							transport_compatibility_group:
+								frm.doc.delivery_orders?.[0]?.transport_compatibility_group ||
+								null,
 						},
 						get_query() {
 							return {
@@ -408,19 +413,31 @@ function render_execution_progress(frm, summary) {
 	const cards = steps
 		.map(
 			(step, index) => `
-				<div style="flex:1; min-width:140px; padding:12px; border:1px solid var(--border-color); border-radius:8px; background:var(--card-bg);">
+				<div style="min-width:0; min-height:82px; padding:8px; border:1px solid var(--border-color); border-radius:6px; background:var(--card-bg);">
 					<div class="text-muted small">${index + 1}. ${frappe.utils.escape_html(step.label)}</div>
-					<div style="font-weight:600; margin-top:4px;">${frappe.utils.escape_html(step.value)}</div>
-					<div class="indicator-pill ${colors[step.state]}" style="margin-top:8px;">${__(step.state)}</div>
+					<div style="font-weight:600; margin-top:3px;">${frappe.utils.escape_html(step.value)}</div>
+					<div class="indicator-pill ${colors[step.state]}" style="margin-top:5px;">${__(step.state)}</div>
 				</div>`
 		)
 		.join("");
 
 	frm.get_field("execution_overview").$wrapper.html(`
-		<div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">${cards}</div>
-		<div class="alert alert-info" style="margin-bottom:0;">
-			<div style="font-weight:600;">${frappe.utils.escape_html(__(summary.next_action.label))}</div>
-			<div class="small">${frappe.utils.escape_html(__(summary.next_action.description))}</div>
+		<div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border:1px solid var(--border-color); border-radius:6px; background:var(--control-bg);">
+			<span><span class="indicator-pill ${colors[load_step.state]}">${frappe.utils.escape_html(
+		load_step.value
+	)}</span><span class="text-muted small" style="margin-left:8px;">${frappe.utils.escape_html(
+		__(summary.next_action.label)
+	)}</span></span>
+			<details style="display:inline-block;"><summary class="text-muted small" style="cursor:pointer;">${__(
+				"View progress"
+			)}</summary>
+				<div style="position:absolute; z-index:5; right:var(--padding-md); width:min(720px, calc(100vw - 40px)); padding:10px; border:1px solid var(--border-color); border-radius:6px; background:var(--card-bg); box-shadow:var(--card-shadow);">
+					<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:6px;">${cards}</div>
+					<div class="small text-muted" style="margin-top:8px;">${frappe.utils.escape_html(
+						__(summary.next_action.description)
+					)}</div>
+				</div>
+			</details>
 		</div>
 	`);
 }
@@ -442,10 +459,29 @@ frappe.ui.form.on("Delivery Load Order", {
 			frappe.model.set_value(cdt, cdn, "sales_order", delivery_order.sales_order);
 			frappe.model.set_value(cdt, cdn, "customer", delivery_order.customer);
 			frappe.model.set_value(cdt, cdn, "delivery_address", delivery_order.delivery_address);
+			frappe.model.set_value(cdt, cdn, "delivery_group", delivery_order.delivery_group);
+			frappe.model.set_value(
+				cdt,
+				cdn,
+				"transport_compatibility_group",
+				delivery_order.transport_compatibility_group
+			);
 		});
 	},
 
 	delivery_order_item(frm, cdt, cdn) {
+		const row = locals[cdt][cdn];
+		if (row.delivery_order_item) {
+			frappe.db.get_doc("Delivery Order Item", row.delivery_order_item).then((item) => {
+				frappe.model.set_value(cdt, cdn, "delivery_group", item.delivery_group);
+				frappe.model.set_value(
+					cdt,
+					cdn,
+					"transport_compatibility_group",
+					item.transport_compatibility_group
+				);
+			});
+		}
 		update_allocation_preview(frm, cdt, cdn, true);
 	},
 
