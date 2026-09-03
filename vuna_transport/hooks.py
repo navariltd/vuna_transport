@@ -221,6 +221,7 @@ doc_events = {
 doctype_js = {
 	"Address": "public/js/address.js",
 	"Delivery Trip": "public/js/delivery_trip.js",
+	"Sales Order": "public/js/sales_order.js",
 	"Vehicle": "public/js/vehicle.js",
 	"Vehicle Incident": "public/js/vehicle_incident_location.js",
 }

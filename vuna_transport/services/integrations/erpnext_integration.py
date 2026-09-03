@@ -51,10 +51,13 @@ def create_pick_list_for_load(load):
 			{
 				"item_code": delivery_order_item.item_code,
 				"qty": flt(load_row.allocated_quantity),
-				"stock_qty": flt(load_row.allocated_quantity),
-				"picked_qty": flt(load_row.allocated_quantity),
-				"uom": delivery_order_item.stock_uom,
+				"stock_qty": flt(load_row.allocated_quantity)
+				* flt(delivery_order_item.conversion_factor or 1),
+				"picked_qty": flt(load_row.allocated_quantity)
+				* flt(delivery_order_item.conversion_factor or 1),
+				"uom": delivery_order_item.uom or delivery_order_item.stock_uom,
 				"stock_uom": delivery_order_item.stock_uom,
+				"conversion_factor": delivery_order_item.conversion_factor or 1,
 				"warehouse": load.source_warehouse,
 				"sales_order": load_row.sales_order,
 				"sales_order_item": delivery_order_item.sales_order_item,

@@ -10,12 +10,14 @@ from frappe.tests import UnitTestCase
 from frappe.utils import flt
 
 from vuna_transport.services.demand.delivery_order_service import (
+	_get_delivery_order_item_values,
 	_get_group_key,
 	_get_group_transport_requirements,
 	_get_item_measure,
 	_get_transport_quantity,
 	_is_stock_item,
 	_requires_transport_planning,
+	get_delivery_order_generation_status,
 	get_sales_order_item_quantities,
 	sync_delivery_order_quantities,
 )
@@ -102,9 +104,57 @@ class TestDeliveryOrder(UnitTestCase):
 		_create_delivery_order.assert_called_once()
 		self.assertEqual(_create_delivery_order.call_args.args[2], [(stock_item, 1)])
 
+	@patch(
+		"vuna_transport.services.demand.delivery_order_service._is_item_already_linked", return_value=False
+	)
+	@patch("vuna_transport.services.demand.delivery_order_service._get_transport_quantity", return_value=1)
+	@patch("vuna_transport.services.demand.delivery_order_service._is_stock_item", return_value=True)
+	@patch(
+		"vuna_transport.services.demand.delivery_order_service._requires_transport_planning",
+		return_value=True,
+	)
+	@patch("vuna_transport.services.demand.delivery_order_service.require_document_permission")
+	@patch("vuna_transport.services.demand.delivery_order_service._get_sales_order")
+	def test_generation_status_is_available_for_missing_delivery_orders(
+		self,
+		get_sales_order,
+		_require_document_permission,
+		_requires_transport_planning,
+		_is_stock_item,
+		_get_transport_quantity,
+		_is_item_already_linked,
+	):
+		item = SimpleNamespace(name="SOI-1", item_code="MILK")
+		get_sales_order.return_value = SimpleNamespace(docstatus=1, items=[item])
+
+		self.assertEqual(get_delivery_order_generation_status("SO-TEST"), {"can_generate": True})
+
 	def test_sales_order_quantities_are_authoritative(self):
 		item = SimpleNamespace(qty=100, delivered_qty=30)
 		self.assertEqual(get_sales_order_item_quantities(item), (100, 70))
+
+	@patch("vuna_transport.services.demand.delivery_order_service._get_item_transport_measurements")
+	def test_delivery_order_item_preserves_sales_uom_and_stock_quantity(self, get_measurements):
+		get_measurements.return_value = SimpleNamespace(
+			weight=120, weight_uom="Kg", volume=12, volume_uom="Cubic Meter"
+		)
+		item = SimpleNamespace(
+			name="SOI-1",
+			item_code="MILK-CARTON",
+			item_name="Milk Carton",
+			qty=10,
+			uom="Carton",
+			stock_uom="Litre",
+			conversion_factor=12,
+			warehouse="Main Warehouse",
+		)
+
+		values = _get_delivery_order_item_values(item, 10)
+
+		self.assertEqual(values["uom"], "Carton")
+		self.assertEqual(values["stock_uom"], "Litre")
+		self.assertEqual(values["conversion_factor"], 12)
+		self.assertEqual(values["stock_qty"], 120)
 
 	@patch("vuna_transport.services.demand.delivery_order_service.frappe.db.get_single_value")
 	def test_auto_submit_delivery_orders_setting_is_disabled_by_default(self, get_single_value):

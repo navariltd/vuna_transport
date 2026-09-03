@@ -25,6 +25,22 @@
   "delivery_method",
   "section_break_rrsi",
   "items",
+  "planning_details_section",
+  "total_quantity",
+  "requested_quantity",
+  "column_break_xsfm",
+  "total_weight",
+  "weight_uom",
+  "total_volume",
+  "volume_uom",
+  "column_break_guha",
+  "allocated_quantity",
+  "reserved_quantity",
+  "unallocated_quantity",
+  "column_break_zjut",
+  "total_pallets",
+  "total_cases",
+  "total_crates",
   "section_break_bdbs",
   "amended_from",
   "planning_tab",
@@ -61,21 +77,6 @@
   "destination_location",
   "destination_latitude",
   "destination_longitude",
-  "planning_details_section",
-  "total_quantity",
-  "requested_quantity",
-  "total_weight",
-  "weight_uom",
-  "column_break_guha",
-  "allocated_quantity",
-  "reserved_quantity",
-  "unallocated_quantity",
-  "total_volume",
-  "volume_uom",
-  "column_break_zjut",
-  "total_pallets",
-  "total_cases",
-  "total_crates",
   "connections"
  ],
  "fields": [
@@ -385,16 +386,16 @@
    "label": "Allocation Summary"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "total_quantity",
    "fieldtype": "Float",
-   "allow_on_submit": 1,
    "label": "Total Quantity",
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "requested_quantity",
    "fieldtype": "Float",
-   "allow_on_submit": 1,
    "label": "Requested Quantity",
    "read_only": 1
   },
@@ -403,23 +404,23 @@
    "fieldtype": "Column Break"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "allocated_quantity",
    "fieldtype": "Float",
-   "allow_on_submit": 1,
    "label": "Allocated Quantity",
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "reserved_quantity",
    "fieldtype": "Float",
-   "allow_on_submit": 1,
    "label": "Reserved Quantity",
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "unallocated_quantity",
    "fieldtype": "Float",
-   "allow_on_submit": 1,
    "label": "Unallocated Quantity",
    "read_only": 1
   },
@@ -428,53 +429,53 @@
    "fieldtype": "Column Break"
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "total_weight",
    "fieldtype": "Float",
-   "allow_on_submit": 1,
    "label": "Total Weight",
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "weight_uom",
    "fieldtype": "Link",
-   "allow_on_submit": 1,
    "label": "Weight UOM",
    "options": "UOM",
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "total_volume",
    "fieldtype": "Float",
-   "allow_on_submit": 1,
    "label": "Total Volume",
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "volume_uom",
    "fieldtype": "Link",
-   "allow_on_submit": 1,
    "label": "Volume UOM",
    "options": "UOM",
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "total_pallets",
    "fieldtype": "Float",
-   "allow_on_submit": 1,
    "label": "Total Pallets",
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "total_cases",
    "fieldtype": "Float",
-   "allow_on_submit": 1,
    "label": "Total Cases",
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "total_crates",
    "fieldtype": "Float",
-   "allow_on_submit": 1,
    "label": "Total Crates",
    "read_only": 1
   },
@@ -519,6 +520,10 @@
    "fieldtype": "Tab Break",
    "label": "Connections",
    "show_dashboard": 1
+  },
+  {
+   "fieldname": "column_break_xsfm",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
@@ -530,7 +535,7 @@
    "link_fieldname": "delivery_order"
   }
  ],
- "modified": "2026-08-31 12:29:58.754531",
+ "modified": "2026-09-03 05:52:12.488111",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Delivery Order",

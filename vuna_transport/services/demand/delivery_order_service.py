@@ -9,6 +9,10 @@ from frappe.utils import flt, getdate
 from vuna_transport.services.demand.delivery_method_service import canonical_delivery_method
 from vuna_transport.services.routing.location_service import get_address_planning_data
 from vuna_transport.services.shared.measurement_service import convert_measurement, get_transport_uoms
+from vuna_transport.services.shared.security_service import (
+	require_doctype_permission,
+	require_document_permission,
+)
 
 GROUPING_FIELDS = (
 	"delivery_date",
@@ -78,6 +82,40 @@ def sync_delivery_orders_for_sales_order(sales_order):
 	return create_delivery_orders_for_sales_order(doc)
 
 
+@frappe.whitelist()
+def get_delivery_order_generation_status(sales_order):
+	"""Return whether the Sales Order currently has demand to generate."""
+	doc = _get_sales_order(sales_order)
+	require_document_permission(doc, "read")
+
+	if doc.docstatus != 1:
+		return {"can_generate": False, "reason": _("The Sales Order must be submitted first.")}
+	if not _requires_transport_planning(doc):
+		return {
+			"can_generate": False,
+			"reason": _("This Delivery Method does not require transport planning."),
+		}
+
+	for item in doc.items:
+		if (
+			_is_stock_item(item)
+			and _get_transport_quantity(item) > 0
+			and not _is_item_already_linked(item.name)
+		):
+			return {"can_generate": True}
+
+	return {"can_generate": False, "reason": _("All eligible stock items already have Delivery Orders.")}
+
+
+@frappe.whitelist()
+def generate_delivery_orders_for_sales_order(sales_order):
+	"""Generate missing Delivery Orders from an explicitly requested Sales Order action."""
+	doc = _get_sales_order(sales_order)
+	require_document_permission(doc, "read")
+	require_doctype_permission("Delivery Order", "create")
+	return create_delivery_orders_for_sales_order(doc)
+
+
 def sync_delivery_order_quantities(delivery_order, persist=False):
 	"""Refresh generated quantities from Sales Order Items without breaking allocations."""
 	if not delivery_order.sales_order:
@@ -105,6 +143,9 @@ def sync_delivery_order_quantities(delivery_order, persist=False):
 		values = {
 			"ordered_qty": ordered_qty,
 			"transport_qty": transport_qty,
+			"uom": getattr(sales_item, "uom", None),
+			"conversion_factor": flt(getattr(sales_item, "conversion_factor", 1) or 1),
+			"stock_qty": _get_stock_quantity(sales_item, transport_qty),
 			"weight": measurements.weight,
 			"weight_uom": measurements.weight_uom,
 			"volume": measurements.volume,
@@ -446,6 +487,9 @@ def _get_delivery_order_item_values(
 		"item_name": getattr(item, "item_name", None),
 		"ordered_qty": flt(getattr(item, "qty", 0)),
 		"transport_qty": transport_qty,
+		"uom": getattr(item, "uom", None),
+		"conversion_factor": flt(getattr(item, "conversion_factor", 1) or 1),
+		"stock_qty": _get_stock_quantity(item, transport_qty),
 		"stock_uom": getattr(item, "stock_uom", None) or getattr(item, "uom", None),
 		"s_warehouse": getattr(item, "warehouse", None),
 		"delivery_date": getattr(item, "delivery_date", None),
@@ -467,7 +511,7 @@ def _get_delivery_order_item_values(
 def _get_item_transport_measurements(sales_order_item, transport_qty):
 	item = frappe.get_cached_doc("Item", sales_order_item.item_code)
 	uoms = get_transport_uoms()
-	stock_quantity = flt(transport_qty) * flt(getattr(sales_order_item, "conversion_factor", 1) or 1)
+	stock_quantity = _get_stock_quantity(sales_order_item, transport_qty)
 	if flt(item.weight_per_unit) and not uoms.weight_uom:
 		frappe.throw(_("Set Default Weight UOM in Transport Settings."))
 	if flt(getattr(item, "vuna_volume_per_stock_uom", 0)) and not uoms.volume_uom:
@@ -493,6 +537,10 @@ def _get_item_transport_measurements(sales_order_item, transport_qty):
 		volume=volume,
 		volume_uom=uoms.volume_uom or volume_uom,
 	)
+
+
+def _get_stock_quantity(sales_order_item, quantity):
+	return flt(quantity) * flt(getattr(sales_order_item, "conversion_factor", 1) or 1)
 
 
 def _get_item_measure(item, measure, quantity):
