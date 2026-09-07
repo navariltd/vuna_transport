@@ -14,6 +14,7 @@ from vuna_transport.services.shared.security_service import require_document_per
 
 def validate_vehicle(doc, method=None):
 	"""Populate standard Vehicle fields from the selected Vuna Vehicle Model."""
+	_validate_vehicle_operational_roles(doc)
 	_validate_vehicle_asset(doc)
 	if not getattr(doc, "vuna_vehicle_model", None):
 		return
@@ -33,6 +34,55 @@ def validate_vehicle(doc, method=None):
 		"Electric",
 	):
 		doc.fuel_type = vehicle_model.fuel_type
+
+
+def _validate_vehicle_operational_roles(doc):
+	"""Validate role assignments without coupling roles to availability or permissions."""
+	roles = (
+		doc.get("vuna_operational_roles")
+		if hasattr(doc, "get")
+		else getattr(doc, "vuna_operational_roles", None)
+	)
+	role_names = [
+		getattr(row, "operational_role", None)
+		for row in (roles or [])
+		if getattr(row, "operational_role", None)
+	]
+	duplicates = sorted({role for role in role_names if role_names.count(role) > 1})
+	if duplicates:
+		frappe.throw(
+			_("Vehicle Operational Roles cannot contain duplicates: {0}.").format(", ".join(duplicates))
+		)
+	if not role_names:
+		return
+	disabled_roles = frappe.get_all(
+		"Vehicle Operational Role",
+		filters={"name": ["in", role_names], "disabled": 1},
+		pluck="name",
+	)
+	if disabled_roles:
+		frappe.throw(
+			_("Disabled Vehicle Operational Roles cannot be assigned: {0}.").format(", ".join(disabled_roles))
+		)
+
+
+def get_vehicles_by_operational_role(role, *, company=None, include_disabled=False):
+	"""Return Vehicles assigned to a role, without changing other fleet rules."""
+	if not role:
+		return []
+	role_rows = frappe.get_all(
+		"Vehicle Operational Role Item",
+		filters={"operational_role": role},
+		pluck="parent",
+	)
+	if not role_rows:
+		return []
+	vehicle_filters = {"name": ["in", role_rows]}
+	if company:
+		vehicle_filters["company"] = company
+	if not include_disabled:
+		vehicle_filters["docstatus"] = ["<", 2]
+	return frappe.get_all("Vehicle", filters=vehicle_filters, pluck="name")
 
 
 @frappe.whitelist()

@@ -10,6 +10,15 @@ frappe.ui.form.on("Vehicle", {
 				current_vehicle: frm.doc.name,
 			},
 		}));
+		const roles_field = frm.fields_dict.vuna_operational_roles;
+		if (roles_field?.grid) {
+			const role_field = roles_field.grid.get_field("operational_role");
+			if (role_field) {
+				role_field.get_query = () => ({
+					filters: { disabled: 0 },
+				});
+			}
+		}
 	},
 
 	refresh(frm) {

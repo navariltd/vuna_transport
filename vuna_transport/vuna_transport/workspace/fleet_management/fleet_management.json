@@ -91,6 +91,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Vehicle Operational Role",
+   "link_count": 0,
+   "link_to": "Vehicle Operational Role",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Vehicle Document Type",
    "link_count": 0,
    "link_to": "Vehicle Document Type",

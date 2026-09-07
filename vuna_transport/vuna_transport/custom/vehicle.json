@@ -1,6 +1,23 @@
 {
  "custom_fields": [
   {
+   "creation": "2026-09-07 11:00:00.000000",
+   "description": "Business functions this vehicle may perform. Roles do not determine availability or user permissions.",
+   "docstatus": 0,
+   "dt": "Vehicle",
+   "fieldname": "vuna_operational_roles",
+   "fieldtype": "Table MultiSelect",
+   "in_list_view": 0,
+   "insert_after": "vuna_vehicle_category",
+   "label": "Operational Roles",
+   "modified": "2026-09-07 11:00:00.000000",
+   "modified_by": "Administrator",
+   "module": "Vuna Transport",
+   "name": "Vehicle-vuna_operational_roles",
+   "options": "Vehicle Operational Role Item",
+   "owner": "Administrator"
+  },
+  {
    "creation": "2026-09-07 10:00:00.000000",
    "default": "0",
    "description": "Globally disables this Vehicle from operational use across Vuna Transport.",

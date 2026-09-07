@@ -10,6 +10,8 @@ from frappe.tests import UnitTestCase
 
 from vuna_transport.services.fleet.fleet_service import (
 	_validate_vehicle_asset,
+	_validate_vehicle_operational_roles,
+	get_vehicles_by_operational_role,
 	sync_vehicle_operational_snapshots,
 	validate_vehicle,
 )
@@ -89,6 +91,37 @@ class TestVehicleAssetValidation(UnitTestCase):
 		validate_vehicle(vehicle)
 
 		self.assertEqual(vehicle.vuna_vehicle_category, "Refrigerated Van")
+
+
+class TestVehicleOperationalRoles(UnitTestCase):
+	def test_duplicate_roles_are_rejected(self):
+		vehicle = frappe._dict(
+			vuna_operational_roles=[
+				frappe._dict(operational_role="Distribution"),
+				frappe._dict(operational_role="Distribution"),
+			]
+		)
+
+		with self.assertRaises(ValidationError):
+			_validate_vehicle_operational_roles(vehicle)
+
+	@patch("vuna_transport.services.fleet.fleet_service.frappe.get_all")
+	def test_disabled_roles_are_rejected(self, get_all):
+		get_all.return_value = ["Distribution"]
+		vehicle = frappe._dict(vuna_operational_roles=[frappe._dict(operational_role="Distribution")])
+
+		with self.assertRaises(ValidationError):
+			_validate_vehicle_operational_roles(vehicle)
+
+	def test_vehicles_can_be_queried_by_role_and_company(self):
+		with patch(
+			"vuna_transport.services.fleet.fleet_service.frappe.get_all",
+			side_effect=[["KDA 123A", "KDB 456B"], ["KDA 123A"]],
+		) as get_all:
+			result = get_vehicles_by_operational_role("Distribution", company="Yovuna Tech")
+
+		self.assertEqual(result, ["KDA 123A"])
+		self.assertEqual(get_all.call_count, 2)
 
 
 class TestVehicleStatusSnapshot(UnitTestCase):

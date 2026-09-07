@@ -124,6 +124,18 @@
   {
    "child": 1,
    "collapsible": 1,
+   "icon": "briefcase",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Vehicle Operational Role",
+   "link_to": "Vehicle Operational Role",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
    "icon": "file-text",
    "indent": 0,
    "keep_closed": 0,
