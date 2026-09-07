@@ -127,8 +127,8 @@
   {
    "fieldname": "return_reason",
    "fieldtype": "Small Text",
-   "label": "Return Reason",
-   "reqd": 1
+   "label": "Item Return Reason",
+   "description": "Required before submitting the Return Request."
   },
   {
    "fieldname": "quality_inspection",

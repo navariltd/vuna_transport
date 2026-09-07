@@ -152,6 +152,12 @@ def _validate_items(request, delivery_note):
 			frappe.throw(
 				_("Resolution quantity cannot exceed received quantity for {0}.").format(row.item_code)
 			)
+		if request.status != "Draft" and not row.return_reason:
+			frappe.throw(
+				_("Item Return Reason is required for {0} before submitting the Return Request.").format(
+					row.item_code
+				)
+			)
 		_validate_quality_inspection(row, request, delivery_note)
 		_validate_resolution_type(row, request.company)
 
@@ -254,6 +260,40 @@ def get_remaining_returnable_quantity(delivery_note_item, exclude_request=None):
 		(delivery_note_item, exclude_request, exclude_request),
 	)[0][0]
 	return max(delivered - flt(returned) - flt(requested), 0)
+
+
+@frappe.whitelist()
+def get_returnable_items(delivery_note):
+	"""Return submitted Delivery Note items with remaining returnable quantities."""
+	require_doctype_permission("Delivery Note", "read")
+	source = frappe.get_doc("Delivery Note", delivery_note)
+	require_document_permission(source, "read")
+	if source.docstatus != 1 or source.is_return:
+		frappe.throw(_("Return Requests must reference a submitted non-return Delivery Note."))
+
+	items = []
+	for row in source.items:
+		remaining = get_remaining_returnable_quantity(row.name)
+		if remaining <= 0:
+			continue
+		delivery_order_item = row.get("delivery_order_item")
+		if not delivery_order_item and row.get("so_detail"):
+			delivery_order_item = frappe.db.get_value(
+				"Delivery Order Item",
+				{"sales_order_item": row.so_detail, "item_code": row.item_code},
+				"name",
+			)
+		items.append(
+			{
+				"item_code": row.item_code,
+				"item_name": row.item_name,
+				"delivery_note_item": row.name,
+				"delivery_order_item": delivery_order_item,
+				"delivered_qty": abs(flt(row.stock_qty or row.qty)),
+				"requested_return_qty": remaining,
+			}
+		)
+	return items
 
 
 @frappe.whitelist()

@@ -26,6 +26,7 @@ frappe.ui.form.on("Return Request", {
 
 	refresh(frm) {
 		add_view_buttons(frm);
+		add_get_delivered_items_button(frm);
 		if (frm.is_new()) return;
 
 		if (frm.doc.status === "Draft") {
@@ -70,7 +71,44 @@ frappe.ui.form.on("Return Request", {
 			frm.add_custom_button(__("Close"), () => transition(frm, "close"), __("Actions"));
 		}
 	},
+
+	delivery_note(frm) {
+		add_get_delivered_items_button(frm);
+	},
 });
+
+function add_get_delivered_items_button(frm) {
+	frm.remove_custom_button(__("Get Delivered Items"), __("Actions"));
+	if (!frm.doc.delivery_note) return;
+	frm.add_custom_button(
+		__("Get Delivered Items"),
+		() => get_delivered_items(frm),
+		__("Actions")
+	);
+}
+
+function get_delivered_items(frm) {
+	frappe.call({
+		method: "vuna_transport.services.execution.return_service.get_returnable_items",
+		args: { delivery_note: frm.doc.delivery_note },
+		freeze: true,
+		callback: (response) => {
+			const items = response.message || [];
+			frm.clear_table("items");
+			items.forEach((item) => frm.add_child("items", item));
+			frm.refresh_field("items");
+			if (!items.length) {
+				frappe.msgprint(__("This Delivery Note has no remaining returnable items."));
+				return;
+			}
+			frm.dirty();
+			frappe.show_alert({
+				message: __("{0} returnable item(s) added", [items.length]),
+				indicator: "green",
+			});
+		},
+	});
+}
 
 function transition(frm, action) {
 	frappe.call({
