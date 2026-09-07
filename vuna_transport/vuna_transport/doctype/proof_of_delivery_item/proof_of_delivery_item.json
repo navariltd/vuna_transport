@@ -77,7 +77,7 @@
    "fieldname": "rejection_reasons",
    "fieldtype": "Table MultiSelect",
    "label": "Rejection Reasons",
-   "options": "Proof of Delivery Rejection Reason"
+   "options": "Rejection Reason Item"
   },
   {
    "depends_on": "eval:doc.rejected_qty",

@@ -1,0 +1,261 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-09-07 07:29:34.478202",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "return_tab",
+  "identity_section",
+  "naming_series",
+  "company",
+  "customer",
+  "column_break_identity",
+  "status",
+  "initiated_by",
+  "initiation_date",
+  "return_reasons",
+  "return_remarks",
+  "source_section",
+  "sales_order",
+  "delivery_note",
+  "column_break_source",
+  "delivery_trip",
+  "proof_of_delivery",
+  "return_section",
+  "return_method",
+  "return_warehouse",
+  "items",
+  "resolution_section",
+  "return_stock_document",
+  "credit_note",
+  "replacement_delivery_reference",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "return_tab",
+   "fieldtype": "Tab Break",
+   "label": "Return Request"
+  },
+  {
+   "fieldname": "identity_section",
+   "fieldtype": "Section Break",
+   "label": "Request Details"
+  },
+  {
+   "default": "RR-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "RR-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Customer",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_identity",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nRequested\nApproved\nAwaiting Return\nIn Transit\nReceived\nUnder Inspection\nAwaiting Resolution\nResolved\nClosed\nCancelled",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "initiated_by",
+   "fieldtype": "Select",
+   "label": "Initiated By",
+   "options": "Customer\nDriver\nSalesperson\nDispatcher\nOther",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "initiation_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Initiation Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "return_reasons",
+   "fieldtype": "Table MultiSelect",
+   "label": "Return Reasons",
+   "options": "Rejection Reason Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "return_remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "source_section",
+   "fieldtype": "Section Break",
+   "label": "Original Delivery"
+  },
+  {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "label": "Sales Order",
+   "options": "Sales Order",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_note",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Delivery Note",
+   "options": "Delivery Note",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_source",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "delivery_trip",
+   "fieldtype": "Link",
+   "label": "Delivery Trip",
+   "options": "Delivery Trip"
+  },
+  {
+   "fieldname": "proof_of_delivery",
+   "fieldtype": "Link",
+   "label": "Proof of Delivery",
+   "options": "Proof of Delivery"
+  },
+  {
+   "fieldname": "return_section",
+   "fieldtype": "Section Break",
+   "label": "Return Movement"
+  },
+  {
+   "fieldname": "return_method",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Return Method",
+   "options": "Company Pickup\nCustomer Drop-off\nDriver Return\nThird-party Return",
+   "reqd": 1
+  },
+  {
+   "fieldname": "return_warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Return Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Return Items",
+   "options": "Return Request Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "resolution_section",
+   "fieldtype": "Section Break",
+   "label": "ERPNext Stock & Follow-up"
+  },
+  {
+   "fieldname": "return_stock_document",
+   "fieldtype": "Link",
+   "label": "Return Stock Document",
+   "options": "Delivery Note",
+   "read_only": 1
+  },
+  {
+   "fieldname": "credit_note",
+   "fieldtype": "Link",
+   "label": "Credit Note",
+   "options": "Sales Invoice"
+  },
+  {
+   "fieldname": "replacement_delivery_reference",
+   "fieldtype": "Link",
+   "label": "Replacement / Follow-up Delivery Order",
+   "options": "Delivery Order"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Long Text",
+   "label": "Notes"
+  }
+ ],
+ "grid_page_length": 50,
+ "links": [],
+ "modified": "2026-09-07 07:29:34.478202",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Return Request",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Planner",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Dispatcher",
+   "write": 1
+  },
+  {
+   "create": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Manager",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

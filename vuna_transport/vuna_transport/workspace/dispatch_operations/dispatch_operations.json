@@ -77,6 +77,18 @@
    "type": "Link"
   },
   {
+   "label": "Return Requests",
+   "link_to": "Return Request",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Return Resolution Types",
+   "link_to": "Return Resolution Type",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
    "label": "Dispatch Setup",
    "link_count": 6,
    "type": "Card Break"
@@ -166,7 +178,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-03 05:56:56.991966",
+ "modified": "2026-09-07 07:29:34.478202",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Dispatch Operations",

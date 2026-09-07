@@ -4,5 +4,5 @@
 from frappe.model.document import Document
 
 
-class DeliveryRejectionReason(Document):
+class RejectionReasonItem(Document):
 	pass
