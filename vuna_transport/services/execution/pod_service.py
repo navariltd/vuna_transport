@@ -103,6 +103,7 @@ def validate_pod_items(items):
 	if not items:
 		frappe.throw(_("At least one Proof of Delivery item is required."))
 	for item in items:
+		item.rejected_qty = max(flt(item.ordered_qty) - flt(item.delivered_qty), 0)
 		if flt(item.delivered_qty) < 0 or flt(item.rejected_qty) < 0:
 			frappe.throw(_("Delivered and rejected quantities cannot be negative."))
 		if flt(item.delivered_qty) + flt(item.rejected_qty) > flt(item.ordered_qty):
@@ -111,7 +112,7 @@ def validate_pod_items(items):
 					item.item_code
 				)
 			)
-		if flt(item.rejected_qty) and not item.rejection_reason:
+		if flt(item.rejected_qty) and not getattr(item, "rejection_reasons", None):
 			frappe.throw(_("A rejection reason is required for item {0}.").format(item.item_code))
 
 

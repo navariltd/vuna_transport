@@ -31,6 +31,7 @@
   "items",
   "exception_details",
   "exception_reason",
+  "remarks",
   "notes",
   "section_break_kaie",
   "amended_from"
@@ -162,6 +163,12 @@
    "fieldtype": "Select",
    "label": "Exception Reason",
    "options": "Customer Closed\nCustomer Unavailable\nWrong Address\nProduct Rejected\nProduct Damaged\nQuantity Shortage\nTemperature Breach\nPayment Unavailable\nVehicle Breakdown\nRoad or Weather Disruption\nOther"
+  },
+  {
+   "depends_on": "eval:doc.status in ['Partially Delivered', 'Rejected', 'Failed']",
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
   },
   {
    "fieldname": "notes",
