@@ -9,6 +9,7 @@ from vuna_transport.services.demand.delivery_method_service import (
 	delivery_methods_are_compatible,
 )
 from vuna_transport.services.fleet.vehicle_category_service import (
+	apply_capacity_override,
 	evaluate_vehicle_category,
 	get_effective_capacities,
 	get_vehicle_categories,
@@ -504,6 +505,12 @@ def validate_capacity(load, vehicle_category=None):
 		{"weight_uom": load.weight_uom, "volume_uom": load.volume_uom},
 		capacity_buffer,
 	)
+	capacity_override_enabled = _capacity_override_enabled()
+	vehicle.capacities = apply_capacity_override(
+		vehicle.capacities,
+		vehicle,
+		enabled=capacity_override_enabled,
+	)
 	result = evaluate_vehicle_category(
 		{
 			"weight": load.total_weight,
@@ -530,6 +537,8 @@ def validate_capacity(load, vehicle_category=None):
 		"valid": True,
 		"utilization": result["utilization"],
 		"capacity_buffer_percentage": capacity_buffer,
+		"capacity_override_percentage": flt(getattr(vehicle, "capacity_override_percentage", 0)),
+		"capacity_override_applied": bool(capacity_override_enabled),
 	}
 
 
@@ -636,7 +645,16 @@ def _fits(required, capacity):
 
 
 def get_capacity_buffer_percentage():
-	return flt(frappe.get_cached_doc("Transport Settings").default_capacity_buffer_percentage)
+	"""Return the legacy global safety buffer, retained for API compatibility."""
+	return 0
+
+
+def _capacity_override_enabled():
+	"""Return whether the current user may use a category's overload allowance."""
+	settings = frappe.get_cached_doc("Transport Settings")
+	return bool(getattr(settings, "allow_capacity_override", 0)) and frappe.has_permission(
+		"Vehicle Category", "write", throw=False
+	)
 
 
 def apply_capacity_buffer(capacity, buffer_percentage):

@@ -14,6 +14,7 @@ from vuna_transport.services.execution.lineage_service import (
 	validate_delivery_trip_note_set,
 )
 from vuna_transport.services.fleet.vehicle_category_service import (
+	apply_capacity_override,
 	evaluate_vehicle_category,
 	maximum_fitting_fraction,
 )
@@ -193,6 +194,13 @@ class TestDeliveryLoad(UnitTestCase):
 	def test_capacity_buffer_reduces_usable_capacity(self):
 		self.assertEqual(apply_capacity_buffer(100, 5), 95)
 		self.assertEqual(apply_capacity_buffer(0, 5), 0)
+
+	def test_category_capacity_override_increases_capacity_only_when_enabled(self):
+		category = SimpleNamespace(capacity_override_percentage=10)
+		capacities = {"weight": 100, "volume": 20, "pallets": 0, "cases": 0, "crates": 0}
+
+		self.assertEqual(apply_capacity_override(capacities, category, enabled=False), capacities)
+		self.assertAlmostEqual(apply_capacity_override(capacities, category, enabled=True)["weight"], 110)
 
 	def test_delivery_note_cannot_exceed_load_allocation(self):
 		items = [SimpleNamespace(so_detail="SOI-1", item_code="ITEM-1", qty=51)]

@@ -20,6 +20,7 @@
   "section_break_pbqv",
   "max_payload_weight",
   "max_payload_weight_uom",
+  "capacity_override_percentage",
   "column_break_kuyt",
   "max_volume",
   "max_volume_uom",
@@ -109,11 +110,11 @@
    "reqd": 1
   },
   {
+   "default": "Kg",
    "fieldname": "max_payload_weight_uom",
    "fieldtype": "Link",
    "label": "Payload Weight UOM",
    "options": "UOM",
-   "default": "Kg",
    "reqd": 1
   },
   {
@@ -136,6 +137,13 @@
    "fieldname": "max_crates",
    "fieldtype": "Float",
    "label": "Maximum Crates"
+  },
+  {
+   "default": "0",
+   "fieldname": "capacity_override_percentage",
+   "fieldtype": "Percent",
+   "label": "Capacity Override Percentage",
+   "non_negative": 1
   },
   {
    "fieldname": "section_break_ymgh",
@@ -167,11 +175,11 @@
    "reqd": 1
   },
   {
+   "default": "Cubic Meter",
    "fieldname": "max_volume_uom",
    "fieldtype": "Link",
    "label": "Volume UOM",
    "options": "UOM",
-   "default": "Cubic Meter",
    "reqd": 1
   },
   {
@@ -192,7 +200,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-31 12:34:11.144233",
+ "modified": "2026-09-07 06:29:59.210778",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Category",

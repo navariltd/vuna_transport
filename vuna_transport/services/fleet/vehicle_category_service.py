@@ -23,6 +23,7 @@ def get_vehicle_categories(load_uoms, capacity_buffer_percentage=0):
 			"max_pallets",
 			"max_cases",
 			"max_crates",
+			"capacity_override_percentage",
 			"refrigerated",
 			"tail_lift",
 			"body_type",
@@ -92,6 +93,19 @@ def evaluate_vehicle_category(totals, category, requirements=None):
 		"compatible": not rejections,
 		"utilization": utilization,
 		"rejections": rejections,
+	}
+
+
+def apply_capacity_override(capacities, category, *, enabled=False):
+	"""Extend category capacities only for an explicitly enabled authorized override."""
+	if not enabled:
+		return capacities
+	percentage = flt(getattr(category, "capacity_override_percentage", 0))
+	if not percentage:
+		return capacities
+	factor = 1 + percentage / 100
+	return {
+		dimension: flt(capacity) * factor if capacity else 0 for dimension, capacity in capacities.items()
 	}
 
 

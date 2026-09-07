@@ -9,7 +9,6 @@
   "general_tab",
   "general_section",
   "default_source_document_type",
-  "default_capacity_buffer_percentage",
   "load_suggestion_option_count",
   "column_break_xyxh",
   "enabled",
@@ -18,7 +17,6 @@
   "require_sales_order_submission",
   "planning_section",
   "section_break_yskt",
-  "require_load_approval",
   "allow_capacity_override",
   "vehicle_allocation_timing",
   "column_break_gnzw",
@@ -48,12 +46,6 @@
    "fieldtype": "Link",
    "label": "Default Source Document Type",
    "options": "DocType"
-  },
-  {
-   "default": "0",
-   "fieldname": "default_capacity_buffer_percentage",
-   "fieldtype": "Percent",
-   "label": "Default Capacity Buffer Percentage"
   },
   {
    "default": "3",
@@ -94,12 +86,6 @@
   {
    "fieldname": "section_break_yskt",
    "fieldtype": "Section Break"
-  },
-  {
-   "default": "1",
-   "fieldname": "require_load_approval",
-   "fieldtype": "Check",
-   "label": "Require Load Approval"
   },
   {
    "default": "0",
