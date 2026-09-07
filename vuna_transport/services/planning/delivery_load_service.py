@@ -11,6 +11,7 @@ from vuna_transport.services.demand.delivery_method_service import (
 from vuna_transport.services.fleet.vehicle_category_service import (
 	apply_capacity_override,
 	evaluate_vehicle_category,
+	get_capacity_breakdown,
 	get_effective_capacities,
 	get_vehicle_categories,
 	validate_vehicle_access_limit,
@@ -121,6 +122,31 @@ def get_compatible_vehicle_categories(doctype, txt, searchfield, start, page_len
 	start = cint(start)
 	page_len = min(cint(page_len) or 20, 50)
 	return compatible[start : start + page_len]
+
+
+@frappe.whitelist()
+def get_vehicle_category_capacity_summary(vehicle_category, totals=None, weight_uom=None, volume_uom=None):
+	"""Return the live capacity breakdown for a selected Vehicle Category."""
+	require_doctype_permission("Vehicle Category", "read")
+	totals = frappe.parse_json(totals) if isinstance(totals, str) else dict(totals or {})
+	category = frappe.get_cached_doc("Vehicle Category", vehicle_category)
+	capacities = get_effective_capacities(
+		category,
+		{"weight_uom": weight_uom, "volume_uom": volume_uom},
+		get_capacity_buffer_percentage(),
+	)
+	capacities = apply_capacity_override(
+		capacities,
+		category,
+		enabled=_capacity_override_enabled(),
+	)
+	category.capacities = capacities
+	return {
+		"vehicle_category": category.name,
+		"vehicle_category_label": category.vehicle_category_name or category.name,
+		"capacity_override_percentage": flt(getattr(category, "capacity_override_percentage", 0)),
+		"capacity": get_capacity_breakdown(totals, category),
+	}
 
 
 @frappe.whitelist()

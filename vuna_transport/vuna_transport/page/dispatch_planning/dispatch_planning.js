@@ -29,6 +29,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.make_layout();
 		this.make_filters();
 		this.bind_events();
+		this.load_vehicle_categories();
 	}
 
 	make_layout() {
@@ -51,7 +52,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				</div>
 				<div class="dp-grid">
 					<div class="dp-main">
-						<div class="dp-section">
+						<div class="dp-section dp-demand-section">
 							<div class="dp-section-heading">
 								<div class="dp-section-title">${__("Delivery Demand")}</div>
 								<div class="dp-pagination"></div>
@@ -68,6 +69,11 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					<div class="dp-sidebar">
 						<div class="dp-section dp-plan">
 							<div class="dp-section-title">${__("Manual Load Plan")}</div>
+							<div class="dp-category-picker"><label>${__(
+								"Vehicle Category"
+							)} <span class="text-muted">→</span></label><select class="form-control dp-category-select"><option value="">${__(
+				"Select"
+			)}</option></select></div>
 							<div class="dp-plan-content dp-empty">${__("Select Delivery Orders to begin planning.")}</div>
 							<div class="dp-plan-actions">
 								<button class="btn btn-default btn-sm btn-evaluate" disabled>${__("Evaluate")}</button>
@@ -76,13 +82,13 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 								)}</button>
 							</div>
 						</div>
-						<div class="dp-section">
+						<div class="dp-section dp-fleet-section">
 							<div class="dp-section-title">${__(
 								"Fleet Availability"
 							)} <small class="text-muted dp-availability-date"></small></div>
 							<div class="dp-fleet dp-empty">${__("Choose a company.")}</div>
 						</div>
-						<div class="dp-section">
+						<div class="dp-section dp-driver-section">
 							<div class="dp-section-title">${__("Driver Availability")}</div>
 							<div class="dp-drivers dp-empty">${__("Choose a company.")}</div>
 						</div>
@@ -128,6 +134,24 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		}
 	}
 
+	async load_vehicle_categories() {
+		const response = await frappe.db.get_list("Vehicle Category", {
+			filters: { disabled: 0 },
+			fields: ["name", "vehicle_category_name"],
+			order_by: "vehicle_category_name asc",
+			limit: 100,
+		});
+		const options = response
+			.map(
+				(category) =>
+					`<option value="${this.escape(category.name)}">${this.escape(
+						category.vehicle_category_name || category.name
+					)}</option>`
+			)
+			.join("");
+		this.$root.find(".dp-category-select").append(options);
+	}
+
 	bind_events() {
 		this.$root.on("click", ".btn-toggle-filters", () => this.toggle_filters());
 		this.$root.on("click", ".btn-refresh", () => this.refresh(true));
@@ -139,13 +163,21 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.$root.on("change", ".dp-order-select", (event) => this.toggle_order(event));
 		this.$root.on("click", ".dp-expand-order", (event) => this.toggle_details(event));
 		this.$root.on("change", ".dp-allocation-qty", (event) => this.change_quantity(event));
-		this.$root.on("change", ".dp-category-select", () => this.evaluate_plan());
+		this.$root.on("change", ".dp-category-select", () => this.category_changed());
 		this.$root.on("click", ".dp-use-suggestion", (event) => this.use_suggestion(event));
 		this.$root.on("click", ".dp-create-suggestion", (event) =>
 			this.create_from_suggestion(event)
 		);
 		this.$root.on("click", ".dp-fleet-category", (event) => this.show_vehicle_details(event));
 		this.$root.on("click", ".dp-driver-details", () => this.show_driver_details());
+	}
+
+	category_changed() {
+		this.clear_suggestions();
+		this.plan = null;
+		this.plan_evaluation_id += 1;
+		this.render_plan();
+		this.refresh(false).then(() => this.schedule_plan_evaluation());
 	}
 
 	toggle_filters() {
@@ -192,7 +224,15 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.clear_suggestions();
 		if (clear_selection) this.clear_plan();
 		this.$root.find(".dp-demand").html(this.loading());
-		const args = { ...filters, start: this.start, page_length: this.page_length };
+		const args = {
+			...filters,
+			required_vehicle_category: this.selected_vehicle_category(),
+			selected_delivery_order_names: [
+				...new Set([...this.allocations.values()].map((row) => row.delivery_order)),
+			],
+			start: this.start,
+			page_length: this.page_length,
+		};
 		try {
 			const [demand] = await Promise.all([
 				this.call("get_planning_demand", args),
@@ -205,6 +245,10 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		} catch (error) {
 			this.$root.find(".dp-demand").html(this.error_message(error));
 		}
+	}
+
+	selected_vehicle_category() {
+		return this.$root.find(".dp-category-select").val() || null;
 	}
 
 	async refresh_availability() {
@@ -477,16 +521,20 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					)}</p>`
 				);
 		const totals = this.plan.totals;
-		const options = this.plan.compatible_vehicle_categories
-			.map(
-				(category) =>
-					`<option value="${this.escape(category.name)}" ${
-						category.recommended ? "selected" : ""
-					}>${this.escape(category.label)}${
-						category.recommended ? ` — ${__("Recommended")}` : ""
-					}</option>`
-			)
-			.join("");
+		const selected_category = this.selected_vehicle_category();
+		const selected_category_row = this.plan.compatible_vehicle_categories.find(
+			(category) => category.name === selected_category
+		);
+		const recommended_category_row = this.plan.compatible_vehicle_categories.find(
+			(category) => category.name === this.plan.recommended_vehicle_category
+		);
+		const category_row = selected_category_row || recommended_category_row;
+		const capacity = category_row?.capacity;
+		const category_label =
+			category_row?.label || selected_category || this.plan.recommended_vehicle_category;
+		const category_caption = selected_category
+			? __("Selected Vehicle Category: {0}")
+			: __("Recommended Vehicle Category: {0}");
 		$content
 			.removeClass("dp-empty")
 			.html(
@@ -496,17 +544,44 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					this.plan.weight_uom || __("Weight")
 				)}</span><span><strong>${this.number(totals.volume)}</strong>${this.escape(
 					this.plan.volume_uom || __("Volume")
-				)}</span><span><strong>${this.number(totals.pallets)}</strong>${__(
-					"Pallets"
-				)}</span></div><label>${__(
-					"Vehicle Category"
-				)}</label><select class="form-control dp-category-select"><option value="">${__(
-					"Select"
-				)}</option>${options}</select><div class="small text-muted dp-requirements">${this.escape(
+				)}</span></div>${this.render_capacity_breakdown(
+					capacity
+				)}<div class="small text-muted dp-selected-category">${category_caption.replace(
+					"{0}",
+					this.escape(category_label || __("None"))
+				)}</div><div class="small text-muted dp-requirements">${this.escape(
 					this.requirements_text(this.plan.requirements)
 				)}</div>`
 			);
-		this.$root.find(".btn-create-load").prop("disabled", !options);
+		const can_create = selected_category
+			? this.plan.selected_vehicle_category_compatible
+			: Boolean(this.plan.recommended_vehicle_category);
+		this.$root.find(".btn-create-load").prop("disabled", !can_create);
+	}
+
+	render_capacity_breakdown(capacity) {
+		if (!capacity) return "";
+		const labels = {
+			weight: __("Weight"),
+			volume: __("Volume"),
+		};
+		const rows = Object.entries(capacity)
+			.filter(([dimension]) => ["weight", "volume"].includes(dimension))
+			.filter(([, values]) => values.capacity)
+			.map(
+				([dimension, values]) =>
+					`<div><span>${labels[dimension]}</span><strong>${this.number(
+						values.used
+					)} / ${this.number(values.capacity)}</strong><small>${this.number(
+						values.remaining
+					)} ${__("remaining")} · ${this.number(values.utilization)}%</small></div>`
+			)
+			.join("");
+		return rows
+			? `<div class="dp-capacity-breakdown"><div class="text-muted small">${__(
+					"Selected Category Capacity"
+			  )}</div>${rows}</div>`
+			: "";
 	}
 
 	async evaluate_plan() {

@@ -14,7 +14,10 @@ from vuna_transport.services.fleet.vehicle_availability_service import (
 )
 from vuna_transport.services.fleet.vehicle_category_service import (
 	evaluate_vehicle_category,
+	get_capacity_breakdown,
+	get_effective_capacities,
 	get_vehicle_categories,
+	validate_vehicle_access_limit,
 )
 from vuna_transport.services.planning.delivery_load_service import (
 	build_delivery_load_from_allocations,
@@ -51,6 +54,8 @@ def get_planning_demand(
 	priority=None,
 	customer=None,
 	allocation_state=None,
+	required_vehicle_category=None,
+	selected_delivery_order_names=None,
 	start=0,
 	page_length=50,
 	required_delivery_date=None,
@@ -82,6 +87,11 @@ def get_planning_demand(
 	page_metrics = _get_order_metrics([row.name for row in page_orders])
 	all_page_rows = [_format_demand_row(order, page_metrics.get(order.name)) for order in page_orders]
 	all_page_rows = _filter_allocation_state(all_page_rows, allocation_state)
+	all_page_rows = _keep_selected_orders_visible(
+		all_page_rows,
+		_filter_vehicle_category(all_page_rows, required_vehicle_category),
+		selected_delivery_order_names,
+	)
 	has_more = page_pool_truncated or len(all_page_rows) > start + page_length
 	rows = all_page_rows[start : start + page_length]
 
@@ -97,6 +107,11 @@ def get_planning_demand(
 	summary_metrics = _get_order_metrics([row.name for row in summary_orders])
 	summary_rows = [_format_demand_row(order, summary_metrics.get(order.name)) for order in summary_orders]
 	summary_rows = _filter_allocation_state(summary_rows, allocation_state)
+	summary_rows = _keep_selected_orders_visible(
+		summary_rows,
+		_filter_vehicle_category(summary_rows, required_vehicle_category),
+		selected_delivery_order_names,
+	)
 	return {
 		"orders": rows,
 		"warehouse_summaries": _warehouse_summaries(summary_rows),
@@ -151,7 +166,7 @@ def evaluate_manual_load_plan(allocations, vehicle_category=None):
 	)
 	category_rows = []
 	for category in categories:
-		if category.name not in compatible_names:
+		if category.name not in compatible_names and category.name != vehicle_category:
 			continue
 		result = evaluate_vehicle_category(_load_totals(load), category, _load_requirements(load))
 		category_rows.append(
@@ -160,6 +175,8 @@ def evaluate_manual_load_plan(allocations, vehicle_category=None):
 				"label": category.vehicle_category_name or category.name,
 				"recommended": category.name == recommended,
 				"utilization": result["utilization"],
+				"compatible": result["compatible"],
+				"capacity": get_capacity_breakdown(_load_totals(load), category),
 			}
 		)
 	return {
@@ -174,6 +191,10 @@ def evaluate_manual_load_plan(allocations, vehicle_category=None):
 		"volume_uom": load.volume_uom,
 		"requirements": _load_requirements(load),
 		"compatible_vehicle_categories": category_rows,
+		"selected_vehicle_category_capacity": next(
+			(row["capacity"] for row in category_rows if row["name"] == vehicle_category),
+			None,
+		),
 		"recommended_vehicle_category": recommended,
 		"selected_vehicle_category_compatible": (
 			vehicle_category in compatible_names if vehicle_category else None
@@ -473,6 +494,53 @@ def _filter_allocation_state(rows, allocation_state):
 			if row["unallocated_quantity"] > 0 and (row["allocated_quantity"] or row["reserved_quantity"])
 		]
 	return [row for row in rows if row["unallocated_quantity"] > 0]
+
+
+def _filter_vehicle_category(rows, vehicle_category):
+	if not vehicle_category:
+		return rows
+	category = frappe.get_cached_doc("Vehicle Category", vehicle_category)
+	if category.disabled:
+		return []
+	filtered = []
+	for row in rows:
+		category.capacities = get_effective_capacities(
+			category,
+			{"weight_uom": row.get("weight_uom"), "volume_uom": row.get("volume_uom")},
+			0,
+		)
+		result = evaluate_vehicle_category(
+			{dimension: row.get(dimension) for dimension in CAPACITY_DIMENSIONS},
+			category,
+			{
+				"refrigeration_required": row.get("refrigeration_required"),
+				"tail_lift_required": row.get("tail_lift_required"),
+				"required_body_type": row.get("required_body_type"),
+				"special_equipment_required": row.get("special_equipment_required"),
+			},
+		)
+		if (
+			result["compatible"]
+			and validate_vehicle_access_limit(category, row.get("maximum_vehicle_category"))["compatible"]
+		):
+			filtered.append(row)
+	return filtered
+
+
+def _keep_selected_orders_visible(all_rows, filtered_rows, selected_order_names):
+	"""Keep selected rows visible when a category filter changes their eligibility."""
+	if not selected_order_names:
+		return filtered_rows
+	selected_order_names = (
+		frappe.parse_json(selected_order_names)
+		if isinstance(selected_order_names, str)
+		else selected_order_names
+	)
+	selected = set(selected_order_names or [])
+	visible_names = {row["name"] for row in filtered_rows}
+	return filtered_rows + [
+		row for row in all_rows if row["name"] in selected and row["name"] not in visible_names
+	]
 
 
 def _warehouse_summaries(rows):

@@ -45,6 +45,8 @@
   "column_break_fymq",
   "minimum_payload",
   "minimum_volume",
+  "section_break_mvxd",
+  "capacity_summary",
   "pallets_section",
   "total_pallets",
   "column_break_lonb",
@@ -77,6 +79,11 @@
    "fieldname": "capacity_section",
    "fieldtype": "Section Break",
    "label": "Capacity & Contents"
+  },
+  {
+   "fieldname": "capacity_summary",
+   "fieldtype": "HTML",
+   "label": "Capacity Summary"
   },
   {
    "fieldname": "execution_tab",
@@ -380,6 +387,10 @@
    "fieldname": "more_info_section",
    "fieldtype": "Section Break",
    "label": "More Info"
+  },
+  {
+   "fieldname": "section_break_mvxd",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
@@ -412,7 +423,7 @@
    "link_fieldname": "delivery_load"
   }
  ],
- "modified": "2026-09-03 07:03:54.457863",
+ "modified": "2026-09-07 06:47:01.450803",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Delivery Load",

@@ -96,6 +96,21 @@ def evaluate_vehicle_category(totals, category, requirements=None):
 	}
 
 
+def get_capacity_breakdown(totals, category):
+	"""Return used, effective capacity, remaining capacity, and utilization per dimension."""
+	breakdown = {}
+	for dimension in CAPACITY_DIMENSIONS:
+		used = flt(totals.get(dimension))
+		capacity = flt(category.capacities.get(dimension))
+		breakdown[dimension] = {
+			"used": used,
+			"capacity": capacity,
+			"remaining": capacity - used if capacity else None,
+			"utilization": round(used / capacity * 100, 2) if capacity else None,
+		}
+	return breakdown
+
+
 def apply_capacity_override(capacities, category, *, enabled=False):
 	"""Extend category capacities only for an explicitly enabled authorized override."""
 	if not enabled:

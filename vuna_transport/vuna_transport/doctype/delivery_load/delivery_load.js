@@ -52,6 +52,10 @@ frappe.ui.form.on("Delivery Load", {
 			});
 	},
 
+	required_vehicle_category(frm) {
+		render_capacity_summary(frm);
+	},
+
 	refresh(frm) {
 		// Downstream documents retain their audit lineage. The server-side
 		// cancellation guard still blocks cancellation when submitted stock or
@@ -158,9 +162,11 @@ frappe.ui.form.on("Delivery Load", {
 
 		if (frm.is_new()) {
 			render_new_load_progress(frm);
+			render_capacity_summary(frm);
 			return;
 		}
 
+		render_capacity_summary(frm);
 		frm.trigger("load_execution_progress");
 	},
 
@@ -549,4 +555,78 @@ function recalculate_load_totals(frm) {
 		frm.doc[fieldname] = value;
 	});
 	frm.refresh_fields(Object.keys(values));
+	render_capacity_summary(frm);
+}
+
+function render_capacity_summary(frm) {
+	const field = frm.get_field("capacity_summary");
+	if (!field) return;
+	if (!frm.doc.required_vehicle_category) {
+		field.$wrapper.html(
+			`<div class="text-muted">${__(
+				"Select a Vehicle Category to view occupied and remaining capacity."
+			)}</div>`
+		);
+		return;
+	}
+	field.$wrapper.html(`<div class="text-muted">${__("Calculating capacity...")}</div>`);
+	frappe
+		.call({
+			method: "vuna_transport.services.planning.delivery_load_service.get_vehicle_category_capacity_summary",
+			args: {
+				vehicle_category: frm.doc.required_vehicle_category,
+				totals: {
+					weight: frm.doc.total_weight || 0,
+					volume: frm.doc.total_volume || 0,
+					pallets: frm.doc.total_pallets || 0,
+					cases: frm.doc.total_cases || 0,
+					crates: frm.doc.total_crates || 0,
+				},
+				weight_uom: frm.doc.weight_uom,
+				volume_uom: frm.doc.volume_uom,
+			},
+		})
+		.then(({ message }) => {
+			if (!message || frm.doc.required_vehicle_category !== message.vehicle_category) return;
+			field.$wrapper.html(render_capacity_breakdown(message));
+		})
+		.catch(() => {
+			field.$wrapper.html(
+				`<div class="text-muted">${__("Capacity summary could not be loaded.")}</div>`
+			);
+		});
+}
+
+function render_capacity_breakdown(result) {
+	const labels = {
+		weight: __("Weight"),
+		volume: __("Volume"),
+	};
+	const number = (value) => frappe.format(value || 0, { fieldtype: "Float" });
+	const status_class = (utilization) => {
+		if (utilization > 100) return "danger";
+		if (utilization >= 90) return "warning";
+		return "success";
+	};
+	const rows = Object.entries(result.capacity || {})
+		.filter(([dimension]) => ["weight", "volume"].includes(dimension))
+		.filter(([, values]) => values.capacity)
+		.map(
+			([dimension, values]) =>
+				`<tr><td class="text-muted">${labels[dimension]}</td><td>${number(
+					values.used
+				)}</td><td>${number(values.capacity)}</td><td class="${status_class(
+					values.utilization
+				)}">${number(values.remaining)}</td><td><span class="indicator-pill ${status_class(
+					values.utilization
+				)}">${number(values.utilization)}%</span></td></tr>`
+		)
+		.join("");
+	return `<div class="vuna-capacity-summary"><table class="table table-bordered table-condensed" style="margin:0;"><thead><tr><th>${__(
+		"Dimension"
+	)}</th><th>${__("Occupied")}</th><th>${__("Capacity")}</th><th>${__(
+		"Remaining"
+	)}</th><th style="width:110px;">${__(
+		"Used"
+	)}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
