@@ -1,6 +1,24 @@
 {
  "custom_fields": [
   {
+   "creation": "2026-09-07 10:00:00.000000",
+   "default": "0",
+   "description": "Globally disables this Vehicle from operational use across Vuna Transport.",
+   "docstatus": 0,
+   "dt": "Vehicle",
+   "fieldname": "vuna_disabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "insert_after": "vuna_transport_enabled",
+   "label": "Disabled",
+   "modified": "2026-09-07 10:00:00.000000",
+   "modified_by": "Administrator",
+   "module": "Vuna Transport",
+   "name": "Vehicle-vuna_disabled",
+   "owner": "Administrator"
+  },
+  {
    "_assign": null,
    "_comments": null,
    "_liked_by": null,

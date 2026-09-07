@@ -170,6 +170,7 @@ def get_vehicle_availability_map(
 			"company",
 			"vuna_vehicle_category",
 			"vuna_transport_enabled",
+			"vuna_disabled",
 			"vuna_vehicle_owner",
 			"vuna_asset",
 			"policy_no",
@@ -382,6 +383,8 @@ def _evaluate_vehicle(
 
 	if not vehicle.vuna_transport_enabled:
 		reasons.append(_reason("TRANSPORT_DISABLED", _("Vehicle is not enabled for transport planning.")))
+	if getattr(vehicle, "vuna_disabled", 0):
+		reasons.append(_reason("VEHICLE_DISABLED", _("Vehicle is globally disabled.")))
 	if company and vehicle.company and vehicle.company != company:
 		reasons.append(
 			_reason(
@@ -461,6 +464,7 @@ def _evaluate_vehicle(
 		reason.code
 		in {
 			"TRANSPORT_DISABLED",
+			"VEHICLE_DISABLED",
 			"COMPANY_MISMATCH",
 			"CATEGORY_MISSING",
 			"CATEGORY_INCOMPATIBLE",

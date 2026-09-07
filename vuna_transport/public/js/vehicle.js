@@ -13,6 +13,26 @@ frappe.ui.form.on("Vehicle", {
 	},
 
 	refresh(frm) {
+		if (!frm.is_new()) {
+			const label = frm.doc.vuna_disabled ? __("Enable Vehicle") : __("Disable Vehicle");
+			const button = frm.add_custom_button(
+				label,
+				() => {
+					const disabled = Boolean(frm.doc.vuna_disabled);
+					frappe.confirm(
+						disabled
+							? __("Enable Vehicle {0} for operations?", [frm.doc.name])
+							: __("Disable Vehicle {0} from operations?", [frm.doc.name]),
+						() => {
+							frm.set_value("vuna_disabled", disabled ? 0 : 1);
+							frm.save();
+						}
+					);
+				},
+				__("Operations")
+			);
+			if (!frm.doc.vuna_disabled) button.addClass("btn-danger");
+		}
 		if (!frm.is_new() && frm.doc.vuna_asset) {
 			frm.add_custom_button(
 				__("Linked Asset"),
