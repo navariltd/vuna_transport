@@ -224,6 +224,18 @@ class TestDeliveryLoad(UnitTestCase):
 			current_name="DN-2",
 		)
 
+	@patch("vuna_transport.services.execution.lineage_service.frappe.db.sql")
+	def test_delivery_note_allocation_compares_transaction_uom_not_stock_uom(self, sql):
+		sql.return_value = [{"so_detail": "SOI-1", "quantity": 50}]
+		items = [SimpleNamespace(so_detail="SOI-1", item_code="ITEM-1", qty=50, stock_qty=600)]
+		validate_delivery_note_item_allocations(
+			items,
+			{"SOI-1": 100},
+			"LOAD-1",
+			delivery_order="DO-1",
+			current_name="DN-2",
+		)
+
 	def test_delivery_trip_stops_must_match_submitted_delivery_notes(self):
 		validate_delivery_trip_note_set({"DN-1", "DN-2"}, ["DN-1", "DN-2"])
 		with self.assertRaises(ValidationError):

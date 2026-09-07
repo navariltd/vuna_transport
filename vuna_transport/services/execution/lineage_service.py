@@ -111,7 +111,7 @@ def validate_delivery_note_item_allocations(
 	if delivery_order and allocated_by_sales_order_item:
 		existing_rows = frappe.db.sql(
 			"""
-				select dni.so_detail, coalesce(sum(coalesce(dni.stock_qty, dni.qty)), 0) as quantity
+				select dni.so_detail, coalesce(sum(dni.qty), 0) as quantity
 				from `tabDelivery Note Item` dni
 				join `tabDelivery Note` dn on dn.name = dni.parent
 				where dn.vuna_delivery_load = %(load_name)s
@@ -143,7 +143,7 @@ def validate_delivery_note_item_allocations(
 				)
 			)
 		current_quantities[item.so_detail] = current_quantities.get(item.so_detail, 0) + flt(
-			getattr(item, "stock_qty", None) or getattr(item, "qty", None)
+			getattr(item, "qty", None)
 		)
 	for so_detail, quantity in current_quantities.items():
 		if existing_quantities.get(so_detail, 0) + quantity > flt(allocated_by_sales_order_item[so_detail]):
