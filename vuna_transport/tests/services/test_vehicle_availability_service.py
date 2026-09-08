@@ -249,6 +249,10 @@ class TestVehicleAvailabilityService(UnitTestCase):
 		with self.assertRaises(ValidationError):
 			normalize_vehicle_interval("undefined 00:00:00", "2026-08-25 00:00:00")
 
+	def test_equal_vehicle_window_becomes_point_in_time_check(self):
+		from_time, to_time = normalize_vehicle_interval("2026-08-25 10:00:00", "2026-08-25 10:00:00")
+		self.assertEqual((to_time - from_time).total_seconds(), 1)
+
 	def _evaluate(
 		self,
 		allocations=None,
@@ -343,6 +347,10 @@ class TestDriverAvailabilityService(UnitTestCase):
 	def test_invalid_driver_window_has_validation_message(self):
 		with self.assertRaises(ValidationError):
 			normalize_driver_interval("undefined 00:00:00", "2026-08-25 00:00:00")
+
+	def test_equal_driver_window_becomes_point_in_time_check(self):
+		from_time, to_time = normalize_driver_interval("2026-08-25 10:00:00", "2026-08-25 10:00:00")
+		self.assertEqual((to_time - from_time).total_seconds(), 1)
 
 	def _evaluate(self, allocations=None, trips=None, loads=None):
 		return _evaluate_driver(

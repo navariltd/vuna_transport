@@ -6,12 +6,32 @@ frappe.pages["dispatch-planning"].on_page_load = function (wrapper) {
 		title: __("Dispatch Planning"),
 		single_column: true,
 	});
-	wrapper.dispatch_planning = new vuna_transport.DispatchPlanning.Controller(wrapper);
+	load_vue(wrapper);
 };
 
 frappe.pages["dispatch-planning"].on_page_show = function (wrapper) {
-	wrapper.dispatch_planning?.refresh();
+	if (frappe.dispatch_planning_controller) {
+		frappe.dispatch_planning_controller.refresh();
+	} else if (!frappe.dispatch_planning_vue_loading) {
+		load_vue(wrapper);
+	}
 };
+
+async function load_vue(wrapper) {
+	if (frappe.dispatch_planning_vue_loading) return frappe.dispatch_planning_vue_loading;
+	frappe.dispatch_planning_vue_loading = (async () => {
+		const $parent = $(wrapper).find(".layout-main-section");
+		$parent.empty();
+		await frappe.require("dispatch_planning.bundle.js");
+		frappe.dispatch_planning_vue_app?.unmount();
+		frappe.dispatch_planning_vue_app = frappe.ui.setup_dispatch_planning_vue($parent);
+	})();
+	try {
+		return await frappe.dispatch_planning_vue_loading;
+	} finally {
+		frappe.dispatch_planning_vue_loading = null;
+	}
+}
 
 vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	constructor(wrapper) {
@@ -26,10 +46,20 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.suggestions = [];
 		this.plan_evaluation_timer = null;
 		this.plan_evaluation_id = 0;
+		this.refresh_request_id = 0;
+		this.availability_request_id = 0;
+		this.suggestion_request_id = 0;
+		this.details_requests = new Map();
 		this.make_layout();
 		this.make_filters();
 		this.bind_events();
 		this.load_vehicle_categories();
+	}
+
+	destroy() {
+		clearTimeout(this.filter_timer);
+		clearTimeout(this.plan_evaluation_timer);
+		this.$root?.off();
 	}
 
 	make_layout() {
@@ -135,21 +165,29 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	async load_vehicle_categories() {
-		const response = await frappe.db.get_list("Vehicle Category", {
-			filters: { disabled: 0 },
-			fields: ["name", "vehicle_category_name"],
-			order_by: "vehicle_category_name asc",
-			limit: 100,
-		});
-		const options = response
-			.map(
-				(category) =>
-					`<option value="${this.escape(category.name)}">${this.escape(
-						category.vehicle_category_name || category.name
-					)}</option>`
-			)
-			.join("");
-		this.$root.find(".dp-category-select").append(options);
+		try {
+			const response = await frappe.db.get_list("Vehicle Category", {
+				filters: { disabled: 0 },
+				fields: ["name", "vehicle_category_name"],
+				order_by: "vehicle_category_name asc",
+				limit: 100,
+			});
+			const options = response
+				.map(
+					(category) =>
+						`<option value="${this.escape(category.name)}">${this.escape(
+							category.vehicle_category_name || category.name
+						)}</option>`
+				)
+				.join("");
+			this.$root.find(".dp-category-select").append(options);
+		} catch (error) {
+			this.$root.find(".dp-category-select").prop("disabled", true);
+			frappe.show_alert({
+				message: error?.message || __("Unable to load Vehicle Categories."),
+				indicator: "red",
+			});
+		}
 	}
 
 	bind_events() {
@@ -177,7 +215,8 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.plan = null;
 		this.plan_evaluation_id += 1;
 		this.render_plan();
-		this.refresh(false).then(() => this.schedule_plan_evaluation());
+		this.refresh(false, false);
+		this.schedule_plan_evaluation();
 	}
 
 	toggle_filters() {
@@ -199,15 +238,20 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 
 	get_filter_values() {
 		return Object.fromEntries(
-			Object.entries(this.filters).map(([key, field]) => [key, field.get_value()])
+			Object.entries(this.filters).map(([key, field]) => [
+				key,
+				key.startsWith("required_delivery_date_")
+					? this.valid_date_filter(field.get_value())
+					: field.get_value(),
+			])
 		);
 	}
 
 	planning_window() {
 		const filter_from = this.filters.required_delivery_date_from.get_value();
 		const filter_to = this.filters.required_delivery_date_to.get_value();
-		const date_from = filter_from && filter_from !== "undefined" ? filter_from : null;
-		const date_to = filter_to && filter_to !== "undefined" ? filter_to : null;
+		const date_from = this.valid_date_filter(filter_from);
+		const date_to = this.valid_date_filter(filter_to);
 		const fallback = frappe.datetime.get_today();
 		const start_date = date_from || date_to || fallback;
 		const end_date = date_to || date_from || fallback;
@@ -218,9 +262,17 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		};
 	}
 
-	async refresh(clear_selection = false) {
+	valid_date_filter(value) {
+		if (!value) return null;
+		const normalized = String(value).trim().toLowerCase();
+		if (normalized.includes("undefined") || normalized.includes("null")) return null;
+		return value;
+	}
+
+	async refresh(clear_selection = false, refresh_resources = true) {
 		const filters = this.get_filter_values();
 		if (!filters.company) return;
+		const request_id = ++this.refresh_request_id;
 		this.clear_suggestions();
 		if (clear_selection) this.clear_plan();
 		this.$root.find(".dp-demand").html(this.loading());
@@ -233,16 +285,19 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			start: this.start,
 			page_length: this.page_length,
 		};
+		if (refresh_resources) {
+			const availability_request_id = ++this.availability_request_id;
+			this.refresh_availability(availability_request_id);
+		}
 		try {
-			const [demand] = await Promise.all([
-				this.call("get_planning_demand", args),
-				this.refresh_availability(),
-			]);
+			const demand = await this.call("get_planning_demand", args);
+			if (request_id !== this.refresh_request_id) return;
 			this.orders = demand.orders || [];
 			this.has_more = demand.has_more;
 			this.render_warehouses(demand.warehouse_summaries || [], demand.summary_truncated);
 			this.render_demand();
 		} catch (error) {
+			if (request_id !== this.refresh_request_id) return;
 			this.$root.find(".dp-demand").html(this.error_message(error));
 		}
 	}
@@ -251,9 +306,10 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		return this.$root.find(".dp-category-select").val() || null;
 	}
 
-	async refresh_availability() {
+	async refresh_availability(request_id = this.availability_request_id) {
 		const { company } = this.get_filter_values();
 		if (!company) return;
+		this.$root.find(".dp-fleet, .dp-drivers").html(this.loading());
 		const window = this.planning_window();
 		if (!window) {
 			const message = __("Delivery Date From cannot be after Delivery Date To.");
@@ -262,30 +318,39 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		}
 		const filter_from = this.filters.required_delivery_date_from.get_value();
 		const filter_to = this.filters.required_delivery_date_to.get_value();
-		const date_from = filter_from && filter_from !== "undefined" ? filter_from : null;
-		const date_to = filter_to && filter_to !== "undefined" ? filter_to : null;
+		const date_from = this.valid_date_filter(filter_from);
+		const date_to = this.valid_date_filter(filter_to);
 		const fallback = frappe.datetime.get_today();
 		const start_date = date_from || date_to || fallback;
 		const end_date = date_to || date_from || fallback;
 		const availability_label =
-			start_date === end_date
+			!date_from && !date_to
+				? `${__("Today")}, ${frappe.datetime.str_to_user(start_date)}`
+				: start_date === end_date
 				? frappe.datetime.str_to_user(start_date)
 				: `${frappe.datetime.str_to_user(start_date)} – ${frappe.datetime.str_to_user(
 						end_date
 				  )}`;
-		this.$root
-			.find(".dp-availability-date")
-			.text(
-				date_from || date_to
-					? `— ${availability_label}`
-					: `— ${__("Today")}, ${availability_label}`
-			);
-		const [fleet, drivers] = await Promise.all([
-			this.call("get_fleet_availability_summary", { company, ...window }),
-			this.call("get_driver_availability_summary", { company, ...window }),
-		]);
-		this.render_fleet(fleet);
-		this.render_drivers(drivers);
+		this.$root.find(".dp-availability-date").text(`— ${availability_label}`);
+		const requests = [
+			[".dp-fleet", "get_fleet_availability_summary", (data) => this.render_fleet(data)],
+			[
+				".dp-drivers",
+				"get_driver_availability_summary",
+				(data) => this.render_drivers(data),
+			],
+		];
+		await Promise.all(
+			requests.map(async ([selector, method, render]) => {
+				try {
+					const data = await this.call(method, { company, ...window });
+					if (request_id === this.availability_request_id) render(data);
+				} catch (error) {
+					if (request_id === this.availability_request_id)
+						this.$root.find(selector).html(this.error_message(error));
+				}
+			})
+		);
 	}
 
 	render_warehouses(rows, truncated) {
@@ -341,7 +406,13 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					]
 						.filter(Boolean)
 						.join(", ") || "—";
-				return `<div class="dp-demand-row" data-order="${this.escape(order.name)}">
+				return `<div class="dp-demand-row${
+					order.vehicle_category_incompatible ? " dp-demand-row-warning" : ""
+				}" data-order="${this.escape(order.name)}" title="${this.escape(
+					order.vehicle_category_incompatible
+						? __("Selected order is not compatible with this Vehicle Category.")
+						: ""
+				)}">
 				<div><input type="checkbox" class="dp-order-select" ${selected}></div>
 				<div><a href="/app/delivery-order/${encodeURIComponent(order.name)}"><strong>${this.escape(
 					order.name
@@ -400,7 +471,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 
 	change_page(direction) {
 		this.start = Math.max(0, this.start + direction * this.page_length);
-		this.refresh(false);
+		this.refresh(false, false);
 	}
 
 	async toggle_order(event) {
@@ -432,17 +503,32 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		const $target = this.$root.find(`[data-details="${this.selector(name)}"]`);
 		if ($target.children().length) return $target.toggle();
 		$target.html(this.loading()).show();
-		await this.ensure_details([name]);
-		$target.html(this.render_item_table(this.details[name]));
+		try {
+			await this.ensure_details([name]);
+			$target.html(this.render_item_table(this.details[name]));
+		} catch (error) {
+			$target.html(this.error_message(error));
+		}
 	}
 
 	async ensure_details(names) {
 		const missing = names.filter((name) => !this.details[name]);
 		if (!missing.length) return;
-		const rows = await this.call("get_delivery_order_details", {
-			delivery_order_names: missing,
-		});
-		for (const row of rows) this.details[row.name] = row;
+		const request_key = [...missing].sort().join("\u0000");
+		if (!this.details_requests.has(request_key)) {
+			this.details_requests.set(
+				request_key,
+				this.call("get_delivery_order_details", {
+					delivery_order_names: missing,
+				})
+					.then((rows) => {
+						for (const row of rows) this.details[row.name] = row;
+						return rows;
+					})
+					.finally(() => this.details_requests.delete(request_key))
+			);
+		}
+		await this.details_requests.get(request_key);
 	}
 
 	render_item_table(order) {
@@ -504,6 +590,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	render_plan() {
 		const rows = [...this.allocations.values()];
 		const $content = this.$root.find(".dp-plan-content");
+		const selected_category = this.selected_vehicle_category();
 		this.$root.find(".btn-evaluate").prop("disabled", !rows.length);
 		this.$root.find(".btn-create-load").prop("disabled", !this.plan);
 		if (!rows.length)
@@ -521,7 +608,6 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					)}</p>`
 				);
 		const totals = this.plan.totals;
-		const selected_category = this.selected_vehicle_category();
 		const selected_category_row = this.plan.compatible_vehicle_categories.find(
 			(category) => category.name === selected_category
 		);
@@ -636,6 +722,8 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	async load_suggestions() {
 		const filters = this.get_filter_values();
 		if (!filters.company) return;
+		const request_id = ++this.suggestion_request_id;
+		this.$root.find(".btn-suggest").prop("disabled", true);
 		this.$root.find(".dp-suggestions").html(this.loading());
 		const selected_names = [
 			...new Set([...this.allocations.values()].map((row) => row.delivery_order)),
@@ -646,6 +734,10 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				args: {
 					company: filters.company,
 					source_warehouse: filters.source_warehouse || null,
+					transport_zone: filters.transport_zone || null,
+					delivery_method: filters.delivery_method || null,
+					priority: filters.priority || null,
+					customer: filters.customer || null,
 					delivery_date_from: filters.required_delivery_date_from || null,
 					delivery_date_to: filters.required_delivery_date_to || null,
 					delivery_order_names: selected_names.length ? selected_names : null,
@@ -653,12 +745,17 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				freeze: true,
 				freeze_message: __("Building load suggestions..."),
 			});
+			if (request_id !== this.suggestion_request_id) return;
 			const result = response.message || {};
 			this.suggestions = result.suggestions || [];
 			this.render_suggestions(result);
 		} catch (error) {
+			if (request_id !== this.suggestion_request_id) return;
 			this.suggestions = [];
 			this.$root.find(".dp-suggestions").html(this.error_message(error));
+		} finally {
+			if (request_id === this.suggestion_request_id)
+				this.$root.find(".btn-suggest").prop("disabled", false);
 		}
 	}
 
@@ -904,7 +1001,9 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	clear_suggestions() {
+		this.suggestion_request_id += 1;
 		this.suggestions = [];
+		this.$root.find(".btn-suggest").prop("disabled", false);
 		this.$root
 			.find(".dp-suggestions")
 			.addClass("dp-empty")

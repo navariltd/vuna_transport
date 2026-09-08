@@ -277,6 +277,10 @@ def get_vehicle_availability_map(
 	trips = frappe.get_all(
 		"Delivery Trip",
 		filters={"docstatus": ["!=", 2], "status": ["in", ACTIVE_TRIP_STATUSES]},
+		or_filters=[
+			{"vehicle": ["in", vehicle_names]},
+			{"vuna_current_vehicle": ["in", vehicle_names]},
+		],
 		fields=[
 			"name",
 			"vehicle",
@@ -648,6 +652,11 @@ def _normalize_interval(from_time, to_time):
 		to_time = get_datetime(to_time or add_to_date(from_time, seconds=1))
 	except (TypeError, ValueError):
 		frappe.throw(_("Select a valid planning date and time window."))
+	# A current-availability request may lose sub-second precision in transit.
+	# Treat a zero/near-zero interval as a point-in-time check, but still reject
+	# genuinely reversed windows.
+	if from_time <= to_time and (to_time - from_time).total_seconds() <= 1:
+		to_time = add_to_date(from_time, seconds=1)
 	if from_time >= to_time:
 		frappe.throw(_("Availability end time must be after start time."))
 	return from_time, to_time

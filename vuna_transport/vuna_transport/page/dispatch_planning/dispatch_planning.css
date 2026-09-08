@@ -50,6 +50,7 @@
 .dp-demand-row { align-items: center; display: grid; gap: 10px; grid-template-columns: 28px 1.4fr 1.2fr 1fr 1fr 1fr 1.2fr 54px; }
 .dp-demand-header { border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: var(--text-xs); padding: 10px 8px; }
 .dp-demand-row { border-bottom: 1px solid var(--border-color); font-size: var(--text-sm); min-height: 56px; padding: 6px; }
+.dp-demand-row-warning { background: var(--alert-bg); border-left: 3px solid var(--orange-500); }
 .dp-demand-row small,
 .dp-item-row small { color: var(--text-muted); display: block; margin-top: 3px; }
 .dp-item-details { display: none; }

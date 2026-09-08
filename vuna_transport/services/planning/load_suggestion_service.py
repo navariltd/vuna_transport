@@ -45,6 +45,10 @@ logger = frappe.logger("vuna_transport.load_suggestions")
 def suggest_delivery_loads(
 	company,
 	source_warehouse=None,
+	transport_zone=None,
+	delivery_method=None,
+	priority=None,
+	customer=None,
 	delivery_date=None,
 	delivery_order_names=None,
 	option_count=None,
@@ -63,6 +67,10 @@ def suggest_delivery_loads(
 	orders = _get_plannable_orders(
 		company,
 		source_warehouse=source_warehouse,
+		transport_zone=transport_zone,
+		delivery_method=delivery_method,
+		priority=priority,
+		customer=customer,
 		delivery_date_from=delivery_date_from or delivery_date,
 		delivery_date_to=delivery_date_to or delivery_date,
 		delivery_order_names=delivery_order_names,
@@ -186,6 +194,10 @@ def create_delivery_load_from_suggestion(suggestion):
 def _get_plannable_orders(
 	company,
 	source_warehouse=None,
+	transport_zone=None,
+	delivery_method=None,
+	priority=None,
+	customer=None,
 	delivery_date_from=None,
 	delivery_date_to=None,
 	delivery_order_names=None,
@@ -197,6 +209,14 @@ def _get_plannable_orders(
 	}
 	if source_warehouse:
 		filters["source_warehouse"] = source_warehouse
+	if transport_zone:
+		filters["transport_zone"] = transport_zone
+	if delivery_method:
+		filters["delivery_method"] = delivery_method
+	if priority:
+		filters["priority"] = priority
+	if customer:
+		filters["customer"] = customer
 	if delivery_date_from and delivery_date_to and getdate(delivery_date_from) > getdate(delivery_date_to):
 		frappe.throw(_("Delivery Date From cannot be after Delivery Date To."))
 	if delivery_date_from and delivery_date_to:

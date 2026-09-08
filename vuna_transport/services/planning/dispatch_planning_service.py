@@ -39,6 +39,7 @@ from vuna_transport.services.shared.security_service import (
 MAX_PAGE_LENGTH = 100
 MAX_SUMMARY_ORDERS = 500
 MAX_DETAIL_ORDERS = 50
+MAX_SELECTED_ORDERS = 100
 PLANNABLE_STATUSES = ("Open", "Partially Allocated")
 CAPACITY_DIMENSIONS = ("weight", "volume", "pallets", "cases", "crates")
 
@@ -63,6 +64,15 @@ def get_planning_demand(
 	"""Return a paginated demand list and bounded warehouse summaries."""
 	require_doctype_permission("Delivery Order", "read")
 	require_company_access(company)
+	if required_vehicle_category:
+		require_doctype_permission("Vehicle Category", "read")
+	selected_delivery_order_names = (
+		frappe.parse_json(selected_delivery_order_names)
+		if isinstance(selected_delivery_order_names, str)
+		else selected_delivery_order_names
+	)
+	if len(selected_delivery_order_names or []) > MAX_SELECTED_ORDERS:
+		frappe.throw(_("Select no more than {0} Delivery Orders at a time.").format(MAX_SELECTED_ORDERS))
 	start = max(cint(start), 0)
 	page_length = max(1, min(cint(page_length or 50), MAX_PAGE_LENGTH))
 	filters = _planning_filters(
@@ -75,40 +85,26 @@ def get_planning_demand(
 		priority,
 		customer,
 	)
-	page_orders = frappe.get_list(
+	orders = frappe.get_list(
 		"Delivery Order",
 		filters=filters,
 		fields=_delivery_order_fields(),
 		order_by="required_delivery_date asc, priority desc, creation asc",
 		limit_page_length=MAX_SUMMARY_ORDERS + 1,
 	)
-	page_pool_truncated = len(page_orders) > MAX_SUMMARY_ORDERS
-	page_orders = page_orders[:MAX_SUMMARY_ORDERS]
-	page_metrics = _get_order_metrics([row.name for row in page_orders])
-	all_page_rows = [_format_demand_row(order, page_metrics.get(order.name)) for order in page_orders]
-	all_page_rows = _filter_allocation_state(all_page_rows, allocation_state)
-	all_page_rows = _keep_selected_orders_visible(
-		all_page_rows,
-		_filter_vehicle_category(all_page_rows, required_vehicle_category),
-		selected_delivery_order_names,
-	)
-	has_more = page_pool_truncated or len(all_page_rows) > start + page_length
+	pool_truncated = len(orders) > MAX_SUMMARY_ORDERS
+	orders = orders[:MAX_SUMMARY_ORDERS]
+	metrics = _get_order_metrics([row.name for row in orders])
+	all_rows = [_format_demand_row(order, metrics.get(order.name)) for order in orders]
+	all_rows = _filter_allocation_state(all_rows, allocation_state)
+	filtered_rows = _filter_vehicle_category(all_rows, required_vehicle_category)
+	all_page_rows = _keep_selected_orders_visible(all_rows, filtered_rows, selected_delivery_order_names)
+	has_more = pool_truncated or len(all_page_rows) > start + page_length
 	rows = all_page_rows[start : start + page_length]
-
-	summary_orders = frappe.get_list(
-		"Delivery Order",
-		filters=filters,
-		fields=_delivery_order_fields(),
-		order_by="source_warehouse asc, required_delivery_date asc",
-		limit_page_length=MAX_SUMMARY_ORDERS + 1,
-	)
-	summary_truncated = len(summary_orders) > MAX_SUMMARY_ORDERS
-	summary_orders = summary_orders[:MAX_SUMMARY_ORDERS]
-	summary_metrics = _get_order_metrics([row.name for row in summary_orders])
-	summary_rows = [_format_demand_row(order, summary_metrics.get(order.name)) for order in summary_orders]
+	summary_rows = all_rows
 	summary_rows = _filter_allocation_state(summary_rows, allocation_state)
 	summary_rows = _keep_selected_orders_visible(
-		summary_rows,
+		all_rows,
 		_filter_vehicle_category(summary_rows, required_vehicle_category),
 		selected_delivery_order_names,
 	)
@@ -118,7 +114,7 @@ def get_planning_demand(
 		"start": start,
 		"page_length": page_length,
 		"has_more": has_more,
-		"summary_truncated": summary_truncated,
+		"summary_truncated": pool_truncated,
 		"summary_limit": MAX_SUMMARY_ORDERS,
 	}
 
@@ -499,16 +495,17 @@ def _filter_allocation_state(rows, allocation_state):
 def _filter_vehicle_category(rows, vehicle_category):
 	if not vehicle_category:
 		return rows
-	category = frappe.get_cached_doc("Vehicle Category", vehicle_category)
+	category = frappe._dict(frappe.get_cached_doc("Vehicle Category", vehicle_category).as_dict())
 	if category.disabled:
 		return []
 	filtered = []
 	for row in rows:
-		category.capacities = get_effective_capacities(
+		capacities = get_effective_capacities(
 			category,
 			{"weight_uom": row.get("weight_uom"), "volume_uom": row.get("volume_uom")},
 			0,
 		)
+		category.capacities = capacities
 		result = evaluate_vehicle_category(
 			{dimension: row.get(dimension) for dimension in CAPACITY_DIMENSIONS},
 			category,
@@ -538,9 +535,13 @@ def _keep_selected_orders_visible(all_rows, filtered_rows, selected_order_names)
 	)
 	selected = set(selected_order_names or [])
 	visible_names = {row["name"] for row in filtered_rows}
-	return filtered_rows + [
-		row for row in all_rows if row["name"] in selected and row["name"] not in visible_names
-	]
+	selected_rows = []
+	for row in all_rows:
+		if row["name"] in selected and row["name"] not in visible_names:
+			selected_row = dict(row)
+			selected_row["vehicle_category_incompatible"] = True
+			selected_rows.append(selected_row)
+	return filtered_rows + selected_rows
 
 
 def _warehouse_summaries(rows):
