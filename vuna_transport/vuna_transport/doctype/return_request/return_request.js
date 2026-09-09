@@ -3,6 +3,12 @@
 
 frappe.ui.form.on("Return Request", {
 	setup(frm) {
+		frm.set_query("delivery_note", () => {
+			const filters = { docstatus: 1, is_return: 0 };
+			if (frm.doc.customer) filters.customer = frm.doc.customer;
+			if (frm.doc.company) filters.company = frm.doc.company;
+			return { filters };
+		});
 		frm.set_query("return_warehouse", () => ({
 			filters: { company: frm.doc.company, is_group: 0, disabled: 0 },
 		}));

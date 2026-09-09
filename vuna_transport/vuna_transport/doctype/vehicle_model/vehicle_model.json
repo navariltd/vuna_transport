@@ -72,6 +72,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "Enter a year from 1886 through next year, or leave blank if unknown.",
    "fieldname": "model_year",
    "fieldtype": "Int",
    "label": "Model Year",
