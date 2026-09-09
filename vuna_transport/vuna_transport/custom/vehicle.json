@@ -1,6 +1,53 @@
 {
  "custom_fields": [
   {
+   "creation": "2026-09-09 10:06:00.000000",
+   "default": "0",
+   "description": "Fuel efficiency used for transport cost estimates, for example 5 km/L.",
+   "docstatus": 0,
+   "dt": "Vehicle",
+   "fieldname": "vuna_expected_fuel_efficiency",
+   "fieldtype": "Float",
+   "insert_after": "vuna_transport_cost_profile",
+   "label": "Expected Fuel Efficiency",
+   "modified": "2026-09-09 10:06:00.000000",
+   "modified_by": "Administrator",
+   "module": "Vuna Transport",
+   "name": "Vehicle-vuna_expected_fuel_efficiency",
+   "owner": "Administrator"
+  },
+  {
+   "creation": "2026-09-09 10:06:00.000000",
+   "docstatus": 0,
+   "dt": "Vehicle",
+   "fieldname": "vuna_fuel_efficiency_uom",
+   "fieldtype": "Link",
+   "insert_after": "vuna_expected_fuel_efficiency",
+   "label": "Fuel Efficiency UOM",
+   "options": "UOM",
+   "modified": "2026-09-09 10:06:00.000000",
+   "modified_by": "Administrator",
+   "module": "Vuna Transport",
+   "name": "Vehicle-vuna_fuel_efficiency_uom",
+   "owner": "Administrator"
+  },
+  {
+   "creation": "2026-09-09 10:06:00.000000",
+   "docstatus": 0,
+   "dt": "Vehicle",
+   "fieldname": "vuna_transport_cost_profile",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "insert_after": "vuna_vehicle_owner",
+   "label": "Transport Cost Profile",
+   "options": "Transport Cost Profile",
+   "modified": "2026-09-09 10:06:00.000000",
+   "modified_by": "Administrator",
+   "module": "Vuna Transport",
+   "name": "Vehicle-vuna_transport_cost_profile",
+   "owner": "Administrator"
+  },
+  {
    "creation": "2026-09-07 11:00:00.000000",
    "description": "Business functions this vehicle may perform. Roles do not determine availability or user permissions.",
    "docstatus": 0,
