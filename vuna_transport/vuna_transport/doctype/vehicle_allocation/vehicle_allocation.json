@@ -40,6 +40,19 @@
   "planned_reporting_time",
   "effective_to",
   "replaced_by",
+  "cost_estimate_section",
+  "cost_profile",
+  "costing_model",
+  "estimated_distance",
+  "estimated_distance_uom",
+  "distance_source",
+  "estimated_marginal_cost",
+  "estimated_fixed_cost",
+  "estimated_full_cost",
+  "estimated_cost_currency",
+  "estimated_on",
+  "cost_breakdown",
+  "cost_warnings",
   "remarks",
   "section_break_amendment",
   "amended_from"
@@ -274,6 +287,87 @@
    "fieldtype": "Link",
    "label": "Replaced By",
    "options": "Vehicle Allocation",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cost_estimate_section",
+   "fieldtype": "Section Break",
+   "label": "Cost Estimate Snapshot"
+  },
+  {
+   "fieldname": "cost_profile",
+   "fieldtype": "Link",
+   "label": "Cost Profile",
+   "options": "Transport Cost Profile",
+   "read_only": 1
+  },
+  {
+   "fieldname": "costing_model",
+   "fieldtype": "Data",
+   "label": "Costing Model",
+   "read_only": 1
+  },
+  {
+   "fieldname": "estimated_distance",
+   "fieldtype": "Float",
+   "label": "Estimated Distance",
+   "read_only": 1
+  },
+  {
+   "fieldname": "estimated_distance_uom",
+   "fieldtype": "Link",
+   "label": "Distance UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "distance_source",
+   "fieldtype": "Select",
+   "label": "Distance Source",
+   "options": "Manual\nRouting Provider\nPlanned Distance\nActual Odometer\nEstimated\nHaversine",
+   "read_only": 1
+  },
+  {
+   "fieldname": "estimated_marginal_cost",
+   "fieldtype": "Currency",
+   "label": "Estimated Marginal Cost",
+   "read_only": 1
+  },
+  {
+   "fieldname": "estimated_fixed_cost",
+   "fieldtype": "Currency",
+   "label": "Estimated Fixed Cost",
+   "read_only": 1
+  },
+  {
+   "fieldname": "estimated_full_cost",
+   "fieldtype": "Currency",
+   "label": "Estimated Full Cost",
+   "read_only": 1
+  },
+  {
+   "fieldname": "estimated_cost_currency",
+   "fieldtype": "Link",
+   "label": "Cost Currency",
+   "options": "Currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "estimated_on",
+   "fieldtype": "Datetime",
+   "label": "Estimated On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cost_breakdown",
+   "fieldtype": "JSON",
+   "label": "Cost Breakdown",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cost_warnings",
+   "fieldtype": "Small Text",
+   "label": "Cost Warnings",
    "read_only": 1
   },
   {

@@ -16,9 +16,53 @@ from vuna_transport.services.fleet.vehicle_allocation_service import (
 	prepare_allocation_cancellation,
 	time_windows_overlap,
 )
+from vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation import (
+	snapshot_transport_cost,
+)
 
 
 class TestVehicleAllocation(UnitTestCase):
+	@patch(
+		"vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation.frappe.db.get_single_value",
+		return_value=0,
+	)
+	def test_cost_snapshot_is_skipped_when_costing_is_disabled(self, _get_single_value):
+		allocation = SimpleNamespace(vehicle="KDA 123A", delivery_load="DL-1")
+
+		snapshot_transport_cost(allocation)
+
+		self.assertFalse(hasattr(allocation, "estimated_marginal_cost"))
+
+	@patch(
+		"vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation.estimate_transport_cost",
+		return_value={
+			"cost_profile": "Mileage 2026",
+			"costing_model": "Mileage",
+			"distance": 300,
+			"distance_uom": "Kilometer",
+			"distance_source": "Planned Distance",
+			"marginal_cost": 11100,
+			"fixed_cost": 0,
+			"estimated_full_cost": 11100,
+			"currency": "KES",
+			"components": [{"component": "Fuel", "amount": 11100}],
+			"warnings": [],
+		},
+	)
+	@patch(
+		"vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation.frappe.db.get_single_value",
+		return_value=1,
+	)
+	def test_cost_snapshot_is_captured_on_submission(self, _get_single_value, estimate):
+		allocation = SimpleNamespace(vehicle="KDA 123A", delivery_load="DL-1")
+
+		snapshot_transport_cost(allocation)
+
+		self.assertEqual(allocation.cost_profile, "Mileage 2026")
+		self.assertEqual(allocation.estimated_marginal_cost, 11100)
+		self.assertEqual(allocation.estimated_cost_currency, "KES")
+		self.assertEqual(allocation.cost_breakdown[0]["component"], "Fuel")
+
 	def test_overlapping_time_windows(self):
 		first = SimpleNamespace(
 			planned_departure="2026-08-15 08:00:00", planned_arrival="2026-08-15 12:00:00"

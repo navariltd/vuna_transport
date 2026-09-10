@@ -1,9 +1,13 @@
 # Copyright (c) 2026, Yovuna Technologies Limited and contributors
 # For license information, please see license.txt
 
+import frappe
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
+from vuna_transport.services.costing.transport_cost_estimation_service import (
+	estimate_transport_cost,
+)
 from vuna_transport.services.fleet.vehicle_allocation_service import (
 	activate_allocation,
 	restore_previous_allocation,
@@ -31,6 +35,7 @@ class VehicleAllocation(Document):
 	def before_submit(self):
 		self.status = "Allocated"
 		self.effective_from = self.effective_from or now_datetime()
+		snapshot_transport_cost(self)
 
 	def on_submit(self):
 		activate_allocation(self)
@@ -46,3 +51,24 @@ class VehicleAllocation(Document):
 	def on_cancel(self):
 		self.db_set("status", "Cancelled", update_modified=False)
 		restore_previous_allocation(self, active_link_cleared=True)
+
+
+def snapshot_transport_cost(allocation):
+	"""Persist the estimate used when an allocation becomes confirmed."""
+	if not frappe.db.get_single_value("Transport Settings", "enable_transport_costing"):
+		return
+	if not allocation.vehicle or not allocation.delivery_load:
+		return
+	result = estimate_transport_cost(allocation.delivery_load, allocation.vehicle)
+	allocation.cost_profile = result.get("cost_profile")
+	allocation.costing_model = result.get("costing_model")
+	allocation.estimated_distance = result.get("distance")
+	allocation.estimated_distance_uom = result.get("distance_uom")
+	allocation.distance_source = result.get("distance_source")
+	allocation.estimated_marginal_cost = result.get("marginal_cost")
+	allocation.estimated_fixed_cost = result.get("fixed_cost")
+	allocation.estimated_full_cost = result.get("estimated_full_cost")
+	allocation.estimated_cost_currency = result.get("currency")
+	allocation.estimated_on = now_datetime()
+	allocation.cost_breakdown = result.get("components") or []
+	allocation.cost_warnings = "\n".join(result.get("warnings") or [])
