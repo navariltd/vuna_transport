@@ -46,9 +46,17 @@ class TransportCostProfile(Document):
 				frappe.throw(_("Destination {0} is duplicated.").format(row.destination_key))
 			destinations.add(row.destination_key)
 		if self.vehicle:
-			vehicle_company = frappe.db.get_value("Vehicle", self.vehicle, "company")
-			if vehicle_company and vehicle_company != self.company:
-				frappe.throw(_("Vehicle {0} belongs to Company {1}.").format(self.vehicle, vehicle_company))
+			vehicle = frappe.db.get_value(
+				"Vehicle", self.vehicle, ["company", "vuna_transport_costing_model"], as_dict=True
+			)
+			if vehicle and vehicle.company and vehicle.company != self.company:
+				frappe.throw(_("Vehicle {0} belongs to Company {1}.").format(self.vehicle, vehicle.company))
+			if vehicle and vehicle.vuna_transport_costing_model != self.costing_model:
+				frappe.throw(
+					_("Vehicle {0} uses Costing Model {1}; this profile uses {2}.").format(
+						self.vehicle, vehicle.vuna_transport_costing_model or _("None"), self.costing_model
+					)
+				)
 		self._validate_overlapping_profiles()
 
 	def _validate_overlapping_profiles(self):
@@ -57,6 +65,7 @@ class TransportCostProfile(Document):
 			filters={"company": self.company, "disabled": 0, "name": ["!=", self.name]},
 			fields=[
 				"name",
+				"costing_model",
 				"vehicle",
 				"supplier",
 				"vehicle_category",
@@ -67,7 +76,7 @@ class TransportCostProfile(Document):
 		for profile in profiles:
 			if any(
 				getattr(self, field, None) != getattr(profile, field, None)
-				for field in ("vehicle", "supplier", "vehicle_category")
+				for field in ("costing_model", "vehicle", "supplier", "vehicle_category")
 			):
 				continue
 			if _date_ranges_overlap(self.valid_from, self.valid_to, profile.valid_from, profile.valid_to):

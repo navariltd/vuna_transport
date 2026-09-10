@@ -1,6 +1,22 @@
 {
  "custom_fields": [
   {
+   "creation": "2026-09-10 09:00:00.000000",
+   "docstatus": 0,
+   "dt": "Vehicle",
+   "fieldname": "vuna_transport_costing_model",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "insert_after": "vuna_vehicle_owner",
+   "label": "Transport Costing Model",
+   "options": "Transport Costing Model",
+   "modified": "2026-09-10 09:00:00.000000",
+   "modified_by": "Administrator",
+   "module": "Vuna Transport",
+   "name": "Vehicle-vuna_transport_costing_model",
+   "owner": "Administrator"
+  },
+  {
    "creation": "2026-09-09 10:06:00.000000",
    "default": "0",
    "description": "Fuel efficiency used for transport cost estimates, for example 5 km/L.",
@@ -38,7 +54,7 @@
    "fieldname": "vuna_transport_cost_profile",
    "fieldtype": "Link",
    "in_standard_filter": 1,
-   "insert_after": "vuna_vehicle_owner",
+   "insert_after": "vuna_transport_costing_model",
    "label": "Transport Cost Profile",
    "options": "Transport Cost Profile",
    "modified": "2026-09-09 10:06:00.000000",
