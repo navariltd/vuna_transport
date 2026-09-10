@@ -6,9 +6,11 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, getdate
 
+from vuna_transport.services.costing.transport_cost_estimation_service import estimate_transport_cost
 from vuna_transport.services.fleet.driver_availability_service import (
 	get_driver_availability_map,
 )
+from vuna_transport.services.fleet.vehicle_allocation_service import get_load_resource_window
 from vuna_transport.services.fleet.vehicle_availability_service import (
 	get_vehicle_availability_map,
 )
@@ -236,6 +238,64 @@ def get_vehicle_availability_details(company, vehicle_category, from_time, to_ti
 	require_company_access(company)
 	results = _permitted_vehicle_availability(company, from_time, to_time, vehicle_category)
 	return list(results.values())
+
+
+@frappe.whitelist()
+def get_costed_vehicle_candidates(allocations, vehicle_category=None):
+	"""Return eligible physical vehicles ranked by estimated marginal cost."""
+	require_doctype_permission("Delivery Load", "read")
+	require_doctype_permission("Vehicle", "read")
+	load = build_delivery_load_from_allocations(allocations, vehicle_category)
+	validate_load_allocations(load, lock=False)
+	calculate_load_totals(load)
+	category = vehicle_category or recommend_vehicle_category(load)
+	if not category:
+		return []
+	from_time, to_time = get_load_resource_window(load)
+	results = get_vehicle_availability_map(
+		company=load.company,
+		vehicle_category=category,
+		from_time=from_time,
+		to_time=to_time,
+		required_vehicle_category=category,
+		delivery_load=load,
+		expected_company=load.company,
+	)
+	vehicles = {
+		row.name: row
+		for row in frappe.get_all(
+			"Vehicle",
+			filters={"name": ["in", list(results)]},
+			fields=["name", "license_plate", "company", "vuna_vehicle_category"],
+			limit_page_length=100,
+		)
+	}
+	candidates = []
+	for name, availability in results.items():
+		if not availability.dispatch_eligible or name not in vehicles:
+			continue
+		estimate = estimate_transport_cost(load, vehicles[name])
+		candidates.append(
+			{
+				"vehicle": name,
+				"license_plate": vehicles[name].license_plate or name,
+				"vehicle_category": availability.vehicle_category,
+				"operational_state": availability.operational_state,
+				"dispatch_eligible": availability.dispatch_eligible,
+				"costing_model": estimate.get("costing_model"),
+				"cost_profile": estimate.get("cost_profile"),
+				"currency": estimate.get("currency"),
+				"estimated_distance": estimate.get("distance"),
+				"distance_uom": estimate.get("distance_uom"),
+				"marginal_cost": estimate.get("marginal_cost"),
+				"estimated_full_cost": estimate.get("estimated_full_cost"),
+				"cost_breakdown": estimate.get("components", []),
+				"warnings": estimate.get("warnings", []),
+			}
+		)
+	return sorted(
+		candidates, key=lambda row: (row["marginal_cost"] is None, row["marginal_cost"], row["vehicle"])
+	)
 
 
 @frappe.whitelist()

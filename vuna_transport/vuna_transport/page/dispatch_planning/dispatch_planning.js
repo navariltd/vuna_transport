@@ -49,6 +49,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.refresh_request_id = 0;
 		this.availability_request_id = 0;
 		this.suggestion_request_id = 0;
+		this.cost_request_id = 0;
 		this.details_requests = new Map();
 		this.make_layout();
 		this.make_filters();
@@ -105,6 +106,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				"Select"
 			)}</option></select></div>
 							<div class="dp-plan-content dp-empty">${__("Select Delivery Orders to begin planning.")}</div>
+							<div class="dp-costed-vehicles"></div>
 							<div class="dp-plan-actions">
 								<button class="btn btn-default btn-sm btn-evaluate" disabled>${__("Evaluate")}</button>
 								<button class="btn btn-primary btn-sm btn-create-load" disabled>${__(
@@ -594,11 +596,19 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.$root.find(".btn-evaluate").prop("disabled", !rows.length);
 		this.$root.find(".btn-create-load").prop("disabled", !this.plan);
 		if (!rows.length)
-			return $content
+			return this.$root
+				.find(".dp-costed-vehicles")
+				.empty()
+				.end()
+				.find(".dp-plan-content")
 				.addClass("dp-empty")
 				.html(__("Select Delivery Orders to begin planning."));
 		if (!this.plan)
-			return $content
+			return this.$root
+				.find(".dp-costed-vehicles")
+				.empty()
+				.end()
+				.find(".dp-plan-content")
 				.removeClass("dp-empty")
 				.html(
 					`<strong>${__("{0} item allocations selected", [
@@ -643,6 +653,57 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			? this.plan.selected_vehicle_category_compatible
 			: Boolean(this.plan.recommended_vehicle_category);
 		this.$root.find(".btn-create-load").prop("disabled", !can_create);
+		this.load_costed_candidates();
+	}
+
+	async load_costed_candidates() {
+		const request_id = ++this.cost_request_id;
+		const rows = [...this.allocations.values()];
+		const $target = this.$root.find(".dp-costed-vehicles");
+		if (!rows.length || !this.plan) return $target.empty();
+		$target.html(`<div class="text-muted small">${__("Loading costed vehicles...")}</div>`);
+		try {
+			const response = await this.call("get_costed_vehicle_candidates", {
+				allocations: rows,
+				vehicle_category:
+					this.selected_vehicle_category() || this.plan.recommended_vehicle_category,
+			});
+			if (request_id !== this.cost_request_id) return;
+			const candidates = response || [];
+			$target.html(
+				candidates.length
+					? `<div class="small text-muted">${__(
+							"Eligible vehicles ranked by estimated marginal cost"
+					  )}</div>${candidates
+							.map(
+								(row, index) =>
+									`<div class="dp-costed-vehicle"><strong>${
+										index + 1
+									}. ${this.escape(
+										row.license_plate
+									)}</strong><span>${this.escape(
+										row.costing_model || __("No profile")
+									)}</span><b>${
+										row.currency
+											? `${this.number(row.marginal_cost)} ${this.escape(
+													row.currency
+											  )}`
+											: __("Not estimated")
+									}</b></div>`
+							)
+							.join("")}`
+					: `<div class="text-muted small">${__(
+							"No eligible costed vehicles found."
+					  )}</div>`
+			);
+		} catch (error) {
+			if (request_id === this.cost_request_id)
+				$target.html(
+					`<div class="text-muted small">${this.escape(
+						error.message || __("Cost estimates unavailable.")
+					)}</div>`
+				);
+		}
 	}
 
 	render_capacity_breakdown(capacity) {

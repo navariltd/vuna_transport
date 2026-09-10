@@ -80,6 +80,10 @@
 .dp-plan-metrics span { background: var(--control-bg); border-radius: var(--border-radius); padding: 8px; }
 .dp-plan-metrics strong { display: block; font-size: var(--text-lg); }
 .dp-requirements { margin-top: 8px; }
+.dp-costed-vehicles { border-top: 1px solid var(--border-color); margin-top: 10px; padding-top: 8px; }
+.dp-costed-vehicle { align-items: center; background: var(--control-bg); border: 1px solid var(--border-color); border-radius: var(--border-radius); display: grid; gap: 8px; grid-template-columns: 1.2fr 1fr auto; margin-top: 5px; padding: 6px 8px; }
+.dp-costed-vehicle span { color: var(--text-muted); font-size: var(--text-xs); }
+.dp-costed-vehicle b { font-size: var(--text-sm); text-align: right; }
 .dp-suggestion-card { border-bottom: 1px solid var(--border-color); padding: 12px 0; }
 .dp-suggestion-card:first-child { padding-top: 8px; }
 .dp-suggestion-card .indicator-pill { float: right; }
