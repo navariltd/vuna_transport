@@ -8,7 +8,7 @@ app_license = "agpl-3.0"
 # Apps
 # ------------------
 
-required_apps = ["frappe/erpnext"]
+required_apps = ["frappe/erpnext", "frappe/hrms"]
 
 # Each item in the list will be shown as an app in the apps page
 app_logo_url = "/assets/vuna_transport/images/vuna_transport.png"
