@@ -16,7 +16,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Vehicles",
-   "link_count": 3,
+   "link_count": 4,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -46,6 +46,16 @@
    "label": "Asset",
    "link_count": 0,
    "link_to": "Asset",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Vehicle Log",
+   "link_count": 0,
+   "link_to": "Vehicle Log",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -121,6 +131,44 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Transport Costing",
+   "link_count": 3,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Transport Costing Model",
+   "link_count": 0,
+   "link_to": "Transport Costing Model",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Transport Cost Component",
+   "link_count": 0,
+   "link_to": "Transport Cost Component",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Transport Cost Profile",
+   "link_count": 0,
+   "link_to": "Transport Cost Profile",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Compliance",
    "link_count": 3,
    "onboard": 0,
@@ -160,7 +208,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Fleet Operations",
-   "link_count": 2,
+   "link_count": 3,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -188,7 +236,7 @@
    "hidden": 0,
    "is_query_report": 1,
    "label": "Reports",
-   "link_count": 8,
+   "link_count": 7,
    "onboard": 0,
    "type": "Card Break"
   },
@@ -261,19 +309,9 @@
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 1,
-   "label": "Dispatch Readiness",
-   "link_count": 0,
-   "link_to": "Dispatch Readiness",
-   "link_type": "Report",
-   "onboard": 0,
-   "type": "Link"
   }
  ],
- "modified": "2026-09-02 20:14:32.633930",
+ "modified": "2026-09-10 07:11:55.168551",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Fleet Management",

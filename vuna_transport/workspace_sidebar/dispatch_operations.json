@@ -214,6 +214,18 @@
   {
    "child": 1,
    "collapsible": 1,
+   "icon": "list-checks",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Rejection Reasons",
+   "link_to": "Rejection Reason",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
    "icon": "layers",
    "indent": 0,
    "keep_closed": 0,
@@ -342,6 +354,18 @@
    "type": "Link"
   },
   {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "clipboard-check",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Dispatch Readiness",
+   "link_to": "Dispatch Readiness",
+   "link_type": "Report",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
    "child": 0,
    "collapsible": 1,
    "icon": "settings",
@@ -354,7 +378,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-07 06:17:27.359678",
+ "modified": "2026-09-10 07:41:49.318085",
  "modified_by": "Administrator",
  "name": "Dispatch Operations",
  "owner": "Administrator",

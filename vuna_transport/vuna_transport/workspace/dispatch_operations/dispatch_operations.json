@@ -90,12 +90,18 @@
   },
   {
    "label": "Dispatch Setup",
-   "link_count": 6,
+   "link_count": 7,
    "type": "Card Break"
   },
   {
    "label": "Delivery Method",
    "link_to": "Delivery Method",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Rejection Reason",
+   "link_to": "Rejection Reason",
    "link_type": "DocType",
    "type": "Link"
   },
@@ -131,7 +137,7 @@
   },
   {
    "label": "Reports",
-   "link_count": 6,
+   "link_count": 7,
    "is_query_report": 0,
    "type": "Card Break"
   },
@@ -176,9 +182,16 @@
    "link_type": "Report",
    "is_query_report": 0,
    "type": "Link"
+  },
+  {
+   "label": "Dispatch Readiness",
+   "link_to": "Dispatch Readiness",
+   "link_type": "Report",
+   "is_query_report": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-09-07 07:29:34.478202",
+ "modified": "2026-09-10 07:41:49.318085",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Dispatch Operations",
