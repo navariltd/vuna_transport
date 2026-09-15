@@ -23,6 +23,11 @@ from vuna_transport.services.planning.delivery_load_service import (
 	get_capacity_buffer_percentage,
 )
 from vuna_transport.services.planning.load_validation_service import PLANNABLE_DELIVERY_ORDER_STATUSES
+from vuna_transport.services.planning.dispatch_filter_service import (
+	as_filter_conditions,
+	validate_additional_filters,
+	validate_configured_filters,
+)
 from vuna_transport.services.routing.geography_service import (
 	calculate_delivery_window_compatibility,
 	calculate_geographic_cohesion,
@@ -49,11 +54,17 @@ def suggest_delivery_loads(
 	delivery_method=None,
 	priority=None,
 	customer=None,
+	delivery_address=None,
+	province=None,
+	county=None,
+	town=None,
 	delivery_date=None,
 	delivery_order_names=None,
 	option_count=None,
 	delivery_date_from=None,
 	delivery_date_to=None,
+	planning_filters=None,
+	additional_filters=None,
 ):
 	"""Return ranked load configurations without changing transactional state."""
 	require_doctype_permission("Delivery Order", "read")
@@ -63,6 +74,8 @@ def suggest_delivery_loads(
 	requested_count = cint(option_count or settings.load_suggestion_option_count or 3)
 	requested_count = max(3, min(requested_count, 10))
 	delivery_order_names = _parse_names(delivery_order_names)
+	configured_filters = validate_configured_filters(company, planning_filters)
+	additional_filter_conditions = validate_additional_filters(additional_filters)
 
 	orders = _get_plannable_orders(
 		company,
@@ -71,9 +84,15 @@ def suggest_delivery_loads(
 		delivery_method=delivery_method,
 		priority=priority,
 		customer=customer,
+		delivery_address=delivery_address,
+		province=province,
+		county=county,
+		town=town,
 		delivery_date_from=delivery_date_from or delivery_date,
 		delivery_date_to=delivery_date_to or delivery_date,
 		delivery_order_names=delivery_order_names,
+			planning_filters=configured_filters,
+			additional_filters=additional_filter_conditions,
 	)
 	logger.debug(
 		"Load suggestion candidate pool: company=%s orders=%s selected=%s",
@@ -198,9 +217,15 @@ def _get_plannable_orders(
 	delivery_method=None,
 	priority=None,
 	customer=None,
+	delivery_address=None,
+	province=None,
+	county=None,
+	town=None,
 	delivery_date_from=None,
 	delivery_date_to=None,
 	delivery_order_names=None,
+	planning_filters=None,
+	additional_filters=None,
 ):
 	filters = {
 		"company": company,
@@ -217,6 +242,23 @@ def _get_plannable_orders(
 		filters["priority"] = priority
 	if customer:
 		filters["customer"] = customer
+	if planning_filters:
+		for fieldname in (
+			"delivery_group",
+			"transport_compatibility_group",
+			"preferred_route",
+			"maximum_vehicle_category",
+			"transport_handling_profile",
+		):
+			if planning_filters.get(fieldname):
+				filters[fieldname] = planning_filters[fieldname]
+		delivery_address = delivery_address or planning_filters.get("delivery_address")
+		province = province or planning_filters.get("province")
+		county = county or planning_filters.get("county")
+		town = town or planning_filters.get("town")
+	address_names = _get_address_names(delivery_address, province, county, town)
+	if address_names is not None:
+		filters["delivery_address"] = ["in", address_names]
 	if delivery_date_from and delivery_date_to and getdate(delivery_date_from) > getdate(delivery_date_to):
 		frappe.throw(_("Delivery Date From cannot be after Delivery Date To."))
 	if delivery_date_from and delivery_date_to:
@@ -259,7 +301,7 @@ def _get_plannable_orders(
 	]
 	orders = frappe.get_list(
 		"Delivery Order",
-		filters=filters,
+		filters=as_filter_conditions(filters, additional_filters),
 		fields=fields,
 		order_by="priority desc, required_delivery_date asc, creation asc",
 		limit_page_length=MAX_CANDIDATE_ORDERS,
@@ -273,6 +315,21 @@ def _get_plannable_orders(
 		for order in orders
 		if order.order_items and not order.delivery_method_disabled and order.requires_transport_planning
 	]
+
+
+def _get_address_names(delivery_address=None, province=None, county=None, town=None):
+	if not any((delivery_address, province, county, town)):
+		return None
+	filters = {}
+	if delivery_address:
+		filters["name"] = delivery_address
+	if province:
+		filters["vuna_province"] = province
+	if county:
+		filters["vuna_county"] = county
+	if town:
+		filters["vuna_town"] = town
+	return frappe.get_list("Address", filters=filters, pluck="name", limit_page_length=5000)
 
 
 def _populate_delivery_method_workflows(orders):

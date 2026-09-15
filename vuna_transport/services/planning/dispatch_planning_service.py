@@ -32,6 +32,12 @@ from vuna_transport.services.planning.delivery_load_service import (
 	create_delivery_load_from_plan as _create_delivery_load_from_plan,
 )
 from vuna_transport.services.planning.load_validation_service import validate_load_allocations
+from vuna_transport.services.planning.dispatch_filter_service import (
+	as_filter_conditions,
+	get_filter_definitions,
+	validate_additional_filters,
+	validate_configured_filters,
+)
 from vuna_transport.services.shared.security_service import (
 	require_company_access,
 	require_doctype_permission,
@@ -56,7 +62,13 @@ def get_planning_demand(
 	delivery_method=None,
 	priority=None,
 	customer=None,
+	delivery_address=None,
+	province=None,
+	county=None,
+	town=None,
 	allocation_state=None,
+	planning_filters=None,
+	additional_filters=None,
 	required_vehicle_category=None,
 	selected_delivery_order_names=None,
 	start=0,
@@ -68,6 +80,12 @@ def get_planning_demand(
 	require_company_access(company)
 	if required_vehicle_category:
 		require_doctype_permission("Vehicle Category", "read")
+	configured_filters = validate_configured_filters(company, planning_filters)
+	additional_filter_conditions = validate_additional_filters(additional_filters)
+	province = province or configured_filters.get("province")
+	county = county or configured_filters.get("county")
+	town = town or configured_filters.get("town")
+	delivery_address = delivery_address or configured_filters.get("delivery_address")
 	selected_delivery_order_names = (
 		frappe.parse_json(selected_delivery_order_names)
 		if isinstance(selected_delivery_order_names, str)
@@ -86,10 +104,23 @@ def get_planning_demand(
 		delivery_method,
 		priority,
 		customer,
+		delivery_address,
+		province,
+		county,
+		town,
 	)
+	for fieldname in (
+		"delivery_group",
+		"transport_compatibility_group",
+		"preferred_route",
+		"maximum_vehicle_category",
+		"transport_handling_profile",
+	):
+		if configured_filters.get(fieldname):
+			filters[fieldname] = configured_filters[fieldname]
 	orders = frappe.get_list(
 		"Delivery Order",
-		filters=filters,
+		filters=as_filter_conditions(filters, additional_filter_conditions),
 		fields=_delivery_order_fields(),
 		order_by="required_delivery_date asc, priority desc, creation asc",
 		limit_page_length=MAX_SUMMARY_ORDERS + 1,
@@ -119,6 +150,15 @@ def get_planning_demand(
 		"summary_truncated": pool_truncated,
 		"summary_limit": MAX_SUMMARY_ORDERS,
 	}
+
+
+@frappe.whitelist()
+def get_dispatch_planning_filter_definitions(company=None):
+	"""Return administrator-configured additional filters for the planner."""
+	require_doctype_permission("Delivery Order", "read")
+	if company:
+		require_company_access(company)
+	return get_filter_definitions()
 
 
 @frappe.whitelist()
@@ -325,13 +365,17 @@ def get_driver_availability_details(company, from_time, to_time):
 
 def _planning_filters(
 	company,
-	required_delivery_date_from,
-	required_delivery_date_to,
-	source_warehouse,
-	transport_zone,
-	delivery_method,
-	priority,
-	customer,
+	required_delivery_date_from=None,
+	required_delivery_date_to=None,
+	source_warehouse=None,
+	transport_zone=None,
+	delivery_method=None,
+	priority=None,
+	customer=None,
+	delivery_address=None,
+	province=None,
+	county=None,
+	town=None,
 ):
 	filters = {
 		"company": company,
@@ -347,10 +391,30 @@ def _planning_filters(
 		"delivery_method": delivery_method,
 		"priority": priority,
 		"customer": customer,
+		"delivery_address": delivery_address,
 	}.items():
 		if value:
 			filters[fieldname] = value
+	address_names = _get_address_names(delivery_address, province, county, town)
+	if address_names is not None:
+		filters["delivery_address"] = ["in", address_names]
 	return filters
+
+
+def _get_address_names(delivery_address=None, province=None, county=None, town=None):
+	"""Resolve planner geography filters to permitted Address names."""
+	if not any((delivery_address, province, county, town)):
+		return None
+	filters = {}
+	if delivery_address:
+		filters["name"] = delivery_address
+	if province:
+		filters["vuna_province"] = province
+	if county:
+		filters["vuna_county"] = county
+	if town:
+		filters["vuna_town"] = town
+	return frappe.get_list("Address", filters=filters, pluck="name", limit_page_length=5000)
 
 
 def _delivery_date_filter(date_from=None, date_to=None):

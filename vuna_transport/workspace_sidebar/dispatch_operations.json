@@ -238,6 +238,18 @@
   {
    "child": 1,
    "collapsible": 1,
+   "icon": "sliders-horizontal",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Dispatch Planning Filters",
+   "link_to": "Dispatch Planning Filter",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
    "icon": "box",
    "indent": 0,
    "keep_closed": 0,
@@ -378,7 +390,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-10 07:41:49.318085",
+ "modified": "2026-09-15 15:22:36.208815",
  "modified_by": "Administrator",
  "name": "Dispatch Operations",
  "owner": "Administrator",

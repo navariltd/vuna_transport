@@ -4,6 +4,7 @@
 from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
 from frappe.utils import getdate
+from unittest.mock import patch
 
 from vuna_transport.services.planning.dispatch_planning_service import (
 	_delivery_date_filter,
@@ -12,6 +13,7 @@ from vuna_transport.services.planning.dispatch_planning_service import (
 	_summarize_vehicle_categories,
 	_warehouse_summaries,
 )
+from vuna_transport.services.planning.dispatch_filter_service import validate_additional_filters
 from vuna_transport.services.planning.load_suggestion_service import _partition_orders
 
 
@@ -41,6 +43,32 @@ class TestDispatchPlanningService(UnitTestCase):
 			_delivery_date_filter("2026-08-24", None),
 			[">=", getdate("2026-08-24")],
 		)
+
+	@patch(
+		"vuna_transport.services.planning.dispatch_planning_service._get_address_names",
+		return_value=["Address-1", "Address-2"],
+	)
+	def test_location_filters_resolve_to_delivery_addresses(self, get_address_names):
+		filters = _planning_filters(
+			"Vuna Foods",
+			delivery_address="Address-1",
+			province="Meru",
+			county="Meru County",
+			town="Meru Town",
+		)
+
+		get_address_names.assert_called_once_with("Address-1", "Meru", "Meru County", "Meru Town")
+		self.assertEqual(filters["delivery_address"], ["in", ["Address-1", "Address-2"]])
+
+	def test_native_filter_group_accepts_custom_delivery_order_fields(self):
+		filters = validate_additional_filters(
+			[["Delivery Order", "transport_compatibility_group", "=", "Packed Dairy"]]
+		)
+		self.assertEqual(filters[0][1:], ["transport_compatibility_group", "=", "Packed Dairy"])
+
+	def test_native_filter_group_cannot_override_security_fields(self):
+		with self.assertRaises(ValidationError):
+			validate_additional_filters([["Delivery Order", "company", "=", "Other Company"]])
 		self.assertEqual(
 			_delivery_date_filter(None, "2026-08-30"),
 			["<=", getdate("2026-08-30")],

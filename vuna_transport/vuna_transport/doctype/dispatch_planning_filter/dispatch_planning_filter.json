@@ -1,0 +1,101 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "field:filter_name",
+ "creation": "2026-09-15 15:22:36.208815",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "filter_name",
+  "field_key",
+  "filter_label",
+  "sequence",
+  "disabled",
+  "description"
+ ],
+ "fields": [
+  {
+   "fieldname": "filter_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Filter Name",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "field_key",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Filter Field",
+   "options": "delivery_group\ntransport_compatibility_group\npreferred_route\nmaximum_vehicle_category\ndelivery_address\nprovince\ncounty\ntown\ntransport_zone\ndelivery_method\npriority\ncustomer\nsource_warehouse\ntransport_handling_profile",
+   "reqd": 1
+  },
+  {
+   "fieldname": "filter_label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Displayed Label",
+   "reqd": 1
+  },
+  {
+   "default": "10",
+   "fieldname": "sequence",
+   "fieldtype": "Int",
+   "label": "Sequence"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Disabled"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-15 15:22:36.208815",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Dispatch Planning Filter",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Manager",
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Planner"
+  }
+ ],
+ "sort_field": "sequence",
+ "sort_order": "ASC",
+ "track_changes": 1
+}

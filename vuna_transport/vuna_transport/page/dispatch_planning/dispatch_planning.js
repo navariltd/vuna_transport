@@ -52,13 +52,18 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.cost_request_id = 0;
 		this.details_requests = new Map();
 		this.warehouse_summary_expanded = false;
+		this.configured_filter_keys = new Set();
+		this.configured_filter_company = null;
 		this.make_layout();
 		this.make_filters();
+		this.make_native_filter_group();
 		this.bind_events();
+		this.load_configured_filters();
 		this.load_vehicle_categories();
 	}
 
 	destroy() {
+		this.destroyed = true;
 		clearTimeout(this.filter_timer);
 		clearTimeout(this.plan_evaluation_timer);
 		this.$root?.off();
@@ -72,6 +77,8 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 						<div class="dp-filter-title">${__("Planning Filters")}</div>
 						<div class="dp-toolbar-actions">
 							<button class="btn btn-default btn-sm btn-toggle-filters">${__("Show Filters")}</button>
+							<button class="btn btn-default btn-sm btn-native-filter">${__("Add Filter")}</button>
+							<button class="btn btn-default btn-sm btn-clear-native-filter" title="${__("Clear added filters")}">×</button>
 						<button class="btn btn-default btn-refresh">${__("Refresh")}</button>
 						<button class="btn btn-default btn-suggest">${__("Suggest Loads")}</button>
 						</div>
@@ -142,8 +149,10 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			["required_delivery_date_from", "Date", __("Delivery Date From")],
 			["required_delivery_date_to", "Date", __("Delivery Date To")],
 			["source_warehouse", "Link", __("Source Warehouse"), "Warehouse"],
-			["transport_zone", "Link", __("Transport Zone"), "Transport Zone"],
-			["delivery_method", "Link", __("Delivery Method"), "Delivery Method"],
+			["delivery_address", "Link", __("Delivery Address"), "Address"],
+			["province", "Link", __("Province / Region"), "Province"],
+			["county", "Link", __("County"), "County"],
+			["town", "Link", __("Town"), "Town"],
 			["priority", "Select", __("Priority"), "\nLow\nMedium\nHigh\nUrgent"],
 			["customer", "Link", __("Customer"), "Customer"],
 			[
@@ -170,6 +179,103 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			field.set_value(default_value || "");
 			this.filters[fieldname] = field;
 		}
+		this.filters.province.get_query = () => ({ filters: { disabled: 0 } });
+		this.filters.county.get_query = () => ({
+			filters: this.filters.province.get_value()
+				? { province: this.filters.province.get_value(), disabled: 0 }
+				: { disabled: 0 },
+		});
+		this.filters.town.get_query = () => ({
+			filters: this.filters.county.get_value()
+				? { county: this.filters.county.get_value(), disabled: 0 }
+				: { disabled: 0 },
+		});
+		this.filters.province.$input?.on("change", () => {
+			this.filters.county.set_value("");
+			this.filters.town.set_value("");
+		});
+		this.filters.county.$input?.on("change", () => this.filters.town.set_value(""));
+	}
+
+	async make_native_filter_group() {
+		const $button = this.$root.find(".btn-native-filter");
+		$button.prop("disabled", true);
+		try {
+			await frappe.model.with_doctype("Delivery Order");
+		} catch (error) {
+			$button.prop("disabled", false);
+			frappe.show_alert({
+				message: error?.message || __("Unable to load Delivery Order fields."),
+				indicator: "red",
+			});
+			return;
+		}
+		if (this.destroyed) return;
+		this.filter_group = new frappe.ui.FilterGroup({
+			parent: this.$root.find(".dp-toolbar-actions"),
+			doctype: "Delivery Order",
+			filter_button: this.$root.find(".btn-native-filter"),
+			filter_x_button: this.$root.find(".btn-clear-native-filter"),
+			on_change: () => this.filters_changed(),
+		});
+		$button.prop("disabled", false);
+	}
+
+	async load_configured_filters() {
+		if (this.configured_filter_company === "global") return;
+		try {
+			for (const key of this.configured_filter_keys) {
+				this.filters[key]?.$wrapper?.remove();
+				delete this.filters[key];
+			}
+			this.configured_filter_keys.clear();
+			this.configured_filter_company = "global";
+			const response = await frappe.call({
+				method:
+					"vuna_transport.services.planning.dispatch_planning_service.get_dispatch_planning_filter_definitions",
+				args: {},
+			});
+			for (const definition of response.message || []) {
+				if (this.filters[definition.field_key]) continue;
+				const field = frappe.ui.form.make_control({
+					parent: this.$root.find(".dp-filter-grid"),
+					df: {
+						fieldname: definition.field_key,
+						fieldtype: definition.fieldtype,
+						label: definition.label,
+						options: definition.options,
+						onchange: () => this.filters_changed(),
+					},
+					render_input: true,
+				});
+				field.set_value("");
+				this.filters[definition.field_key] = field;
+				this.configured_filter_keys.add(definition.field_key);
+			}
+			this.configure_location_filter_queries();
+		} catch (error) {
+			this.configured_filter_company = null;
+			frappe.show_alert({
+				message: error?.message || __("Unable to load configured planning filters."),
+				indicator: "red",
+			});
+		}
+	}
+
+	configure_location_filter_queries() {
+		if (this.filters.province) this.filters.province.get_query = () => ({ filters: { disabled: 0 } });
+		if (this.filters.county)
+			this.filters.county.get_query = () => ({
+				filters: this.filters.province?.get_value()
+					? { province: this.filters.province.get_value(), disabled: 0 }
+					: { disabled: 0 },
+			});
+		if (this.filters.town)
+			this.filters.town.get_query = () => ({
+				filters: this.filters.county?.get_value()
+					? { county: this.filters.county.get_value(), disabled: 0 }
+					: { disabled: 0 },
+			});
 	}
 
 	async load_vehicle_categories() {
@@ -248,6 +354,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	filters_changed() {
+		this.load_configured_filters();
 		this.start = 0;
 		this.clear_suggestions();
 		clearTimeout(this.filter_timer);
@@ -263,6 +370,18 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					: field.get_value(),
 			])
 		);
+	}
+
+	get_configured_filter_values(filters) {
+		return Object.fromEntries(
+			[...this.configured_filter_keys]
+				.filter((key) => filters[key])
+				.map((key) => [key, filters[key]])
+		);
+	}
+
+	get_native_filter_values() {
+		return this.filter_group?.get_filters?.() || [];
 	}
 
 	planning_window() {
@@ -296,6 +415,8 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.$root.find(".dp-demand").html(this.loading());
 		const args = {
 			...filters,
+			planning_filters: this.get_configured_filter_values(filters),
+			additional_filters: this.get_native_filter_values(),
 			required_vehicle_category: this.selected_vehicle_category(),
 			selected_delivery_order_names: [
 				...new Set([...this.allocations.values()].map((row) => row.delivery_order)),
@@ -815,6 +936,12 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					delivery_method: filters.delivery_method || null,
 					priority: filters.priority || null,
 					customer: filters.customer || null,
+					delivery_address: filters.delivery_address || null,
+					province: filters.province || null,
+					county: filters.county || null,
+					town: filters.town || null,
+					planning_filters: this.get_configured_filter_values(filters),
+					additional_filters: this.get_native_filter_values(),
 					delivery_date_from: filters.required_delivery_date_from || null,
 					delivery_date_to: filters.required_delivery_date_to || null,
 					delivery_order_names: selected_names.length ? selected_names : null,
