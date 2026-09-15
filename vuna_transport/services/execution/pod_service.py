@@ -20,7 +20,7 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 	if trip.docstatus != 1:
 		frappe.throw(_("Submit the Delivery Trip before creating a Proof of Delivery."))
 	if not trip.vuna_delivery_load:
-		frappe.throw(_("Delivery Trip is not linked to a Delivery Load."))
+		frappe.throw(_("Delivery Trip is not linked to a Vehicle Allocation or Delivery Load."))
 
 	stop = next((row for row in trip.delivery_stops if row.name == delivery_stop), None)
 	if not stop:
@@ -40,7 +40,7 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 	pod.company = trip.company
 	pod.delivery_trip = trip.name
 	pod.delivery_stop = stop.name
-	pod.delivery_load = trip.vuna_delivery_load
+	pod.delivery_load = delivery_note.vuna_delivery_load
 	pod.delivery_order = stop.vuna_delivery_order or delivery_note.vuna_delivery_order
 	pod.delivery_note = delivery_note.name
 	pod.customer = stop.customer

@@ -225,13 +225,17 @@ def sync_related_vehicle_snapshots(doc, method=None):
 		asset = frappe.db.get_value("Asset Maintenance", maintenance, "asset_name")
 		vehicle_names.update(_vehicles_for_asset(asset))
 	elif doctype == "Delivery Load":
-		vehicle_names.update(
-			frappe.get_all(
-				"Vehicle Allocation",
-				filters={"delivery_load": doc.name, "vehicle": ["is", "set"]},
-				pluck="vehicle",
+		from vuna_transport.services.fleet.vehicle_allocation_service import get_allocation_names_for_load
+
+		allocation_names = get_allocation_names_for_load(doc.name)
+		if allocation_names:
+			vehicle_names.update(
+				frappe.get_all(
+					"Vehicle Allocation",
+					filters={"name": ["in", allocation_names], "vehicle": ["is", "set"]},
+					pluck="vehicle",
+				)
 			)
-		)
 
 	if vehicle_names:
 		sync_vehicle_operational_snapshots(sorted(vehicle_names))

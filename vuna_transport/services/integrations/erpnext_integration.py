@@ -13,7 +13,10 @@ from vuna_transport.services.execution.dispatch_guard_service import (
 	set_delivery_load_status,
 	validate_load_is_operational,
 )
-from vuna_transport.services.fleet.vehicle_allocation_service import get_active_allocation
+from vuna_transport.services.fleet.vehicle_allocation_service import (
+	get_active_allocation,
+	get_allocation_loads,
+)
 from vuna_transport.services.shared.security_service import (
 	require_doctype_permission,
 	require_document_permission,
@@ -201,7 +204,7 @@ def make_delivery_trip_from_load(source_name):
 
 
 def create_delivery_trip_for_load(load):
-	"""Build the ERPNext Delivery Trip that executes a Delivery Load."""
+	"""Build the ERPNext Delivery Trip for every Load on the active allocation."""
 	if isinstance(load, str):
 		load = frappe.get_doc("Delivery Load", load)
 	load = get_locked_delivery_load(load)
@@ -236,15 +239,21 @@ def create_delivery_trip_for_load(load):
 			)
 		)
 
+	loads = get_allocation_loads(allocation) if allocation else [load]
+	if any(selected_load.delivery_trip and selected_load.delivery_trip != existing_trip_name for selected_load in loads):
+		linked = next(selected_load for selected_load in loads if selected_load.delivery_trip)
+		return frappe.get_doc("Delivery Trip", linked.delivery_trip)
 	delivery_note_rows = frappe.get_all(
 		"Delivery Note",
-		filters={"vuna_delivery_load": load.name, "docstatus": 1},
-		fields=["name", "vuna_delivery_order"],
+		filters={"vuna_delivery_load": ["in", [selected_load.name for selected_load in loads]], "docstatus": 1},
+		fields=["name", "vuna_delivery_order", "vuna_delivery_load"],
 	)
 	delivery_notes = [row.name for row in delivery_note_rows]
 	if not delivery_notes:
 		frappe.throw(_("Create and submit the Delivery Notes for this load first."))
-	expected_delivery_orders = {row.delivery_order for row in load.delivery_orders if row.delivery_order}
+	expected_delivery_orders = {
+		row.delivery_order for selected_load in loads for row in selected_load.delivery_orders if row.delivery_order
+	}
 	note_delivery_orders = {row.vuna_delivery_order for row in delivery_note_rows if row.vuna_delivery_order}
 	if expected_delivery_orders != note_delivery_orders:
 		missing = sorted(expected_delivery_orders - note_delivery_orders)
@@ -262,23 +271,28 @@ def create_delivery_trip_for_load(load):
 	if allocation:
 		delivery_trip.vehicle = allocation.vehicle
 		delivery_trip.driver = allocation.driver
-	delivery_trip.departure_time = (
-		get_datetime(load.planned_departure) if load.planned_departure else now_datetime()
-	)
+	departures = [get_datetime(selected_load.planned_departure) for selected_load in loads if selected_load.planned_departure]
+	delivery_trip.departure_time = min(departures) if departures else now_datetime()
 	delivery_trip.vuna_delivery_load = load.name
 	delivery_trip.vuna_vehicle_allocation = allocation.name if allocation else None
 	delivery_trip.vuna_current_vehicle_allocation = allocation.name if allocation else None
 	delivery_trip.vuna_current_vehicle = allocation.vehicle if allocation else None
 	delivery_trip.vuna_current_driver = allocation.driver if allocation else None
 	delivery_trip.vuna_reallocation_count = 0
-	_populate_delivery_stop_links(delivery_trip, load)
+	_populate_delivery_stop_links(delivery_trip, loads)
 	return delivery_trip
 
 
-def _populate_delivery_stop_links(delivery_trip, load):
+def _populate_delivery_stop_links(delivery_trip, loads):
 	for stop in delivery_trip.delivery_stops:
-		delivery_order = frappe.db.get_value("Delivery Note", stop.delivery_note, "vuna_delivery_order")
-		load_rows = [row for row in load.delivery_orders if row.delivery_order == delivery_order]
+		delivery_note = frappe.db.get_value(
+			"Delivery Note", stop.delivery_note, ["vuna_delivery_order", "vuna_delivery_load"], as_dict=True
+		)
+		if not delivery_note:
+			continue
+		delivery_order = delivery_note.vuna_delivery_order
+		load = next((row for row in loads if row.name == delivery_note.vuna_delivery_load), None)
+		load_rows = [row for row in (load.delivery_orders if load else []) if row.delivery_order == delivery_order]
 		stop.vuna_delivery_order = delivery_order
 		if len(load_rows) == 1:
 			stop.vuna_delivery_load_order = load_rows[0].name

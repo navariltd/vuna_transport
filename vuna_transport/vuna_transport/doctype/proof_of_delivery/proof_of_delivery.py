@@ -39,7 +39,7 @@ class ProofofDelivery(Document):
 		self.customer = stop.customer
 		self.delivery_address = stop.address
 		self.delivery_note = stop.delivery_note
-		self.delivery_load = frappe.db.get_value("Delivery Trip", self.delivery_trip, "vuna_delivery_load")
+		self.delivery_load = frappe.db.get_value("Delivery Note", self.delivery_note, "vuna_delivery_load")
 
 	def populate_item_details(self):
 		for item in self.items:

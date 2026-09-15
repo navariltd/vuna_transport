@@ -4,6 +4,7 @@ import frappe
 from frappe import _
 
 from vuna_transport.services.shared.security_service import require_document_permission
+from vuna_transport.services.fleet.vehicle_allocation_service import get_allocation_names_for_load
 from vuna_transport.services.shared.workflow_policy_service import (
 	ALLOCATION_AFTER_DELIVERY_NOTES,
 	get_vehicle_allocation_timing,
@@ -21,9 +22,10 @@ def get_load_execution_summary(load):
 
 	pick_list = _get_pick_list(load)
 	vehicle_allocation = _get_vehicle_allocation(load)
+	allocation_names = get_allocation_names_for_load(load.name)
 	vehicle_allocation_history = frappe.get_all(
 		"Vehicle Allocation",
-		filters={"delivery_load": load.name},
+		filters={"name": ["in", allocation_names or [""]]},
 		fields=[
 			"name",
 			"docstatus",
@@ -160,12 +162,8 @@ def _get_vehicle_allocation(load):
 			["name", "docstatus", "status", "allocation_type", "vehicle", "driver", "supplier"],
 			as_dict=True,
 		)
-	name = frappe.db.get_value(
-		"Vehicle Allocation",
-		{"delivery_load": load.name, "docstatus": 0},
-		"name",
-		order_by="creation desc",
-	)
+	draft_names = get_allocation_names_for_load(load.name, docstatus=0)
+	name = draft_names[-1] if draft_names else None
 	if not name:
 		return None
 	return frappe.db.get_value(
