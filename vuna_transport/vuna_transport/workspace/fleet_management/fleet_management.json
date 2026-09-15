@@ -139,7 +139,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Transport Cost Structure",
+   "label": "Cost Structures",
    "link_count": 0,
    "link_to": "Transport Cost Structure",
    "link_type": "DocType",
@@ -149,7 +149,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Transport Cost Component",
+   "label": "Cost Components",
    "link_count": 0,
    "link_to": "Transport Cost Component",
    "link_type": "DocType",
@@ -159,7 +159,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Cost Structure Assignment",
+   "label": "Cost Structure Assignments",
    "link_count": 0,
    "link_to": "Transport Cost Structure Assignment",
    "link_type": "DocType",
@@ -311,7 +311,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-10 07:11:55.168551",
+ "modified": "2026-09-15 08:00:04.851986",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Fleet Management",
