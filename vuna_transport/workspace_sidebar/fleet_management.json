@@ -194,11 +194,11 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "calculator",
+   "icon": "list-checks",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Cost Structures",
-   "link_to": "Transport Cost Structure",
+   "label": "Cost Components",
+   "link_to": "Transport Cost Component",
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
@@ -206,11 +206,11 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "list-checks",
+   "icon": "calculator",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Cost Components",
-   "link_to": "Transport Cost Component",
+   "label": "Cost Structures",
+   "link_to": "Transport Cost Structure",
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
@@ -368,7 +368,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-15 08:00:04.851986",
+ "modified": "2026-09-15 14:41:39.819400",
  "modified_by": "Administrator",
  "name": "Fleet Management",
  "owner": "Administrator",
