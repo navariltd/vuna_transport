@@ -27,8 +27,23 @@ frappe.ui.form.on("Delivery Exception", {
 	refresh(frm) {
 		add_view_buttons(frm);
 		if (frm.is_new()) return;
+		if (requires_stock_return(frm.doc)) {
+			if (frm.doc.return_request) {
+				frm.add_custom_button(
+					__("Return Request"),
+					() => frappe.set_route("Form", "Return Request", frm.doc.return_request),
+					__("View")
+				);
+			} else {
+				frm.add_custom_button(
+					__("Create Return Request"),
+					() => create_return_request(frm),
+					__("Resolve")
+				);
+			}
+		}
 
-		if (requires_stock_return(frm.doc) && !frm.doc.return_document) {
+		if (requires_stock_return(frm.doc) && !frm.doc.return_document && !frm.doc.return_request) {
 			frm.add_custom_button(
 				__("Prepare Stock Return"),
 				() => {
@@ -94,6 +109,7 @@ function add_view_buttons(frm) {
 		["return_document", "Delivery Note", __("Return Document")],
 		["credit_note", "Sales Invoice", __("Credit Note")],
 		["replacement_delivery_reference", "Delivery Order", __("Follow-up Delivery")],
+		["return_request", "Return Request", __("Return Request")],
 	].forEach(([fieldname, doctype, label]) => {
 		if (!frm.doc[fieldname]) return;
 		frm.add_custom_button(
@@ -103,6 +119,17 @@ function add_view_buttons(frm) {
 			},
 			__("View")
 		);
+	});
+}
+
+function create_return_request(frm) {
+	frappe.call({
+		method: "vuna_transport.services.execution.return_service.create_return_request_from_exception",
+		args: { delivery_exception: frm.doc.name },
+		freeze: true,
+		callback: ({ message }) => {
+			if (message) frappe.set_route("Form", "Return Request", message);
+		},
 	});
 }
 

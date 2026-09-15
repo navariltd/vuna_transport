@@ -21,18 +21,27 @@
   "source_section",
   "sales_order",
   "delivery_note",
+  "delivery_exception",
   "column_break_source",
+  "delivery_order",
   "delivery_trip",
   "proof_of_delivery",
+  "delivery_address",
   "return_section",
   "return_method",
   "return_warehouse",
+  "custody",
+  "responsible_party",
+  "physical_resolution",
+  "commercial_resolution",
   "items",
   "resolution_section",
   "return_stock_document",
   "credit_note",
   "replacement_delivery_reference",
-  "notes"
+  "notes",
+  "activity_section",
+  "activities"
  ],
  "fields": [
   {
@@ -105,8 +114,7 @@
    "fieldname": "return_reasons",
    "fieldtype": "Table MultiSelect",
    "label": "Return Reasons",
-   "options": "Rejection Reason Item",
-   "reqd": 1
+   "options": "Rejection Reason Item"
   },
   {
    "fieldname": "return_remarks",
@@ -134,8 +142,24 @@
    "reqd": 1
   },
   {
+   "fieldname": "delivery_exception",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Delivery Exception",
+   "options": "Delivery Exception",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
    "fieldname": "column_break_source",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "delivery_order",
+   "fieldtype": "Link",
+   "label": "Delivery Order",
+   "options": "Delivery Order",
+   "read_only": 1
   },
   {
    "fieldname": "delivery_trip",
@@ -148,6 +172,13 @@
    "fieldtype": "Link",
    "label": "Proof of Delivery",
    "options": "Proof of Delivery"
+  },
+  {
+   "fieldname": "delivery_address",
+   "fieldtype": "Link",
+   "label": "Delivery Address",
+   "options": "Address",
+   "read_only": 1
   },
   {
    "fieldname": "return_section",
@@ -169,6 +200,30 @@
    "label": "Return Warehouse",
    "options": "Warehouse",
    "reqd": 1
+  },
+  {
+  "fieldname": "custody",
+  "fieldtype": "Select",
+  "label": "Custody",
+  "options": "\nStill With Vehicle\nLeft With Customer\nHeld By Transporter\nReturned To Depot\nTransferred To Another Vehicle\nUnknown"
+  },
+  {
+  "fieldname": "responsible_party",
+  "fieldtype": "Select",
+  "label": "Responsible Party",
+  "options": "\nCompany\nCustomer\nTransporter\nDriver\nThird Party\nUnknown"
+  },
+  {
+  "fieldname": "physical_resolution",
+  "fieldtype": "Select",
+  "label": "Physical Resolution",
+  "options": "\nReturn to Original Depot\nReturn to Nearest Depot\nCustomer Return to Depot\nLeave With Customer\nRe-deliver\nDispose / Write Off\nPending Decision"
+  },
+  {
+  "fieldname": "commercial_resolution",
+  "fieldtype": "Select",
+  "label": "Commercial Resolution",
+  "options": "\nReplacement\nCredit Note\nRe-delivery\nNo Charge\nNo Further Action\nPending"
   },
   {
    "fieldname": "items",
@@ -205,11 +260,23 @@
    "fieldname": "notes",
    "fieldtype": "Long Text",
    "label": "Notes"
+  },
+  {
+   "fieldname": "activity_section",
+   "fieldtype": "Section Break",
+   "label": "Return Activity"
+  },
+  {
+   "fieldname": "activities",
+   "fieldtype": "Table",
+   "label": "Activity History",
+   "options": "Return Request Activity",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "links": [],
- "modified": "2026-09-07 07:29:34.478202",
+ "modified": "2026-09-15 22:07:48.597473",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Return Request",

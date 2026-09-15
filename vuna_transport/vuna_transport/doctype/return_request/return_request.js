@@ -31,6 +31,7 @@ frappe.ui.form.on("Return Request", {
 	},
 
 	refresh(frm) {
+		set_exception_context_read_only(frm);
 		add_view_buttons(frm);
 		add_get_delivered_items_button(frm);
 		if (frm.is_new()) return;
@@ -45,6 +46,20 @@ frappe.ui.form.on("Return Request", {
 		if (["Draft", "Requested"].includes(frm.doc.status)) {
 			frm.add_custom_button(__("Approve"), () => transition(frm, "approve"), __("Actions"));
 		}
+		if (frm.doc.status === "Approved") {
+			frm.add_custom_button(
+				__("Await Return"),
+				() => transition(frm, "await_return"),
+				__("Actions")
+			);
+		}
+		if (frm.doc.status === "Awaiting Return") {
+			frm.add_custom_button(
+				__("Mark In Transit"),
+				() => transition(frm, "dispatch"),
+				__("Actions")
+			);
+		}
 		if (["Approved", "Awaiting Return", "In Transit"].includes(frm.doc.status)) {
 			frm.add_custom_button(
 				__("Mark Received"),
@@ -52,10 +67,17 @@ frappe.ui.form.on("Return Request", {
 				__("Actions")
 			);
 		}
-		if (["Received", "Under Inspection", "Awaiting Resolution"].includes(frm.doc.status)) {
+		if (frm.doc.status === "Received") {
 			frm.add_custom_button(
 				__("Start Inspection"),
 				() => transition(frm, "inspect"),
+				__("Actions")
+			);
+		}
+		if (frm.doc.status === "Under Inspection") {
+			frm.add_custom_button(
+				__("Await Resolution"),
+				() => transition(frm, "await_resolution"),
 				__("Actions")
 			);
 		}
@@ -65,8 +87,15 @@ frappe.ui.form.on("Return Request", {
 				() => prepare_return_stock_document(frm),
 				__("Actions")
 			);
+			if ((frm.doc.items || []).some((row) => flt(row.received_qty) && !row.quality_inspection)) {
+				frm.add_custom_button(
+					__("Prepare Quality Inspections"),
+					() => prepare_quality_inspections(frm),
+					__("Actions")
+				);
+			}
 		}
-		if (["Awaiting Resolution", "Under Inspection"].includes(frm.doc.status)) {
+		if (frm.doc.status === "Awaiting Resolution") {
 			frm.add_custom_button(
 				__("Mark Resolved"),
 				() => transition(frm, "resolve"),
@@ -76,10 +105,32 @@ frappe.ui.form.on("Return Request", {
 		if (frm.doc.status === "Resolved") {
 			frm.add_custom_button(__("Close"), () => transition(frm, "close"), __("Actions"));
 		}
+		add_resolution_actions(frm);
 	},
 
 	delivery_note(frm) {
 		add_get_delivered_items_button(frm);
+	},
+});
+
+frappe.ui.form.on("Return Request Item", {
+	received_qty(frm, cdt, cdn) {
+		const row = frappe.get_doc(cdt, cdn);
+		frappe.model.set_value(
+			cdt,
+			cdn,
+			"remaining_qty",
+			Math.max(flt(row.requested_return_qty) - flt(row.received_qty), 0)
+		);
+	},
+	requested_return_qty(frm, cdt, cdn) {
+		const row = frappe.get_doc(cdt, cdn);
+		frappe.model.set_value(
+			cdt,
+			cdn,
+			"remaining_qty",
+			Math.max(flt(row.requested_return_qty) - flt(row.received_qty), 0)
+		);
 	},
 });
 
@@ -142,8 +193,53 @@ function prepare_return_stock_document(frm) {
 	});
 }
 
+function prepare_quality_inspections(frm) {
+	frappe.call({
+		method: "vuna_transport.services.execution.return_service.create_return_quality_inspections",
+		args: { return_request: frm.doc.name },
+		freeze: true,
+		callback: ({ message }) => {
+			if (message?.length) {
+				frappe.show_alert({
+					message: __("{0} Quality Inspection document(s) prepared", [message.length]),
+					indicator: "green",
+				});
+				frm.reload_doc();
+			}
+		},
+	});
+}
+
+function set_exception_context_read_only(frm) {
+	const read_only = Boolean(frm.doc.delivery_exception);
+	["custody", "responsible_party", "physical_resolution", "commercial_resolution"].forEach(
+		(fieldname) => frm.set_df_property(fieldname, "read_only", read_only)
+	);
+}
+
+function add_resolution_actions(frm) {
+	if (frm.doc.commercial_resolution === "Credit Note" && !frm.doc.credit_note) {
+		frm.add_custom_button(
+			__("Find Credit Note"),
+			() => frappe.set_route("List", "Sales Invoice", { customer: frm.doc.customer, is_return: 1 }),
+			__("Resolve")
+		);
+	}
+	if (
+		["Replacement", "Re-delivery"].includes(frm.doc.commercial_resolution) &&
+		!frm.doc.replacement_delivery_reference
+	) {
+		frm.add_custom_button(
+			__("Link Follow-up Delivery"),
+			() => frm.scroll_to_field("replacement_delivery_reference"),
+			__("Resolve")
+		);
+	}
+}
+
 function add_view_buttons(frm) {
 	[
+		["delivery_exception", "Delivery Exception", __("Delivery Exception")],
 		["delivery_note", "Delivery Note", __("Original Delivery Note")],
 		["sales_order", "Sales Order", __("Sales Order")],
 		["delivery_trip", "Delivery Trip", __("Delivery Trip")],
