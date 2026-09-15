@@ -8,6 +8,7 @@ from frappe.tests import UnitTestCase
 
 from vuna_transport.services.costing.transport_cost_estimation_service import (
 	CostContext,
+	_destination_rate,
 	estimate_cost_component,
 )
 
@@ -72,6 +73,53 @@ class TestTransportCostEstimationService(UnitTestCase):
 
 		self.assertEqual(result["amount"], 250000)
 		self.assertIn("Monthly Fixed", result["warnings"][0])
+
+	def test_destination_rate_prefers_most_specific_geography(self):
+		component = SimpleNamespace(cost_component="Trip Charge")
+		profile = SimpleNamespace(
+			destination_rates=[
+				SimpleNamespace(province="Nairobi", county=None, town=None, rate=15000),
+				SimpleNamespace(province="Nairobi", county="Nairobi", town="Kilimani", rate=18000),
+			]
+		)
+		context = self.context
+		context.destination_geographies = [
+			SimpleNamespace(province="Nairobi", county="Nairobi", town="Kilimani")
+		]
+
+		self.assertEqual(_destination_rate(component, context, profile), 18000)
+
+	def test_destination_rate_requires_geography(self):
+		component = SimpleNamespace(cost_component="Trip Charge")
+		profile = SimpleNamespace(
+			destination_rates=[SimpleNamespace(province="Nairobi", county=None, town=None, rate=15000)]
+		)
+		context = self.context
+		context.destination_geographies = []
+
+		self.assertEqual(_destination_rate(component, context, profile), 0)
+
+	def test_destination_rate_prefers_source_warehouse_specific_rate(self):
+		component = SimpleNamespace(cost_component="Trip Charge")
+		profile = SimpleNamespace(
+			destination_rates=[
+				SimpleNamespace(
+					source_warehouse=None, province="Nairobi", county=None, town=None, rate=15000
+				),
+				SimpleNamespace(
+					source_warehouse="Meru Dispatch - YT",
+					province="Nairobi",
+					county=None,
+					town=None,
+					rate=22000,
+				),
+			]
+		)
+		context = self.context
+		context.source_warehouse = "Meru Dispatch - YT"
+		context.destination_geographies = [SimpleNamespace(province="Nairobi", county=None, town=None)]
+
+		self.assertEqual(_destination_rate(component, context, profile), 22000)
 
 	@patch("vuna_transport.services.costing.transport_cost_estimation_service.get_transport_uoms")
 	@patch("vuna_transport.services.costing.transport_cost_estimation_service.require_company_access")

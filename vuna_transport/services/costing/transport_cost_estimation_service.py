@@ -11,6 +11,7 @@ from vuna_transport.services.shared.security_service import (
 	require_company_access,
 	require_document_permission,
 )
+from vuna_transport.services.routing.location_service import get_address_planning_data
 
 
 @dataclass
@@ -24,6 +25,8 @@ class CostContext:
 	distance_source: str
 	destination: str | None
 	destinations: list[str]
+	destination_geographies: list[object] | None = None
+	source_warehouse: str | None = None
 
 
 @frappe.whitelist()
@@ -210,6 +213,7 @@ def _build_context(load, vehicle, uoms, *, as_of_date, distance, distance_source
 	addresses = sorted(
 		{row.delivery_address for row in getattr(load, "delivery_orders", []) if row.delivery_address}
 	)
+	destination_geographies = [get_address_planning_data(address) for address in addresses]
 	return CostContext(
 		company=load.company,
 		load=load,
@@ -220,6 +224,8 @@ def _build_context(load, vehicle, uoms, *, as_of_date, distance, distance_source
 		distance_source=source,
 		destination=addresses[0] if len(addresses) == 1 else None,
 		destinations=addresses,
+		destination_geographies=destination_geographies,
+		source_warehouse=getattr(load, "source_warehouse", None),
 	)
 
 
@@ -260,8 +266,39 @@ def _fuel_quantity(context, component):
 def _destination_rate(component, context, profile):
 	if not context.destination or not profile:
 		return 0
+	if len(context.destination_geographies or []) != 1:
+		return _legacy_destination_rate(context, profile)
+	geography = context.destination_geographies[0]
+	candidates = []
 	for row in getattr(profile, "destination_rates", []) or []:
-		if row.destination_key == context.destination:
+		if getattr(row, "source_warehouse", None) and row.source_warehouse != context.source_warehouse:
+			continue
+		if row.province != geography.province:
+			continue
+		if row.county and row.county != geography.county:
+			continue
+		if row.town and row.town != geography.town:
+			continue
+		specificity = (
+			int(bool(getattr(row, "source_warehouse", None))) * 10
+			+ int(bool(row.county))
+			+ int(bool(row.town))
+		)
+		candidates.append((specificity, flt(row.rate)))
+	if candidates:
+		return max(candidates)[1]
+	return _legacy_destination_rate(context, profile)
+
+
+def _legacy_destination_rate(context, profile):
+	for row in getattr(profile, "destination_rates", []) or []:
+		if (
+			getattr(row, "destination_key", None) == context.destination
+			and (
+				not getattr(row, "source_warehouse", None)
+				or row.source_warehouse == context.source_warehouse
+			)
+		):
 			return flt(row.rate)
 	return 0
 

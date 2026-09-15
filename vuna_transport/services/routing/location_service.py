@@ -18,6 +18,9 @@ def get_address_planning_data(address_name):
 	longitude = _coordinate_or_fallback(getattr(address, "vuna_longitude", None), map_longitude)
 	return frappe._dict(
 		address=address.name,
+		province=getattr(address, "vuna_province", None),
+		county=getattr(address, "vuna_county", None),
+		town=getattr(address, "vuna_town", None),
 		delivery_zone=getattr(address, "vuna_delivery_zone", None),
 		location=location,
 		latitude=latitude,
