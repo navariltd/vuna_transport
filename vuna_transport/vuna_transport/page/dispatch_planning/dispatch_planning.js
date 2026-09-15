@@ -552,7 +552,9 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 						? __("Selected order is not compatible with this Vehicle Category.")
 						: ""
 				)}">
-				<div><input type="checkbox" class="dp-order-select" ${selected}></div>
+				<div><input type="checkbox" class="dp-order-select" title="${__(
+					"Load all remaining items from this Delivery Order"
+				)}" aria-label="${__("Load all remaining items")}" ${selected}></div>
 				<div><a href="/app/delivery-order/${encodeURIComponent(order.name)}"><strong>${this.escape(
 					order.name
 				)}</strong></a><small>${this.escape(
@@ -685,6 +687,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		)}</div>${order.items
 			.map((item) => {
 				const allocation = this.allocations.get(item.name);
+				const stock_sufficient = item.stock_availability_status === "Available";
 				return `<div class="dp-item-row"><span><strong>${this.escape(
 					item.item_code
 				)}</strong><small>${this.escape(
@@ -694,12 +697,16 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				)}<small>${this.number(item.allocated_quantity)} ${__(
 					"allocated"
 				)}</small></span><span>${this.number(item.available_quantity)} ${__(
-					"available"
-				)}</span><span>${this.number(item.weight)} / ${this.number(
+					"remaining"
+				)}<small class="${stock_sufficient ? "text-success" : "text-warning"}">${this.number(item.stock_available_quantity)} ${this.escape(item.stock_uom || "")} ${stock_sufficient ? __("on hand") : __("on hand — insufficient")}</small></span><span>${this.number(item.weight)} / ${this.number(
 					item.volume
 				)}<small>${this.escape(
 					item.handling_requirements || __("No handling profile")
-				)}</small></span><span><input type="number" class="form-control input-xs dp-allocation-qty" data-order="${this.escape(
+				)}</small></span><span class="dp-qty-entry"><label>${__(
+					"Load Qty"
+				)}</label><input type="number" class="form-control dp-allocation-qty" placeholder="${__(
+					"Enter quantity"
+				)}" title="${__("Enter the quantity to include in this Delivery Load")}" data-order="${this.escape(
 					order.name
 				)}" data-item="${this.escape(item.name)}" min="0" max="${
 					item.available_quantity

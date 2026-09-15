@@ -58,7 +58,11 @@
 .dp-item-details { display: none; }
 .dp-items { background: var(--subtle-fg); border-bottom: 1px solid var(--border-color); padding: 8px 44px; }
 .dp-item-heading { color: var(--text-muted); margin-bottom: 8px; }
-.dp-item-row { align-items: center; display: grid; gap: 10px; grid-template-columns: 1.5fr 1fr 1fr 1.2fr 100px; padding: 7px 0; }
+.dp-item-row { align-items: center; display: grid; gap: 10px; grid-template-columns: 1.5fr 1fr 1fr 1.2fr 130px; padding: 7px 0; }
+.dp-qty-entry { background: var(--control-bg); border: 1px solid var(--primary); border-radius: var(--border-radius); padding: 4px; }
+.dp-qty-entry label { color: var(--primary); display: block; font-size: var(--text-xs); font-weight: 600; margin: 0 0 3px 2px; }
+.dp-qty-entry .dp-allocation-qty { border-color: var(--primary); font-weight: 600; min-height: 30px; }
+.dp-qty-entry .dp-allocation-qty:focus { box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent); }
 .dp-pagination { align-items: center; display: flex; gap: 8px; }
 .dp-plan-actions,
 .dp-card-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }

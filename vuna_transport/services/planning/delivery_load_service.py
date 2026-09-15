@@ -295,6 +295,9 @@ def add_delivery_orders_to_load(load, delivery_order_names):
 		frappe.throw(_("All Delivery Orders in a load must use the same Transport Zone."))
 
 	existing_items = {(row.delivery_order, row.delivery_order_item) for row in load.delivery_orders}
+	bins = _get_on_hand_stock(
+		[item.item_code for order in delivery_orders for item in order.items], load.source_warehouse
+	)
 	stop_sequences = {
 		row.delivery_address: row.stop_sequence
 		for row in load.delivery_orders
@@ -315,11 +318,17 @@ def add_delivery_orders_to_load(load, delivery_order_names):
 			stop_key = delivery_order.delivery_address
 			stop_sequences.setdefault(stop_key, len(stop_sequences) + 1)
 			ratio = available_quantity / flt(delivery_order_item.transport_qty or 1)
+			stock_required_quantity = available_quantity * flt(delivery_order_item.conversion_factor or 1)
+			stock_available_quantity = flt(bins.get(delivery_order_item.item_code))
 			load.append(
 				"delivery_orders",
 				{
 					"delivery_order": delivery_order.name,
 					"delivery_order_item": delivery_order_item.name,
+					"item_code": delivery_order_item.item_code,
+					"item_name": delivery_order_item.item_name,
+					"uom": delivery_order_item.uom,
+					"stock_uom": delivery_order_item.stock_uom,
 					"sales_order": delivery_order.sales_order,
 					"customer": delivery_order.customer,
 					"delivery_address": delivery_order.delivery_address,
@@ -330,6 +339,11 @@ def add_delivery_orders_to_load(load, delivery_order_names):
 					),
 					"allocated_quantity": available_quantity,
 					"available_quantity": available_quantity,
+					"stock_available_quantity": stock_available_quantity,
+					"stock_required_quantity": stock_required_quantity,
+					"stock_availability_status": (
+						"Available" if stock_available_quantity >= stock_required_quantity else "Insufficient"
+					),
 					"weight": flt(delivery_order_item.weight) * ratio,
 					"weight_uom": delivery_order_item.weight_uom,
 					"volume": flt(delivery_order_item.volume) * ratio,
@@ -350,13 +364,15 @@ def add_delivery_orders_to_load(load, delivery_order_names):
 
 
 @frappe.whitelist()
-def get_delivery_order_items(delivery_order_names):
+def get_delivery_order_items(delivery_order_names, delivery_order_item_names=None, source_warehouse=None):
 	"""Return validated, still-unallocated load rows for a client-side draft Load."""
 	require_doctype_permission("Delivery Load", "create")
 	if isinstance(delivery_order_names, str):
 		delivery_order_names = frappe.parse_json(delivery_order_names)
 	if not delivery_order_names:
 		frappe.throw(_("Select at least one Delivery Order."))
+	if isinstance(delivery_order_item_names, str):
+		delivery_order_item_names = frappe.parse_json(delivery_order_item_names)
 
 	delivery_orders = [frappe.get_doc("Delivery Order", name) for name in delivery_order_names]
 	for delivery_order in delivery_orders:
@@ -364,10 +380,21 @@ def get_delivery_order_items(delivery_order_names):
 	require_company_access(delivery_orders[0].company)
 	_validate_delivery_orders(delivery_orders)
 
+	selected_item_names = set(delivery_order_item_names or [])
+	valid_item_names = {item.name for order in delivery_orders for item in order.items}
+	if selected_item_names and not selected_item_names.issubset(valid_item_names):
+		frappe.throw(_("One or more selected items do not belong to the selected Delivery Orders."))
+
+	planning_warehouse = source_warehouse or delivery_orders[0].source_warehouse
+	bins = _get_on_hand_stock(
+		[item.item_code for order in delivery_orders for item in order.items], planning_warehouse
+	)
 	items = []
 	stop_sequences = {}
 	for delivery_order in delivery_orders:
 		for delivery_order_item in delivery_order.items:
+			if selected_item_names and delivery_order_item.name not in selected_item_names:
+				continue
 			available_quantity = get_available_quantity(delivery_order.name, delivery_order_item.name)
 			if available_quantity <= 0:
 				continue
@@ -375,10 +402,16 @@ def get_delivery_order_items(delivery_order_names):
 			stop_key = delivery_order.delivery_address
 			stop_sequences.setdefault(stop_key, len(stop_sequences) + 1)
 			ratio = available_quantity / flt(delivery_order_item.transport_qty or 1)
+			stock_required_quantity = available_quantity * flt(delivery_order_item.conversion_factor or 1)
+			stock_available_quantity = flt(bins.get(delivery_order_item.item_code))
 			items.append(
 				{
 					"delivery_order": delivery_order.name,
 					"delivery_order_item": delivery_order_item.name,
+					"item_code": delivery_order_item.item_code,
+					"item_name": delivery_order_item.item_name,
+					"uom": delivery_order_item.uom,
+					"stock_uom": delivery_order_item.stock_uom,
 					"sales_order": delivery_order.sales_order,
 					"customer": delivery_order.customer,
 					"delivery_address": delivery_order.delivery_address,
@@ -389,6 +422,11 @@ def get_delivery_order_items(delivery_order_names):
 					),
 					"allocated_quantity": available_quantity,
 					"available_quantity": available_quantity,
+					"stock_available_quantity": stock_available_quantity,
+					"stock_required_quantity": stock_required_quantity,
+					"stock_availability_status": (
+						"Available" if stock_available_quantity >= stock_required_quantity else "Insufficient"
+					),
 					"weight": flt(delivery_order_item.weight) * ratio,
 					"weight_uom": delivery_order_item.weight_uom,
 					"volume": flt(delivery_order_item.volume) * ratio,
@@ -412,13 +450,33 @@ def get_delivery_order_items(delivery_order_names):
 		"dispatch_date": min(order.required_delivery_date for order in delivery_orders),
 		"weight_uom": delivery_orders[0].weight_uom,
 		"volume_uom": delivery_orders[0].volume_uom,
+		"stock_warehouse": planning_warehouse,
 		"items": items,
+	}
+
+
+def _get_on_hand_stock(item_codes, warehouse):
+	"""Return on-hand stock by Item for planning visibility only.
+
+	This intentionally does not reserve stock or decide Pick List/Delivery Note
+	availability. ERPNext stock documents remain the execution authority.
+	"""
+	item_codes = sorted(set(filter(None, item_codes or [])))
+	if not item_codes or not warehouse:
+		return {}
+	return {
+		row.item_code: flt(row.actual_qty)
+		for row in frappe.get_all(
+			"Bin",
+			filters={"warehouse": warehouse, "item_code": ["in", item_codes]},
+			fields=["item_code", "actual_qty"],
+		)
 	}
 
 
 @frappe.whitelist()
 def get_delivery_order_item_allocation_preview(
-	delivery_order_item, allocated_quantity=None, exclude_load=None
+	delivery_order_item, allocated_quantity=None, exclude_load=None, source_warehouse=None
 ):
 	"""Return authoritative partial-allocation dimensions for immediate form feedback."""
 	item = frappe.get_doc("Delivery Order Item", delivery_order_item)
@@ -432,6 +490,9 @@ def get_delivery_order_item_allocation_preview(
 		frappe.throw(
 			_("Allocated quantity exceeds the available quantity of {0}.").format(available_quantity)
 		)
+	planning_warehouse = source_warehouse or delivery_order.source_warehouse
+	stock_available_quantity = flt(_get_on_hand_stock([item.item_code], planning_warehouse).get(item.item_code))
+	stock_required_quantity = quantity * flt(item.conversion_factor or 1)
 	return {
 		"delivery_order": delivery_order.name,
 		"sales_order": delivery_order.sales_order,
@@ -439,6 +500,15 @@ def get_delivery_order_item_allocation_preview(
 		"delivery_address": delivery_order.delivery_address,
 		"allocated_quantity": quantity,
 		"available_quantity": available_quantity,
+		"item_code": item.item_code,
+		"item_name": item.item_name,
+		"uom": item.uom,
+		"stock_uom": item.stock_uom,
+		"stock_available_quantity": stock_available_quantity,
+		"stock_required_quantity": stock_required_quantity,
+		"stock_availability_status": (
+			"Available" if stock_available_quantity >= stock_required_quantity else "Insufficient"
+		),
 		**calculate_allocated_measurements(item, quantity),
 	}
 

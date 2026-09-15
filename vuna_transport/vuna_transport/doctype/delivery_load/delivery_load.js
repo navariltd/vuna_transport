@@ -111,46 +111,15 @@ frappe.ui.form.on("Delivery Load", {
 							frappe
 								.call({
 									method: "vuna_transport.services.planning.delivery_load_service.get_delivery_order_items",
-									args: { delivery_order_names: selections },
+									args: {
+										delivery_order_names: selections,
+										source_warehouse: frm.doc.source_warehouse,
+									},
 								})
 								.then((response) => {
 									const result = response.message;
 									if (!result) return;
-
-									[
-										"company",
-										"source_warehouse",
-										"delivery_method",
-										"transport_zone",
-										"transport_route",
-										"dispatch_date",
-										"weight_uom",
-										"volume_uom",
-									].forEach((field) => {
-										if (!frm.doc[field] && result[field])
-											frm.doc[field] = result[field];
-									});
-
-									const existing = new Set(
-										(frm.doc.delivery_orders || []).map(
-											(row) =>
-												`${row.delivery_order}::${row.delivery_order_item}`
-										)
-									);
-									result.items.forEach((row) => {
-										const key = `${row.delivery_order}::${row.delivery_order_item}`;
-										if (existing.has(key)) return;
-										frm.add_child("delivery_orders", row);
-										existing.add(key);
-									});
-
-									recalculate_load_totals(frm);
-									frm.refresh_fields();
-									frm.dirty();
-									frappe.show_alert({
-										message: __("Items added to the Delivery Load"),
-										indicator: "green",
-									});
+									show_item_selection_dialog(frm, result);
 								});
 							cur_dialog.hide();
 						},
@@ -162,10 +131,12 @@ frappe.ui.form.on("Delivery Load", {
 
 		if (frm.is_new()) {
 			render_new_load_progress(frm);
+			render_load_contents_summary(frm);
 			render_capacity_summary(frm);
 			return;
 		}
 
+		render_load_contents_summary(frm);
 		render_capacity_summary(frm);
 		frm.trigger("load_execution_progress");
 	},
@@ -511,6 +482,7 @@ function update_allocation_preview(frm, cdt, cdn, use_available_quantity) {
 				delivery_order_item: row.delivery_order_item,
 				allocated_quantity: requested_quantity,
 				exclude_load: frm.is_new() ? null : frm.doc.name,
+				source_warehouse: frm.doc.source_warehouse,
 			},
 		})
 		.then(({ message }) => {
@@ -521,8 +493,15 @@ function update_allocation_preview(frm, cdt, cdn, use_available_quantity) {
 				"sales_order",
 				"customer",
 				"delivery_address",
+				"item_code",
+				"item_name",
+				"uom",
+				"stock_uom",
 				"available_quantity",
 				"allocated_quantity",
+				"stock_available_quantity",
+				"stock_required_quantity",
+				"stock_availability_status",
 				"weight",
 				"weight_uom",
 				"volume",
@@ -555,7 +534,71 @@ function recalculate_load_totals(frm) {
 		frm.doc[fieldname] = value;
 	});
 	frm.refresh_fields(Object.keys(values));
+	render_load_contents_summary(frm);
 	render_capacity_summary(frm);
+}
+
+function show_item_selection_dialog(frm, result) {
+	const existing = new Set(
+		(frm.doc.delivery_orders || []).map((row) => `${row.delivery_order}::${row.delivery_order_item}`)
+	);
+	const items = (result.items || []).filter(
+		(row) => !existing.has(`${row.delivery_order}::${row.delivery_order_item}`)
+	);
+	if (!items.length) {
+		frappe.msgprint(__("The selected Delivery Orders have no new unallocated items."));
+		return;
+	}
+	const dialog = new frappe.ui.Dialog({
+		title: __("Select Items to Load"),
+		size: "extra-large",
+		fields: [{ fieldtype: "HTML", fieldname: "items" }],
+		primary_action_label: __("Add Selected Items"),
+		primary_action() {
+			const selected = new Set(
+				dialog.$wrapper.find(".vuna-load-item:checked").map((_, input) => $(input).data("item")).get()
+			);
+			if (!selected.size) {
+				frappe.msgprint(__("Select at least one item."));
+				return;
+			}
+			["company", "source_warehouse", "delivery_method", "transport_zone", "transport_route", "dispatch_date", "weight_uom", "volume_uom"].forEach((field) => {
+				if (!frm.doc[field] && result[field]) frm.doc[field] = result[field];
+			});
+			items.filter((row) => selected.has(row.delivery_order_item)).forEach((row) => frm.add_child("delivery_orders", row));
+			recalculate_load_totals(frm);
+			frm.refresh_fields();
+			frm.dirty();
+			dialog.hide();
+			frappe.show_alert({ message: __("Selected items added to the Delivery Load"), indicator: "green" });
+		},
+	});
+	const number = (value) => frappe.format(value || 0, { fieldtype: "Float" });
+	const rows = items.map((row) => {
+		const sufficient = row.stock_availability_status === "Available";
+		return `<tr><td><input class="vuna-load-item" type="checkbox" checked data-item="${frappe.utils.escape_html(row.delivery_order_item)}"></td><td>${frappe.utils.escape_html(row.delivery_order)}</td><td><strong>${frappe.utils.escape_html(row.item_code)}</strong><br><span class="text-muted small">${frappe.utils.escape_html(row.item_name || "")}</span></td><td>${number(row.available_quantity)} ${frappe.utils.escape_html(row.uom || "")}</td><td><span class="indicator-pill ${sufficient ? "green" : "orange"}">${number(row.stock_available_quantity)} ${frappe.utils.escape_html(row.stock_uom || "")}</span><br><span class="text-muted small">${sufficient ? __("On hand") : __("Insufficient on hand")}</span></td></tr>`;
+	}).join("");
+	dialog.get_field("items").$wrapper.html(`<p class="text-muted small">${__("On-hand stock is a planning warning. Pick List and Delivery Note remain the stock authority.")}</p><table class="table table-bordered"><thead><tr><th></th><th>${__("Delivery Order")}</th><th>${__("Item")}</th><th>${__("Transport Available")}</th><th>${__("On Hand")}</th></tr></thead><tbody>${rows}</tbody></table>`);
+	dialog.show();
+}
+
+function render_load_contents_summary(frm) {
+	const field = frm.get_field("load_contents_summary");
+	if (!field) return;
+	const groups = new Map();
+	for (const row of frm.doc.delivery_orders || []) {
+		if (!row.delivery_order) continue;
+		const group = groups.get(row.delivery_order) || { customer: row.customer, address: row.delivery_address, count: 0, quantity: 0 };
+		group.count += 1;
+		group.quantity += flt(row.allocated_quantity);
+		groups.set(row.delivery_order, group);
+	}
+	if (!groups.size) {
+		field.$wrapper.html(`<div class="text-muted">${__("No items have been added to this load.")}</div>`);
+		return;
+	}
+	const rows = [...groups.entries()].map(([order, group]) => `<tr><td><a href="/app/delivery-order/${encodeURIComponent(order)}">${frappe.utils.escape_html(order)}</a></td><td>${frappe.utils.escape_html(group.customer || "")}</td><td>${frappe.utils.escape_html(group.address || "")}</td><td>${group.count}</td><td>${frappe.format(group.quantity, { fieldtype: "Float" })}</td></tr>`).join("");
+	field.$wrapper.html(`<div class="vuna-load-contents-summary"><table class="table table-bordered table-condensed" style="margin:0"><thead><tr><th>${__("Delivery Order")}</th><th>${__("Customer")}</th><th>${__("Delivery Address")}</th><th>${__("Items")}</th><th>${__("Allocated Qty")}</th></tr></thead><tbody>${rows}</tbody></table></div>`);
 }
 
 function render_capacity_summary(frm) {

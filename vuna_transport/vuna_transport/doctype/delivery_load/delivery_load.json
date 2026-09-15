@@ -58,6 +58,7 @@
   "execution_overview",
   "section_break_ksai",
   "delivery_orders",
+	  "load_contents_summary",
   "more_info_section",
   "status",
   "section_break_lydc",
@@ -350,8 +351,13 @@
   {
    "fieldname": "delivery_orders",
    "fieldtype": "Table",
-   "label": "Delivery Orders",
+   "label": "Load Items",
    "options": "Delivery Load Order"
+  },
+  {
+   "fieldname": "load_contents_summary",
+   "fieldtype": "HTML",
+   "label": "Delivery Orders & Stops"
   },
   {
    "fieldname": "minimum_payload",
@@ -404,11 +410,6 @@
   },
   {
    "group": "Dispatch Execution",
-   "link_doctype": "Vehicle Allocation",
-   "link_fieldname": "delivery_load"
-  },
-  {
-   "group": "Dispatch Execution",
    "link_doctype": "Delivery Note",
    "link_fieldname": "vuna_delivery_load"
   },
@@ -423,7 +424,7 @@
    "link_fieldname": "delivery_load"
   }
  ],
- "modified": "2026-09-07 06:47:01.450803",
+ "modified": "2026-09-15 21:27:15.257718",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Delivery Load",

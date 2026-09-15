@@ -485,6 +485,23 @@ def _get_order_metrics(order_names, include_items=False):
 		],
 		order_by="parent asc, idx asc",
 	)
+	warehouses_by_order = {
+		row.name: row.source_warehouse
+		for row in frappe.get_all(
+			"Delivery Order", filters={"name": ["in", order_names]}, fields=["name", "source_warehouse"]
+		)
+	}
+	bins = {
+		(row.item_code, row.warehouse): flt(row.actual_qty)
+		for row in frappe.get_all(
+			"Bin",
+			filters={
+				"item_code": ["in", sorted({item.item_code for item in items if item.item_code})],
+				"warehouse": ["in", sorted(set(warehouses_by_order.values()) - {None, ""})],
+			},
+			fields=["item_code", "warehouse", "actual_qty"],
+		)
+	} if items and any(warehouses_by_order.values()) else {}
 	allocation_rows = frappe.db.sql(
 		"""
 			select
@@ -534,6 +551,8 @@ def _get_order_metrics(order_names, include_items=False):
 		for dimension in CAPACITY_DIMENSIONS:
 			order[dimension] += metrics[dimension]
 		if include_items:
+			stock_required_quantity = available * flt(item.conversion_factor or 1)
+			stock_available_quantity = bins.get((item.item_code, warehouses_by_order.get(item.parent)), 0.0)
 			order["items"].append(
 				{
 					"name": item.name,
@@ -547,6 +566,11 @@ def _get_order_metrics(order_names, include_items=False):
 					"reserved_quantity": reserved,
 					"allocated_quantity": allocated,
 					"available_quantity": available,
+					"stock_available_quantity": stock_available_quantity,
+					"stock_required_quantity": stock_required_quantity,
+					"stock_availability_status": (
+						"Available" if stock_available_quantity >= stock_required_quantity else "Insufficient"
+					),
 					"weight": metrics["weight"],
 					"weight_uom": item.weight_uom,
 					"volume": metrics["volume"],
