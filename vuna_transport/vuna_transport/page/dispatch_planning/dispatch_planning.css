@@ -26,6 +26,8 @@
 .dp-toolbar-actions { display: flex; gap: 8px; }
 .dp-section { margin-top: 10px; padding: 10px; }
 .dp-section-title { font-size: var(--text-md); font-weight: 600; }
+.dp-warehouse-section.dp-collapsed { padding-bottom: 8px; }
+.dp-warehouse-section.dp-collapsed .dp-warehouse-cards { display: none; }
 .dp-section-heading { align-items: center; display: flex; justify-content: space-between; }
 .dp-warehouse-cards { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin-top: 12px; }
 .dp-summary-card,

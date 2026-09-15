@@ -51,6 +51,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.suggestion_request_id = 0;
 		this.cost_request_id = 0;
 		this.details_requests = new Map();
+		this.warehouse_summary_expanded = false;
 		this.make_layout();
 		this.make_filters();
 		this.bind_events();
@@ -77,8 +78,13 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					</div>
 					<div class="dp-filter-grid dp-filter-grid-collapsed"></div>
 				</div>
-				<div class="dp-section dp-warehouse-section">
-					<div class="dp-section-title">${__("Warehouse Demand")}</div>
+				<div class="dp-section dp-warehouse-section dp-collapsed">
+					<div class="dp-section-heading">
+						<div class="dp-section-title">${__("Warehouse Demand")}</div>
+						<button class="btn btn-default btn-xs btn-toggle-warehouse" aria-expanded="false">
+							${__("Show")}
+						</button>
+					</div>
 					<div class="dp-warehouse-cards"></div>
 				</div>
 				<div class="dp-grid">
@@ -194,6 +200,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 
 	bind_events() {
 		this.$root.on("click", ".btn-toggle-filters", () => this.toggle_filters());
+		this.$root.on("click", ".btn-toggle-warehouse", () => this.toggle_warehouse_summary());
 		this.$root.on("click", ".btn-refresh", () => this.refresh(true));
 		this.$root.on("click", ".btn-suggest", () => this.load_suggestions());
 		this.$root.on("click", ".btn-evaluate", () => this.evaluate_plan());
@@ -210,6 +217,15 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		);
 		this.$root.on("click", ".dp-fleet-category", (event) => this.show_vehicle_details(event));
 		this.$root.on("click", ".dp-driver-details", () => this.show_driver_details());
+	}
+
+	toggle_warehouse_summary() {
+		this.warehouse_summary_expanded = !this.warehouse_summary_expanded;
+		const $section = this.$root.find(".dp-warehouse-section");
+		$section.toggleClass("dp-collapsed", !this.warehouse_summary_expanded);
+		const $button = $section.find(".btn-toggle-warehouse");
+		$button.attr("aria-expanded", this.warehouse_summary_expanded ? "true" : "false");
+		$button.text(this.warehouse_summary_expanded ? __("Hide") : __("Show"));
 	}
 
 	category_changed() {
