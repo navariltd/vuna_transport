@@ -262,11 +262,11 @@ def get_costed_vehicle_candidates(allocations, vehicle_category=None):
 		expected_company=load.company,
 	)
 	vehicles = {
-		row.name: row
+		row.name: frappe.get_cached_doc("Vehicle", row.name)
 		for row in frappe.get_all(
 			"Vehicle",
 			filters={"name": ["in", list(results)]},
-			fields=["name", "license_plate", "company", "vuna_vehicle_category"],
+			fields=["name"],
 			limit_page_length=100,
 		)
 	}
