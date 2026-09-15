@@ -10,6 +10,7 @@ from vuna_transport.services.costing.transport_cost_estimation_service import (
 )
 from vuna_transport.services.fleet.vehicle_allocation_service import (
 	activate_allocation,
+	get_allocation_load_names,
 	restore_previous_allocation,
 	validate_allocation,
 	validate_allocation_cancellation,
@@ -57,9 +58,16 @@ def snapshot_transport_cost(allocation):
 	"""Persist the estimate used when an allocation becomes confirmed."""
 	if not frappe.db.get_single_value("Transport Settings", "enable_transport_costing"):
 		return
-	if not allocation.vehicle or not allocation.delivery_load:
+	load_names = get_allocation_load_names(allocation)
+	if not allocation.vehicle or not load_names:
 		return
-	result = estimate_transport_cost(allocation.delivery_load, allocation.vehicle)
+	if len(load_names) > 1:
+		allocation.cost_warnings = (
+			"A combined allocation cost estimate is not yet calculated. "
+			"The current estimator remains Delivery Load-specific."
+		)
+		return
+	result = estimate_transport_cost(load_names[0], allocation.vehicle)
 	allocation.cost_structure_assignment = result.get("cost_structure_assignment")
 	allocation.cost_structure = result.get("cost_structure")
 	allocation.estimated_distance = result.get("distance")

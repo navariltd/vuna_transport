@@ -12,6 +12,7 @@ from vuna_transport.services.fleet.vehicle_allocation_service import (
 	_validate_initial_allocation_sequence,
 	_validate_planning_window,
 	_validate_subcontractor,
+	get_allocation_load_names,
 	get_load_resource_window,
 	prepare_allocation_cancellation,
 	time_windows_overlap,
@@ -22,12 +23,24 @@ from vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation
 
 
 class TestVehicleAllocation(UnitTestCase):
+	def test_child_table_is_the_canonical_delivery_load_set(self):
+		allocation = SimpleNamespace(
+			delivery_loads=[
+				SimpleNamespace(delivery_load="DL-001"),
+				SimpleNamespace(delivery_load="DL-002"),
+				SimpleNamespace(delivery_load="DL-001"),
+			],
+		)
+		self.assertEqual(get_allocation_load_names(allocation), ["DL-001", "DL-002"])
+
 	@patch(
 		"vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation.frappe.db.get_single_value",
 		return_value=0,
 	)
 	def test_cost_snapshot_is_skipped_when_costing_is_disabled(self, _get_single_value):
-		allocation = SimpleNamespace(vehicle="KDA 123A", delivery_load="DL-1")
+		allocation = SimpleNamespace(
+			vehicle="KDA 123A", delivery_loads=[SimpleNamespace(delivery_load="DL-1")]
+		)
 
 		snapshot_transport_cost(allocation)
 
@@ -54,7 +67,9 @@ class TestVehicleAllocation(UnitTestCase):
 		return_value=1,
 	)
 	def test_cost_snapshot_is_captured_on_submission(self, _get_single_value, estimate):
-		allocation = SimpleNamespace(vehicle="KDA 123A", delivery_load="DL-1")
+		allocation = SimpleNamespace(
+			vehicle="KDA 123A", delivery_loads=[SimpleNamespace(delivery_load="DL-1")]
+		)
 
 		snapshot_transport_cost(allocation)
 
@@ -168,5 +183,7 @@ class TestVehicleAllocation(UnitTestCase):
 	def test_cancellation_detaches_active_allocation_from_load(self, get_doc):
 		load = SimpleNamespace(active_vehicle_allocation="VA-1", db_set=MagicMock())
 		get_doc.return_value = load
-		prepare_allocation_cancellation(SimpleNamespace(name="VA-1", delivery_load="LOAD-1"))
+		prepare_allocation_cancellation(
+			SimpleNamespace(name="VA-1", delivery_loads=[SimpleNamespace(delivery_load="LOAD-1")])
+		)
 		load.db_set.assert_called_once_with("active_vehicle_allocation", None, update_modified=True)

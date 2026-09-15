@@ -114,11 +114,24 @@ def get_driver_availability_map(
 		fields=[
 			"name",
 			"driver",
-			"delivery_load",
 			"effective_from",
 			"effective_to",
 		],
 	)
+	allocation_load_rows = (
+		frappe.get_all(
+			"Vehicle Allocation Load",
+			filters={"parent": ["in", [row.name for row in allocations]], "parenttype": "Vehicle Allocation"},
+			fields=["parent", "delivery_load"],
+		)
+		if allocations
+		else []
+	)
+	allocation_load_names = defaultdict(list)
+	for row in allocation_load_rows:
+		allocation_load_names[row.parent].append(row.delivery_load)
+	for allocation in allocations:
+		allocation.delivery_loads = allocation_load_names.get(allocation.name, [])
 	trips = frappe.get_all(
 		"Delivery Trip",
 		filters={"docstatus": ["!=", 2], "status": ["in", ACTIVE_TRIP_STATUSES]},
@@ -136,7 +149,9 @@ def get_driver_availability_map(
 		],
 	)
 	trips = [trip for trip in trips if (trip.vuna_current_driver or trip.driver) in driver_names]
-	load_names = {row.delivery_load for row in allocations if row.delivery_load} | {
+	load_names = {
+		load_name for row in allocations for load_name in row.delivery_loads if load_name
+	} | {
 		row.vuna_delivery_load for row in trips if row.vuna_delivery_load
 	}
 	loads = (
@@ -156,7 +171,7 @@ def get_driver_availability_map(
 	for allocation in allocations:
 		if allocation.name == exclude_allocation:
 			continue
-		if exclude_delivery_load and allocation.delivery_load == exclude_delivery_load:
+		if exclude_delivery_load and exclude_delivery_load in allocation.delivery_loads:
 			continue
 		allocations_by_driver[allocation.driver].append(allocation)
 	trips_by_driver = defaultdict(list)
@@ -228,9 +243,16 @@ def _evaluate_driver(driver, allocations, trips, loads, from_time, to_time, expe
 			next_available_at = _latest_datetime(next_available_at, trip_to)
 
 	for allocation in allocations:
-		load = loads.get(allocation.delivery_load)
-		allocation_from = load.planned_departure if load else allocation.effective_from
-		allocation_to = load.planned_arrival if load else allocation.effective_to
+		allocation_load_names = getattr(allocation, "delivery_loads", None) or []
+		allocation_loads = [loads.get(name) for name in allocation_load_names if loads.get(name)]
+		allocation_from = min(
+			(get_datetime(load.planned_departure) for load in allocation_loads if load.planned_departure),
+			default=allocation.effective_from,
+		)
+		allocation_to = max(
+			(get_datetime(load.planned_arrival) for load in allocation_loads if load.planned_arrival),
+			default=allocation.effective_to,
+		)
 		if not interval_overlaps(from_time, to_time, allocation_from, allocation_to):
 			continue
 		if state != "In Trip":
@@ -239,7 +261,7 @@ def _evaluate_driver(driver, allocations, trips, loads, from_time, to_time, expe
 		reasons.append(
 			_reason(
 				"ACTIVE_ALLOCATION",
-				_("Driver is allocated to Delivery Load {0}.").format(allocation.delivery_load),
+				_("Driver is allocated to Delivery Load(s) {0}.").format(", ".join(allocation_load_names)),
 				"Vehicle Allocation",
 				allocation.name,
 			)

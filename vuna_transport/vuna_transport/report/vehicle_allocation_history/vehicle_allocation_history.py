@@ -21,11 +21,15 @@ def execute(filters=None):
 		values.to_date = filters.to_date
 	rows = frappe.db.sql(
 		f"""
-		SELECT va.name, va.company, va.vehicle, va.driver, va.delivery_load,
+		SELECT va.name, va.company, va.vehicle, va.driver,
+			NULLIF(GROUP_CONCAT(DISTINCT val.delivery_load ORDER BY val.idx SEPARATOR ', '), '') AS delivery_load,
 			va.allocation_type, va.assignment_event, va.status,
 			va.effective_from, va.effective_to, va.replacement_of, va.replaced_by
 		FROM `tabVehicle Allocation` va
+		LEFT JOIN `tabVehicle Allocation Load` val
+			on val.parent = va.name and val.parenttype = 'Vehicle Allocation'
 		WHERE {" AND ".join(conditions)}
+		GROUP BY va.name
 		ORDER BY COALESCE(va.effective_from, va.creation) DESC
 		LIMIT 500
 	""",
@@ -38,10 +42,9 @@ def execute(filters=None):
 		{"label": _("Vehicle"), "fieldname": "vehicle", "fieldtype": "Link", "options": "Vehicle"},
 		{"label": _("Driver"), "fieldname": "driver", "fieldtype": "Link", "options": "Driver"},
 		{
-			"label": _("Delivery Load"),
+			"label": _("Delivery Loads"),
 			"fieldname": "delivery_load",
-			"fieldtype": "Link",
-			"options": "Delivery Load",
+			"fieldtype": "Data",
 		},
 		{"label": _("Type"), "fieldname": "allocation_type", "fieldtype": "Data"},
 		{"label": _("Event"), "fieldname": "assignment_event", "fieldtype": "Data"},
