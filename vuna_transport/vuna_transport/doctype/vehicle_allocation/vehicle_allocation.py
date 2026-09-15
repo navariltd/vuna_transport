@@ -60,8 +60,8 @@ def snapshot_transport_cost(allocation):
 	if not allocation.vehicle or not allocation.delivery_load:
 		return
 	result = estimate_transport_cost(allocation.delivery_load, allocation.vehicle)
-	allocation.cost_profile = result.get("cost_profile")
-	allocation.costing_model = result.get("costing_model")
+	allocation.cost_structure_assignment = result.get("cost_structure_assignment")
+	allocation.cost_structure = result.get("cost_structure")
 	allocation.estimated_distance = result.get("distance")
 	allocation.estimated_distance_uom = result.get("distance_uom")
 	allocation.distance_source = result.get("distance_source")

@@ -58,7 +58,7 @@
  "modified": "2026-09-09 07:14:42.668857",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
- "name": "Transport Costing Model Component",
+ "name": "Transport Cost Structure Component",
  "owner": "Administrator",
  "permissions": [],
  "row_format": "Dynamic",

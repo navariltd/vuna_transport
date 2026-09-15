@@ -7,19 +7,21 @@ from frappe.model.document import Document
 from frappe.utils import getdate
 
 
-class TransportCostProfile(Document):
+class TransportCostStructureAssignment(Document):
 	def validate(self):
 		if self.valid_from and self.valid_to and getdate(self.valid_to) < getdate(self.valid_from):
 			frappe.throw(_("Valid To cannot be before Valid From."))
 		if self.vehicle and self.supplier:
-			frappe.throw(_("A Cost Profile cannot be restricted to both a Vehicle and a Supplier."))
-		model_company = frappe.db.get_value("Transport Costing Model", self.costing_model, "company")
+			frappe.throw(
+				_("A Cost Structure Assignment cannot be restricted to both a Vehicle and a Supplier.")
+			)
+		model_company = frappe.db.get_value("Transport Cost Structure", self.cost_structure, "company")
 		if model_company and model_company != self.company:
 			frappe.throw(
-				_("Costing Model {0} belongs to Company {1}.").format(self.costing_model, model_company)
+				_("Cost Structure {0} belongs to Company {1}.").format(self.cost_structure, model_company)
 			)
-		if frappe.db.get_value("Transport Costing Model", self.costing_model, "disabled"):
-			frappe.throw(_("Disabled Costing Model {0} cannot be assigned.").format(self.costing_model))
+		if frappe.db.get_value("Transport Cost Structure", self.cost_structure, "disabled"):
+			frappe.throw(_("Disabled Cost Structure {0} cannot be assigned.").format(self.cost_structure))
 		seen = set()
 		for row in self.components:
 			if row.cost_component in seen:
@@ -47,31 +49,33 @@ class TransportCostProfile(Document):
 			destinations.add(row.destination_key)
 		if self.vehicle:
 			vehicle = frappe.db.get_value(
-				"Vehicle", self.vehicle, ["company", "vuna_transport_costing_model"], as_dict=True
+				"Vehicle", self.vehicle, ["company", "vuna_transport_cost_structure"], as_dict=True
 			)
 			if vehicle and vehicle.company and vehicle.company != self.company:
 				frappe.throw(_("Vehicle {0} belongs to Company {1}.").format(self.vehicle, vehicle.company))
-			if vehicle and vehicle.vuna_transport_costing_model != self.costing_model:
+			if vehicle and vehicle.vuna_transport_cost_structure != self.cost_structure:
 				frappe.throw(
-					_("Vehicle {0} uses Costing Model {1}; this profile uses {2}.").format(
-						self.vehicle, vehicle.vuna_transport_costing_model or _("None"), self.costing_model
+					_("Vehicle {0} uses Cost Structure {1}; this assignment uses {2}.").format(
+						self.vehicle,
+						vehicle.vuna_transport_cost_structure or _("None"),
+						self.cost_structure,
 					)
 				)
 		self._validate_overlapping_profiles()
 
 	def _validate_overlapping_profiles(self):
 		profiles = frappe.get_all(
-			"Transport Cost Profile",
+			"Transport Cost Structure Assignment",
 			filters={
 				"company": self.company,
-				"costing_model": self.costing_model,
+				"cost_structure": self.cost_structure,
 				"disabled": 0,
 				"docstatus": 1,
 				"name": ["!=", self.name],
 			},
 			fields=[
 				"name",
-				"costing_model",
+				"cost_structure",
 				"vehicle",
 				"supplier",
 				"vehicle_category",
@@ -82,14 +86,14 @@ class TransportCostProfile(Document):
 		for profile in profiles:
 			if any(
 				getattr(self, field, None) != getattr(profile, field, None)
-				for field in ("costing_model", "vehicle", "supplier", "vehicle_category")
+				for field in ("cost_structure", "vehicle", "supplier", "vehicle_category")
 			):
 				continue
 			if _date_ranges_overlap(self.valid_from, self.valid_to, profile.valid_from, profile.valid_to):
 				frappe.throw(
-					_("Cost Profile {0} overlaps this profile's validity period for the same scope.").format(
-						profile.name
-					)
+					_(
+						"Cost Structure Assignment {0} overlaps this assignment's validity period for the same scope."
+					).format(profile.name)
 				)
 
 

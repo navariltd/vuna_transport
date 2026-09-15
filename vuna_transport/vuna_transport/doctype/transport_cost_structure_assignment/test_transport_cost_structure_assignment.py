@@ -4,12 +4,12 @@
 from frappe.tests import UnitTestCase
 
 from vuna_transport.services.costing.transport_cost_estimation_service import _profile_is_active
-from vuna_transport.vuna_transport.doctype.transport_cost_profile.transport_cost_profile import (
+from vuna_transport.vuna_transport.doctype.transport_cost_structure_assignment.transport_cost_structure_assignment import (
 	_date_ranges_overlap,
 )
 
 
-class TestTransportCostProfile(UnitTestCase):
+class TestTransportCostStructureAssignment(UnitTestCase):
 	def test_adjacent_validity_ranges_do_not_overlap(self):
 		self.assertFalse(_date_ranges_overlap("2026-01-01", "2026-06-30", "2026-07-01", "2026-12-31"))
 

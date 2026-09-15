@@ -4,5 +4,5 @@
 from frappe.model.document import Document
 
 
-class TransportCostProfileComponent(Document):
+class TransportCostStructureAssignmentComponent(Document):
 	pass

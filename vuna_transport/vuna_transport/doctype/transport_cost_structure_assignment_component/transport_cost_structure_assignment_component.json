@@ -70,7 +70,7 @@
  "modified": "2026-09-09 07:16:11.588692",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
- "name": "Transport Cost Profile Component",
+ "name": "Transport Cost Structure Assignment Component",
  "owner": "Administrator",
  "permissions": [],
  "row_format": "Dynamic",

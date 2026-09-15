@@ -36,8 +36,8 @@ class TestVehicleAllocation(UnitTestCase):
 	@patch(
 		"vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation.estimate_transport_cost",
 		return_value={
-			"cost_profile": "Mileage 2026",
-			"costing_model": "Mileage",
+			"cost_structure_assignment": "Mileage 2026",
+			"cost_structure": "Mileage",
 			"distance": 300,
 			"distance_uom": "Kilometer",
 			"distance_source": "Planned Distance",
@@ -58,7 +58,7 @@ class TestVehicleAllocation(UnitTestCase):
 
 		snapshot_transport_cost(allocation)
 
-		self.assertEqual(allocation.cost_profile, "Mileage 2026")
+		self.assertEqual(allocation.cost_structure_assignment, "Mileage 2026")
 		self.assertEqual(allocation.estimated_marginal_cost, 11100)
 		self.assertEqual(allocation.estimated_cost_currency, "KES")
 		self.assertEqual(allocation.cost_breakdown[0]["component"], "Fuel")

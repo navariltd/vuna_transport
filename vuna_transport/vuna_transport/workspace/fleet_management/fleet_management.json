@@ -131,7 +131,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Transport Costing",
+   "label": "Transport Costs",
    "link_count": 3,
    "onboard": 0,
    "type": "Card Break"
@@ -139,9 +139,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Transport Costing Model",
+   "label": "Transport Cost Structure",
    "link_count": 0,
-   "link_to": "Transport Costing Model",
+   "link_to": "Transport Cost Structure",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -159,9 +159,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Transport Cost Profile",
+   "label": "Cost Structure Assignment",
    "link_count": 0,
-   "link_to": "Transport Cost Profile",
+   "link_to": "Transport Cost Structure Assignment",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"

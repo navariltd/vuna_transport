@@ -94,7 +94,7 @@ class TestTransportCostEstimationService(UnitTestCase):
 			doctype="Vehicle",
 			name="KDA 123A",
 			company="Yovuna Tech",
-			vuna_transport_costing_model="Mileage",
+			vuna_transport_cost_structure="Mileage",
 			vuna_vehicle_category="8 Ton Truck",
 		)
 		get_doc.side_effect = [load, vehicle]
@@ -107,18 +107,20 @@ class TestTransportCostEstimationService(UnitTestCase):
 			result = estimate_transport_cost("DL-001", "KDA 123A")
 
 		self.assertEqual(result["estimated_full_cost"], 0)
-		self.assertTrue(any("No active Transport Cost Profile" in warning for warning in result["warnings"]))
+		self.assertTrue(
+			any("No active Cost Structure Assignment" in warning for warning in result["warnings"])
+		)
 
 	@patch("vuna_transport.services.costing.transport_cost_estimation_service.frappe.get_doc")
 	@patch("vuna_transport.services.costing.transport_cost_estimation_service.frappe.get_all")
-	def test_profile_resolution_is_scoped_to_vehicle_costing_model(self, get_all, get_doc):
+	def test_assignment_resolution_is_scoped_to_vehicle_cost_structure(self, get_all, get_doc):
 		from vuna_transport.services.costing.transport_cost_estimation_service import (
-			get_applicable_cost_profile,
+			get_applicable_cost_structure_assignment,
 		)
 
 		vehicle = SimpleNamespace(
 			name="KDA 123A",
-			vuna_transport_costing_model="Mileage",
+			vuna_transport_cost_structure="Mileage",
 			vuna_vehicle_category="8 Ton Truck",
 			vuna_supplier=None,
 		)
@@ -137,7 +139,7 @@ class TestTransportCostEstimationService(UnitTestCase):
 		]
 		profile = SimpleNamespace(
 			name="Mileage Company Profile",
-			costing_model="Mileage",
+			cost_structure="Mileage",
 			company="Yovuna Tech",
 			disabled=0,
 			docstatus=1,
@@ -146,14 +148,14 @@ class TestTransportCostEstimationService(UnitTestCase):
 		)
 		get_doc.return_value = profile
 
-		result = get_applicable_cost_profile(vehicle, "Yovuna Tech", "2026-09-10")
+		result = get_applicable_cost_structure_assignment(vehicle, "Yovuna Tech", "2026-09-10")
 
 		self.assertIs(result, profile)
 		get_all.assert_called_once_with(
-			"Transport Cost Profile",
+			"Transport Cost Structure Assignment",
 			filters={
 				"company": "Yovuna Tech",
-				"costing_model": "Mileage",
+				"cost_structure": "Mileage",
 				"disabled": 0,
 				"docstatus": 1,
 			},

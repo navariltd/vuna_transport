@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 
 
-class TransportCostingModel(Document):
+class TransportCostStructure(Document):
 	def validate(self):
 		seen = set()
 		for row in self.components:

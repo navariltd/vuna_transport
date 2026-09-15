@@ -682,7 +682,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 									}. ${this.escape(
 										row.license_plate
 									)}</strong><span>${this.escape(
-										row.costing_model || __("No profile")
+										row.cost_structure || __("No assignment")
 									)}</span><b>${
 										row.currency
 											? `${this.number(row.marginal_cost)} ${this.escape(

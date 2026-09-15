@@ -41,8 +41,8 @@
   "effective_to",
   "replaced_by",
   "cost_estimate_section",
-  "cost_profile",
-  "costing_model",
+  "cost_structure_assignment",
+  "cost_structure",
   "estimated_distance",
   "estimated_distance_uom",
   "distance_source",
@@ -295,16 +295,16 @@
    "label": "Cost Estimate Snapshot"
   },
   {
-   "fieldname": "cost_profile",
+   "fieldname": "cost_structure_assignment",
    "fieldtype": "Link",
-   "label": "Cost Profile",
-   "options": "Transport Cost Profile",
+   "label": "Cost Structure Assignment",
+   "options": "Transport Cost Structure Assignment",
    "read_only": 1
   },
   {
-   "fieldname": "costing_model",
+   "fieldname": "cost_structure",
    "fieldtype": "Data",
-   "label": "Costing Model",
+   "label": "Cost Structure",
    "read_only": 1
   },
   {

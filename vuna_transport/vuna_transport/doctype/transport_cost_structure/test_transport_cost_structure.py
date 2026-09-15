@@ -5,6 +5,6 @@ import frappe
 from frappe.tests import UnitTestCase
 
 
-class TestTransportCostingModel(UnitTestCase):
+class TestTransportCostStructure(UnitTestCase):
 	def test_model_controller_exists(self):
-		self.assertFalse(frappe.get_meta("Transport Costing Model").istable)
+		self.assertFalse(frappe.get_meta("Transport Cost Structure").istable)

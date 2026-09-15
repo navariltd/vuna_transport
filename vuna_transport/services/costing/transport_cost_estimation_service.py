@@ -54,18 +54,18 @@ def estimate_transport_cost(
 		distance=distance,
 		distance_source=distance_source,
 	)
-	profile = get_applicable_cost_profile(vehicle_doc, load.company, context.date)
+	profile = get_applicable_cost_structure_assignment(vehicle_doc, load.company, context.date)
 	warnings = list(context_warnings(context))
 	if not profile:
-		if not getattr(vehicle_doc, "vuna_transport_costing_model", None):
+		if not getattr(vehicle_doc, "vuna_transport_cost_structure", None):
 			warnings.append(
-				_("Vehicle {0} has no Transport Costing Model selected.").format(vehicle_doc.name)
+				_("Vehicle {0} has no Transport Cost Structure selected.").format(vehicle_doc.name)
 			)
 		else:
 			warnings.append(
-				_("No active Transport Cost Profile applies to Vehicle {0} for Costing Model {1}.").format(
-					vehicle_doc.name, vehicle_doc.vuna_transport_costing_model
-				)
+				_(
+					"No active Cost Structure Assignment applies to Vehicle {0} for Cost Structure {1}."
+				).format(vehicle_doc.name, vehicle_doc.vuna_transport_cost_structure)
 			)
 		return _empty_estimate(vehicle_doc, context, warnings)
 
@@ -80,8 +80,8 @@ def estimate_transport_cost(
 	return {
 		"vehicle": vehicle_doc.name,
 		"vehicle_category": getattr(vehicle_doc, "vuna_vehicle_category", None),
-		"costing_model": profile.costing_model,
-		"cost_profile": profile.name,
+		"cost_structure": profile.cost_structure,
+		"cost_structure_assignment": profile.name,
 		"currency": profile.currency,
 		"distance": context.distance,
 		"distance_uom": context.distance_uom,
@@ -96,18 +96,18 @@ def estimate_transport_cost(
 	}
 
 
-def get_applicable_cost_profile(vehicle, company, date=None):
+def get_applicable_cost_structure_assignment(vehicle, company, date=None):
 	"""Resolve a single profile using explicit vehicle and scope precedence."""
 	date = getdate(date or nowdate())
-	costing_model = getattr(vehicle, "vuna_transport_costing_model", None)
-	if not costing_model:
+	cost_structure = getattr(vehicle, "vuna_transport_cost_structure", None)
+	if not cost_structure:
 		return None
 
 	profiles = frappe.get_all(
-		"Transport Cost Profile",
+		"Transport Cost Structure Assignment",
 		filters={
 			"company": company,
-			"costing_model": costing_model,
+			"cost_structure": cost_structure,
 			"disabled": 0,
 			"docstatus": 1,
 		},
@@ -140,11 +140,11 @@ def get_applicable_cost_profile(vehicle, company, date=None):
 	best = [name for precedence, name in candidates if precedence == best_precedence]
 	if len(best) > 1:
 		frappe.throw(
-			_("Multiple active Transport Cost Profiles match Vehicle {0}: {1}.").format(
+			_("Multiple active Cost Structure Assignments match Vehicle {0}: {1}.").format(
 				vehicle.name, ", ".join(best)
 			)
 		)
-	return frappe.get_doc("Transport Cost Profile", best[0])
+	return frappe.get_doc("Transport Cost Structure Assignment", best[0])
 
 
 def estimate_cost_component(component, context, profile=None):
@@ -283,8 +283,8 @@ def _empty_estimate(vehicle, context, warnings):
 	return {
 		"vehicle": vehicle.name,
 		"vehicle_category": getattr(vehicle, "vuna_vehicle_category", None),
-		"costing_model": None,
-		"cost_profile": None,
+		"cost_structure": None,
+		"cost_structure_assignment": None,
 		"currency": None,
 		"distance": context.distance,
 		"distance_uom": context.distance_uom,

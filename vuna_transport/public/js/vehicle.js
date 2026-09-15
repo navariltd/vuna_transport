@@ -3,7 +3,7 @@
 
 frappe.ui.form.on("Vehicle", {
 	setup(frm) {
-		frm.set_query("vuna_transport_costing_model", () => ({
+		frm.set_query("vuna_transport_cost_structure", () => ({
 			filters: {
 				company: frm.doc.company,
 				disabled: 0,

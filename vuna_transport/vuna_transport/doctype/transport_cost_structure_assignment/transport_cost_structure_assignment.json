@@ -8,9 +8,9 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "profile_name",
+  "assignment_name",
   "company",
-  "costing_model",
+  "cost_structure",
   "currency",
   "column_break_ggkq",
   "disabled",
@@ -30,11 +30,11 @@
  ],
  "fields": [
   {
-   "fieldname": "profile_name",
+   "fieldname": "assignment_name",
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Profile Name",
+   "label": "Assignment Name",
    "reqd": 1,
    "unique": 1
   },
@@ -47,11 +47,11 @@
    "reqd": 1
   },
   {
-   "fieldname": "costing_model",
+   "fieldname": "cost_structure",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Costing Model",
-   "options": "Transport Costing Model",
+   "label": "Cost Structure",
+   "options": "Transport Cost Structure",
    "reqd": 1
   },
   {
@@ -118,7 +118,7 @@
    "fieldname": "components",
    "fieldtype": "Table",
    "label": "Components",
-   "options": "Transport Cost Profile Component",
+   "options": "Transport Cost Structure Assignment Component",
    "reqd": 1
   },
   {
@@ -137,7 +137,7 @@
    "fieldtype": "Link",
    "label": "Amended From",
    "no_copy": 1,
-   "options": "Transport Cost Profile",
+   "options": "Transport Cost Structure Assignment",
    "print_hide": 1,
    "read_only": 1
   },
@@ -156,7 +156,7 @@
  "modified": "2026-09-09 07:15:46.856142",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
- "name": "Transport Cost Profile",
+ "name": "Transport Cost Structure Assignment",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
