@@ -16,13 +16,6 @@ frappe.ui.form.on("Vehicle", {
 				current_vehicle: frm.doc.name,
 			},
 		}));
-		frm.set_query("vuna_transport_cost_profile", () => ({
-			filters: {
-				company: frm.doc.company,
-				costing_model: frm.doc.vuna_transport_costing_model,
-				disabled: 0,
-			},
-		}));
 		const roles_field = frm.fields_dict.vuna_operational_roles;
 		if (roles_field?.grid) {
 			const role_field = roles_field.grid.get_field("operational_role");
@@ -83,25 +76,6 @@ frappe.ui.form.on("Vehicle", {
 				frm.set_value("vuna_vehicle_category", message.vehicle_category);
 				if (["Petrol", "Diesel", "Natural Gas", "Electric"].includes(message.fuel_type)) {
 					frm.set_value("fuel_type", message.fuel_type);
-				}
-			});
-	},
-
-	vuna_transport_costing_model(frm) {
-		if (!frm.doc.vuna_transport_cost_profile) return;
-		if (!frm.doc.vuna_transport_costing_model) {
-			frm.set_value("vuna_transport_cost_profile", null);
-			return;
-		}
-		frappe.db
-			.get_value(
-				"Transport Cost Profile",
-				frm.doc.vuna_transport_cost_profile,
-				"costing_model"
-			)
-			.then(({ message }) => {
-				if (message?.costing_model !== frm.doc.vuna_transport_costing_model) {
-					frm.set_value("vuna_transport_cost_profile", null);
 				}
 			});
 	},

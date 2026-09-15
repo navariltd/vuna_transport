@@ -24,7 +24,7 @@
    "dt": "Vehicle",
    "fieldname": "vuna_expected_fuel_efficiency",
    "fieldtype": "Float",
-   "insert_after": "vuna_transport_cost_profile",
+   "insert_after": "vuna_transport_costing_model",
    "label": "Expected Fuel Efficiency",
    "modified": "2026-09-09 10:06:00.000000",
    "modified_by": "Administrator",
@@ -45,22 +45,6 @@
    "modified_by": "Administrator",
    "module": "Vuna Transport",
    "name": "Vehicle-vuna_fuel_efficiency_uom",
-   "owner": "Administrator"
-  },
-  {
-   "creation": "2026-09-09 10:06:00.000000",
-   "docstatus": 0,
-   "dt": "Vehicle",
-   "fieldname": "vuna_transport_cost_profile",
-   "fieldtype": "Link",
-   "in_standard_filter": 1,
-   "insert_after": "vuna_transport_costing_model",
-   "label": "Transport Cost Profile",
-   "options": "Transport Cost Profile",
-   "modified": "2026-09-09 10:06:00.000000",
-   "modified_by": "Administrator",
-   "module": "Vuna Transport",
-   "name": "Vehicle-vuna_transport_cost_profile",
    "owner": "Administrator"
   },
   {

@@ -103,23 +103,15 @@ def get_applicable_cost_profile(vehicle, company, date=None):
 	if not costing_model:
 		return None
 
-	direct = getattr(vehicle, "vuna_transport_cost_profile", None)
-	if direct:
-		profile = frappe.get_doc("Transport Cost Profile", direct)
-		if profile.costing_model != costing_model:
-			frappe.throw(
-				_("Transport Cost Profile {0} uses Costing Model {1}, but Vehicle {2} uses {3}.").format(
-					profile.name, profile.costing_model, vehicle.name, costing_model
-				)
-			)
-		if _profile_is_active(profile, company, date):
-			return profile
-		return None
-
 	profiles = frappe.get_all(
 		"Transport Cost Profile",
-		filters={"company": company, "costing_model": costing_model, "disabled": 0},
-		fields=["name", "vehicle", "supplier", "vehicle_category", "valid_from", "valid_to"],
+		filters={
+			"company": company,
+			"costing_model": costing_model,
+			"disabled": 0,
+			"docstatus": 1,
+		},
+		fields=["name", "vehicle", "supplier", "vehicle_category", "valid_from", "valid_to", "docstatus"],
 	)
 	vehicle_category = getattr(vehicle, "vuna_vehicle_category", None)
 	supplier = getattr(vehicle, "vuna_supplier", None)
@@ -243,6 +235,7 @@ def context_warnings(context):
 def _profile_is_active(profile, company, date):
 	return (
 		profile.company == company
+		and getattr(profile, "docstatus", 0) == 1
 		and not profile.disabled
 		and getdate(profile.valid_from) <= date
 		and (not profile.valid_to or getdate(profile.valid_to) >= date)

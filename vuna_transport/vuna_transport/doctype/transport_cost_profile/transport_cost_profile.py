@@ -62,7 +62,13 @@ class TransportCostProfile(Document):
 	def _validate_overlapping_profiles(self):
 		profiles = frappe.get_all(
 			"Transport Cost Profile",
-			filters={"company": self.company, "disabled": 0, "name": ["!=", self.name]},
+			filters={
+				"company": self.company,
+				"costing_model": self.costing_model,
+				"disabled": 0,
+				"docstatus": 1,
+				"name": ["!=", self.name],
+			},
 			fields=[
 				"name",
 				"costing_model",

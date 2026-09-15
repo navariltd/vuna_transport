@@ -95,7 +95,6 @@ class TestTransportCostEstimationService(UnitTestCase):
 			name="KDA 123A",
 			company="Yovuna Tech",
 			vuna_transport_costing_model="Mileage",
-			vuna_transport_cost_profile=None,
 			vuna_vehicle_category="8 Ton Truck",
 		)
 		get_doc.side_effect = [load, vehicle]
@@ -120,7 +119,6 @@ class TestTransportCostEstimationService(UnitTestCase):
 		vehicle = SimpleNamespace(
 			name="KDA 123A",
 			vuna_transport_costing_model="Mileage",
-			vuna_transport_cost_profile=None,
 			vuna_vehicle_category="8 Ton Truck",
 			vuna_supplier=None,
 		)
@@ -134,6 +132,7 @@ class TestTransportCostEstimationService(UnitTestCase):
 				disabled=0,
 				valid_from="2026-01-01",
 				valid_to=None,
+				docstatus=1,
 			)
 		]
 		profile = SimpleNamespace(
@@ -141,6 +140,7 @@ class TestTransportCostEstimationService(UnitTestCase):
 			costing_model="Mileage",
 			company="Yovuna Tech",
 			disabled=0,
+			docstatus=1,
 			valid_from="2026-01-01",
 			valid_to=None,
 		)
@@ -151,22 +151,11 @@ class TestTransportCostEstimationService(UnitTestCase):
 		self.assertIs(result, profile)
 		get_all.assert_called_once_with(
 			"Transport Cost Profile",
-			filters={"company": "Yovuna Tech", "costing_model": "Mileage", "disabled": 0},
-			fields=["name", "vehicle", "supplier", "vehicle_category", "valid_from", "valid_to"],
+			filters={
+				"company": "Yovuna Tech",
+				"costing_model": "Mileage",
+				"disabled": 0,
+				"docstatus": 1,
+			},
+			fields=["name", "vehicle", "supplier", "vehicle_category", "valid_from", "valid_to", "docstatus"],
 		)
-
-	@patch("vuna_transport.services.costing.transport_cost_estimation_service.frappe.get_doc")
-	def test_direct_profile_with_different_costing_model_is_rejected(self, get_doc):
-		from vuna_transport.services.costing.transport_cost_estimation_service import (
-			get_applicable_cost_profile,
-		)
-
-		vehicle = SimpleNamespace(
-			name="KDA 123A",
-			vuna_transport_costing_model="Mileage",
-			vuna_transport_cost_profile="Contract Profile",
-		)
-		get_doc.return_value = SimpleNamespace(name="Contract Profile", costing_model="Contract")
-
-		with self.assertRaises(Exception):
-			get_applicable_cost_profile(vehicle, "Yovuna Tech", "2026-09-10")
