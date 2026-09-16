@@ -10,6 +10,7 @@
  "field_order": [
   "company",
   "cost_structure_name",
+  "vehicle_owner",
   "description",
   "disabled",
   "components_section",
@@ -24,6 +25,12 @@
    "label": "Cost Structure Name",
    "reqd": 1,
    "unique": 1
+  },
+  {
+   "fieldname": "vehicle_owner",
+   "fieldtype": "Select",
+   "label": "Vehicle Owner",
+   "options": "Company\nSupplier"
   },
   {
    "fieldname": "company",

@@ -8,6 +8,8 @@ from frappe.model.document import Document
 
 class TransportCostStructure(Document):
 	def validate(self):
+		if self.vehicle_owner and self.vehicle_owner not in {"Company", "Supplier"}:
+			frappe.throw(_("Vehicle Owner must be Company or Supplier."))
 		seen = set()
 		for row in self.components:
 			if row.cost_component in seen:
