@@ -85,9 +85,17 @@ def _validate_delivery_note_against_load(doc, load):
 	if warehouse_companies and warehouse_companies != {load.company}:
 		frappe.throw(_("Every Delivery Note item warehouse must belong to the Delivery Load company."))
 
-	item_allocations = {
-		row.delivery_order_item: row.allocated_quantity for row in load_rows if row.delivery_order_item
-	}
+	item_allocations = {}
+	for row in load_rows:
+		if not row.delivery_order_item:
+			continue
+		if row.delivery_order_item in item_allocations:
+			frappe.throw(
+				_("Delivery Order Item {0} appears more than once on Delivery Load {1}.").format(
+					row.delivery_order_item, load.name
+				)
+			)
+		item_allocations[row.delivery_order_item] = flt(row.allocated_quantity)
 	order_items = frappe.get_all(
 		"Delivery Order Item",
 		filters={"name": ["in", list(item_allocations)]},
@@ -188,8 +196,10 @@ def validate_delivery_trip(doc, method=None):
 	if allocation and set(get_allocation_load_names(allocation)) != {selected_load.name for selected_load in loads}:
 		frappe.throw(_("Delivery Trip loads must match the active Vehicle Allocation."))
 	if allocation:
-		if not allocation.vehicle or not allocation.driver:
-			frappe.throw(_("The active Vehicle Allocation must have an ERPNext Vehicle and Driver."))
+		if not allocation.vehicle:
+			frappe.throw(_("The active Vehicle Allocation must have an ERPNext Vehicle."))
+		if not allocation.driver:
+			frappe.throw(_("The active Vehicle Allocation must have an ERPNext Driver."))
 		if doc.docstatus == 0 or doc.status in ("Draft", "Scheduled"):
 			if doc.vuna_vehicle_allocation != allocation.name:
 				frappe.throw(_("Delivery Trip must use the active Vehicle Allocation for this load."))
@@ -230,6 +240,7 @@ def validate_delivery_trip(doc, method=None):
 		)
 	)
 	validate_delivery_trip_note_set(expected_delivery_notes, stop_delivery_notes)
+	validate_delivery_note_quantities_for_loads(loads)
 
 	for stop in doc.delivery_stops:
 		if not stop.delivery_note:
@@ -315,6 +326,70 @@ def validate_delivery_trip_note_set(expected_delivery_notes, stop_delivery_notes
 				"; ".join(details) or _("no submitted Delivery Notes")
 			)
 		)
+
+
+def validate_delivery_note_quantities_for_loads(loads):
+	"""Ensure submitted Delivery Notes cover every allocated item quantity."""
+	load_names = [load.name for load in loads if getattr(load, "name", None)]
+	if not load_names:
+		return
+	load_rows = frappe.get_all(
+		"Delivery Load Order",
+		filters={"parent": ["in", load_names], "parenttype": "Delivery Load"},
+		fields=["parent", "delivery_order_item", "allocated_quantity"],
+	)
+	if not load_rows:
+		return
+
+	item_names = list({row.delivery_order_item for row in load_rows if row.delivery_order_item})
+	item_sales_orders = {
+		row.name: row.sales_order_item
+		for row in frappe.get_all(
+			"Delivery Order Item",
+			filters={"name": ["in", item_names]},
+			fields=["name", "sales_order_item"],
+		)
+	}
+	actual_rows = frappe.db.sql(
+		"""
+			select dn.vuna_delivery_load as load_name, dni.so_detail, coalesce(sum(dni.qty), 0) as quantity
+			from `tabDelivery Note` dn
+			join `tabDelivery Note Item` dni on dni.parent = dn.name
+			where dn.vuna_delivery_load in %(load_names)s
+			and dn.docstatus = 1
+			group by dn.vuna_delivery_load, dni.so_detail
+		""",
+		{"load_names": tuple(load_names)},
+		as_dict=True,
+	)
+	actual = {
+		(_row_value(row, "load_name"), _row_value(row, "so_detail")): flt(_row_value(row, "quantity"))
+		for row in actual_rows
+	}
+
+	for row in load_rows:
+		sales_order_item = item_sales_orders.get(row.delivery_order_item)
+		allocated = flt(row.allocated_quantity)
+		delivered = actual.get((row.parent, sales_order_item), 0)
+		if delivered > allocated:
+			frappe.throw(
+				_("Submitted Delivery Note quantity for item {0} exceeds Delivery Load {1} allocation.").format(
+					row.delivery_order_item, row.parent
+				)
+			)
+		if delivered < allocated:
+			frappe.throw(
+				_("Submitted Delivery Notes are missing {0} of item {1} allocated on Delivery Load {2}.").format(
+					allocated - delivered, row.delivery_order_item, row.parent
+				)
+			)
+
+
+def _row_value(row, fieldname, default=None):
+	"""Read a field from either a Frappe row object or a test/database dict."""
+	if isinstance(row, dict):
+		return row.get(fieldname, default)
+	return getattr(row, fieldname, default)
 
 
 def link_delivery_trip(doc, method=None):

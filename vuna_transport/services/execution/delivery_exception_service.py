@@ -387,15 +387,23 @@ def recompute_delivery_load_completion(delivery_load, delivery_trip=None):
 		return
 
 	trip_name = delivery_trip or frappe.db.get_value(
-		"Delivery Trip",
-		{"vuna_delivery_load": delivery_load, "docstatus": ["!=", 2]},
-		"name",
+		"Delivery Stop",
+		{
+			"vuna_delivery_load": delivery_load,
+			"parenttype": "Delivery Trip",
+			"docstatus": ["!=", 2],
+		},
+		"parent",
 	)
 	if not trip_name:
 		return
 	stops = frappe.get_all(
 		"Delivery Stop",
-		filters={"parent": trip_name, "parenttype": "Delivery Trip"},
+		filters={
+			"parent": trip_name,
+			"parenttype": "Delivery Trip",
+			"vuna_delivery_load": delivery_load,
+		},
 		fields=["visited"],
 	)
 	if not stops or not all(stop.visited for stop in stops):

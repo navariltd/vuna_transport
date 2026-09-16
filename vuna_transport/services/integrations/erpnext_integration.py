@@ -80,6 +80,11 @@ def create_delivery_notes_for_load(load):
 	load = get_locked_delivery_load(load)
 	validate_load_is_operational(load, _("creating Delivery Notes"))
 	_repair_single_item_load_rows(load)
+	# Revalidate against live Sales Order balances. A direct ERPNext Delivery Note
+	# may have reduced the outstanding quantity since this load was planned.
+	from vuna_transport.services.planning.load_validation_service import validate_load_allocations
+
+	validate_load_allocations(load)
 	_validate_delivery_orders_for_execution(load)
 	_validate_delivery_note_allocation(load)
 	pick_list = frappe.get_doc("Pick List", load.pick_list) if load.pick_list else None
@@ -187,7 +192,15 @@ def _make_delivery_note_direct(delivery_order_name, load_rows, source_warehouse)
 		frappe.throw(
 			_("Delivery Order {0} must reference exactly one Sales Order.").format(delivery_order_name)
 		)
-	allocated_by_item = {row.delivery_order_item: flt(row.allocated_quantity) for row in load_rows}
+	allocated_by_item = {}
+	for row in load_rows:
+		if row.delivery_order_item in allocated_by_item:
+			frappe.throw(
+				_("Delivery Order Item {0} appears more than once on Delivery Load {1}.").format(
+					row.delivery_order_item, row.parent or _("the selected load")
+				)
+			)
+		allocated_by_item[row.delivery_order_item] = flt(row.allocated_quantity)
 	order_items = frappe.get_all(
 		"Delivery Order Item",
 		filters={"name": ["in", list(allocated_by_item)]},
@@ -231,16 +244,6 @@ def create_delivery_trip_for_load(load):
 		load = frappe.get_doc("Delivery Load", load)
 	load = get_locked_delivery_load(load)
 	validate_load_is_operational(load, _("creating a Delivery Trip"))
-	existing_trip_name = load.delivery_trip or frappe.db.get_value(
-		"Delivery Stop",
-		{"vuna_delivery_load": load.name, "docstatus": ["!=", 2]},
-		"parent",
-	)
-	if existing_trip_name:
-		existing_trip = frappe.get_doc("Delivery Trip", existing_trip_name)
-		if existing_trip.docstatus != 2:
-			return existing_trip
-		load.db_set("delivery_trip", None, update_modified=False)
 
 	requires_allocation = True
 	if load.delivery_method:
@@ -256,15 +259,29 @@ def create_delivery_trip_for_load(load):
 		)
 	if allocation and not allocation.driver:
 		frappe.throw(
-			_(
-				"The active Vehicle Allocation must reference an ERPNext Driver before creating a Delivery Trip."
-			)
+			_("The active Vehicle Allocation must reference an ERPNext Driver before creating a Delivery Trip.")
 		)
 
 	loads = get_allocation_loads(allocation) if allocation else [load]
-	if any(selected_load.delivery_trip and selected_load.delivery_trip != existing_trip_name for selected_load in loads):
-		linked = next(selected_load for selected_load in loads if selected_load.delivery_trip)
-		return frappe.get_doc("Delivery Trip", linked.delivery_trip)
+	load_names = [selected_load.name for selected_load in loads]
+	trip_names = set(
+		frappe.get_all(
+			"Delivery Stop",
+			filters={
+				"vuna_delivery_load": ["in", load_names],
+				"parenttype": "Delivery Trip",
+				"docstatus": ["!=", 2],
+			},
+			pluck="parent",
+		)
+	)
+	trip_names.update(selected_load.delivery_trip for selected_load in loads if selected_load.delivery_trip)
+	if len(trip_names) > 1:
+		frappe.throw(
+			_("The selected Delivery Loads are already linked to different Delivery Trips: {0}.").format(
+				", ".join(sorted(trip_names))
+			)
+		)
 	delivery_note_rows = frappe.get_all(
 		"Delivery Note",
 		filters={"vuna_delivery_load": ["in", [selected_load.name for selected_load in loads]], "docstatus": 1},
@@ -282,6 +299,30 @@ def create_delivery_trip_for_load(load):
 		frappe.throw(
 			_("Submitted Delivery Notes are missing for Delivery Orders: {0}.").format(", ".join(missing))
 		)
+	from vuna_transport.services.execution.lineage_service import validate_delivery_note_quantities_for_loads
+
+	validate_delivery_note_quantities_for_loads(loads)
+
+	if trip_names:
+		existing_trip_name = next(iter(trip_names))
+		linked_load_names = set(
+			frappe.get_all(
+				"Delivery Stop",
+				filters={"parent": existing_trip_name, "parenttype": "Delivery Trip"},
+				pluck="vuna_delivery_load",
+			)
+		)
+		linked_load_names.discard(None)
+		if linked_load_names != set(load_names):
+			frappe.throw(
+				_(
+					"The active Vehicle Allocation contains loads that are not all assigned to Delivery Trip {0}. "
+					"Review the allocation before continuing."
+				).format(existing_trip_name)
+			)
+		existing_trip = frappe.get_doc("Delivery Trip", existing_trip_name)
+		if existing_trip.docstatus != 2:
+			return existing_trip
 
 	from erpnext.stock.doctype.delivery_note.delivery_note import make_delivery_trip
 
@@ -325,7 +366,7 @@ def _validate_delivery_orders_for_execution(load):
 		delivery_order = frappe.db.get_value(
 			"Delivery Order",
 			delivery_order_name,
-			["docstatus", "status", "company", "source_warehouse"],
+			["docstatus", "status", "company", "source_warehouse", "sales_order"],
 			as_dict=True,
 		)
 		if (
@@ -339,6 +380,16 @@ def _validate_delivery_orders_for_execution(load):
 		):
 			frappe.throw(
 				_("Delivery Order {0} is no longer eligible for execution.").format(delivery_order_name)
+			)
+		sales_order_name = delivery_order.sales_order
+		sales_order = frappe.db.get_value(
+			"Sales Order", sales_order_name, ["docstatus", "status"], as_dict=True
+		)
+		if sales_order and (sales_order.docstatus == 2 or sales_order.status in ("Closed", "Cancelled")):
+			frappe.throw(
+				_("Delivery Order {0} cannot be executed because its Sales Order is {1}.").format(
+					delivery_order_name, sales_order.status or "Cancelled"
+				)
 			)
 		if delivery_order.company != load.company:
 			frappe.throw(_("Delivery Order {0} belongs to a different company.").format(delivery_order_name))

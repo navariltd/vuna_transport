@@ -126,15 +126,31 @@ def is_load_status_transition_allowed(current, target):
 
 
 def validate_load_can_be_cancelled(load):
-	linked_documents = (
-		("Delivery Trip", "Delivery Stop", {"vuna_delivery_load": load.name, "docstatus": 1}),
-		("Delivery Note", "Delivery Note", {"vuna_delivery_load": load.name, "docstatus": 1}),
+	trip_rows = frappe.db.sql(
+		"""
+			select ds.parent
+			from `tabDelivery Stop` ds
+			join `tabDelivery Trip` dt on dt.name = ds.parent
+			where ds.parenttype = 'Delivery Trip'
+			and ds.vuna_delivery_load = %s
+			and dt.docstatus != 2
+			limit 1
+		""",
+		load.name,
+		as_dict=True,
 	)
-	for label, doctype, filters in linked_documents:
-		linked_name = frappe.db.get_value(doctype, filters, "parent" if doctype == "Delivery Stop" else "name")
-		if linked_name:
-			frappe.throw(
-				_("Cancel {0} {1} before cancelling Delivery Load {2}.").format(
-					label, linked_name, load.name
-				)
-			)
+	if trip_rows:
+		trip_name = trip_rows[0].get("parent") if isinstance(trip_rows[0], dict) else trip_rows[0].parent
+		frappe.throw(
+			_("Cancel Delivery Trip {0} before cancelling Delivery Load {1}.").format(trip_name, load.name)
+		)
+
+	note_name = frappe.db.get_value(
+		"Delivery Note",
+		{"vuna_delivery_load": load.name, "docstatus": ["!=", 2]},
+		"name",
+	)
+	if note_name:
+		frappe.throw(
+			_("Cancel Delivery Note {0} before cancelling Delivery Load {1}.").format(note_name, load.name)
+		)
