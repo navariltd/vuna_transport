@@ -330,6 +330,7 @@ def _validate_owned_fleet(allocation, loads):
 	lock_document("Vehicle", allocation.vehicle)
 	lock_document("Driver", allocation.driver)
 	vehicle = frappe.get_doc("Vehicle", allocation.vehicle)
+	allocation.vehicle_owner = getattr(vehicle, "vuna_vehicle_owner", None)
 	_validate_vehicle_category_for_loads(loads, vehicle.vuna_vehicle_category)
 	_validate_vehicle_is_available(allocation, loads)
 	_validate_driver_is_available(allocation, loads)
@@ -337,10 +338,11 @@ def _validate_owned_fleet(allocation, loads):
 
 def _validate_subcontractor(allocation, loads):
 	loads = _coerce_loads(loads)
-	if not allocation.vehicle:
-		frappe.throw(_("Select the ERPNext Vehicle record for the subcontracted vehicle."))
+	if not allocation.vehicle or not allocation.driver:
+		frappe.throw(_("Vehicle and Driver records are required for a Subcontractor allocation."))
 	lock_document("Vehicle", allocation.vehicle)
 	vehicle = frappe.get_doc("Vehicle", allocation.vehicle)
+	allocation.vehicle_owner = getattr(vehicle, "vuna_vehicle_owner", None)
 	if getattr(vehicle, "vuna_supplier", None):
 		allocation.supplier = vehicle.vuna_supplier
 	if len(loads) == 1:
@@ -348,9 +350,8 @@ def _validate_subcontractor(allocation, loads):
 	else:
 		_validate_vehicle_category_for_loads(loads, vehicle.vuna_vehicle_category)
 	_validate_vehicle_is_available(allocation, loads)
-	if allocation.driver:
-		lock_document("Driver", allocation.driver)
-		_validate_driver_is_available(allocation, loads)
+	lock_document("Driver", allocation.driver)
+	_validate_driver_is_available(allocation, loads)
 
 
 def _validate_planning_window(load):
@@ -678,9 +679,13 @@ def validate_allocation_cancellation(allocation):
 
 def _get_active_trip(load):
 	name = load.delivery_trip or frappe.db.get_value(
-		"Delivery Trip",
-		{"vuna_delivery_load": load.name, "docstatus": ["!=", 2]},
-		"name",
+		"Delivery Stop",
+		{
+			"vuna_delivery_load": load.name,
+			"parenttype": "Delivery Trip",
+			"docstatus": ["!=", 2],
+		},
+		"parent",
 	)
 	if not name:
 		return None
@@ -724,7 +729,7 @@ def _sync_trip_execution_allocation(load, allocation, rollback=False):
 		_("Execution allocation changed to {0}: vehicle {1}, driver {2}.").format(
 			allocation.name,
 			allocation.vehicle,
-			allocation.driver or allocation.subcontractor_driver_name,
+			allocation.driver,
 		),
 	)
 

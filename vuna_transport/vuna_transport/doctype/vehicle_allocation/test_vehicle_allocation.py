@@ -158,16 +158,17 @@ class TestVehicleAllocation(UnitTestCase):
 			_validate_subcontractor(allocation, load)
 
 	@patch("vuna_transport.services.fleet.vehicle_allocation_service._validate_vehicle_is_available")
+	@patch("vuna_transport.services.fleet.vehicle_allocation_service._validate_driver_is_available")
 	@patch("vuna_transport.services.fleet.vehicle_allocation_service._validate_vehicle_category_for_load")
 	@patch("vuna_transport.services.fleet.vehicle_allocation_service.lock_document")
 	@patch("vuna_transport.services.fleet.vehicle_allocation_service.frappe.get_doc")
 	def test_subcontractor_vehicle_populates_supplier_server_side(
-		self, get_doc, lock_document, validate_category, validate_vehicle
+		self, get_doc, lock_document, validate_category, validate_driver, validate_vehicle
 	):
 		allocation = SimpleNamespace(
 			vehicle="KDA 123A",
 			supplier=None,
-			driver=None,
+			driver="DR-1",
 		)
 		load = SimpleNamespace(name="LOAD-1")
 		get_doc.return_value = SimpleNamespace(

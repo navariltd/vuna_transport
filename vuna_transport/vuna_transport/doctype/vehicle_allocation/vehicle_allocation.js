@@ -80,8 +80,9 @@ frappe.ui.form.on("Vehicle Allocation", {
 		const vehicle_name = frm.doc.vehicle;
 		if (!vehicle_name) return;
 		frm._vehicle_used_for_allocation_defaults = vehicle_name;
-		frappe.db.get_value("Vehicle", vehicle_name, ["vuna_supplier"]).then(({ message }) => {
+		frappe.db.get_value("Vehicle", vehicle_name, ["vuna_supplier", "vuna_vehicle_owner"]).then(({ message }) => {
 			if (!message || frm.doc.vehicle !== frm._vehicle_used_for_allocation_defaults) return;
+			frm.set_value("vehicle_owner", message.vuna_vehicle_owner || null);
 			if (frm.doc.allocation_type === "Subcontractor") {
 				frm.set_value("supplier", message.vuna_supplier || null);
 			}
@@ -90,7 +91,7 @@ frappe.ui.form.on("Vehicle Allocation", {
 
 	allocation_type(frm) {
 		frm.toggle_reqd("vehicle", ["Owned Fleet", "Subcontractor"].includes(frm.doc.allocation_type));
-		frm.toggle_reqd("driver", frm.doc.allocation_type === "Owned Fleet");
+		frm.toggle_reqd("driver", true);
 	},
 });
 

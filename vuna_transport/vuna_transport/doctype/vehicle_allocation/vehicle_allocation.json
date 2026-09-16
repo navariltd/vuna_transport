@@ -12,6 +12,7 @@
   "company",
   "column_break_allocation",
   "allocation_type",
+  "vehicle_owner",
   "required_vehicle_category",
   "status",
   "owned_fleet_section",
@@ -21,8 +22,6 @@
   "subcontractor_section",
   "supplier",
   "column_break_subcontractor",
-  "subcontractor_driver_name",
-  "subcontractor_driver_phone",
   "delivery_load_section",
   "delivery_loads",
   "section_break_garp",
@@ -120,6 +119,13 @@
    "reqd": 1
   },
   {
+   "fieldname": "vehicle_owner",
+   "fieldtype": "Select",
+   "label": "Vehicle Owner",
+   "options": "Company\nSupplier",
+   "read_only": 1
+  },
+  {
    "fieldname": "required_vehicle_category",
    "fieldtype": "Link",
    "label": "Required Vehicle Category",
@@ -214,8 +220,8 @@
    "fieldname": "driver",
    "fieldtype": "Link",
    "label": "Driver",
-   "mandatory_depends_on": "eval:doc.allocation_type == 'Owned Fleet'",
-   "options": "Driver"
+   "options": "Driver",
+   "reqd": 1
   },
   {
    "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
@@ -234,19 +240,6 @@
   {
    "fieldname": "column_break_subcontractor",
    "fieldtype": "Column Break"
-  },
-  {
-   "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
-   "fieldname": "subcontractor_driver_name",
-   "fieldtype": "Data",
-   "label": "Driver"
-  },
-  {
-   "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
-   "fieldname": "subcontractor_driver_phone",
-   "fieldtype": "Data",
-   "label": "Driver Phone",
-   "options": "Phone"
   },
   {
    "fieldname": "planning_section",
