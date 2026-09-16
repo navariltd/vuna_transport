@@ -62,6 +62,18 @@ class TestProofOfDelivery(UnitTestCase):
 		with self.assertRaises(ValidationError):
 			validate_pod_items([item])
 
+	def test_item_rejection_reason_satisfies_validation(self):
+		item = SimpleNamespace(
+			item_code="Milk",
+			ordered_qty=10,
+			delivered_qty=7,
+			rejected_qty=0,
+			rejection_reason="Product Damaged",
+		)
+
+		validate_pod_items([item])
+		self.assertEqual(item.rejected_qty, 3)
+
 	def test_first_of_two_partial_loads_does_not_complete_delivery_order(self):
 		loads = [
 			SimpleNamespace(name="LOAD-1", status="Completed"),

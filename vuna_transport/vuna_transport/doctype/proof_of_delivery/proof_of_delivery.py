@@ -22,7 +22,9 @@ class ProofofDelivery(Document):
 	def validate(self):
 		self.populate_stop_details()
 		self.populate_item_details()
-		validate_pod_items(self.items)
+		validate_pod_items(self.items, self.rejection_reasons)
+		self.total_accepted_qty = sum(flt(item.delivered_qty) for item in self.items)
+		self.total_rejected_qty = sum(flt(item.rejected_qty) for item in self.items)
 		self.status = derive_pod_status(self.items)
 		self.validate_exception_reason()
 
@@ -30,7 +32,15 @@ class ProofofDelivery(Document):
 		stop = frappe.db.get_value(
 			"Delivery Stop",
 			self.delivery_stop,
-			["parent", "parenttype", "customer", "address", "delivery_note", "vuna_delivery_order"],
+			[
+				"parent",
+				"parenttype",
+				"customer",
+				"address",
+				"delivery_note",
+				"vuna_delivery_order",
+				"vuna_delivery_load",
+			],
 			as_dict=True,
 		)
 		if not stop or stop.parenttype != "Delivery Trip" or stop.parent != self.delivery_trip:
@@ -39,13 +49,30 @@ class ProofofDelivery(Document):
 		self.customer = stop.customer
 		self.delivery_address = stop.address
 		self.delivery_note = stop.delivery_note
-		self.delivery_load = frappe.db.get_value("Delivery Note", self.delivery_note, "vuna_delivery_load")
+		self.delivery_load = stop.vuna_delivery_load or frappe.db.get_value(
+			"Delivery Note", self.delivery_note, "vuna_delivery_load"
+		)
 
 	def populate_item_details(self):
+		"""Populate item snapshots with one batched query instead of one query per row."""
+		item_names = {item.delivery_order_item for item in self.items if item.delivery_order_item}
+		if not item_names:
+			return
+
+		requirement_items = {
+			row.name: row
+			for row in frappe.get_all(
+				"Delivery Order Item",
+				filters={"name": ["in", list(item_names)]},
+				fields=["name", "item_code", "item_name", "transport_qty"],
+			)
+		}
 		for item in self.items:
 			if not item.delivery_order_item:
 				continue
-			requirement_item = frappe.get_doc("Delivery Order Item", item.delivery_order_item)
+			requirement_item = requirement_items.get(item.delivery_order_item)
+			if not requirement_item:
+				frappe.throw(_("Delivery Order Item {0} could not be found.").format(item.delivery_order_item))
 			item.item_code = requirement_item.item_code
 			item.item_name = requirement_item.item_name
 			if not flt(item.ordered_qty):

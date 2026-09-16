@@ -3,6 +3,7 @@
 
 frappe.ui.form.on("Proof of Delivery", {
 	refresh(frm) {
+		update_pod_totals(frm);
 		// A Delivery Trip is the execution parent. Cancelling a POD must not
 		// offer to cancel the submitted trip; the server-side on_cancel handler
 		// resets only this POD's Delivery Stop outcome.
@@ -23,16 +24,33 @@ frappe.ui.form.on("Proof of Delivery", {
 });
 
 frappe.ui.form.on("Proof of Delivery Item", {
+	items_add(frm) {
+		update_pod_totals(frm);
+	},
 	ordered_qty(frm, cdt, cdn) {
 		set_rejected_quantity(frm, cdt, cdn);
 	},
 	delivered_qty(frm, cdt, cdn) {
 		set_rejected_quantity(frm, cdt, cdn);
 	},
+	rejected_qty(frm) {
+		update_pod_totals(frm);
+	},
+	items_remove(frm) {
+		update_pod_totals(frm);
+	},
 });
+
 
 function set_rejected_quantity(frm, cdt, cdn) {
 	const row = frappe.get_doc(cdt, cdn);
 	const rejected = Math.max((row.ordered_qty || 0) - (row.delivered_qty || 0), 0);
 	frappe.model.set_value(cdt, cdn, "rejected_qty", rejected);
+	update_pod_totals(frm);
+}
+
+function update_pod_totals(frm) {
+	const items = frm.doc.items || [];
+	frm.set_value("total_accepted_qty", items.reduce((total, row) => total + (row.delivered_qty || 0), 0));
+	frm.set_value("total_rejected_qty", items.reduce((total, row) => total + (row.rejected_qty || 0), 0));
 }

@@ -5,6 +5,7 @@ from frappe import _
 from frappe.utils import flt, now_datetime
 
 from vuna_transport.services.execution.dispatch_guard_service import set_delivery_load_status
+from vuna_transport.services.execution.lineage_service import get_delivery_trip_load_names
 from vuna_transport.services.shared.security_service import (
 	require_doctype_permission,
 	require_document_permission,
@@ -19,7 +20,7 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 	require_document_permission(trip, "read")
 	if trip.docstatus != 1:
 		frappe.throw(_("Submit the Delivery Trip before creating a Proof of Delivery."))
-	if not trip.vuna_delivery_load:
+	if not get_delivery_trip_load_names(trip):
 		frappe.throw(_("Delivery Trip is not linked to a Vehicle Allocation or Delivery Load."))
 
 	stop = next((row for row in trip.delivery_stops if row.name == delivery_stop), None)
@@ -99,7 +100,8 @@ def derive_pod_status(items):
 	return "Accepted"
 
 
-def validate_pod_items(items):
+def validate_pod_items(items, rejection_reasons=None):
+	rejection_reasons = rejection_reasons or []
 	if not items:
 		frappe.throw(_("At least one Proof of Delivery item is required."))
 	for item in items:
@@ -112,7 +114,13 @@ def validate_pod_items(items):
 					item.item_code
 				)
 			)
-		if flt(item.rejected_qty) and not getattr(item, "rejection_reasons", None):
+		item_reasons = list(rejection_reasons)
+		if getattr(item, "rejection_reason", None):
+			item_reasons.append(item.rejection_reason)
+		# Preserve compatibility with older in-memory/test documents while existing
+		# records transition away from the unsupported nested Table MultiSelect.
+		item_reasons.extend(getattr(item, "rejection_reasons", None) or [])
+		if flt(item.rejected_qty) and not item_reasons and not getattr(item, "rejection_reason_remarks", None):
 			frappe.throw(_("A rejection reason is required for item {0}.").format(item.item_code))
 
 

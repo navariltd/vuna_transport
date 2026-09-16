@@ -519,8 +519,7 @@ def _get_exception_rejection_reasons(exception):
 	return list(
 		dict.fromkeys(
 			reason.rejection_reason
-			for item in pod.items
-			for reason in (getattr(item, "rejection_reasons", None) or [])
+			for reason in (getattr(pod, "rejection_reasons", None) or [])
 			if getattr(reason, "rejection_reason", None)
 		)
 	)

@@ -29,6 +29,9 @@
   "delivery_photo",
   "items_tab",
   "items",
+  "total_accepted_qty",
+  "total_rejected_qty",
+  "rejection_reasons",
   "exception_details",
   "exception_reason",
   "remarks",
@@ -153,19 +156,20 @@
    "read_only": 1
   },
   {
+   "depends_on": "eval:doc.total_rejected_qty > 0",
    "fieldname": "exception_details",
    "fieldtype": "Section Break",
    "label": "Delivery Exception"
   },
   {
-   "depends_on": "eval:doc.status in ['Partially Delivered', 'Rejected', 'Failed']",
+   "depends_on": "eval:doc.total_rejected_qty > 0",
    "fieldname": "exception_reason",
    "fieldtype": "Select",
    "label": "Exception Reason",
    "options": "Customer Closed\nCustomer Unavailable\nWrong Address\nProduct Rejected\nProduct Damaged\nQuantity Shortage\nTemperature Breach\nPayment Unavailable\nVehicle Breakdown\nRoad or Weather Disruption\nOther"
   },
   {
-   "depends_on": "eval:doc.status in ['Partially Delivered', 'Rejected', 'Failed']",
+   "depends_on": "eval:doc.total_rejected_qty > 0",
    "fieldname": "remarks",
    "fieldtype": "Small Text",
    "label": "Remarks"
@@ -191,6 +195,25 @@
    "label": "Delivered Items",
    "options": "Proof of Delivery Item",
    "reqd": 1
+  },
+  {
+   "fieldname": "total_accepted_qty",
+   "fieldtype": "Float",
+   "label": "Total Accepted Quantity",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_rejected_qty",
+   "fieldtype": "Float",
+   "label": "Total Rejected Quantity",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.total_rejected_qty > 0",
+   "fieldname": "rejection_reasons",
+   "fieldtype": "Table MultiSelect",
+   "label": "Rejection Reasons",
+   "options": "Rejection Reason Item"
   },
   {
    "fieldname": "amended_from",
