@@ -143,16 +143,16 @@ def get_driver_availability_map(
 			"name",
 			"driver",
 			"vuna_current_driver",
-			"vuna_delivery_load",
 			"departure_time",
 			"status",
 		],
 	)
 	trips = [trip for trip in trips if (trip.vuna_current_driver or trip.driver) in driver_names]
+	_attach_trip_loads(trips)
 	load_names = {
 		load_name for row in allocations for load_name in row.delivery_loads if load_name
 	} | {
-		row.vuna_delivery_load for row in trips if row.vuna_delivery_load
+		load_name for row in trips for load_name in row.delivery_loads
 	}
 	loads = (
 		{
@@ -176,7 +176,7 @@ def get_driver_availability_map(
 		allocations_by_driver[allocation.driver].append(allocation)
 	trips_by_driver = defaultdict(list)
 	for trip in trips:
-		if exclude_delivery_load and trip.vuna_delivery_load == exclude_delivery_load:
+		if exclude_delivery_load and exclude_delivery_load in trip.delivery_loads:
 			continue
 		trips_by_driver[trip.vuna_current_driver or trip.driver].append(trip)
 
@@ -225,8 +225,7 @@ def _evaluate_driver(driver, allocations, trips, loads, from_time, to_time, expe
 		)
 
 	for trip in trips:
-		load = loads.get(trip.vuna_delivery_load)
-		trip_from, trip_to = _trip_window(trip, load)
+		trip_from, trip_to = _trip_window(trip, [loads.get(name) for name in trip.delivery_loads])
 		if trip.status != "In Transit" and not interval_overlaps(from_time, to_time, trip_from, trip_to):
 			continue
 		state = "In Trip"
@@ -243,7 +242,7 @@ def _evaluate_driver(driver, allocations, trips, loads, from_time, to_time, expe
 			next_available_at = _latest_datetime(next_available_at, trip_to)
 
 	for allocation in allocations:
-		allocation_load_names = getattr(allocation, "delivery_loads", None) or []
+		allocation_load_names = _allocation_load_names(allocation)
 		allocation_loads = [loads.get(name) for name in allocation_load_names if loads.get(name)]
 		allocation_from = min(
 			(get_datetime(load.planned_departure) for load in allocation_loads if load.planned_departure),
@@ -285,6 +284,14 @@ def _evaluate_driver(driver, allocations, trips, loads, from_time, to_time, expe
 	)
 
 
+def _allocation_load_names(allocation):
+	"""Read canonical allocation child rows, with a compatibility fallback for test/domain stubs."""
+	return list(
+		getattr(allocation, "delivery_loads", None)
+		or ([allocation.delivery_load] if getattr(allocation, "delivery_load", None) else [])
+	)
+
+
 def _primary_reason(reasons, state):
 	if not reasons:
 		return None
@@ -299,9 +306,28 @@ def _primary_reason(reasons, state):
 	return reasons[0].message
 
 
-def _trip_window(trip, load):
-	if load and load.planned_departure and load.planned_arrival:
-		return load.planned_departure, load.planned_arrival
+def _attach_trip_loads(trips):
+	if not trips:
+		return
+	load_rows = frappe.get_all(
+		"Delivery Stop",
+		filters={"parent": ["in", [trip.name for trip in trips]], "parenttype": "Delivery Trip"},
+		fields=["parent", "vuna_delivery_load"],
+	)
+	loads_by_trip = defaultdict(list)
+	for row in load_rows:
+		if row.vuna_delivery_load:
+			loads_by_trip[row.parent].append(row.vuna_delivery_load)
+	for trip in trips:
+		trip.delivery_loads = loads_by_trip.get(trip.name, [])
+
+
+def _trip_window(trip, loads):
+	loads = [load for load in loads if load]
+	departures = [get_datetime(load.planned_departure) for load in loads if load.planned_departure]
+	arrivals = [get_datetime(load.planned_arrival) for load in loads if load.planned_arrival]
+	if departures and arrivals:
+		return min(departures), max(arrivals)
 	departure = trip.departure_time
 	return departure, add_days(departure, 1) if departure else None
 

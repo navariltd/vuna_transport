@@ -17,9 +17,11 @@ def execute(filters=None):
 		f"""
 		SELECT dt.name, dt.company, COALESCE(dt.vuna_current_vehicle, dt.vehicle) AS vehicle,
 			COALESCE(dt.vuna_current_driver, dt.driver) AS driver,
-			dt.vuna_delivery_load, dt.departure_time, dt.status
+			ds.vuna_delivery_load, dt.departure_time, dt.status
 		FROM `tabDelivery Trip` dt
+		JOIN `tabDelivery Stop` ds ON ds.parent = dt.name AND ds.parenttype = 'Delivery Trip'
 		WHERE {" AND ".join(conditions)}
+		GROUP BY dt.name, dt.company, vehicle, driver, ds.vuna_delivery_load, dt.departure_time, dt.status
 		ORDER BY dt.departure_time DESC
 		LIMIT 500
 	""",

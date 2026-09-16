@@ -1,6 +1,19 @@
 {
  "custom_fields": [
   {
+   "allow_on_submit": 1,
+   "dt": "Delivery Stop",
+   "fieldname": "vuna_delivery_load",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "insert_after": "delivery_note",
+   "label": "Delivery Load",
+   "module": "Vuna Transport",
+   "name": "Delivery Stop-vuna_delivery_load",
+   "options": "Delivery Load",
+   "read_only": 1
+  },
+  {
    "_assign": null,
    "_comments": null,
    "_liked_by": null,

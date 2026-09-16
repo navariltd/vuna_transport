@@ -158,20 +158,20 @@ def validate_delivery_note_item_allocations(
 
 
 def validate_delivery_trip(doc, method=None):
-	if not getattr(doc, "vuna_delivery_load", None):
-		return
 	loads = get_delivery_trip_loads(doc, lock=True)
+	if not loads:
+		return
 	load = loads[0]
 	for selected_load in loads:
 		validate_load_is_operational(selected_load, _("creating or updating a Delivery Trip"))
 	existing_trip = frappe.db.get_value(
-		"Delivery Trip",
+		"Delivery Stop",
 		{
-			"name": ["!=", doc.name or ""],
-			"vuna_delivery_load": load.name,
+			"vuna_delivery_load": ["in", [selected_load.name for selected_load in loads]],
+			"parent": ["!=", doc.name or ""],
 			"docstatus": ["!=", 2],
 		},
-		"name",
+		"parent",
 	)
 	if existing_trip:
 		frappe.throw(
@@ -197,6 +197,7 @@ def validate_delivery_trip(doc, method=None):
 				frappe.throw(
 					_("Delivery Trip vehicle must match Vehicle Allocation {0}.").format(allocation.name)
 				)
+
 			if allocation.driver and doc.driver != allocation.driver:
 				frappe.throw(
 					_("Delivery Trip driver must match Vehicle Allocation {0}.").format(allocation.name)
@@ -246,6 +247,7 @@ def validate_delivery_trip(doc, method=None):
 				)
 			)
 		stop.vuna_delivery_order = delivery_note.vuna_delivery_order
+		stop.vuna_delivery_load = delivery_note.vuna_delivery_load
 		load_rows = frappe.get_all(
 			"Delivery Load Order",
 			filters={
@@ -259,6 +261,22 @@ def validate_delivery_trip(doc, method=None):
 
 def get_delivery_trip_load_names(doc):
 	"""Return every Delivery Load executed by a Delivery Trip."""
+	stop_names = [
+		row.vuna_delivery_load
+		for row in (getattr(doc, "delivery_stops", None) or [])
+		if getattr(row, "vuna_delivery_load", None)
+	]
+	if stop_names:
+		return list(dict.fromkeys(stop_names))
+
+	stop_names = frappe.get_all(
+		"Delivery Stop",
+		filters={"parent": doc.name, "parenttype": "Delivery Trip", "vuna_delivery_load": ["is", "set"]},
+		pluck="vuna_delivery_load",
+	) if getattr(doc, "name", None) else []
+	if stop_names:
+		return list(dict.fromkeys(stop_names))
+
 	allocation_name = getattr(doc, "vuna_vehicle_allocation", None) or getattr(
 		doc, "vuna_current_vehicle_allocation", None
 	)
@@ -267,7 +285,7 @@ def get_delivery_trip_load_names(doc):
 		names = get_allocation_load_names(allocation)
 		if names:
 			return names
-	return [doc.vuna_delivery_load] if getattr(doc, "vuna_delivery_load", None) else []
+	return []
 
 
 def get_delivery_trip_loads(doc, *, lock=False):
@@ -300,7 +318,7 @@ def validate_delivery_trip_note_set(expected_delivery_notes, stop_delivery_notes
 
 
 def link_delivery_trip(doc, method=None):
-	if not getattr(doc, "vuna_delivery_load", None):
+	if not get_delivery_trip_load_names(doc):
 		return
 	for load_name in get_delivery_trip_load_names(doc):
 		linked_trip = frappe.db.get_value("Delivery Load", load_name, "delivery_trip")
@@ -313,21 +331,21 @@ def link_delivery_trip(doc, method=None):
 
 
 def submit_delivery_trip(doc, method=None):
-	if getattr(doc, "vuna_delivery_load", None):
+	if get_delivery_trip_load_names(doc):
 		for load_name in get_delivery_trip_load_names(doc):
 			set_delivery_load_status(load_name, "Dispatched", _("Delivery Trip {0} submitted").format(doc.name))
 			_recompute_delivery_order_statuses(load_name)
 
 
 def cancel_delivery_trip(doc, method=None):
-	if getattr(doc, "vuna_delivery_load", None):
+	if get_delivery_trip_load_names(doc):
 		for load_name in get_delivery_trip_load_names(doc):
 			set_delivery_load_status(load_name, "Ready for Dispatch", _("Delivery Trip {0} cancelled").format(doc.name))
 			_recompute_delivery_order_statuses(load_name)
 
 
 def unlink_delivery_trip(doc, method=None):
-	if not getattr(doc, "vuna_delivery_load", None):
+	if not get_delivery_trip_load_names(doc):
 		return
 	for load_name in get_delivery_trip_load_names(doc):
 		if frappe.db.get_value("Delivery Load", load_name, "delivery_trip") == doc.name:

@@ -127,14 +127,14 @@ def is_load_status_transition_allowed(current, target):
 
 def validate_load_can_be_cancelled(load):
 	linked_documents = (
-		("Delivery Trip", {"vuna_delivery_load": load.name, "docstatus": 1}),
-		("Delivery Note", {"vuna_delivery_load": load.name, "docstatus": 1}),
+		("Delivery Trip", "Delivery Stop", {"vuna_delivery_load": load.name, "docstatus": 1}),
+		("Delivery Note", "Delivery Note", {"vuna_delivery_load": load.name, "docstatus": 1}),
 	)
-	for doctype, filters in linked_documents:
-		linked_name = frappe.db.get_value(doctype, filters, "name")
+	for label, doctype, filters in linked_documents:
+		linked_name = frappe.db.get_value(doctype, filters, "parent" if doctype == "Delivery Stop" else "name")
 		if linked_name:
 			frappe.throw(
 				_("Cancel {0} {1} before cancelling Delivery Load {2}.").format(
-					doctype, linked_name, load.name
+					label, linked_name, load.name
 				)
 			)

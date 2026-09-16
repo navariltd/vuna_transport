@@ -115,6 +115,7 @@ def create_delivery_notes_for_load(load):
 		delivery_note.shipping_address = get_address_display(
 			frappe.get_doc("Address", delivery_address).as_dict()
 		)
+		_set_delivery_note_load_lineage(delivery_note, load_rows)
 		delivery_note.vuna_delivery_load = load.name
 		delivery_note.vuna_delivery_order = delivery_order_name
 		delivery_note.save()
@@ -129,6 +130,27 @@ def create_delivery_notes_for_load(load):
 		_("Delivery Notes created or confirmed for this load"),
 	)
 	return created
+
+
+def _set_delivery_note_load_lineage(delivery_note, load_rows):
+	"""Link every Delivery Note Item back to its exact load-allocation row."""
+	by_sales_order_item = {}
+	by_item_code = {}
+	for load_row in load_rows:
+		if not load_row.delivery_order_item:
+			continue
+		delivery_order_item = frappe.get_cached_doc("Delivery Order Item", load_row.delivery_order_item)
+		if delivery_order_item.sales_order_item:
+			by_sales_order_item[delivery_order_item.sales_order_item] = load_row.name
+		by_item_code.setdefault(delivery_order_item.item_code, []).append(load_row.name)
+
+	for delivery_note_item in delivery_note.items:
+		load_order = by_sales_order_item.get(delivery_note_item.so_detail)
+		if not load_order:
+			matches = by_item_code.get(delivery_note_item.item_code, [])
+			load_order = matches[0] if len(matches) == 1 else None
+		if load_order:
+			delivery_note_item.vuna_delivery_load_order = load_order
 
 
 def _validate_delivery_note_allocation(load):
@@ -210,9 +232,9 @@ def create_delivery_trip_for_load(load):
 	load = get_locked_delivery_load(load)
 	validate_load_is_operational(load, _("creating a Delivery Trip"))
 	existing_trip_name = load.delivery_trip or frappe.db.get_value(
-		"Delivery Trip",
+		"Delivery Stop",
 		{"vuna_delivery_load": load.name, "docstatus": ["!=", 2]},
-		"name",
+		"parent",
 	)
 	if existing_trip_name:
 		existing_trip = frappe.get_doc("Delivery Trip", existing_trip_name)
@@ -273,7 +295,6 @@ def create_delivery_trip_for_load(load):
 		delivery_trip.driver = allocation.driver
 	departures = [get_datetime(selected_load.planned_departure) for selected_load in loads if selected_load.planned_departure]
 	delivery_trip.departure_time = min(departures) if departures else now_datetime()
-	delivery_trip.vuna_delivery_load = load.name
 	delivery_trip.vuna_vehicle_allocation = allocation.name if allocation else None
 	delivery_trip.vuna_current_vehicle_allocation = allocation.name if allocation else None
 	delivery_trip.vuna_current_vehicle = allocation.vehicle if allocation else None
@@ -294,6 +315,7 @@ def _populate_delivery_stop_links(delivery_trip, loads):
 		load = next((row for row in loads if row.name == delivery_note.vuna_delivery_load), None)
 		load_rows = [row for row in (load.delivery_orders if load else []) if row.delivery_order == delivery_order]
 		stop.vuna_delivery_order = delivery_order
+		stop.vuna_delivery_load = delivery_note.vuna_delivery_load
 		if len(load_rows) == 1:
 			stop.vuna_delivery_load_order = load_rows[0].name
 

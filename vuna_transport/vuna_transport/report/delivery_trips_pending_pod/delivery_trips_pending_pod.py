@@ -13,14 +13,15 @@ def execute(filters=None):
 		conditions.append("dt.company = %(company)s")
 		values.company = filters.company
 	if filters.delivery_load:
-		conditions.append("dt.vuna_delivery_load = %(delivery_load)s")
+		conditions.append("ds.vuna_delivery_load = %(delivery_load)s")
 		values.delivery_load = filters.delivery_load
 	rows = frappe.db.sql(
 		f"""select dt.name, dt.company, dt.status, dt.vehicle, dt.driver,
-			dt.vuna_delivery_load, count(ds.name) as pending_stops
-			from `tabDelivery Trip` dt join `tabDelivery Stop` ds on ds.parent = dt.name
+			ds.vuna_delivery_load, count(ds.name) as pending_stops
+			from `tabDelivery Trip` dt
+			join `tabDelivery Stop` ds on ds.parent = dt.name
 			where {" and ".join(conditions)} group by dt.name, dt.company, dt.status,
-			dt.vehicle, dt.driver, dt.vuna_delivery_load order by dt.creation limit 500""",
+			dt.vehicle, dt.driver, ds.vuna_delivery_load order by dt.creation limit 500""",
 		values,
 		as_dict=True,
 	)

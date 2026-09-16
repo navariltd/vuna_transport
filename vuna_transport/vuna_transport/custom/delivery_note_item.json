@@ -1,0 +1,21 @@
+{
+ "custom_fields": [
+  {
+   "allow_on_submit": 1,
+   "dt": "Delivery Note Item",
+   "fieldname": "vuna_delivery_load_order",
+   "fieldtype": "Link",
+   "insert_after": "so_detail",
+   "label": "Delivery Load Order",
+   "module": "Vuna Transport",
+   "name": "Delivery Note Item-vuna_delivery_load_order",
+   "options": "Delivery Load Order",
+   "read_only": 1
+  }
+ ],
+ "custom_perms": [],
+ "doctype": "Delivery Note Item",
+ "links": [],
+ "property_setters": [],
+ "sync_on_migrate": 1
+}

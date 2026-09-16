@@ -51,7 +51,9 @@ def validate_incident(incident):
 
 def _load_context_from_references(incident, allocation=None, trip=None):
 	if trip:
-		incident.delivery_load = incident.delivery_load or getattr(trip, "vuna_delivery_load", None)
+		trip_loads = get_delivery_trip_load_names(trip)
+		if not incident.delivery_load and len(trip_loads) == 1:
+			incident.delivery_load = trip_loads[0]
 		incident.vehicle_allocation = incident.vehicle_allocation or (
 			getattr(trip, "vuna_current_vehicle_allocation", None)
 			or getattr(trip, "vuna_vehicle_allocation", None)

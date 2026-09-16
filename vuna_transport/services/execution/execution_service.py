@@ -176,7 +176,9 @@ def _get_vehicle_allocation(load):
 
 def _get_delivery_trip(load):
 	name = load.delivery_trip or frappe.db.get_value(
-		"Delivery Trip", {"vuna_delivery_load": load.name, "docstatus": ["!=", 2]}, "name"
+		"Delivery Stop",
+		{"vuna_delivery_load": load.name, "docstatus": ["!=", 2]},
+		"parent",
 	)
 	if not name:
 		return None

@@ -1,20 +1,30 @@
 frappe.ui.form.on("Delivery Trip", {
 	setup(frm) {
 		frm.set_query("vehicle", () => {
-			if (!frm.doc.vuna_delivery_load) return {};
+			const loads = (frm.doc.delivery_stops || [])
+				.map((row) => row.vuna_delivery_load)
+				.filter(Boolean);
+			if (!loads.length) return {};
 			return {
 				query: "vuna_transport.api.get_vehicles_for_load",
-				filters: { delivery_load: frm.doc.vuna_delivery_load },
+				filters: { delivery_load: loads[0] },
 			};
 		});
 	},
 
 	refresh(frm) {
-		if (frm.doc.vuna_delivery_load) {
+		const loads = (frm.doc.delivery_stops || [])
+			.map((row) => row.vuna_delivery_load)
+			.filter(Boolean);
+		if (loads.length) {
 			frm.add_custom_button(
-				__("Open Delivery Load"),
+				loads.length === 1 ? __("Open Delivery Load") : __("Open Delivery Loads"),
 				() => {
-					frappe.set_route("Form", "Delivery Load", frm.doc.vuna_delivery_load);
+					frappe.set_route(
+						loads.length === 1 ? "Form" : "List",
+						"Delivery Load",
+						loads.length === 1 ? loads[0] : { name: ["in", loads] }
+					);
 				},
 				__("Vuna Transport")
 			);
@@ -22,7 +32,7 @@ frappe.ui.form.on("Delivery Trip", {
 				__("Allocation History"),
 				() => {
 					frappe.set_route("List", "Vehicle Allocation", {
-						delivery_load: frm.doc.vuna_delivery_load,
+						delivery_load: ["in", loads],
 					});
 				},
 				__("Vuna Transport")
@@ -30,7 +40,7 @@ frappe.ui.form.on("Delivery Trip", {
 		}
 
 		if (
-			frm.doc.vuna_delivery_load &&
+			loads.length &&
 			frm.doc.docstatus < 2 &&
 			!["Completed", "Cancelled"].includes(frm.doc.status) &&
 			(frm.doc.vuna_current_vehicle_allocation || frm.doc.vuna_vehicle_allocation)
