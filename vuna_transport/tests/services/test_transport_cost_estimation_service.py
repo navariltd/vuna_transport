@@ -18,7 +18,7 @@ class TestTransportCostEstimationService(UnitTestCase):
 		self.vehicle = SimpleNamespace(
 			name="KDA 123A",
 			vuna_expected_fuel_efficiency=5,
-			vuna_fuel_efficiency_uom="Kilometer",
+			uom="Kilometer",
 		)
 		self.context = CostContext(
 			company="Yovuna Tech",

@@ -11,7 +11,6 @@
   "identity_section",
   "model_name",
   "manufacturer",
-  "vehicle_category",
   "column_break_identity",
   "model_year",
   "fuel_type",
@@ -58,14 +57,6 @@
    "label": "Manufacturer",
    "options": "Vehicle Manufacturer",
    "reqd": 1
-  },
-  {
-   "fieldname": "vehicle_category",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Vehicle Category",
-   "options": "Vehicle Category"
   },
   {
    "fieldname": "column_break_identity",

@@ -12,8 +12,8 @@
    "fieldname": "operational_role",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Operational Role",
-   "options": "Vehicle Operational Role",
+   "label": "Vehicle Classification",
+   "options": "Vehicle Classification",
    "reqd": 1
   }
  ],
@@ -21,7 +21,7 @@
  "modified": "2026-09-07 11:00:00.000000",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
- "name": "Vehicle Operational Role Item",
+ "name": "Vehicle Classification Item",
  "owner": "Administrator",
  "permissions": [],
  "sort_field": "modified",

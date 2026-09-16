@@ -4,5 +4,5 @@
 from frappe.model.document import Document
 
 
-class VehicleOperationalRoleItem(Document):
+class VehicleClassificationItem(Document):
 	pass

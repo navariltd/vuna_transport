@@ -258,7 +258,7 @@ def _fuel_quantity(context, component):
 	efficiency = flt(getattr(context.vehicle, "vuna_expected_fuel_efficiency", None))
 	if not efficiency or not context.distance:
 		return 0, component.rate_uom or "Litre"
-	efficiency_uom = getattr(context.vehicle, "vuna_fuel_efficiency_uom", None)
+	efficiency_uom = getattr(context.vehicle, "uom", None)
 	distance = _distance_in_rate_uom(context.distance, context.distance_uom, efficiency_uom)
 	return distance / efficiency, component.rate_uom or "Litre"
 

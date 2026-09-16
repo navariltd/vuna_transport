@@ -4,5 +4,5 @@
 from frappe.tests import IntegrationTestCase
 
 
-class IntegrationTestVehicleOperationalRole(IntegrationTestCase):
+class IntegrationTestVehicleClassification(IntegrationTestCase):
 	pass

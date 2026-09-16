@@ -33,21 +33,6 @@
    "owner": "Administrator"
   },
   {
-   "creation": "2026-09-09 10:06:00.000000",
-   "docstatus": 0,
-   "dt": "Vehicle",
-   "fieldname": "vuna_fuel_efficiency_uom",
-   "fieldtype": "Link",
-   "insert_after": "vuna_expected_fuel_efficiency",
-   "label": "Fuel Efficiency UOM",
-   "options": "UOM",
-   "modified": "2026-09-09 10:06:00.000000",
-   "modified_by": "Administrator",
-   "module": "Vuna Transport",
-   "name": "Vehicle-vuna_fuel_efficiency_uom",
-   "owner": "Administrator"
-  },
-  {
    "creation": "2026-09-07 11:00:00.000000",
    "description": "Business functions this vehicle may perform. Roles do not determine availability or user permissions.",
    "docstatus": 0,
@@ -61,7 +46,8 @@
    "modified_by": "Administrator",
    "module": "Vuna Transport",
    "name": "Vehicle-vuna_operational_roles",
-   "options": "Vehicle Operational Role Item",
+   "label": "Vehicle Classifications",
+   "options": "Vehicle Classification Item",
    "owner": "Administrator"
   },
   {

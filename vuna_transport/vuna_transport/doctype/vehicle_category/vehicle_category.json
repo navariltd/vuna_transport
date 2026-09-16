@@ -9,6 +9,7 @@
  "field_order": [
   "identity_section",
   "vehicle_category_name",
+  "vehicle_model",
   "body_type",
   "column_break_pxpq",
   "disabled",
@@ -49,6 +50,12 @@
    "label": "Category Name",
    "reqd": 1,
    "unique": 1
+  },
+  {
+   "fieldname": "vehicle_model",
+   "fieldtype": "Link",
+   "label": "Default Vehicle Model",
+   "options": "Vehicle Model"
   },
   {
    "fieldname": "body_type",

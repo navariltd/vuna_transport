@@ -17,6 +17,12 @@ def validate_vehicle(doc, method=None):
 	_validate_vehicle_operational_roles(doc)
 	_validate_vehicle_asset(doc)
 	if not getattr(doc, "vuna_vehicle_model", None):
+		category_name = getattr(doc, "vuna_vehicle_category", None)
+		if category_name:
+			category = frappe.get_cached_doc("Vehicle Category", category_name)
+			if getattr(category, "vehicle_model", None):
+				doc.vuna_vehicle_model = category.vehicle_model
+				return validate_vehicle(doc, method)
 		return
 
 	vehicle_model = frappe.get_cached_doc("Vehicle Model", doc.vuna_vehicle_model)
@@ -25,8 +31,6 @@ def validate_vehicle(doc, method=None):
 
 	doc.make = vehicle_model.manufacturer
 	doc.model = vehicle_model.model_name
-	if vehicle_model.vehicle_category:
-		doc.vuna_vehicle_category = vehicle_model.vehicle_category
 	if vehicle_model.fuel_type and vehicle_model.fuel_type in (
 		"Petrol",
 		"Diesel",
@@ -51,18 +55,18 @@ def _validate_vehicle_operational_roles(doc):
 	duplicates = sorted({role for role in role_names if role_names.count(role) > 1})
 	if duplicates:
 		frappe.throw(
-			_("Vehicle Operational Roles cannot contain duplicates: {0}.").format(", ".join(duplicates))
+			_("Vehicle Classifications cannot contain duplicates: {0}.").format(", ".join(duplicates))
 		)
 	if not role_names:
 		return
 	disabled_roles = frappe.get_all(
-		"Vehicle Operational Role",
+		"Vehicle Classification",
 		filters={"name": ["in", role_names], "disabled": 1},
 		pluck="name",
 	)
 	if disabled_roles:
 		frappe.throw(
-			_("Disabled Vehicle Operational Roles cannot be assigned: {0}.").format(", ".join(disabled_roles))
+			_("Disabled Vehicle Classifications cannot be assigned: {0}.").format(", ".join(disabled_roles))
 		)
 
 
@@ -71,7 +75,7 @@ def get_vehicles_by_operational_role(role, *, company=None, include_disabled=Fal
 	if not role:
 		return []
 	role_rows = frappe.get_all(
-		"Vehicle Operational Role Item",
+		"Vehicle Classification Item",
 		filters={"operational_role": role},
 		pluck="parent",
 	)

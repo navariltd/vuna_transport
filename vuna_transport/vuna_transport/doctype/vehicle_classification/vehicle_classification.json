@@ -51,7 +51,7 @@
  "modified": "2026-09-15 10:40:57.830727",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
- "name": "Vehicle Operational Role",
+ "name": "Vehicle Classification",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
