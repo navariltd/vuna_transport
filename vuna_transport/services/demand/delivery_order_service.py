@@ -118,7 +118,7 @@ def generate_delivery_orders_for_sales_order(sales_order):
 
 def sync_delivery_order_quantities(delivery_order, persist=False):
 	"""Refresh generated quantities from Sales Order Items without breaking allocations."""
-	if not delivery_order.sales_order:
+	if not getattr(delivery_order, "sales_order", None):
 		return False
 
 	sales_order = _get_sales_order(delivery_order.sales_order)
@@ -170,11 +170,30 @@ def sync_delivery_order_quantities(delivery_order, persist=False):
 	return changed
 
 
+def sync_delivery_orders_after_direct_delivery_note(doc, method=None):
+	"""Refresh Vuna demand after a Delivery Note created directly from a Sales Order."""
+	if getattr(doc, "vuna_delivery_load", None):
+		return
+	sales_orders = {row.against_sales_order for row in doc.items if getattr(row, "against_sales_order", None)}
+	for sales_order in sales_orders:
+		delivery_orders = frappe.get_all("Delivery Order", filters={"sales_order": sales_order}, pluck="name")
+		for delivery_order_name in delivery_orders:
+			sync_delivery_order_quantities(frappe.get_doc("Delivery Order", delivery_order_name), persist=True)
+
+
 def get_sales_order_item_quantities(sales_order_item):
 	"""Return authoritative ordered and outstanding transport quantities."""
 	ordered_qty = flt(getattr(sales_order_item, "qty", 0))
 	delivered_qty = flt(getattr(sales_order_item, "delivered_qty", 0))
 	return ordered_qty, max(ordered_qty - delivered_qty, 0)
+
+
+def get_open_sales_order_names(company=None):
+	"""Return submitted Sales Orders that are still operationally open for transport."""
+	filters = {"docstatus": 1, "status": ["not in", ["Closed", "Cancelled"]]}
+	if company:
+		filters["company"] = company
+	return frappe.get_all("Sales Order", filters=filters, pluck="name")
 
 
 def _get_delivery_order_item_commitments(delivery_order_item):
@@ -207,6 +226,12 @@ def _validate_sales_order(sales_order):
 
 	if sales_order.docstatus != 1:
 		frappe.throw(_("The Sales Order must be submitted before Delivery Orders are generated."))
+	if getattr(sales_order, "status", None) in ("Closed", "Cancelled"):
+		frappe.throw(
+			_("Sales Order {0} is {1} and cannot generate new Delivery Orders.").format(
+				sales_order.name, sales_order.status
+			)
+		)
 
 	settings = frappe.get_single("Transport Settings")
 	if not settings.enabled:

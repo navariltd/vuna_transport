@@ -232,6 +232,9 @@ def _get_plannable_orders(
 		"docstatus": 1,
 		"status": ["in", PLANNABLE_DELIVERY_ORDER_STATUSES],
 	}
+	from vuna_transport.services.demand.delivery_order_service import get_open_sales_order_names
+
+	filters["sales_order"] = ["in", get_open_sales_order_names(company)]
 	if source_warehouse:
 		filters["source_warehouse"] = source_warehouse
 	if transport_zone:

@@ -7,10 +7,14 @@ from unittest.mock import patch
 from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
 
-from vuna_transport.services.execution.dispatch_guard_service import is_load_status_transition_allowed
+from vuna_transport.services.execution.dispatch_guard_service import (
+	is_load_status_transition_allowed,
+	validate_load_can_be_cancelled,
+)
 from vuna_transport.services.execution.execution_service import _get_next_action
 from vuna_transport.services.execution.lineage_service import (
 	validate_delivery_note_item_allocations,
+	validate_delivery_note_quantities_for_loads,
 	validate_delivery_trip_note_set,
 )
 from vuna_transport.services.fleet.vehicle_category_service import (
@@ -25,6 +29,7 @@ from vuna_transport.services.planning.delivery_load_service import (
 	calculate_load_totals,
 )
 from vuna_transport.services.planning.load_validation_service import calculate_allocated_measurements
+from vuna_transport.services.planning.load_validation_service import get_available_quantities
 from vuna_transport.services.routing.geography_service import (
 	calculate_delivery_window_compatibility,
 	calculate_geographic_cohesion,
@@ -65,6 +70,48 @@ class TestDeliveryLoad(UnitTestCase):
 		self.assertEqual(load.total_volume, 15)
 		self.assertEqual(load.total_pallets, 3)
 		self.assertEqual(load.total_stops, 2)
+
+	@patch("vuna_transport.services.planning.load_validation_service.frappe.db.sql", return_value=[])
+	@patch("vuna_transport.services.planning.load_validation_service.frappe.get_all")
+	def test_live_sales_order_delivery_reduces_available_quantity(self, get_all, _sql):
+		get_all.side_effect = [
+			[
+				SimpleNamespace(
+					name="DOI-1",
+					transport_qty=10,
+					sales_order_item="SOI-1",
+				)
+			],
+			[SimpleNamespace(name="SOI-1", qty=10, delivered_qty=4)],
+		]
+
+		self.assertEqual(get_available_quantities(["DOI-1"]), {"DOI-1": 6})
+
+	@patch("vuna_transport.services.integrations.erpnext_integration.frappe.db.get_value")
+	def test_closed_sales_order_is_rejected_before_delivery_notes(self, get_value):
+		from vuna_transport.services.integrations.erpnext_integration import (
+			_validate_delivery_orders_for_execution,
+		)
+
+		get_value.side_effect = [
+			SimpleNamespace(
+				docstatus=1,
+				status="Open",
+				company="Company A",
+				source_warehouse="WH-A",
+				sales_order="SO-1",
+			),
+			SimpleNamespace(docstatus=1, status="Closed"),
+		]
+
+		with self.assertRaises(ValidationError):
+			_validate_delivery_orders_for_execution(
+				SimpleNamespace(
+					name="LOAD-1",
+					company="Company A",
+					delivery_orders=[SimpleNamespace(delivery_order="DO-1")],
+				)
+			)
 
 	@patch(
 		"vuna_transport.services.execution.execution_service._requires_vehicle_allocation", return_value=True
@@ -243,6 +290,73 @@ class TestDeliveryLoad(UnitTestCase):
 			delivery_order="DO-1",
 			current_name="DN-2",
 		)
+
+	@patch("vuna_transport.services.execution.lineage_service.frappe.get_all")
+	def test_duplicate_load_item_rows_are_rejected(self, get_all):
+		get_all.return_value = [
+			SimpleNamespace(delivery_order_item="DOI-1", allocated_quantity=30),
+			SimpleNamespace(delivery_order_item="DOI-1", allocated_quantity=20),
+		]
+		load = SimpleNamespace(name="LOAD-1", company="Company A")
+		doc = SimpleNamespace(
+			vuna_delivery_order="DO-1",
+			company="Company A",
+			items=[],
+		)
+		from vuna_transport.services.execution.lineage_service import _validate_delivery_note_against_load
+
+		with self.assertRaises(ValidationError):
+			with patch(
+				"vuna_transport.services.execution.lineage_service.frappe.db.get_value",
+				return_value="Company A",
+			):
+				_validate_delivery_note_against_load(doc, load)
+
+	@patch("vuna_transport.services.execution.lineage_service.frappe.db.sql")
+	@patch("vuna_transport.services.execution.lineage_service.frappe.get_all")
+	def test_delivery_trip_requires_submitted_quantity_for_every_allocated_item(self, get_all, sql):
+		load = SimpleNamespace(name="LOAD-1")
+		get_all.side_effect = [
+			[SimpleNamespace(parent="LOAD-1", delivery_order_item="DOI-1", allocated_quantity=50)],
+			[SimpleNamespace(name="DOI-1", sales_order_item="SOI-1")],
+		]
+		sql.return_value = [{"load_name": "LOAD-1", "so_detail": "SOI-1", "quantity": 40}]
+
+		with self.assertRaises(ValidationError):
+			validate_delivery_note_quantities_for_loads([load])
+
+	@patch("vuna_transport.services.execution.lineage_service.frappe.db.sql")
+	@patch("vuna_transport.services.execution.lineage_service.frappe.get_all")
+	def test_delivery_trip_accepts_multiple_notes_when_allocated_quantity_is_covered(self, get_all, sql):
+		load = SimpleNamespace(name="LOAD-1")
+		get_all.side_effect = [
+			[SimpleNamespace(parent="LOAD-1", delivery_order_item="DOI-1", allocated_quantity=50)],
+			[SimpleNamespace(name="DOI-1", sales_order_item="SOI-1")],
+		]
+		sql.return_value = [{"load_name": "LOAD-1", "so_detail": "SOI-1", "quantity": 50}]
+
+		validate_delivery_note_quantities_for_loads([load])
+
+	@patch("vuna_transport.services.execution.dispatch_guard_service.frappe.db.get_value")
+	@patch("vuna_transport.services.execution.dispatch_guard_service.frappe.db.sql")
+	def test_load_cannot_cancel_with_draft_delivery_trip(self, sql, get_value):
+		sql.return_value = [{"parent": "DT-1"}]
+		load = SimpleNamespace(name="LOAD-1")
+
+		with self.assertRaises(ValidationError):
+			validate_load_can_be_cancelled(load)
+
+		get_value.assert_not_called()
+
+	@patch("vuna_transport.services.execution.dispatch_guard_service.frappe.db.get_value")
+	@patch("vuna_transport.services.execution.dispatch_guard_service.frappe.db.sql")
+	def test_load_cannot_cancel_with_draft_delivery_note(self, sql, get_value):
+		sql.return_value = []
+		get_value.return_value = "DN-1"
+		load = SimpleNamespace(name="LOAD-1")
+
+		with self.assertRaises(ValidationError):
+			validate_load_can_be_cancelled(load)
 
 	def test_delivery_trip_stops_must_match_submitted_delivery_notes(self):
 		validate_delivery_trip_note_set({"DN-1", "DN-2"}, ["DN-1", "DN-2"])

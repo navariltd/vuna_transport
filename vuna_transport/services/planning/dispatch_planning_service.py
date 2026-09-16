@@ -382,6 +382,9 @@ def _planning_filters(
 		"docstatus": 1,
 		"status": ["in", PLANNABLE_STATUSES],
 	}
+	from vuna_transport.services.demand.delivery_order_service import get_open_sales_order_names
+
+	filters["sales_order"] = ["in", get_open_sales_order_names(company)]
 	date_filter = _delivery_date_filter(required_delivery_date_from, required_delivery_date_to)
 	if date_filter:
 		filters["required_delivery_date"] = date_filter

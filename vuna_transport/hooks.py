@@ -151,7 +151,10 @@ doc_events = {
 	},
 	"Delivery Note": {
 		"validate": "vuna_transport.services.execution.lineage_service.populate_delivery_note_delivery_links",
-		"on_submit": "vuna_transport.services.execution.lineage_service.complete_load_without_trip",
+		"on_submit": [
+			"vuna_transport.services.demand.delivery_order_service.sync_delivery_orders_after_direct_delivery_note",
+			"vuna_transport.services.execution.lineage_service.complete_load_without_trip",
+		],
 		"on_cancel": "vuna_transport.services.execution.lineage_service.reconcile_load_after_delivery_note_cancel",
 	},
 	"Delivery Trip": {

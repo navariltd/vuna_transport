@@ -27,10 +27,19 @@ def validate_load_allocations(load, lock=True):
 	delivery_orders = {}
 	delivery_order_items = {}
 	current_allocations = defaultdict(float)
+	seen_item_rows = set()
 	first_order = None
 
 	for row in load.delivery_orders:
 		_validate_required_row_links(row)
+		item_key = (row.delivery_order, row.delivery_order_item)
+		if item_key in seen_item_rows:
+			frappe.throw(
+				_("Delivery Order Item {0} appears more than once in this Delivery Load.").format(
+					row.delivery_order_item
+				)
+			)
+		seen_item_rows.add(item_key)
 		delivery_order = delivery_orders.get(row.delivery_order)
 		if not delivery_order:
 			delivery_order = frappe.get_doc("Delivery Order", row.delivery_order)
@@ -89,12 +98,31 @@ def _validate_required_row_links(row):
 
 
 def _validate_delivery_order_for_load(load, delivery_order, first_order):
+	from vuna_transport.services.demand.delivery_order_service import sync_delivery_order_quantities
+
+	# Re-read Sales Order quantities before accepting a stale Delivery Order into a load.
+	# This catches goods delivered directly from the Sales Order outside Vuna planning.
+	sync_delivery_order_quantities(delivery_order, persist=False)
 	if delivery_order.docstatus != 1:
 		frappe.throw(
 			_("Delivery Order {0} must be submitted before it can be loaded.").format(delivery_order.name)
 		)
 	if delivery_order.status not in PLANNABLE_DELIVERY_ORDER_STATUSES:
 		frappe.throw(_("Delivery Order {0} is not available for load planning.").format(delivery_order.name))
+	sales_order_state = frappe.db.get_value(
+		"Sales Order",
+		delivery_order.sales_order,
+		["docstatus", "status"],
+		as_dict=True,
+	)
+	if sales_order_state and (
+		sales_order_state.docstatus == 2 or sales_order_state.status in ("Closed", "Cancelled")
+	):
+		frappe.throw(
+			_("Delivery Order {0} cannot be loaded because Sales Order {1} is {2}.").format(
+				delivery_order.name, delivery_order.sales_order, sales_order_state.status or "Cancelled"
+			)
+		)
 
 	defaults = {
 		"company": first_order.company,
@@ -243,18 +271,32 @@ def get_available_quantity(delivery_order_name, delivery_order_item_name=None, e
 
 
 def get_available_quantities(delivery_order_item_names, exclude_load=None):
-	"""Return live item balances with one requested and one allocation query."""
+	"""Return live item balances using Sales Order delivery quantities and load commitments."""
 	item_names = sorted(set(delivery_order_item_names or []))
 	if not item_names:
 		return {}
-	requested = dict(
-		frappe.get_all(
-			"Delivery Order Item",
-			filters={"name": ["in", item_names]},
-			fields=["name", "transport_qty"],
-			as_list=True,
-		)
+	item_rows = frappe.get_all(
+		"Delivery Order Item",
+		filters={"name": ["in", item_names]},
+		fields=["name", "transport_qty", "sales_order_item"],
 	)
+	requested = {
+		row.name: flt(row.transport_qty)
+		for row in item_rows
+	}
+	sales_order_item_names = [row.sales_order_item for row in item_rows if row.sales_order_item]
+	if sales_order_item_names:
+		sales_order_quantities = {
+			row.name: max(flt(row.qty) - flt(row.delivered_qty), 0)
+			for row in frappe.get_all(
+				"Sales Order Item",
+				filters={"name": ["in", sales_order_item_names]},
+				fields=["name", "qty", "delivered_qty"],
+			)
+		}
+		for row in item_rows:
+			if row.sales_order_item in sales_order_quantities:
+				requested[row.name] = sales_order_quantities[row.sales_order_item]
 	conditions = [
 		"dlo.delivery_order_item in %(item_names)s",
 		"dlo.parenttype = 'Delivery Load'",

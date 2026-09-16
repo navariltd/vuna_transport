@@ -43,6 +43,12 @@ def get_available_delivery_orders(
 	filters = frappe.parse_json(filters) if isinstance(filters, str) else dict(filters or {})
 	filters.setdefault("docstatus", 1)
 	filters.setdefault("status", ["in", ["Open", "Partially Allocated"]])
+	from vuna_transport.services.demand.delivery_order_service import get_open_sales_order_names
+
+	open_sales_orders = get_open_sales_order_names(filters.get("company"))
+	if not open_sales_orders:
+		return []
+	filters["sales_order"] = ["in", open_sales_orders]
 
 	delivery_orders = frappe.get_list(
 		"Delivery Order",
