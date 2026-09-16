@@ -112,8 +112,9 @@ def get_delivery_loads_for_allocation(doctype, txt, searchfield, start, page_len
 		selected = frappe.parse_json(selected) or []
 	company = filters.get("company")
 	vehicle_category = filters.get("required_vehicle_category")
-	if filters.get("vehicle"):
-		vehicle_category = frappe.db.get_value("Vehicle", filters.vehicle, "vuna_vehicle_category") or vehicle_category
+	vehicle_name = filters.get("vehicle")
+	if vehicle_name:
+		vehicle_category = frappe.db.get_value("Vehicle", vehicle_name, "vuna_vehicle_category") or vehicle_category
 	load_filters = {"docstatus": 1, "status": ["not in", ["Completed", "Completed with Exceptions", "Cancelled"]]}
 	if company:
 		load_filters["company"] = company
