@@ -18,8 +18,12 @@ def get_vehicle_categories(load_uoms, capacity_buffer_percentage=0):
 			"vehicle_category_name",
 			"max_payload_weight",
 			"max_payload_weight_uom",
+			"minimum_payload_weight",
+			"minimum_payload_weight_uom",
 			"max_volume",
 			"max_volume_uom",
+			"minimum_volume",
+			"minimum_volume_uom",
 			"max_pallets",
 			"max_cases",
 			"max_crates",
@@ -58,6 +62,50 @@ def get_effective_capacities(category, load_uoms, buffer_percentage=0):
 		"cases": flt(category.max_cases) * buffer_factor if category.max_cases else 0,
 		"crates": flt(category.max_crates) * buffer_factor if category.max_crates else 0,
 	}
+
+
+def get_minimum_capacities(category, load_uoms):
+	"""Return configured minimum loading thresholds in the load's UOMs."""
+	weight_uom = load_uoms.get("weight_uom") or category.max_payload_weight_uom
+	volume_uom = load_uoms.get("volume_uom") or category.max_volume_uom
+	return {
+		"weight": convert_measurement(
+			getattr(category, "minimum_payload_weight", 0),
+			getattr(category, "minimum_payload_weight_uom", None) or category.max_payload_weight_uom,
+			weight_uom,
+			_("minimum vehicle payload weight"),
+		),
+		"volume": convert_measurement(
+			getattr(category, "minimum_volume", 0),
+			getattr(category, "minimum_volume_uom", None) or category.max_volume_uom,
+			volume_uom,
+			_("minimum vehicle volume"),
+		),
+	}
+
+
+def validate_minimum_load_requirements(load, category):
+	"""Validate minimum loading thresholds without applying them during bundling."""
+	minimums = get_minimum_capacities(
+		category,
+		{"weight_uom": getattr(load, "weight_uom", None), "volume_uom": getattr(load, "volume_uom", None)},
+	)
+	if minimums["weight"] and flt(load.total_weight) < minimums["weight"]:
+		frappe.throw(
+			_("Vehicle Category {0} requires at least {1:.2f} {2} payload weight.").format(
+				category.name,
+				minimums["weight"],
+				getattr(load, "weight_uom", None) or category.max_payload_weight_uom,
+			)
+		)
+	if minimums["volume"] and flt(load.total_volume) < minimums["volume"]:
+		frappe.throw(
+			_("Vehicle Category {0} requires at least {1:.2f} {2} volume.").format(
+				category.name,
+				minimums["volume"],
+				getattr(load, "volume_uom", None) or category.max_volume_uom,
+			)
+		)
 
 
 def evaluate_vehicle_category(totals, category, requirements=None):

@@ -525,9 +525,12 @@ def _validate_vehicle_category_for_loads(loads, vehicle_category):
 				)
 			)
 	from vuna_transport.services.planning.delivery_load_service import validate_capacity
+	from vuna_transport.services.fleet.vehicle_category_service import validate_minimum_load_requirements
 
 	combined = _build_combined_capacity_load(loads)
-	validate_capacity(combined, vehicle_category)
+	category = frappe.get_doc("Vehicle Category", vehicle_category)
+	validate_capacity(combined, category)
+	validate_minimum_load_requirements(combined, category)
 
 
 def _validate_vehicle_category_for_load(load, vehicle_category):

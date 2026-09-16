@@ -6,6 +6,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
 
+from vuna_transport.services.shared.measurement_service import convert_measurement
+
 
 class VehicleCategory(Document):
 	def validate(self):
@@ -23,3 +25,25 @@ class VehicleCategory(Document):
 			self.max_payload_weight_uom = settings.default_weight_uom
 		if not self.max_volume_uom:
 			self.max_volume_uom = settings.default_volume_uom
+		if flt(getattr(self, "minimum_payload_weight", 0)):
+			self.minimum_payload_weight_uom = (
+				self.minimum_payload_weight_uom or self.max_payload_weight_uom or settings.default_weight_uom
+			)
+			minimum_weight = convert_measurement(
+				self.minimum_payload_weight,
+				self.minimum_payload_weight_uom,
+				self.max_payload_weight_uom,
+				_("minimum payload weight"),
+			)
+			if minimum_weight > flt(self.max_payload_weight):
+				frappe.throw(_("Minimum Payload Weight cannot exceed Maximum Payload Weight."))
+		if flt(getattr(self, "minimum_volume", 0)):
+			self.minimum_volume_uom = self.minimum_volume_uom or self.max_volume_uom or settings.default_volume_uom
+			minimum_volume = convert_measurement(
+				self.minimum_volume,
+				self.minimum_volume_uom,
+				self.max_volume_uom,
+				_("minimum volume"),
+			)
+			if minimum_volume > flt(self.max_volume):
+				frappe.throw(_("Minimum Volume cannot exceed Maximum Volume."))

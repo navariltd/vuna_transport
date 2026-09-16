@@ -21,10 +21,14 @@
   "section_break_pbqv",
   "max_payload_weight",
   "max_payload_weight_uom",
+  "minimum_payload_weight",
+  "minimum_payload_weight_uom",
   "capacity_override_percentage",
   "column_break_kuyt",
   "max_volume",
   "max_volume_uom",
+  "minimum_volume",
+  "minimum_volume_uom",
   "section_break_dnkj",
   "max_pallets",
   "column_break_pjok",
@@ -125,6 +129,18 @@
    "reqd": 1
   },
   {
+   "fieldname": "minimum_payload_weight",
+   "fieldtype": "Float",
+   "label": "Minimum Payload Weight",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "minimum_payload_weight_uom",
+   "fieldtype": "Link",
+   "label": "Minimum Payload Weight UOM",
+   "options": "UOM"
+  },
+  {
    "fieldname": "max_pallets",
    "fieldtype": "Float",
    "label": "Maximum Pallets",
@@ -190,6 +206,18 @@
    "reqd": 1
   },
   {
+   "fieldname": "minimum_volume",
+   "fieldtype": "Float",
+   "label": "Minimum Volume",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "minimum_volume_uom",
+   "fieldtype": "Link",
+   "label": "Minimum Volume UOM",
+   "options": "UOM"
+  },
+  {
    "collapsible": 1,
    "fieldname": "section_break_dnkj",
    "fieldtype": "Section Break",
@@ -207,7 +235,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-07 06:29:59.210778",
+ "modified": "2026-09-16 20:00:31.873824",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Category",
