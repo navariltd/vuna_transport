@@ -35,7 +35,7 @@ class TestVehicleIncident(UnitTestCase):
 		self.trip = SimpleNamespace(
 			name="DT-1",
 			company="Vuna Foods",
-			vuna_delivery_load="DL-1",
+			delivery_stops=[SimpleNamespace(vuna_delivery_load="DL-1")],
 			vuna_vehicle_allocation="VA-1",
 			vuna_current_vehicle_allocation="VA-1",
 			vuna_current_vehicle="KDA 123A",
@@ -61,7 +61,7 @@ class TestVehicleIncident(UnitTestCase):
 		)
 
 	def test_cross_load_trip_is_rejected(self):
-		self.trip.vuna_delivery_load = "DL-OTHER"
+		self.trip.delivery_stops = [SimpleNamespace(vuna_delivery_load="DL-OTHER")]
 		with self.assertRaises(ValidationError):
 			_validate_incident_context(
 				self.incident,

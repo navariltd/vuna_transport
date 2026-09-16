@@ -856,20 +856,43 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			weight: __("Weight"),
 			volume: __("Volume"),
 		};
-		const rows = Object.entries(capacity)
+		const capacity_rows = Object.entries(capacity)
 			.filter(([dimension]) => ["weight", "volume"].includes(dimension))
 			.filter(([, values]) => values.capacity)
+		const has_full_dimension = capacity_rows.some(([, values]) => values.remaining <= 0);
+		const has_healthy_dimension = capacity_rows.some(([, values]) => values.utilization >= 70);
+		const overall_status = has_full_dimension
+			? "full"
+			: has_healthy_dimension
+				? "healthy"
+				: "available";
+		const overall_label = {
+			available: __("Capacity Available"),
+			healthy: __("Capacity Available"),
+			full: __("Capacity Full"),
+			unknown: __("Capacity Not Configured"),
+		}[overall_status];
+		const rows = capacity_rows
 			.map(
-				([dimension, values]) =>
-					`<div><span>${labels[dimension]}</span><strong>${this.number(
+				([dimension, values]) => {
+					const row_status = values.remaining <= 0
+						? "full"
+						: values.utilization >= 70
+							? "healthy"
+							: "available";
+					const progress = Math.min(100, Math.max(0, Number(values.utilization) || 0));
+					return `<div class="dp-capacity-row"><span>${labels[dimension]}</span><strong>${this.number(
 						values.used
-					)} / ${this.number(values.capacity)}</strong><small>${this.number(
+					)} / ${this.number(values.capacity)}</strong><small class="dp-capacity-value ${
+						row_status
+					}">${this.number(
 						values.remaining
-					)} ${__("remaining")} · ${this.number(values.utilization)}%</small></div>`
+					)} ${__("available")} · ${this.number(values.utilization)}%</small><div class="dp-capacity-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"><span class="${row_status}" style="width: ${progress}%"></span></div></div>`;
+				}
 			)
 			.join("");
 		return rows
-			? `<div class="dp-capacity-breakdown"><div class="text-muted small">${__(
+			? `<div class="dp-capacity-breakdown"><div class="dp-capacity-status dp-capacity-${overall_status}"><strong>${overall_label}</strong></div><div class="text-muted small">${__(
 					"Selected Category Capacity"
 			  )}</div>${rows}</div>`
 			: "";

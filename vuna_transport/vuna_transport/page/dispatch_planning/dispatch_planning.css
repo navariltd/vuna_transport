@@ -74,6 +74,18 @@
 .dp-category-picker label { color: var(--text-muted); display: block; margin-bottom: 4px; }
 .dp-capacity-breakdown,
 .vuna-capacity-summary { margin: 12px 0; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--border-radius); background: var(--control-bg); }
+.dp-capacity-status { align-items: center; display: flex; gap: 7px; margin-bottom: 5px; }
+.dp-capacity-status.dp-capacity-available,
+.dp-capacity-value.available { color: var(--blue-600, #0d6efd); }
+.dp-capacity-status.dp-capacity-healthy,
+.dp-capacity-value.healthy { color: var(--green-600, #218838); }
+.dp-capacity-status.dp-capacity-full,
+.dp-capacity-value.full { color: var(--red-600, #c82333); }
+.dp-capacity-progress { background: var(--subtle-fg); border-radius: 999px; grid-column: 1 / -1; height: 6px; margin-top: 4px; overflow: hidden; }
+.dp-capacity-progress span { border-radius: inherit; display: block; height: 100%; transition: width 180ms ease; }
+.dp-capacity-progress span.available { background: var(--blue-500, #0d6efd); }
+.dp-capacity-progress span.healthy { background: var(--green-500, #28a745); }
+.dp-capacity-progress span.full { background: var(--red-500, #dc3545); }
 .dp-capacity-breakdown > div:first-child,
 .vuna-capacity-summary > div:first-child { margin-bottom: 8px; }
 .dp-capacity-breakdown > div:not(:first-child),

@@ -196,7 +196,7 @@ class TestVehicleAvailabilityService(UnitTestCase):
 	def test_active_trip_has_in_trip_state(self):
 		trip = SimpleNamespace(
 			name="DT-1",
-			vuna_delivery_load="DL-1",
+			delivery_loads=["DL-1"],
 			departure_time="2026-08-24 08:00:00",
 			status="In Transit",
 		)
@@ -217,7 +217,7 @@ class TestVehicleAvailabilityService(UnitTestCase):
 		self.asset.status = "Out of Order"
 		trip = SimpleNamespace(
 			name="DT-1",
-			vuna_delivery_load="DL-1",
+			delivery_loads=["DL-1"],
 			departure_time="2026-08-24 08:00:00",
 			status="In Transit",
 		)
@@ -329,7 +329,7 @@ class TestDriverAvailabilityService(UnitTestCase):
 	def test_active_trip_blocks_driver(self):
 		trip = SimpleNamespace(
 			name="DT-1",
-			vuna_delivery_load="DL-1",
+			delivery_loads=["DL-1"],
 			departure_time="2026-08-24 08:00:00",
 			status="In Transit",
 		)

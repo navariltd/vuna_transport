@@ -58,7 +58,6 @@
   "execution_overview",
   "section_break_ksai",
   "delivery_orders",
-	  "load_contents_summary",
   "more_info_section",
   "status",
   "section_break_lydc",
@@ -353,11 +352,6 @@
    "fieldtype": "Table",
    "label": "Load Items",
    "options": "Delivery Load Order"
-  },
-  {
-   "fieldname": "load_contents_summary",
-   "fieldtype": "HTML",
-   "label": "Delivery Orders & Stops"
   },
   {
    "fieldname": "minimum_payload",

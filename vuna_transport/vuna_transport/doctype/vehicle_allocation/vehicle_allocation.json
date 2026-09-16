@@ -9,21 +9,11 @@
   "allocation_tab",
   "load_section",
   "naming_series",
-  "delivery_loads",
-  "allocation_capacity_summary",
   "company",
   "column_break_allocation",
   "allocation_type",
   "required_vehicle_category",
   "status",
-  "replacement_section",
-  "assignment_event",
-  "replacement_of",
-  "replacement_stage",
-  "vehicle_incident",
-  "column_break_replacement",
-  "replacement_reason",
-  "replacement_details",
   "owned_fleet_section",
   "vehicle",
   "column_break_zvtf",
@@ -33,6 +23,18 @@
   "column_break_subcontractor",
   "subcontractor_driver_name",
   "subcontractor_driver_phone",
+  "delivery_load_section",
+  "delivery_loads",
+  "section_break_garp",
+  "allocation_capacity_summary",
+  "replacement_section",
+  "assignment_event",
+  "replacement_of",
+  "replacement_stage",
+  "vehicle_incident",
+  "column_break_replacement",
+  "replacement_reason",
+  "replacement_details",
   "planning_section",
   "allocated_by",
   "allocated_on",
@@ -44,16 +46,21 @@
   "cost_estimate_section",
   "cost_structure_assignment",
   "cost_structure",
+  "estimated_cost_currency",
+  "estimated_on",
+  "column_break_spyh",
   "estimated_distance",
   "estimated_distance_uom",
   "distance_source",
-  "estimated_marginal_cost",
+  "column_break_auno",
   "estimated_fixed_cost",
   "estimated_full_cost",
-  "estimated_cost_currency",
-  "estimated_on",
+  "estimated_marginal_cost",
+  "section_break_ebvx",
   "cost_breakdown",
+  "column_break_kdyq",
   "cost_warnings",
+  "section_break_noxp",
   "remarks",
   "section_break_amendment",
   "amended_from"
@@ -392,6 +399,35 @@
   {
    "fieldname": "column_break_zvtf",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "delivery_load_section",
+   "fieldtype": "Section Break",
+   "label": "Delivery Load"
+  },
+  {
+   "fieldname": "column_break_spyh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_auno",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_ebvx",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_kdyq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_noxp",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_garp",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
@@ -407,7 +443,7 @@
    "link_fieldname": "vuna_current_vehicle_allocation"
   }
  ],
- "modified": "2026-09-15 21:27:15.257718",
+ "modified": "2026-09-16 07:52:50.539715",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Allocation",

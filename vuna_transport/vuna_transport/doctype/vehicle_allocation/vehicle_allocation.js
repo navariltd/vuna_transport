@@ -34,6 +34,35 @@ frappe.ui.form.on("Vehicle Allocation", {
 
 	refresh(frm) {
 		const loads = (frm.doc.delivery_loads || []).map((row) => row.delivery_load).filter(Boolean);
+		if (frm.doc.docstatus === 1 && loads.length) {
+			frappe.db.get_single_value("Transport Settings", "vehicle_allocation_timing").then((timing) => {
+				frm.remove_custom_button(__("Create Delivery Notes"), __("Execution"));
+				frm.remove_custom_button(__("Create Delivery Trip"), __("Execution"));
+				const label = timing === "Before Delivery Notes" ? __("Create Delivery Notes") : __("Create Delivery Trip");
+				const method = timing === "Before Delivery Notes" ? "create_delivery_notes" : "create_delivery_trip";
+				frm.add_custom_button(
+					label,
+					() => {
+						if (method === "create_delivery_trip") {
+							return frappe.model.open_mapped_doc({
+								method: "vuna_transport.services.fleet.vehicle_allocation_service.make_delivery_trip_from_allocation",
+								frm,
+								freeze_message: __("Preparing Delivery Trip..."),
+							});
+						}
+						return frm.call(method).then(({ message }) => {
+							if (!message) return;
+							if (message.length === 1) {
+								frappe.set_route("Form", "Delivery Note", message[0]);
+							} else {
+								frappe.set_route("List", "Delivery Note", { name: ["in", message] });
+							}
+						});
+					},
+					__("Execution")
+				);
+			});
+		}
 		if (loads.length) {
 			frappe.call({
 				method: "vuna_transport.services.fleet.vehicle_allocation_service.get_allocation_load_context",
@@ -107,22 +136,27 @@ function render_capacity_summary(frm, context) {
 	}
 	const totals = context.totals;
 	const capacity = context.capacity?.capacity || {};
-	const dimension = (label, value, uom, detail) => {
-		const utilization = detail?.utilization;
-		const indicator = utilization > 100 ? "red" : utilization >= 85 ? "orange" : "green";
-		const available = detail?.remaining == null ? "—" : frappe.format(detail.remaining, { fieldtype: "Float" });
-		return `<div class="col-sm-4"><div class="text-muted small">${label}</div><div><b>${frappe.format(value || 0, { fieldtype: "Float" })} ${uom || ""}</b></div><div class="small text-${indicator}">${
-			utilization == null ? __("Capacity not configured") : `${utilization}% · ${available} ${__("remaining")}`
-		}</div></div>`;
+	const number = (value) => frappe.format(value || 0, { fieldtype: "Float" });
+	const status_class = (utilization) => {
+		if (utilization >= 100) return "red";
+		if (utilization >= 70) return "green";
+		return "blue";
 	};
+	const rows = [
+		[__("Weight"), totals.weight, totals.weight_uom, capacity.weight],
+		[__("Volume"), totals.volume, totals.volume_uom, capacity.volume],
+	]
+		.filter(([, , , detail]) => detail?.capacity)
+		.map(([label, used, _uom, detail]) => {
+			const indicator = status_class(detail.utilization);
+			return `<tr><td class="text-muted">${label}</td><td>${number(used)}</td><td>${number(detail.capacity)}</td><td class="${indicator}">${number(detail.remaining)}</td><td><span class="indicator-pill ${indicator}">${number(detail.utilization)}%</span></td></tr>`;
+		})
+		.join("");
 	$wrapper.html(
-		`<div class="row small" style="padding: 4px 0">${dimension(
-			__("Weight"),
-			totals.weight,
-			totals.weight_uom,
-			capacity.weight
-		)}${dimension(__("Volume"), totals.volume, totals.volume_uom, capacity.volume)}<div class="col-sm-4"><div class="text-muted small">${__(
-			"Stops"
-		)}</div><div><b>${totals.stops || 0}</b></div></div></div>`
+		`<div class="vuna-capacity-summary"><table class="table table-bordered table-condensed" style="margin:0"><thead><tr><th>${__(
+			"Dimension"
+		)}</th><th>${__("Occupied")}</th><th>${__("Capacity")}</th><th>${__("Available")}</th><th style="width:110px">${__(
+			"Used"
+		)}</th></tr></thead><tbody>${rows}</tbody></table></div>`
 	);
 }

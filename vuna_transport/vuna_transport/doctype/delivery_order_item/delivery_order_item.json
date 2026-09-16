@@ -14,6 +14,9 @@
   "section_break_qumm",
   "ordered_qty",
   "transport_qty",
+  "allocated_quantity",
+  "reserved_quantity",
+  "unallocated_quantity",
   "stock_qty",
   "delivery_date",
   "column_break_efmj",
@@ -85,6 +88,32 @@
    "non_negative": 1,
    "read_only": 1,
    "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "allocated_quantity",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Allocated Qty",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "reserved_quantity",
+   "fieldtype": "Float",
+   "label": "Reserved Qty",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "unallocated_quantity",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Unallocated Qty",
+   "non_negative": 1,
+   "read_only": 1
   },
   {
    "fieldname": "uom",

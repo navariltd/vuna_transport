@@ -53,6 +53,33 @@ class VehicleAllocation(Document):
 		self.db_set("status", "Cancelled", update_modified=False)
 		restore_previous_allocation(self, active_link_cleared=True)
 
+	@frappe.whitelist()
+	def create_delivery_notes(self):
+		self.check_permission("write")
+		if self.docstatus != 1:
+			frappe.throw("Submit the Vehicle Allocation before creating Delivery Notes.")
+
+		from vuna_transport.services.integrations.erpnext_integration import create_delivery_notes_for_load
+
+		created = []
+		for load_name in get_allocation_load_names(self):
+			created.extend(create_delivery_notes_for_load(load_name))
+		return created
+
+	@frappe.whitelist()
+	def create_delivery_trip(self):
+		self.check_permission("write")
+		if self.docstatus != 1:
+			frappe.throw("Submit the Vehicle Allocation before creating a Delivery Trip.")
+
+		load_names = get_allocation_load_names(self)
+		if not load_names:
+			frappe.throw("Add at least one Delivery Load before creating a Delivery Trip.")
+
+		from vuna_transport.services.integrations.erpnext_integration import create_delivery_trip_for_load
+
+		return create_delivery_trip_for_load(load_names[0]).name
+
 
 def snapshot_transport_cost(allocation):
 	"""Persist the estimate used when an allocation becomes confirmed."""

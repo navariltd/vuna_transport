@@ -131,12 +131,10 @@ frappe.ui.form.on("Delivery Load", {
 
 		if (frm.is_new()) {
 			render_new_load_progress(frm);
-			render_load_contents_summary(frm);
 			render_capacity_summary(frm);
 			return;
 		}
 
-		render_load_contents_summary(frm);
 		render_capacity_summary(frm);
 		frm.trigger("load_execution_progress");
 	},
@@ -450,6 +448,10 @@ frappe.ui.form.on("Delivery Load Order", {
 		const row = locals[cdt][cdn];
 		if (row.delivery_order_item) {
 			frappe.db.get_doc("Delivery Order Item", row.delivery_order_item).then((item) => {
+				frappe.model.set_value(cdt, cdn, "item_code", item.item_code);
+				frappe.model.set_value(cdt, cdn, "item_name", item.item_name);
+				frappe.model.set_value(cdt, cdn, "uom", item.uom);
+				frappe.model.set_value(cdt, cdn, "stock_uom", item.stock_uom);
 				frappe.model.set_value(cdt, cdn, "delivery_group", item.delivery_group);
 				frappe.model.set_value(
 					cdt,
@@ -534,7 +536,6 @@ function recalculate_load_totals(frm) {
 		frm.doc[fieldname] = value;
 	});
 	frm.refresh_fields(Object.keys(values));
-	render_load_contents_summary(frm);
 	render_capacity_summary(frm);
 }
 
@@ -580,25 +581,6 @@ function show_item_selection_dialog(frm, result) {
 	}).join("");
 	dialog.get_field("items").$wrapper.html(`<p class="text-muted small">${__("On-hand stock is a planning warning. Pick List and Delivery Note remain the stock authority.")}</p><table class="table table-bordered"><thead><tr><th></th><th>${__("Delivery Order")}</th><th>${__("Item")}</th><th>${__("Transport Available")}</th><th>${__("On Hand")}</th></tr></thead><tbody>${rows}</tbody></table>`);
 	dialog.show();
-}
-
-function render_load_contents_summary(frm) {
-	const field = frm.get_field("load_contents_summary");
-	if (!field) return;
-	const groups = new Map();
-	for (const row of frm.doc.delivery_orders || []) {
-		if (!row.delivery_order) continue;
-		const group = groups.get(row.delivery_order) || { customer: row.customer, address: row.delivery_address, count: 0, quantity: 0 };
-		group.count += 1;
-		group.quantity += flt(row.allocated_quantity);
-		groups.set(row.delivery_order, group);
-	}
-	if (!groups.size) {
-		field.$wrapper.html(`<div class="text-muted">${__("No items have been added to this load.")}</div>`);
-		return;
-	}
-	const rows = [...groups.entries()].map(([order, group]) => `<tr><td><a href="/app/delivery-order/${encodeURIComponent(order)}">${frappe.utils.escape_html(order)}</a></td><td>${frappe.utils.escape_html(group.customer || "")}</td><td>${frappe.utils.escape_html(group.address || "")}</td><td>${group.count}</td><td>${frappe.format(group.quantity, { fieldtype: "Float" })}</td></tr>`).join("");
-	field.$wrapper.html(`<div class="vuna-load-contents-summary"><table class="table table-bordered table-condensed" style="margin:0"><thead><tr><th>${__("Delivery Order")}</th><th>${__("Customer")}</th><th>${__("Delivery Address")}</th><th>${__("Items")}</th><th>${__("Allocated Qty")}</th></tr></thead><tbody>${rows}</tbody></table></div>`);
 }
 
 function render_capacity_summary(frm) {
@@ -647,9 +629,9 @@ function render_capacity_breakdown(result) {
 	};
 	const number = (value) => frappe.format(value || 0, { fieldtype: "Float" });
 	const status_class = (utilization) => {
-		if (utilization > 100) return "danger";
-		if (utilization >= 90) return "warning";
-		return "success";
+		if (utilization >= 100) return "red";
+		if (utilization >= 70) return "green";
+		return "blue";
 	};
 	const rows = Object.entries(result.capacity || {})
 		.filter(([dimension]) => ["weight", "volume"].includes(dimension))
@@ -668,7 +650,7 @@ function render_capacity_breakdown(result) {
 	return `<div class="vuna-capacity-summary"><table class="table table-bordered table-condensed" style="margin:0;"><thead><tr><th>${__(
 		"Dimension"
 	)}</th><th>${__("Occupied")}</th><th>${__("Capacity")}</th><th>${__(
-		"Remaining"
+		"Available"
 	)}</th><th style="width:110px;">${__(
 		"Used"
 	)}</th></tr></thead><tbody>${rows}</tbody></table></div>`;

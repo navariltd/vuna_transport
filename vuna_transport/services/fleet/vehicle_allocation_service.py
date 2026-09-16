@@ -80,6 +80,8 @@ def get_allocation_load_names(allocation):
 	"""Return the canonical Delivery Load set for an allocation."""
 	rows = getattr(allocation, "delivery_loads", None) or []
 	names = [row.delivery_load for row in rows if getattr(row, "delivery_load", None)]
+	if not names and getattr(allocation, "delivery_load", None):
+		names = [allocation.delivery_load]
 	return list(dict.fromkeys(names))
 
 
@@ -158,12 +160,31 @@ def make_replacement_allocation_from_load(source_name):
 
 
 @frappe.whitelist()
+def make_delivery_trip_from_allocation(source_name):
+	"""Return a prepared, unsaved Delivery Trip for all loads in an allocation."""
+	allocation = frappe.get_doc("Vehicle Allocation", source_name)
+	require_document_permission(allocation, "read")
+	if allocation.docstatus != 1:
+		frappe.throw(_("Submit the Vehicle Allocation before creating a Delivery Trip."))
+	load_names = get_allocation_load_names(allocation)
+	if not load_names:
+		frappe.throw(_("Add at least one Delivery Load before creating a Delivery Trip."))
+
+	from vuna_transport.services.integrations.erpnext_integration import create_delivery_trip_for_load
+
+	return create_delivery_trip_for_load(load_names[0])
+
+
+@frappe.whitelist()
 def make_replacement_allocation_from_trip(source_name):
 	trip = frappe.get_doc("Delivery Trip", source_name)
 	require_document_permission(trip, "read")
-	if not trip.vuna_delivery_load:
+	from vuna_transport.services.execution.lineage_service import get_delivery_trip_load_names
+
+	load_names = get_delivery_trip_load_names(trip)
+	if not load_names:
 		frappe.throw(_("Delivery Trip {0} is not linked to a Delivery Load.").format(trip.name))
-	return make_replacement_allocation(trip.vuna_delivery_load)
+	return make_replacement_allocation(load_names)
 
 
 def make_replacement_allocation(delivery_load):
@@ -173,14 +194,30 @@ def make_replacement_allocation(delivery_load):
 
 def _make_replacement_allocation(delivery_load):
 	require_doctype_permission("Vehicle Allocation", "create")
-	lock_document("Delivery Load", delivery_load)
-	load = frappe.get_doc("Delivery Load", delivery_load)
-	require_document_permission(load, "write")
-	validate_load_is_operational(load, _("reallocating a vehicle"))
-	_validate_planning_window(load)
-	previous = get_active_allocation(load, required=True)
-	trip = _get_active_trip(load)
+	load_names = list(dict.fromkeys(delivery_load if isinstance(delivery_load, (list, tuple, set)) else [delivery_load]))
+	if not load_names:
+		frappe.throw(_("Select at least one Delivery Load to reallocate."))
+	for load_name in load_names:
+		lock_document("Delivery Load", load_name)
+	loads = [frappe.get_doc("Delivery Load", load_name) for load_name in load_names]
+	for load in loads:
+		require_document_permission(load, "write")
+		validate_load_is_operational(load, _("reallocating a vehicle"))
+		_validate_planning_window(load)
+	previous = get_active_allocation(loads[0], required=True)
+	if any(get_active_allocation(load, required=True).name != previous.name for load in loads):
+		frappe.throw(_("All selected Delivery Loads must belong to the same active Vehicle Allocation."))
+	trip = _get_active_trip(loads[0])
 	_validate_trip_allows_reallocation(trip)
+	previous_load_names = set(get_allocation_load_names(previous))
+	selected_load_names = {load.name for load in loads}
+	if trip and selected_load_names != previous_load_names:
+		frappe.throw(
+			_(
+				"This Delivery Trip contains multiple loads. Reallocate the complete trip allocation, "
+				"or amend the trip stops before splitting individual loads."
+			)
+		)
 	existing_draft = frappe.db.get_value(
 		"Vehicle Allocation",
 		{"replacement_of": previous.name, "docstatus": 0},
@@ -191,11 +228,11 @@ def _make_replacement_allocation(delivery_load):
 		return frappe.get_doc("Vehicle Allocation", existing_draft)
 
 	allocation = frappe.new_doc("Vehicle Allocation")
-	for previous_load in get_allocation_loads(previous):
-		_append_load(allocation, previous_load)
-	allocation.company = load.company
-	allocation.required_vehicle_category = load.required_vehicle_category
-	allocation.planned_reporting_time = load.planned_departure
+	for selected_load in loads:
+		_append_load(allocation, selected_load)
+	allocation.company = loads[0].company
+	allocation.required_vehicle_category = loads[0].required_vehicle_category
+	allocation.planned_reporting_time = loads[0].planned_departure
 	allocation.allocation_type = previous.allocation_type
 	allocation.assignment_event = "Reallocation"
 	allocation.replacement_of = previous.name
@@ -266,8 +303,19 @@ def _validate_replacement_change(allocation):
 	if allocation.assignment_event != "Reallocation" or not allocation.replacement_of:
 		return
 	previous = frappe.get_doc("Vehicle Allocation", allocation.replacement_of)
-	if set(get_allocation_load_names(previous)) != set(get_allocation_load_names(allocation)):
-		frappe.throw(_("A replacement Vehicle Allocation must include the same Delivery Loads."))
+	selected_load_names = set(get_allocation_load_names(allocation))
+	previous_load_names = set(get_allocation_load_names(previous))
+	if not selected_load_names.issubset(previous_load_names):
+		frappe.throw(_("A replacement Vehicle Allocation can only contain loads from the original allocation."))
+	if selected_load_names != previous_load_names:
+		loads = get_allocation_loads(allocation)
+		if loads and _get_active_trip(loads[0]):
+			frappe.throw(
+				_(
+					"Individual loads cannot be split from an active Delivery Trip yet. "
+					"Reallocate the complete trip allocation."
+				)
+			)
 	if previous.docstatus != 1 or previous.status not in ACTIVE_STATUSES:
 		frappe.throw(_("Vehicle Allocation {0} is no longer active. Refresh the load.").format(previous.name))
 	if allocation.vehicle and allocation.vehicle == previous.vehicle and allocation.driver == previous.driver:
@@ -527,17 +575,29 @@ def activate_allocation(allocation):
 					"The active allocation changed while this replacement was being prepared. Refresh and try again."
 				)
 			)
-		effective_from = allocation.effective_from or now_datetime()
-		frappe.db.set_value(
-			"Vehicle Allocation",
-			previous,
-			{
-				"status": "Replaced",
-				"effective_to": effective_from,
-				"replaced_by": allocation.name,
-			},
-			update_modified=False,
-		)
+		previous_doc = frappe.get_doc("Vehicle Allocation", previous)
+		full_replacement = set(get_allocation_load_names(previous_doc)) == {
+			load.name for load in loads
+		}
+		if full_replacement:
+			effective_from = allocation.effective_from or now_datetime()
+			frappe.db.set_value(
+				"Vehicle Allocation",
+				previous,
+				{
+					"status": "Replaced",
+					"effective_to": effective_from,
+					"replaced_by": allocation.name,
+				},
+				update_modified=False,
+			)
+		else:
+			previous_doc.add_comment(
+				"Info",
+				_("Delivery Loads {0} were reallocated to {1}; the original allocation remains active for its other loads.").format(
+					", ".join(sorted(load.name for load in loads)), allocation.name
+				),
+			)
 	for load in loads:
 		if previous:
 			load.add_comment(
@@ -571,12 +631,14 @@ def restore_previous_allocation(allocation, active_link_cleared=False):
 		return
 	previous_name = allocation.replacement_of
 	if previous_name:
-		frappe.db.set_value(
-			"Vehicle Allocation",
-			previous_name,
-			{"status": "Allocated", "effective_to": None, "replaced_by": None},
-			update_modified=False,
-		)
+		previous = frappe.get_doc("Vehicle Allocation", previous_name)
+		if set(get_allocation_load_names(previous)) == set(get_allocation_load_names(allocation)):
+			frappe.db.set_value(
+				"Vehicle Allocation",
+				previous_name,
+				{"status": "Allocated", "effective_to": None, "replaced_by": None},
+				update_modified=False,
+			)
 	for load in loads:
 		load.db_set("active_vehicle_allocation", previous_name, update_modified=False)
 		if previous_name:

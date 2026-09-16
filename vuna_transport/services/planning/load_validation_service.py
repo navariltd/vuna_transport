@@ -184,6 +184,10 @@ def validate_transport_compatibility_groups(delivery_orders):
 
 def _populate_load_row(row, delivery_order, delivery_order_item, available_quantity):
 	metrics = calculate_allocated_measurements(delivery_order_item, row.allocated_quantity)
+	row.item_code = delivery_order_item.item_code
+	row.item_name = delivery_order_item.item_name
+	row.uom = delivery_order_item.uom
+	row.stock_uom = delivery_order_item.stock_uom
 	row.sales_order = delivery_order.sales_order
 	row.customer = delivery_order.customer
 	row.delivery_address = delivery_order.delivery_address
@@ -311,6 +315,39 @@ def sync_delivery_order_allocations(delivery_order_names=None):
 	else:
 		delivery_order_names = frappe.get_all("Delivery Order", pluck="name")
 
+	if not delivery_order_names:
+		return
+
+	item_rows = frappe.get_all(
+		"Delivery Order Item",
+		filters={"parent": ["in", delivery_order_names], "parenttype": "Delivery Order"},
+		fields=["name", "parent", "transport_qty"],
+	)
+	items_by_order = defaultdict(list)
+	for item in item_rows:
+		items_by_order[item.parent].append(item)
+
+	item_names = [item.name for item in item_rows]
+	item_commitments = {}
+	if item_names:
+		commitment_rows = frappe.db.sql(
+			"""
+				select
+					dlo.delivery_order_item,
+					coalesce(sum(case when dl.docstatus = 0 then dlo.allocated_quantity else 0 end), 0) as reserved,
+					coalesce(sum(case when dl.docstatus = 1 then dlo.allocated_quantity else 0 end), 0) as allocated
+				from `tabDelivery Load Order` dlo
+				join `tabDelivery Load` dl on dl.name = dlo.parent
+				where dlo.delivery_order_item in %(item_names)s
+				and dlo.parenttype = 'Delivery Load'
+				and dl.docstatus in (0, 1)
+				group by dlo.delivery_order_item
+			""",
+			{"item_names": tuple(item_names)},
+			as_dict=True,
+		)
+		item_commitments = {row.delivery_order_item: row for row in commitment_rows}
+
 	for delivery_order_name in delivery_order_names:
 		quantities = frappe.db.sql(
 			"""
@@ -354,3 +391,18 @@ def sync_delivery_order_allocations(delivery_order_names=None):
 				else "Open"
 			)
 		frappe.db.set_value("Delivery Order", delivery_order_name, values, update_modified=False)
+
+		for item in items_by_order.get(delivery_order_name, []):
+			commitment = item_commitments.get(item.name, {})
+			reserved = flt(commitment.get("reserved"))
+			allocated = flt(commitment.get("allocated"))
+			frappe.db.set_value(
+				"Delivery Order Item",
+				item.name,
+				{
+					"reserved_quantity": reserved,
+					"allocated_quantity": allocated,
+					"unallocated_quantity": max(flt(item.transport_qty) - reserved - allocated, 0),
+				},
+				update_modified=False,
+			)
