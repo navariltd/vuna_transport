@@ -18,7 +18,7 @@ def get_address_planning_data(address_name):
 	longitude = _coordinate_or_fallback(getattr(address, "vuna_longitude", None), map_longitude)
 	return frappe._dict(
 		address=address.name,
-		province=getattr(address, "vuna_province", None),
+		territory=getattr(address, "vuna_territory", None),
 		county=getattr(address, "vuna_county", None),
 		town=getattr(address, "vuna_town", None),
 		delivery_zone=getattr(address, "vuna_delivery_zone", None),
@@ -89,14 +89,14 @@ def synchronize_address_location(address, method=None):
 
 def _sync_address_geography(address):
 	"""Keep ERPNext's display/search fields populated from structured Vuna geography."""
-	geography_fields = ("vuna_province", "vuna_county", "vuna_town")
+	geography_fields = ("vuna_territory", "vuna_county", "vuna_town")
 	if not all(address.meta.has_field(fieldname) for fieldname in geography_fields):
 		return
 
 	_validate_address_geography(address)
 
-	if address.get("vuna_province"):
-		address.state = address.vuna_province
+	if address.get("vuna_territory"):
+		address.state = address.vuna_territory
 	if address.get("vuna_county"):
 		address.county = address.vuna_county
 	if address.get("vuna_town"):
@@ -104,20 +104,20 @@ def _sync_address_geography(address):
 
 
 def _validate_address_geography(address):
-	"""Ensure the selected location links follow Country → Province → County → Town."""
-	province = address.get("vuna_province")
+	"""Ensure the selected location links follow Country → Territory → County → Town."""
+	territory = address.get("vuna_territory")
 	county = address.get("vuna_county")
 	town = address.get("vuna_town")
 
-	if province and address.get("country"):
-		province_country = frappe.db.get_value("Province", province, "country")
-		if province_country and province_country != address.country:
-			frappe.throw(_("Province {0} does not belong to Country {1}.").format(province, address.country))
+	if territory:
+		territory_group = frappe.db.get_value("Territory", territory, "is_group")
+		if territory_group:
+			frappe.throw(_("Territory {0} must be a non-group Territory.").format(territory))
 
-	if county and province:
-		county_province = frappe.db.get_value("County", county, "province")
-		if county_province and county_province != province:
-			frappe.throw(_("County {0} does not belong to Province {1}.").format(county, province))
+	if county and territory:
+		county_territory = frappe.db.get_value("County", county, "territory")
+		if county_territory and county_territory != territory:
+			frappe.throw(_("County {0} does not belong to Territory {1}.").format(county, territory))
 
 	if town and county:
 		town_county = frappe.db.get_value("Town", town, "county")

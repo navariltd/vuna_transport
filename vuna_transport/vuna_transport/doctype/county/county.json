@@ -8,7 +8,7 @@
  "engine": "InnoDB",
  "field_order": [
   "county_name",
-  "province",
+  "territory",
   "company",
   "disabled",
   "description"
@@ -24,12 +24,12 @@
    "unique": 1
   },
   {
-   "fieldname": "province",
+   "fieldname": "territory",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Province",
-   "options": "Province",
+   "label": "Territory",
+   "options": "Territory",
    "reqd": 1
   },
   {

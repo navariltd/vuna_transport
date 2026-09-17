@@ -52,7 +52,7 @@ class TestDispatchPlanningService(UnitTestCase):
 		filters = _planning_filters(
 			"Vuna Foods",
 			delivery_address="Address-1",
-			province="Meru",
+			territory="Meru",
 			county="Meru County",
 			town="Meru Town",
 		)

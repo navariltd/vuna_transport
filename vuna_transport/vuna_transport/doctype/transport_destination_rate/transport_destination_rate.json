@@ -6,7 +6,7 @@
  "engine": "InnoDB",
  "field_order": [
   "source_warehouse",
-  "province",
+  "territory",
   "county",
   "town",
   "rate",
@@ -22,12 +22,12 @@
    "options": "Warehouse"
   },
   {
-   "fieldname": "province",
+   "fieldname": "territory",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Province / Region",
+   "label": "Territory",
    "mandatory_depends_on": "eval:!doc.destination_key",
-   "options": "Province",
+   "options": "Territory",
    "reqd": 0
   },
   {

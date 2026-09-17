@@ -12,7 +12,7 @@ ALLOWED_FILTER_KEYS = {
 	"preferred_route",
 	"maximum_vehicle_category",
 	"delivery_address",
-	"province",
+	"territory",
 	"county",
 	"town",
 	"transport_zone",

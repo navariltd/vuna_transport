@@ -22,7 +22,7 @@ FILTER_DEFINITIONS = {
 		"options": "Vehicle Category",
 	},
 	"delivery_address": {"label": _("Delivery Address"), "fieldtype": "Link", "options": "Address"},
-	"province": {"label": _("Province / Region"), "fieldtype": "Link", "options": "Province"},
+	"territory": {"label": _("Territory"), "fieldtype": "Link", "options": "Territory"},
 	"county": {"label": _("County"), "fieldtype": "Link", "options": "County"},
 	"town": {"label": _("Town"), "fieldtype": "Link", "options": "Town"},
 	"transport_zone": {"label": _("Transport Zone"), "fieldtype": "Link", "options": "Transport Zone"},

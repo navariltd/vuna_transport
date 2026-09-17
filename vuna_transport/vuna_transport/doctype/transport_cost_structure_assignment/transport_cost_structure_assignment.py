@@ -92,16 +92,16 @@ class TransportCostStructureAssignment(Document):
 							row.source_warehouse, warehouse_company
 						)
 					)
-			if not row.province and not row.destination_key:
-				frappe.throw(_("Province / Region is required for every destination rate."))
-			if not row.province and row.destination_key:
+			if not row.territory and not row.destination_key:
+				frappe.throw(_("Territory is required for every destination rate."))
+			if not row.territory and row.destination_key:
 				continue
 			if row.county:
-				county_province = frappe.db.get_value("County", row.county, "province")
-				if county_province and county_province != row.province:
+				county_territory = frappe.db.get_value("County", row.county, "territory")
+				if county_territory and county_territory != row.territory:
 					frappe.throw(
-						_("County {0} does not belong to Province / Region {1}.").format(
-							row.county, row.province
+						_("County {0} does not belong to Territory {1}.").format(
+							row.county, row.territory
 						)
 					)
 			if row.town and not row.county:
@@ -112,7 +112,7 @@ class TransportCostStructureAssignment(Document):
 					frappe.throw(
 						_("Town {0} does not belong to County {1}.").format(row.town, row.county)
 					)
-			key = (row.source_warehouse or "", row.province, row.county or "", row.town or "")
+			key = (row.source_warehouse or "", row.territory, row.county or "", row.town or "")
 			if key in destinations:
 				frappe.throw(_("Destination geography {0} is duplicated.").format(" / ".join(filter(None, key))))
 			destinations.add(key)

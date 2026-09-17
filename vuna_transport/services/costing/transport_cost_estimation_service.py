@@ -273,7 +273,7 @@ def _destination_rate(component, context, profile):
 	for row in getattr(profile, "destination_rates", []) or []:
 		if getattr(row, "source_warehouse", None) and row.source_warehouse != context.source_warehouse:
 			continue
-		if row.province != geography.province:
+		if row.territory != geography.territory:
 			continue
 		if row.county and row.county != geography.county:
 			continue

@@ -63,7 +63,7 @@ def get_planning_demand(
 	priority=None,
 	customer=None,
 	delivery_address=None,
-	province=None,
+	territory=None,
 	county=None,
 	town=None,
 	allocation_state=None,
@@ -82,7 +82,7 @@ def get_planning_demand(
 		require_doctype_permission("Vehicle Category", "read")
 	configured_filters = validate_configured_filters(company, planning_filters)
 	additional_filter_conditions = validate_additional_filters(additional_filters)
-	province = province or configured_filters.get("province")
+	territory = territory or configured_filters.get("territory")
 	county = county or configured_filters.get("county")
 	town = town or configured_filters.get("town")
 	delivery_address = delivery_address or configured_filters.get("delivery_address")
@@ -105,7 +105,7 @@ def get_planning_demand(
 		priority,
 		customer,
 		delivery_address,
-		province,
+		territory,
 		county,
 		town,
 	)
@@ -373,7 +373,7 @@ def _planning_filters(
 	priority=None,
 	customer=None,
 	delivery_address=None,
-	province=None,
+	territory=None,
 	county=None,
 	town=None,
 ):
@@ -398,21 +398,21 @@ def _planning_filters(
 	}.items():
 		if value:
 			filters[fieldname] = value
-	address_names = _get_address_names(delivery_address, province, county, town)
+	address_names = _get_address_names(delivery_address, territory, county, town)
 	if address_names is not None:
 		filters["delivery_address"] = ["in", address_names]
 	return filters
 
 
-def _get_address_names(delivery_address=None, province=None, county=None, town=None):
+def _get_address_names(delivery_address=None, territory=None, county=None, town=None):
 	"""Resolve planner geography filters to permitted Address names."""
-	if not any((delivery_address, province, county, town)):
+	if not any((delivery_address, territory, county, town)):
 		return None
 	filters = {}
 	if delivery_address:
 		filters["name"] = delivery_address
-	if province:
-		filters["vuna_province"] = province
+	if territory:
+		filters["vuna_territory"] = territory
 	if county:
 		filters["vuna_county"] = county
 	if town:

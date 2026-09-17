@@ -12,9 +12,12 @@ frappe.ui.form.on("Transport Cost Structure Assignment", {
 		frm.set_query("source_warehouse", "destination_rates", () => ({
 			filters: { company: frm.doc.company, is_group: 0, disabled: 0 },
 		}));
+		frm.set_query("territory", "destination_rates", () => ({
+			filters: { is_group: 0 },
+		}));
 		frm.set_query("county", "destination_rates", (doc, cdt, cdn) => {
 			const row = locals[cdt][cdn];
-			return { filters: row.province ? { province: row.province } : {} };
+			return { filters: row.territory ? { territory: row.territory } : {} };
 		});
 		frm.set_query("town", "destination_rates", (doc, cdt, cdn) => {
 			const row = locals[cdt][cdn];

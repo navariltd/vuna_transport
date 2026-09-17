@@ -78,13 +78,13 @@ class TestTransportCostEstimationService(UnitTestCase):
 		component = SimpleNamespace(cost_component="Trip Charge")
 		profile = SimpleNamespace(
 			destination_rates=[
-				SimpleNamespace(province="Nairobi", county=None, town=None, rate=15000),
-				SimpleNamespace(province="Nairobi", county="Nairobi", town="Kilimani", rate=18000),
+				SimpleNamespace(territory="Nairobi", county=None, town=None, rate=15000),
+				SimpleNamespace(territory="Nairobi", county="Nairobi", town="Kilimani", rate=18000),
 			]
 		)
 		context = self.context
 		context.destination_geographies = [
-			SimpleNamespace(province="Nairobi", county="Nairobi", town="Kilimani")
+			SimpleNamespace(territory="Nairobi", county="Nairobi", town="Kilimani")
 		]
 
 		self.assertEqual(_destination_rate(component, context, profile), 18000)
@@ -92,7 +92,7 @@ class TestTransportCostEstimationService(UnitTestCase):
 	def test_destination_rate_requires_geography(self):
 		component = SimpleNamespace(cost_component="Trip Charge")
 		profile = SimpleNamespace(
-			destination_rates=[SimpleNamespace(province="Nairobi", county=None, town=None, rate=15000)]
+			destination_rates=[SimpleNamespace(territory="Nairobi", county=None, town=None, rate=15000)]
 		)
 		context = self.context
 		context.destination_geographies = []
@@ -104,11 +104,11 @@ class TestTransportCostEstimationService(UnitTestCase):
 		profile = SimpleNamespace(
 			destination_rates=[
 				SimpleNamespace(
-					source_warehouse=None, province="Nairobi", county=None, town=None, rate=15000
+					source_warehouse=None, territory="Nairobi", county=None, town=None, rate=15000
 				),
 				SimpleNamespace(
 					source_warehouse="Meru Dispatch - YT",
-					province="Nairobi",
+					territory="Nairobi",
 					county=None,
 					town=None,
 					rate=22000,
@@ -117,7 +117,7 @@ class TestTransportCostEstimationService(UnitTestCase):
 		)
 		context = self.context
 		context.source_warehouse = "Meru Dispatch - YT"
-		context.destination_geographies = [SimpleNamespace(province="Nairobi", county=None, town=None)]
+		context.destination_geographies = [SimpleNamespace(territory="Nairobi", county=None, town=None)]
 
 		self.assertEqual(_destination_rate(component, context, profile), 22000)
 

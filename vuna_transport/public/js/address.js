@@ -1,11 +1,11 @@
 frappe.ui.form.on("Address", {
 	setup(frm) {
-		frm.set_query("vuna_province", () => ({
-			filters: frm.doc.country ? { country: frm.doc.country, disabled: 0 } : { disabled: 0 },
+		frm.set_query("vuna_territory", () => ({
+			filters: { is_group: 0 },
 		}));
 		frm.set_query("vuna_county", () => ({
-			filters: frm.doc.vuna_province
-				? { province: frm.doc.vuna_province, disabled: 0 }
+			filters: frm.doc.vuna_territory
+				? { territory: frm.doc.vuna_territory, disabled: 0 }
 				: { disabled: 0 },
 		}));
 		frm.set_query("vuna_town", () => ({
@@ -16,12 +16,12 @@ frappe.ui.form.on("Address", {
 	},
 
 	country(frm) {
-		frm.set_value("vuna_province", null);
+		frm.set_value("vuna_territory", null);
 		frm.set_value("vuna_county", null);
 		frm.set_value("vuna_town", null);
 	},
 
-	vuna_province(frm) {
+	vuna_territory(frm) {
 		frm.set_value("vuna_county", null);
 		frm.set_value("vuna_town", null);
 	},

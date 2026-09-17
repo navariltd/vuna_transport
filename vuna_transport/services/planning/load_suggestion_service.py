@@ -55,7 +55,7 @@ def suggest_delivery_loads(
 	priority=None,
 	customer=None,
 	delivery_address=None,
-	province=None,
+	territory=None,
 	county=None,
 	town=None,
 	delivery_date=None,
@@ -85,7 +85,7 @@ def suggest_delivery_loads(
 		priority=priority,
 		customer=customer,
 		delivery_address=delivery_address,
-		province=province,
+		territory=territory,
 		county=county,
 		town=town,
 		delivery_date_from=delivery_date_from or delivery_date,
@@ -218,7 +218,7 @@ def _get_plannable_orders(
 	priority=None,
 	customer=None,
 	delivery_address=None,
-	province=None,
+	territory=None,
 	county=None,
 	town=None,
 	delivery_date_from=None,
@@ -256,10 +256,10 @@ def _get_plannable_orders(
 			if planning_filters.get(fieldname):
 				filters[fieldname] = planning_filters[fieldname]
 		delivery_address = delivery_address or planning_filters.get("delivery_address")
-		province = province or planning_filters.get("province")
+		territory = territory or planning_filters.get("territory")
 		county = county or planning_filters.get("county")
 		town = town or planning_filters.get("town")
-	address_names = _get_address_names(delivery_address, province, county, town)
+	address_names = _get_address_names(delivery_address, territory, county, town)
 	if address_names is not None:
 		filters["delivery_address"] = ["in", address_names]
 	if delivery_date_from and delivery_date_to and getdate(delivery_date_from) > getdate(delivery_date_to):
@@ -320,14 +320,14 @@ def _get_plannable_orders(
 	]
 
 
-def _get_address_names(delivery_address=None, province=None, county=None, town=None):
-	if not any((delivery_address, province, county, town)):
+def _get_address_names(delivery_address=None, territory=None, county=None, town=None):
+	if not any((delivery_address, territory, county, town)):
 		return None
 	filters = {}
 	if delivery_address:
 		filters["name"] = delivery_address
-	if province:
-		filters["vuna_province"] = province
+	if territory:
+		filters["vuna_territory"] = territory
 	if county:
 		filters["vuna_county"] = county
 	if town:

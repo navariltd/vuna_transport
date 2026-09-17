@@ -150,7 +150,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			["required_delivery_date_to", "Date", __("Delivery Date To")],
 			["source_warehouse", "Link", __("Source Warehouse"), "Warehouse"],
 			["delivery_address", "Link", __("Delivery Address"), "Address"],
-			["province", "Link", __("Province / Region"), "Province"],
+			["territory", "Link", __("Territory"), "Territory"],
 			["county", "Link", __("County"), "County"],
 			["town", "Link", __("Town"), "Town"],
 			["priority", "Select", __("Priority"), "\nLow\nMedium\nHigh\nUrgent"],
@@ -179,10 +179,10 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			field.set_value(default_value || "");
 			this.filters[fieldname] = field;
 		}
-		this.filters.province.get_query = () => ({ filters: { disabled: 0 } });
+		this.filters.territory.get_query = () => ({ filters: { is_group: 0 } });
 		this.filters.county.get_query = () => ({
-			filters: this.filters.province.get_value()
-				? { province: this.filters.province.get_value(), disabled: 0 }
+			filters: this.filters.territory.get_value()
+				? { territory: this.filters.territory.get_value(), disabled: 0 }
 				: { disabled: 0 },
 		});
 		this.filters.town.get_query = () => ({
@@ -190,7 +190,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				? { county: this.filters.county.get_value(), disabled: 0 }
 				: { disabled: 0 },
 		});
-		this.filters.province.$input?.on("change", () => {
+		this.filters.territory.$input?.on("change", () => {
 			this.filters.county.set_value("");
 			this.filters.town.set_value("");
 		});
@@ -263,11 +263,11 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	configure_location_filter_queries() {
-		if (this.filters.province) this.filters.province.get_query = () => ({ filters: { disabled: 0 } });
+		if (this.filters.territory) this.filters.territory.get_query = () => ({ filters: { is_group: 0 } });
 		if (this.filters.county)
 			this.filters.county.get_query = () => ({
-				filters: this.filters.province?.get_value()
-					? { province: this.filters.province.get_value(), disabled: 0 }
+				filters: this.filters.territory?.get_value()
+					? { territory: this.filters.territory.get_value(), disabled: 0 }
 					: { disabled: 0 },
 			});
 		if (this.filters.town)
@@ -967,7 +967,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					priority: filters.priority || null,
 					customer: filters.customer || null,
 					delivery_address: filters.delivery_address || null,
-					province: filters.province || null,
+					territory: filters.territory || null,
 					county: filters.county || null,
 					town: filters.town || null,
 					planning_filters: this.get_configured_filter_values(filters),
