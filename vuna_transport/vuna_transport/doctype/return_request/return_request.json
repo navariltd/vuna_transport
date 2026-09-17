@@ -31,6 +31,7 @@
   "return_method",
   "return_warehouse",
   "custody",
+  "custody_events",
   "responsible_party",
   "physical_resolution",
   "commercial_resolution",
@@ -202,10 +203,17 @@
    "reqd": 1
   },
   {
-  "fieldname": "custody",
+   "fieldname": "custody",
   "fieldtype": "Select",
   "label": "Custody",
-  "options": "\nStill With Vehicle\nLeft With Customer\nHeld By Transporter\nReturned To Depot\nTransferred To Another Vehicle\nUnknown"
+   "options": "\nStill With Vehicle\nLeft With Customer\nHeld By Transporter\nReturned To Depot\nTransferred To Another Vehicle\nUnknown"
+  },
+  {
+   "fieldname": "custody_events",
+   "fieldtype": "Table",
+   "label": "Custody History",
+   "options": "Return Custody Event",
+   "read_only": 1
   },
   {
   "fieldname": "responsible_party",
@@ -275,6 +283,7 @@
   }
  ],
  "grid_page_length": 50,
+ "is_submittable": 1,
  "links": [],
  "modified": "2026-09-15 22:07:48.597473",
  "modified_by": "Administrator",
@@ -291,6 +300,7 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
+   "submit": 1,
    "write": 1
   },
   {
@@ -300,6 +310,7 @@
    "read": 1,
    "report": 1,
    "role": "Transport Planner",
+   "submit": 1,
    "write": 1
   },
   {
@@ -309,6 +320,7 @@
    "read": 1,
    "report": 1,
    "role": "Transport Dispatcher",
+   "submit": 1,
    "write": 1
   },
   {
@@ -318,6 +330,7 @@
    "read": 1,
    "report": 1,
    "role": "Transport Manager",
+   "submit": 1,
    "write": 1
   }
  ],

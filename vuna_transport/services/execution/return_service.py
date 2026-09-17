@@ -205,10 +205,11 @@ def _validate_quality_inspection(row, request, delivery_note):
 	if not row.quality_inspection:
 		return
 	inspection = frappe.get_doc("Quality Inspection", row.quality_inspection)
-	if inspection.reference_type != "Delivery Note" or inspection.reference_name != delivery_note.name:
+	expected_reference = getattr(request, "return_stock_document", None) or delivery_note.name
+	if inspection.reference_type != "Delivery Note" or inspection.reference_name != expected_reference:
 		frappe.throw(
 			_("Quality Inspection {0} must reference Delivery Note {1}.").format(
-				row.quality_inspection, delivery_note.name
+				row.quality_inspection, expected_reference
 			)
 		)
 	if inspection.item_code != row.item_code:
@@ -349,6 +350,40 @@ def transition_return_request(return_request, action):
 	request.flags.allow_status_change = True
 	request.status = target
 	request.append_activity(target, _("Return Request moved from {0} to {1}.").format(previous_status, target))
+	if action == "request":
+		request.save()
+		request.submit()
+	elif action == "cancel" and request.docstatus == 1:
+		request.cancel()
+	else:
+		if request.docstatus == 1:
+			request.flags.ignore_validate_update_after_submit = True
+		request.save()
+	return request.name
+
+
+@frappe.whitelist()
+def record_custody_transfer(return_request, to_custody, responsible_party=None, remarks=None):
+	"""Record a custody handover without allowing the history to be edited in the browser."""
+	request = frappe.get_doc("Return Request", return_request)
+	require_document_permission(request, "write")
+	require_company_access(request.company)
+	if request.status in TERMINAL_STATUSES:
+		frappe.throw(_("Custody cannot change after Return Request {0} is {1}.").format(request.name, request.status))
+	if not to_custody or to_custody == "Unknown":
+		frappe.throw(_("Select the custody now responsible for the goods."))
+	if not responsible_party or responsible_party == "Unknown":
+		frappe.throw(_("Select the party responsible for the goods."))
+	from_custody = request.custody
+	request.custody = to_custody
+	request.responsible_party = responsible_party
+	request.append_custody_event(from_custody, to_custody, responsible_party, remarks)
+	request.append_activity(
+		"Custody Changed",
+		remarks or _("Custody changed from {0} to {1}.").format(from_custody or _("Not recorded"), to_custody),
+	)
+	if request.docstatus == 1:
+		request.flags.ignore_validate_update_after_submit = True
 	request.save()
 	return request.name
 
@@ -361,8 +396,8 @@ def create_return_stock_document(return_request):
 	require_document_permission(request, "read")
 	if request.return_stock_document:
 		return request.return_stock_document
-	if request.status not in {"Received", "Under Inspection", "Awaiting Resolution", "Resolved"}:
-		frappe.throw(_("Receive the return before preparing its stock document."))
+	if request.status not in {"Under Inspection", "Awaiting Resolution", "Resolved"}:
+		frappe.throw(_("Inspect the return before preparing its stock document."))
 	from erpnext.controllers.sales_and_purchase_return import make_return_doc
 
 	source = frappe.get_doc("Delivery Note", request.delivery_note)
@@ -374,8 +409,11 @@ def create_return_stock_document(return_request):
 		if not request_item:
 			continue
 		conversion_factor = flt(row.conversion_factor) or 1
-		row.qty = -flt(request_item.requested_return_qty) / conversion_factor
-		row.stock_qty = -flt(request_item.requested_return_qty)
+		accepted_qty = flt(request_item.accepted_return_qty)
+		if accepted_qty <= 0:
+			continue
+		row.qty = -accepted_qty / conversion_factor
+		row.stock_qty = -accepted_qty
 		row.warehouse = request.return_warehouse
 		target_items.append(row)
 	target.set("items", target_items)
@@ -410,7 +448,7 @@ def create_return_quality_inspections(return_request):
 				"company": request.company,
 				"inspection_type": "Incoming",
 				"reference_type": "Delivery Note",
-				"reference_name": request.delivery_note,
+				"reference_name": getattr(request, "return_stock_document", None) or request.delivery_note,
 				"item_code": row.item_code,
 				"batch_no": row.batch_no,
 				"sample_size": row.received_qty,
@@ -437,6 +475,15 @@ def _link_stock_return_to_exception(request, return_document):
 	if exception.return_document and exception.return_document != return_document:
 		frappe.throw(_("Delivery Exception {0} already links a different Return Delivery Note.").format(exception.name))
 	exception.db_set("return_document", return_document, update_modified=True)
+	for resolution in getattr(exception, "resolutions", None) or []:
+		if resolution.physical_resolution in RETURN_PHYSICAL_RESOLUTIONS and not resolution.return_document:
+			frappe.db.set_value(
+				"Delivery Exception Resolution",
+				resolution.name,
+				"return_document",
+				return_document,
+				update_modified=False,
+			)
 
 
 @frappe.whitelist()
@@ -459,11 +506,16 @@ def create_return_request_from_exception(delivery_exception):
 		frappe.throw(_("Set Resolution Warehouse before creating a Return Request."))
 
 	request_rows = []
-	for row in exception.items:
-		physical_resolution = row.physical_resolution or exception.physical_resolution
+	resolution_rows = getattr(exception, "resolutions", None) or []
+	if not resolution_rows:
+		resolution_rows = exception.items
+	for row in resolution_rows:
+		physical_resolution = getattr(row, "physical_resolution", None) or exception.physical_resolution
 		if physical_resolution not in RETURN_PHYSICAL_RESOLUTIONS:
 			continue
-		quantity = flt(row.resolution_qty) or flt(row.unresolved_qty)
+		quantity = flt(getattr(row, "quantity", None) or getattr(row, "resolution_qty", None))
+		if not quantity:
+			quantity = flt(getattr(row, "unresolved_qty", None))
 		if quantity <= 0:
 			continue
 		request_rows.append(
@@ -472,7 +524,7 @@ def create_return_request_from_exception(delivery_exception):
 				"item_name": row.item_name,
 				"delivery_note_item": row.delivery_note_item,
 				"delivery_order_item": row.delivery_order_item,
-				"delivered_qty": row.delivered_qty,
+				"delivered_qty": getattr(row, "delivered_qty", None) or 0,
 				"requested_return_qty": quantity,
 				"return_reason": exception.exception_reason,
 			}
@@ -509,7 +561,130 @@ def create_return_request_from_exception(delivery_exception):
 	request.append_activity("Created", _("Created from Delivery Exception {0}").format(exception.name), exception)
 	request.insert()
 	exception.db_set("return_request", request.name, update_modified=True)
+	for resolution in resolution_rows:
+		if resolution.physical_resolution in RETURN_PHYSICAL_RESOLUTIONS and not resolution.return_request:
+			frappe.db.set_value(
+				"Delivery Exception Resolution",
+				resolution.name,
+				"return_request",
+				request.name,
+				update_modified=False,
+			)
 	return request.name
+
+
+@frappe.whitelist()
+def create_replacement_sales_order_from_exception(delivery_exception):
+	"""Prepare one draft Sales Order containing only approved replacement quantities."""
+	require_doctype_permission("Sales Order", "create")
+	frappe.db.sql("select name from `tabDelivery Exception` where name = %s for update", delivery_exception)
+	exception = frappe.get_doc("Delivery Exception", delivery_exception)
+	require_document_permission(exception, "write")
+	require_company_access(exception.company)
+	if exception.docstatus != 1:
+		frappe.throw(_("Submit Delivery Exception {0} before creating replacement demand.").format(exception.name))
+	if exception.replacement_sales_order:
+		return exception.replacement_sales_order
+
+	resolution_rows = getattr(exception, "resolutions", None) or []
+	if not resolution_rows:
+		frappe.throw(_("Add and submit an item-level resolution plan first."))
+	replacement_rows = [
+		row
+		for row in resolution_rows
+		if row.commercial_resolution in {"Replacement", "Re-delivery"} and flt(row.quantity) > 0
+	]
+	if not replacement_rows:
+		frappe.throw(_("No resolution quantity is approved for replacement or re-delivery."))
+
+	sales_order_name = _get_exception_sales_order(exception)
+	source_sales_order = frappe.get_doc("Sales Order", sales_order_name)
+	if source_sales_order.docstatus != 1:
+		frappe.throw(_("Source Sales Order {0} must be submitted.").format(source_sales_order.name))
+	source_items = {row.name: row for row in source_sales_order.items}
+	resolution_items = {
+		row.delivery_order_item: row
+		for row in exception.items
+		if row.delivery_order_item
+	}
+	replacement_quantities = defaultdict(float)
+	for resolution in replacement_rows:
+		item = resolution_items.get(resolution.delivery_order_item)
+		if item:
+			replacement_quantities[item.delivery_order_item] += flt(resolution.quantity)
+	replacement = frappe.copy_doc(source_sales_order)
+	replacement.name = None
+	replacement.docstatus = 0
+	replacement.amended_from = None
+	replacement.transaction_date = nowdate()
+	if exception.follow_up_date:
+		replacement.delivery_date = exception.follow_up_date
+	replacement.items = []
+	replacement.remarks = _(
+		"Replacement demand for Delivery Exception {0}, originating from Sales Order {1}."
+	).format(exception.name, source_sales_order.name)
+
+	for delivery_order_item_name, replacement_quantity in replacement_quantities.items():
+		exception_item = resolution_items.get(delivery_order_item_name)
+		delivery_order_item = (
+			frappe.get_doc("Delivery Order Item", delivery_order_item_name)
+			if exception_item
+			else None
+		)
+		if not delivery_order_item or not delivery_order_item.sales_order_item:
+			frappe.throw(
+				_("Replacement quantity does not have valid Sales Order Item lineage.")
+			)
+		sales_order_item = source_items.get(delivery_order_item.sales_order_item)
+		if not sales_order_item:
+			frappe.throw(
+				_("Sales Order Item {0} could not be found for replacement quantity.").format(
+					delivery_order_item.sales_order_item
+				)
+			)
+		conversion_factor = flt(getattr(delivery_order_item, "conversion_factor", None)) or 1
+		transaction_qty = replacement_quantity / conversion_factor
+		if transaction_qty <= 0:
+			continue
+		item_values = sales_order_item.as_dict()
+		for fieldname in ("name", "parent", "parentfield", "parenttype", "idx", "doctype"):
+			item_values.pop(fieldname, None)
+		item_values["qty"] = transaction_qty
+		item_values["delivered_qty"] = 0
+		item_values["billed_amt"] = 0
+		replacement.append("items", item_values)
+
+	if not replacement.items:
+		frappe.throw(_("No positive replacement quantities were available."))
+	replacement.insert()
+	exception.db_set("replacement_sales_order", replacement.name, update_modified=True)
+	for resolution in replacement_rows:
+		frappe.db.set_value(
+			"Delivery Exception Resolution",
+			resolution.name,
+			"replacement_sales_order",
+			replacement.name,
+			update_modified=False,
+		)
+	return replacement.name
+
+
+def _get_exception_sales_order(exception):
+	if exception.delivery_note:
+		sales_order = frappe.db.get_value(
+			"Delivery Note Item",
+			{"parent": exception.delivery_note, "against_sales_order": ["is", "set"]},
+			"against_sales_order",
+		)
+		if sales_order:
+			return sales_order
+	for row in exception.items:
+		if not row.delivery_order_item:
+			continue
+		sales_order_item = frappe.db.get_value("Delivery Order Item", row.delivery_order_item, "sales_order_item")
+		if sales_order_item:
+			return frappe.db.get_value("Sales Order Item", sales_order_item, "parent")
+	frappe.throw(_("The Delivery Exception has no Sales Order lineage."))
 
 
 def _get_exception_rejection_reasons(exception):

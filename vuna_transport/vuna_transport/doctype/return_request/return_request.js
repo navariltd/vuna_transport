@@ -81,7 +81,7 @@ frappe.ui.form.on("Return Request", {
 				__("Actions")
 			);
 		}
-		if (frm.doc.status === "Received" || frm.doc.status === "Under Inspection") {
+		if (["Under Inspection", "Awaiting Resolution", "Resolved"].includes(frm.doc.status)) {
 			frm.add_custom_button(
 				__("Prepare Return Stock Document"),
 				() => prepare_return_stock_document(frm),
@@ -104,6 +104,9 @@ frappe.ui.form.on("Return Request", {
 		}
 		if (frm.doc.status === "Resolved") {
 			frm.add_custom_button(__("Close"), () => transition(frm, "close"), __("Actions"));
+		}
+		if (!['Resolved', 'Closed', 'Cancelled'].includes(frm.doc.status)) {
+			frm.add_custom_button(__("Record Custody Change"), () => record_custody_change(frm), __("Actions"));
 		}
 		add_resolution_actions(frm);
 	},
@@ -208,6 +211,38 @@ function prepare_quality_inspections(frm) {
 			}
 		},
 	});
+}
+
+function record_custody_change(frm) {
+	frappe.prompt(
+		[
+			{
+				fieldname: "to_custody",
+				fieldtype: "Select",
+				label: __("Custody Now With"),
+				options: "Still With Vehicle\nLeft With Customer\nHeld By Transporter\nReturned To Depot\nTransferred To Another Vehicle",
+				reqd: 1,
+			},
+			{
+				fieldname: "responsible_party",
+				fieldtype: "Select",
+				label: __("Responsible Party"),
+				options: "Company\nCustomer\nTransporter\nDriver\nThird Party",
+				reqd: 1,
+			},
+			{ fieldname: "remarks", fieldtype: "Small Text", label: __("Remarks") },
+		],
+		(values) => {
+			frappe.call({
+				method: "vuna_transport.services.execution.return_service.record_custody_transfer",
+				args: { return_request: frm.doc.name, ...values },
+				freeze: true,
+				callback: () => frm.reload_doc(),
+			});
+		},
+		__("Record Custody Change"),
+		__("Record")
+	);
 }
 
 function set_exception_context_read_only(frm) {

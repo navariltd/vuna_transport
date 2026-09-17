@@ -19,6 +19,9 @@ from vuna_transport.services.execution.return_service import (
 
 
 class TestReturnRequest(UnitTestCase):
+	def test_return_request_is_submittable(self):
+		self.assertTrue(frappe.get_meta("Return Request").is_submittable)
+
 	def test_delivery_exception_link_is_unique(self):
 		self.assertTrue(frappe.get_meta("Return Request").get_field("delivery_exception").unique)
 
