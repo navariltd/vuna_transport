@@ -152,6 +152,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			["delivery_address", "Link", __("Delivery Address"), "Address"],
 			["territory", "Link", __("Territory"), "Territory"],
 			["county", "Link", __("County"), "County"],
+			["constituency", "Link", __("Constituency / Sub-county"), "Constituency"],
 			["town", "Link", __("Town"), "Town"],
 			["priority", "Select", __("Priority"), "\nLow\nMedium\nHigh\nUrgent"],
 			["customer", "Link", __("Customer"), "Customer"],
@@ -186,15 +187,27 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				: { disabled: 0 },
 		});
 		this.filters.town.get_query = () => ({
+			filters: this.filters.constituency.get_value()
+				? { constituency: this.filters.constituency.get_value(), disabled: 0 }
+				: this.filters.county.get_value()
+					? { county: this.filters.county.get_value(), disabled: 0 }
+				: { disabled: 0 },
+		});
+		this.filters.constituency.get_query = () => ({
 			filters: this.filters.county.get_value()
 				? { county: this.filters.county.get_value(), disabled: 0 }
 				: { disabled: 0 },
 		});
 		this.filters.territory.$input?.on("change", () => {
 			this.filters.county.set_value("");
+			this.filters.constituency.set_value("");
 			this.filters.town.set_value("");
 		});
-		this.filters.county.$input?.on("change", () => this.filters.town.set_value(""));
+		this.filters.county.$input?.on("change", () => {
+			this.filters.constituency.set_value("");
+			this.filters.town.set_value("");
+		});
+		this.filters.constituency.$input?.on("change", () => this.filters.town.set_value(""));
 	}
 
 	async make_native_filter_group() {
@@ -272,6 +285,14 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			});
 		if (this.filters.town)
 			this.filters.town.get_query = () => ({
+				filters: this.filters.constituency?.get_value()
+					? { constituency: this.filters.constituency.get_value(), disabled: 0 }
+					: this.filters.county?.get_value()
+						? { county: this.filters.county.get_value(), disabled: 0 }
+					: { disabled: 0 },
+			});
+		if (this.filters.constituency)
+			this.filters.constituency.get_query = () => ({
 				filters: this.filters.county?.get_value()
 					? { county: this.filters.county.get_value(), disabled: 0 }
 					: { disabled: 0 },
@@ -969,6 +990,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					delivery_address: filters.delivery_address || null,
 					territory: filters.territory || null,
 					county: filters.county || null,
+					constituency: filters.constituency || null,
 					town: filters.town || null,
 					planning_filters: this.get_configured_filter_values(filters),
 					additional_filters: this.get_native_filter_values(),

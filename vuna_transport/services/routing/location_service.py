@@ -20,6 +20,7 @@ def get_address_planning_data(address_name):
 		address=address.name,
 		territory=getattr(address, "vuna_territory", None),
 		county=getattr(address, "vuna_county", None),
+		constituency=getattr(address, "vuna_constituency", None),
 		town=getattr(address, "vuna_town", None),
 		delivery_zone=getattr(address, "vuna_delivery_zone", None),
 		location=location,
@@ -89,7 +90,7 @@ def synchronize_address_location(address, method=None):
 
 def _sync_address_geography(address):
 	"""Keep ERPNext's display/search fields populated from structured Vuna geography."""
-	geography_fields = ("vuna_territory", "vuna_county", "vuna_town")
+	geography_fields = ("vuna_territory", "vuna_county", "vuna_constituency", "vuna_town")
 	if not all(address.meta.has_field(fieldname) for fieldname in geography_fields):
 		return
 
@@ -107,6 +108,7 @@ def _validate_address_geography(address):
 	"""Ensure the selected location links follow Country → Territory → County → Town."""
 	territory = address.get("vuna_territory")
 	county = address.get("vuna_county")
+	constituency = address.get("vuna_constituency")
 	town = address.get("vuna_town")
 
 	if territory:
@@ -119,10 +121,30 @@ def _validate_address_geography(address):
 		if county_territory and county_territory != territory:
 			frappe.throw(_("County {0} does not belong to Territory {1}.").format(county, territory))
 
+	if constituency:
+		constituency_data = frappe.db.get_value(
+			"Constituency", constituency, ["county", "disabled"], as_dict=True
+		)
+		if not constituency_data:
+			frappe.throw(_("Constituency {0} does not exist.").format(constituency))
+		if constituency_data.disabled:
+			frappe.throw(_("Constituency {0} is disabled.").format(constituency))
+		if not county:
+			address.vuna_county = constituency_data.county
+			county = constituency_data.county
+		elif constituency_data.county != county:
+			frappe.throw(_("Constituency {0} does not belong to County {1}.").format(constituency, county))
+
 	if town and county:
 		town_county = frappe.db.get_value("Town", town, "county")
 		if town_county and town_county != county:
 			frappe.throw(_("Town {0} does not belong to County {1}.").format(town, county))
+	if town and constituency:
+		town_constituency = frappe.db.get_value("Town", town, "constituency")
+		if town_constituency and town_constituency != constituency:
+			frappe.throw(
+				_("Town {0} does not belong to Constituency {1}.").format(town, constituency)
+			)
 
 
 def backfill_address_coordinates():
@@ -166,6 +188,10 @@ def set_delivery_order_location_snapshots(delivery_order, overwrite=False):
 	source = get_warehouse_planning_data(delivery_order.source_warehouse)
 
 	_set_if_empty(delivery_order, "transport_zone", destination.delivery_zone, overwrite)
+	_set_if_empty(delivery_order, "territory", destination.territory, overwrite)
+	_set_if_empty(delivery_order, "county", destination.county, overwrite)
+	_set_if_empty(delivery_order, "constituency", destination.constituency, overwrite)
+	_set_if_empty(delivery_order, "town", destination.town, overwrite)
 	_set_if_empty(delivery_order, "destination_location", destination.location, overwrite)
 	_set_if_empty(delivery_order, "destination_latitude", destination.latitude, overwrite)
 	_set_if_empty(delivery_order, "destination_longitude", destination.longitude, overwrite)

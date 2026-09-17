@@ -24,6 +24,11 @@ FILTER_DEFINITIONS = {
 	"delivery_address": {"label": _("Delivery Address"), "fieldtype": "Link", "options": "Address"},
 	"territory": {"label": _("Territory"), "fieldtype": "Link", "options": "Territory"},
 	"county": {"label": _("County"), "fieldtype": "Link", "options": "County"},
+	"constituency": {
+		"label": _("Constituency / Sub-county"),
+		"fieldtype": "Link",
+		"options": "Constituency",
+	},
 	"town": {"label": _("Town"), "fieldtype": "Link", "options": "Town"},
 	"transport_zone": {"label": _("Transport Zone"), "fieldtype": "Link", "options": "Transport Zone"},
 	"delivery_method": {"label": _("Delivery Method"), "fieldtype": "Link", "options": "Delivery Method"},

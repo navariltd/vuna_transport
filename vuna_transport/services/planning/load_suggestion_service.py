@@ -58,6 +58,7 @@ def suggest_delivery_loads(
 	territory=None,
 	county=None,
 	town=None,
+	constituency=None,
 	delivery_date=None,
 	delivery_order_names=None,
 	option_count=None,
@@ -88,6 +89,7 @@ def suggest_delivery_loads(
 		territory=territory,
 		county=county,
 		town=town,
+		constituency=constituency,
 		delivery_date_from=delivery_date_from or delivery_date,
 		delivery_date_to=delivery_date_to or delivery_date,
 		delivery_order_names=delivery_order_names,
@@ -221,6 +223,7 @@ def _get_plannable_orders(
 	territory=None,
 	county=None,
 	town=None,
+	constituency=None,
 	delivery_date_from=None,
 	delivery_date_to=None,
 	delivery_order_names=None,
@@ -245,6 +248,16 @@ def _get_plannable_orders(
 		filters["priority"] = priority
 	if customer:
 		filters["customer"] = customer
+	if delivery_address:
+		filters["delivery_address"] = delivery_address
+	if territory:
+		filters["territory"] = territory
+	if county:
+		filters["county"] = county
+	if town:
+		filters["town"] = town
+	if constituency:
+		filters["constituency"] = constituency
 	if planning_filters:
 		for fieldname in (
 			"delivery_group",
@@ -258,10 +271,18 @@ def _get_plannable_orders(
 		delivery_address = delivery_address or planning_filters.get("delivery_address")
 		territory = territory or planning_filters.get("territory")
 		county = county or planning_filters.get("county")
+		constituency = constituency or planning_filters.get("constituency")
 		town = town or planning_filters.get("town")
-	address_names = _get_address_names(delivery_address, territory, county, town)
-	if address_names is not None:
-		filters["delivery_address"] = ["in", address_names]
+	if delivery_address:
+		filters["delivery_address"] = delivery_address
+	if territory:
+		filters["territory"] = territory
+	if county:
+		filters["county"] = county
+	if town:
+		filters["town"] = town
+	if constituency:
+		filters["constituency"] = constituency
 	if delivery_date_from and delivery_date_to and getdate(delivery_date_from) > getdate(delivery_date_to):
 		frappe.throw(_("Delivery Date From cannot be after Delivery Date To."))
 	if delivery_date_from and delivery_date_to:
@@ -288,6 +309,10 @@ def _get_plannable_orders(
 		"customer",
 		"customer_name",
 		"delivery_address",
+		"territory",
+		"county",
+		"constituency",
+		"town",
 		"destination_latitude",
 		"destination_longitude",
 		"delivery_from_time",
@@ -320,8 +345,8 @@ def _get_plannable_orders(
 	]
 
 
-def _get_address_names(delivery_address=None, territory=None, county=None, town=None):
-	if not any((delivery_address, territory, county, town)):
+def _get_address_names(delivery_address=None, territory=None, county=None, constituency=None, town=None):
+	if not any((delivery_address, territory, county, constituency, town)):
 		return None
 	filters = {}
 	if delivery_address:
@@ -330,6 +355,8 @@ def _get_address_names(delivery_address=None, territory=None, county=None, town=
 		filters["vuna_territory"] = territory
 	if county:
 		filters["vuna_county"] = county
+	if constituency:
+		filters["vuna_constituency"] = constituency
 	if town:
 		filters["vuna_town"] = town
 	return frappe.get_list("Address", filters=filters, pluck="name", limit_page_length=5000)

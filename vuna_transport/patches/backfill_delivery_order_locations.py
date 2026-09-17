@@ -6,6 +6,10 @@ from vuna_transport.services.routing.location_service import set_delivery_order_
 
 SNAPSHOT_FIELDS = (
 	"transport_zone",
+	"territory",
+	"county",
+	"constituency",
+	"town",
 	"destination_location",
 	"destination_latitude",
 	"destination_longitude",

@@ -44,11 +44,7 @@ class TestDispatchPlanningService(UnitTestCase):
 			[">=", getdate("2026-08-24")],
 		)
 
-	@patch(
-		"vuna_transport.services.planning.dispatch_planning_service._get_address_names",
-		return_value=["Address-1", "Address-2"],
-	)
-	def test_location_filters_resolve_to_delivery_addresses(self, get_address_names):
+	def test_location_filters_use_delivery_order_snapshots(self):
 		filters = _planning_filters(
 			"Vuna Foods",
 			delivery_address="Address-1",
@@ -57,8 +53,10 @@ class TestDispatchPlanningService(UnitTestCase):
 			town="Meru Town",
 		)
 
-		get_address_names.assert_called_once_with("Address-1", "Meru", "Meru County", "Meru Town")
-		self.assertEqual(filters["delivery_address"], ["in", ["Address-1", "Address-2"]])
+		self.assertEqual(filters["delivery_address"], "Address-1")
+		self.assertEqual(filters["territory"], "Meru")
+		self.assertEqual(filters["county"], "Meru County")
+		self.assertEqual(filters["town"], "Meru Town")
 
 	def test_native_filter_group_accepts_custom_delivery_order_fields(self):
 		filters = validate_additional_filters(

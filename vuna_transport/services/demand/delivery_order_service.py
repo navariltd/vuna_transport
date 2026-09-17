@@ -338,6 +338,11 @@ def _create_delivery_order(sales_order, group_key, group_items):
 	delivery_order.customer = sales_order.customer
 	delivery_order.customer_name = sales_order.customer_name
 	delivery_order.delivery_address = delivery_address
+	address_data = get_address_planning_data(delivery_address)
+	delivery_order.territory = getattr(address_data, "territory", None)
+	delivery_order.county = getattr(address_data, "county", None)
+	delivery_order.constituency = getattr(address_data, "constituency", None)
+	delivery_order.town = getattr(address_data, "town", None)
 	delivery_order.required_delivery_date = delivery_date
 	delivery_order.source_warehouse = source_warehouse
 	delivery_order.transport_zone = transport_zone
@@ -346,7 +351,6 @@ def _create_delivery_order(sales_order, group_key, group_items):
 	delivery_order.delivery_method = delivery_method
 	delivery_order.delivery_group = delivery_group
 	delivery_order.status = "Open"
-	address_data = get_address_planning_data(delivery_address)
 	requirements = _get_group_transport_requirements(group_items, handling_profile, sales_order.company)
 	delivery_order.transport_compatibility_group = requirements.transport_compatibility_group
 	delivery_order.delivery_from_time = address_data.delivery_from_time

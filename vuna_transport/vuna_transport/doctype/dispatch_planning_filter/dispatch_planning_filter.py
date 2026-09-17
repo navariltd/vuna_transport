@@ -14,6 +14,7 @@ ALLOWED_FILTER_KEYS = {
 	"delivery_address",
 	"territory",
 	"county",
+	"constituency",
 	"town",
 	"transport_zone",
 	"delivery_method",

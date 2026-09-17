@@ -9,6 +9,7 @@
  "field_order": [
   "town_name",
   "county",
+  "constituency",
   "company",
   "disabled",
   "description"
@@ -31,6 +32,14 @@
    "label": "County",
    "options": "County",
    "reqd": 1
+  },
+  {
+   "fieldname": "constituency",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Constituency / Sub-county",
+   "options": "Constituency"
   },
   {
    "fieldname": "company",

@@ -19,11 +19,9 @@ def get_vehicle_categories(load_uoms, capacity_buffer_percentage=0):
 			"max_payload_weight",
 			"max_payload_weight_uom",
 			"minimum_payload_weight",
-			"minimum_payload_weight_uom",
 			"max_volume",
 			"max_volume_uom",
 			"minimum_volume",
-			"minimum_volume_uom",
 			"max_pallets",
 			"max_cases",
 			"max_crates",
@@ -71,13 +69,13 @@ def get_minimum_capacities(category, load_uoms):
 	return {
 		"weight": convert_measurement(
 			getattr(category, "minimum_payload_weight", 0),
-			getattr(category, "minimum_payload_weight_uom", None) or category.max_payload_weight_uom,
+			category.max_payload_weight_uom,
 			weight_uom,
 			_("minimum vehicle payload weight"),
 		),
 		"volume": convert_measurement(
 			getattr(category, "minimum_volume", 0),
-			getattr(category, "minimum_volume_uom", None) or category.max_volume_uom,
+			category.max_volume_uom,
 			volume_uom,
 			_("minimum vehicle volume"),
 		),

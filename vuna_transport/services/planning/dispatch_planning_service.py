@@ -66,6 +66,7 @@ def get_planning_demand(
 	territory=None,
 	county=None,
 	town=None,
+	constituency=None,
 	allocation_state=None,
 	planning_filters=None,
 	additional_filters=None,
@@ -85,6 +86,7 @@ def get_planning_demand(
 	territory = territory or configured_filters.get("territory")
 	county = county or configured_filters.get("county")
 	town = town or configured_filters.get("town")
+	constituency = constituency or configured_filters.get("constituency")
 	delivery_address = delivery_address or configured_filters.get("delivery_address")
 	selected_delivery_order_names = (
 		frappe.parse_json(selected_delivery_order_names)
@@ -108,6 +110,7 @@ def get_planning_demand(
 		territory,
 		county,
 		town,
+		constituency,
 	)
 	for fieldname in (
 		"delivery_group",
@@ -376,6 +379,7 @@ def _planning_filters(
 	territory=None,
 	county=None,
 	town=None,
+	constituency=None,
 ):
 	filters = {
 		"company": company,
@@ -395,18 +399,19 @@ def _planning_filters(
 		"priority": priority,
 		"customer": customer,
 		"delivery_address": delivery_address,
+		"territory": territory,
+		"county": county,
+		"town": town,
+		"constituency": constituency,
 	}.items():
 		if value:
 			filters[fieldname] = value
-	address_names = _get_address_names(delivery_address, territory, county, town)
-	if address_names is not None:
-		filters["delivery_address"] = ["in", address_names]
 	return filters
 
 
-def _get_address_names(delivery_address=None, territory=None, county=None, town=None):
+def _get_address_names(delivery_address=None, territory=None, county=None, constituency=None, town=None):
 	"""Resolve planner geography filters to permitted Address names."""
-	if not any((delivery_address, territory, county, town)):
+	if not any((delivery_address, territory, county, constituency, town)):
 		return None
 	filters = {}
 	if delivery_address:
@@ -415,6 +420,8 @@ def _get_address_names(delivery_address=None, territory=None, county=None, town=
 		filters["vuna_territory"] = territory
 	if county:
 		filters["vuna_county"] = county
+	if constituency:
+		filters["vuna_constituency"] = constituency
 	if town:
 		filters["vuna_town"] = town
 	return frappe.get_list("Address", filters=filters, pluck="name", limit_page_length=5000)
@@ -445,6 +452,10 @@ def _delivery_order_fields():
 		"delivery_method",
 		"priority",
 		"delivery_address",
+		"territory",
+		"county",
+		"constituency",
+		"town",
 		"status",
 		"transport_handling_profile",
 		"refrigeration_required",
@@ -600,6 +611,10 @@ def _format_demand_row(order, metrics):
 		"delivery_method": order.delivery_method,
 		"priority": order.priority,
 		"delivery_address": order.delivery_address,
+		"territory": order.territory,
+		"county": order.county,
+		"constituency": order.constituency,
+		"town": order.town,
 		"status": order.status,
 		"requested_quantity": flt(metrics.get("requested_quantity")),
 		"reserved_quantity": flt(metrics.get("reserved_quantity")),

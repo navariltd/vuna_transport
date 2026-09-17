@@ -22,6 +22,10 @@
   "column_break_juvd",
   "sales_order",
   "delivery_address",
+  "territory",
+  "county",
+  "constituency",
+  "town",
   "delivery_method",
   "section_break_rrsi",
   "items",
@@ -186,6 +190,38 @@
    "label": "Delivery Address",
    "options": "Address",
    "reqd": 1
+  },
+  {
+   "fieldname": "territory",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Territory",
+   "options": "Territory",
+   "read_only": 1
+  },
+  {
+   "fieldname": "county",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "County",
+   "options": "County",
+   "read_only": 1
+  },
+  {
+   "fieldname": "constituency",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Constituency / Sub-county",
+   "options": "Constituency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "town",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Town",
+   "options": "Town",
+   "read_only": 1
   },
   {
    "description": "Business fulfilment method copied from the Sales Order; transport sourcing is selected on Vehicle Allocation.",

@@ -22,13 +22,11 @@
   "max_payload_weight",
   "max_payload_weight_uom",
   "minimum_payload_weight",
-  "minimum_payload_weight_uom",
   "capacity_override_percentage",
   "column_break_kuyt",
   "max_volume",
   "max_volume_uom",
   "minimum_volume",
-  "minimum_volume_uom",
   "section_break_dnkj",
   "max_pallets",
   "column_break_pjok",
@@ -135,12 +133,6 @@
    "non_negative": 1
   },
   {
-   "fieldname": "minimum_payload_weight_uom",
-   "fieldtype": "Link",
-   "label": "Minimum Payload Weight UOM",
-   "options": "UOM"
-  },
-  {
    "fieldname": "max_pallets",
    "fieldtype": "Float",
    "label": "Maximum Pallets",
@@ -210,12 +202,6 @@
    "fieldtype": "Float",
    "label": "Minimum Volume",
    "non_negative": 1
-  },
-  {
-   "fieldname": "minimum_volume_uom",
-   "fieldtype": "Link",
-   "label": "Minimum Volume UOM",
-   "options": "UOM"
   },
   {
    "collapsible": 1,

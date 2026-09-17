@@ -4,6 +4,7 @@
 vuna_transport.patches.rename_planning_doctypes
 vuna_transport.patches.rename_delivery_custom_fields
 vuna_transport.patches.rename_vehicle_operational_role
+vuna_transport.patches.remove_vehicle_category_minimum_uoms
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
@@ -12,6 +13,7 @@ vuna_transport.patches.rename_delivery_domain_fields
 vuna_transport.patches.repair_delivery_load_parentfield
 vuna_transport.patches.normalize_delivery_custom_field_names
 vuna_transport.patches.backfill_delivery_order_locations
+vuna_transport.patches.backfill_delivery_order_constituency
 vuna_transport.patches.reset_vehicle_allocation_naming_series
 vuna_transport.patches.migrate_delivery_method_semantics
 vuna_transport.patches.migrate_vehicle_allocation_loads
@@ -19,3 +21,4 @@ vuna_transport.patches.migrate_delivery_trip_loads
 vuna_transport.patches.migrate_pod_rejection_reasons
 vuna_transport.patches.remove_vehicle_fuel_efficiency_uom
 vuna_transport.patches.remove_province_geography
+vuna_transport.patches.set_custom_field_module

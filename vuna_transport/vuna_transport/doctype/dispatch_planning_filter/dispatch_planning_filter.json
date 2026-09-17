@@ -27,7 +27,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Filter Field",
-   "options": "delivery_group\ntransport_compatibility_group\npreferred_route\nmaximum_vehicle_category\ndelivery_address\nterritory\ncounty\ntown\ntransport_zone\ndelivery_method\npriority\ncustomer\nsource_warehouse\ntransport_handling_profile",
+   "options": "delivery_group\ntransport_compatibility_group\npreferred_route\nmaximum_vehicle_category\ndelivery_address\nterritory\ncounty\nconstituency\ntown\ntransport_zone\ndelivery_method\npriority\ncustomer\nsource_warehouse\ntransport_handling_profile",
    "reqd": 1
   },
   {
