@@ -61,6 +61,18 @@ frappe.ui.form.on("Vehicle Allocation", {
 					},
 					__("Execution")
 				);
+				frm.add_custom_button(
+					__("Create Gate Pass"),
+					() => {
+						frappe.route_options = {
+							company: frm.doc.company,
+							vehicle_allocation: frm.doc.name,
+							direction: "Outbound",
+						};
+						frappe.new_doc("Gate Pass");
+					},
+					__("Execution")
+				);
 			});
 		}
 		if (loads.length) {

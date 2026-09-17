@@ -65,6 +65,12 @@
    "type": "Link"
   },
   {
+   "label": "Gate Pass",
+   "link_to": "Gate Pass",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
    "label": "Proof of Delivery",
    "link_to": "Proof of Delivery",
    "link_type": "DocType",
