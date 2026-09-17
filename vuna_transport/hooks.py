@@ -247,7 +247,6 @@ fixtures = [
 
 after_migrate = [
 	"vuna_transport.install.ensure_transport_uoms",
-	"vuna_transport.install.migrate_province_to_territory",
 	"vuna_transport.services.routing.location_service.backfill_address_coordinates",
 	"vuna_transport.services.fleet.fleet_service.sync_vehicle_operational_snapshots",
 ]

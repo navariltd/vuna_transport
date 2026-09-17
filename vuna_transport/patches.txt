@@ -18,3 +18,4 @@ vuna_transport.patches.migrate_vehicle_allocation_loads
 vuna_transport.patches.migrate_delivery_trip_loads
 vuna_transport.patches.migrate_pod_rejection_reasons
 vuna_transport.patches.remove_vehicle_fuel_efficiency_uom
+vuna_transport.patches.remove_province_geography
