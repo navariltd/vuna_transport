@@ -61,3 +61,11 @@ class TestTransportCostStructureAssignment(UnitTestCase):
 		)()
 
 		self.assertFalse(_profile_is_active(profile, "Yovuna Tech", "2026-09-10"))
+
+	def test_assignment_requires_submitted_cost_structure(self):
+		doc = frappe.new_doc("Transport Cost Structure Assignment")
+		doc.cost_structure = "Mileage"
+
+		with patch.object(frappe.db, "get_value", side_effect=[None, 0]):
+			with self.assertRaises(frappe.ValidationError):
+				doc.validate()

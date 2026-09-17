@@ -19,6 +19,15 @@ class TransportCostStructureAssignment(Document):
 				_("A Cost Structure Assignment cannot be restricted to both a Vehicle and a Supplier.")
 			)
 		model_company = frappe.db.get_value("Transport Cost Structure", self.cost_structure, "company")
+		structure_docstatus = frappe.db.get_value(
+			"Transport Cost Structure", self.cost_structure, "docstatus"
+		)
+		if structure_docstatus != 1:
+			frappe.throw(
+				_("Cost Structure {0} must be submitted before it can be assigned.").format(
+					self.cost_structure
+				)
+			)
 		if model_company and model_company != self.company:
 			frappe.throw(
 				_("Cost Structure {0} belongs to Company {1}.").format(self.cost_structure, model_company)
