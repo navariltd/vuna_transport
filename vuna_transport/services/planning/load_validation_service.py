@@ -14,7 +14,7 @@ from vuna_transport.services.demand.delivery_method_service import (
 PLANNABLE_DELIVERY_ORDER_STATUSES = ("Open", "Partially Allocated")
 
 
-def validate_load_allocations(load, lock=True):
+def validate_load_allocations(load, lock=True, for_execution=False):
 	"""Validate and rebuild every load row from authoritative Delivery Order data."""
 	if not load.delivery_orders:
 		frappe.throw(_("At least one Delivery Order is required."))
@@ -46,7 +46,9 @@ def validate_load_allocations(load, lock=True):
 			delivery_orders[row.delivery_order] = delivery_order
 		if first_order is None:
 			first_order = delivery_order
-		_validate_delivery_order_for_load(load, delivery_order, first_order)
+		_validate_delivery_order_for_load(
+			load, delivery_order, first_order, for_execution=for_execution
+		)
 
 		delivery_order_item = delivery_order_items.get(row.delivery_order_item)
 		if not delivery_order_item:
@@ -97,7 +99,7 @@ def _validate_required_row_links(row):
 		frappe.throw(_("Allocated quantity must be greater than zero."))
 
 
-def _validate_delivery_order_for_load(load, delivery_order, first_order):
+def _validate_delivery_order_for_load(load, delivery_order, first_order, for_execution=False):
 	from vuna_transport.services.demand.delivery_order_service import sync_delivery_order_quantities
 
 	# Re-read Sales Order quantities before accepting a stale Delivery Order into a load.
@@ -107,7 +109,10 @@ def _validate_delivery_order_for_load(load, delivery_order, first_order):
 		frappe.throw(
 			_("Delivery Order {0} must be submitted before it can be loaded.").format(delivery_order.name)
 		)
-	if delivery_order.status not in PLANNABLE_DELIVERY_ORDER_STATUSES:
+	allowed_statuses = PLANNABLE_DELIVERY_ORDER_STATUSES
+	if for_execution:
+		allowed_statuses = (*allowed_statuses, "Allocated", "Ready for Dispatch")
+	if delivery_order.status not in allowed_statuses:
 		frappe.throw(_("Delivery Order {0} is not available for load planning.").format(delivery_order.name))
 	sales_order_state = frappe.db.get_value(
 		"Sales Order",

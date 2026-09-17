@@ -84,7 +84,7 @@ def create_delivery_notes_for_load(load):
 	# may have reduced the outstanding quantity since this load was planned.
 	from vuna_transport.services.planning.load_validation_service import validate_load_allocations
 
-	validate_load_allocations(load)
+	validate_load_allocations(load, for_execution=True)
 	_validate_delivery_orders_for_execution(load)
 	_validate_delivery_note_allocation(load)
 	pick_list = frappe.get_doc("Pick List", load.pick_list) if load.pick_list else None

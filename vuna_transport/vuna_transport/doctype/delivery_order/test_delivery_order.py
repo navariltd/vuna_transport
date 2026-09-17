@@ -36,6 +36,14 @@ IGNORE_TEST_RECORD_DEPENDENCIES = []  # eg. ["User"]
 
 
 class TestDeliveryOrder(UnitTestCase):
+	def test_post_submit_sync_fields_are_allowed_to_update(self):
+		for fieldname in ("ordered_qty", "transport_qty", "uom", "conversion_factor", "stock_qty", "stock_uom"):
+			self.assertEqual(
+				frappe.get_meta("Delivery Order Item").get_field(fieldname).allow_on_submit,
+				1,
+				fieldname,
+			)
+
 	"""
 	Integration tests for DeliveryOrder.
 	Use this class for testing interactions between multiple components.
