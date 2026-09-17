@@ -13,6 +13,8 @@ from vuna_transport.services.execution.delivery_exception_service import (
 	_validate_erpnext_links,
 	_validate_follow_up_delivery,
 	_validate_resolution,
+	_validate_resolution_plan,
+	validate_exception_cancellation,
 	_validate_return_quantities,
 	get_exception_item_values,
 	sync_delivery_exception_from_pod,
@@ -20,6 +22,50 @@ from vuna_transport.services.execution.delivery_exception_service import (
 
 
 class TestDeliveryException(UnitTestCase):
+	def test_delivery_exception_is_submittable(self):
+		self.assertTrue(frappe.get_meta("Delivery Exception").is_submittable)
+
+	@patch("vuna_transport.services.execution.delivery_exception_service.frappe.db.get_value")
+	def test_cancellation_requires_downstream_return_request_to_be_cancelled(self, get_value):
+		get_value.return_value = 0
+		exception = SimpleNamespace(
+			name="DEX-1",
+			return_request="RR-1",
+			return_document=None,
+			credit_note=None,
+			replacement_delivery_reference=None,
+		)
+		with self.assertRaises(ValidationError):
+			validate_exception_cancellation(exception)
+
+	def test_resolution_plan_supports_mixed_item_outcomes(self):
+		exception = self._exception()
+		exception.resolutions = [
+			SimpleNamespace(
+				idx=1,
+				delivery_note_item="DNI-1",
+				item_code="MILK",
+				quantity=10,
+				custody="Returned To Depot",
+				responsible_party="Company",
+				physical_resolution="Return to Nearest Depot",
+				commercial_resolution="Credit Note",
+				resolution_warehouse="NEAREST - VF",
+			),
+			SimpleNamespace(
+				idx=2,
+				delivery_note_item="DNI-1",
+				item_code="MILK",
+				quantity=20,
+				custody="Left With Customer",
+				responsible_party="Customer",
+				physical_resolution="Leave With Customer",
+				commercial_resolution="Replacement",
+				resolution_warehouse=None,
+			),
+		]
+
+		self.assertEqual(_validate_resolution_plan(exception, require_complete=True), {"DNI-1": 30})
 	def test_proof_of_delivery_is_unique_exception_context(self):
 		self.assertTrue(frappe.get_meta("Delivery Exception").get_field("proof_of_delivery").unique)
 

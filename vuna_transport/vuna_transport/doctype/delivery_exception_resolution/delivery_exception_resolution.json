@@ -1,0 +1,170 @@
+{
+ "actions": [],
+ "creation": "2026-09-17 03:30:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "delivery_exception_item",
+  "item_code",
+  "item_name",
+  "delivery_order_item",
+  "delivery_note_item",
+  "quantity_section",
+  "quantity",
+  "column_break_quantity",
+  "custody",
+  "responsible_party",
+  "physical_resolution",
+  "resolution_warehouse",
+  "commercial_resolution",
+  "documents_section",
+  "return_request",
+  "return_document",
+  "credit_note",
+  "replacement_sales_order",
+  "replacement_delivery_reference",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "delivery_exception_item",
+   "fieldtype": "Data",
+   "label": "Exception Item Row",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_order_item",
+   "fieldtype": "Link",
+   "label": "Delivery Order Item",
+   "options": "Delivery Order Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_note_item",
+   "fieldtype": "Link",
+   "label": "Delivery Note Item",
+   "options": "Delivery Note Item",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "quantity_section",
+   "fieldtype": "Section Break",
+   "label": "Resolution Quantity"
+  },
+  {
+   "fieldname": "quantity",
+   "fieldtype": "Float",
+   "label": "Quantity",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_quantity",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "custody",
+   "fieldtype": "Select",
+   "label": "Custody",
+   "options": "\nStill With Vehicle\nLeft With Customer\nHeld By Transporter\nReturned To Depot\nTransferred To Another Vehicle\nUnknown"
+  },
+  {
+   "fieldname": "responsible_party",
+   "fieldtype": "Select",
+   "label": "Responsible Party",
+   "options": "\nCompany\nCustomer\nTransporter\nDriver\nThird Party\nUnknown"
+  },
+  {
+   "fieldname": "physical_resolution",
+   "fieldtype": "Select",
+   "label": "Physical Resolution",
+   "options": "\nReturn to Original Depot\nReturn to Nearest Depot\nCustomer Return to Depot\nLeave With Customer\nRe-deliver\nDispose / Write Off\nPending Decision",
+   "reqd": 1
+  },
+  {
+   "fieldname": "resolution_warehouse",
+   "fieldtype": "Link",
+   "label": "Resolution Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "commercial_resolution",
+   "fieldtype": "Select",
+   "label": "Commercial Resolution",
+   "options": "\nReplacement\nCredit Note\nRe-delivery\nNo Charge\nNo Further Action\nPending",
+   "reqd": 1
+  },
+  {
+   "fieldname": "documents_section",
+   "fieldtype": "Section Break",
+   "label": "Resolution Documents"
+  },
+  {
+   "fieldname": "return_request",
+   "fieldtype": "Link",
+   "label": "Return Request",
+   "options": "Return Request",
+   "read_only": 1
+  },
+  {
+   "fieldname": "return_document",
+   "fieldtype": "Link",
+   "label": "Return Delivery Note",
+   "options": "Delivery Note",
+   "read_only": 1
+  },
+  {
+   "fieldname": "credit_note",
+   "fieldtype": "Link",
+   "label": "Credit Note",
+   "options": "Sales Invoice",
+   "read_only": 1
+  },
+  {
+   "fieldname": "replacement_sales_order",
+   "fieldtype": "Link",
+   "label": "Replacement Sales Order",
+   "options": "Sales Order",
+   "read_only": 1
+  },
+  {
+   "fieldname": "replacement_delivery_reference",
+   "fieldtype": "Link",
+   "label": "Replacement Delivery Order",
+   "options": "Delivery Order",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-17 03:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Delivery Exception Resolution",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "ASC"
+}

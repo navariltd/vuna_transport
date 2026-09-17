@@ -30,6 +30,7 @@
   "total_unresolved_quantity",
   "total_resolution_quantity",
   "items",
+  "resolutions",
   "resolution_tab",
   "custody_section",
   "custody",
@@ -46,6 +47,7 @@
   "return_request",
   "return_document",
   "credit_note",
+  "replacement_sales_order",
   "replacement_delivery_reference",
   "notes_section",
   "notes",
@@ -223,6 +225,12 @@
    "reqd": 1
   },
   {
+   "fieldname": "resolutions",
+   "fieldtype": "Table",
+   "label": "Resolution Plan",
+   "options": "Delivery Exception Resolution"
+  },
+  {
    "fieldname": "resolution_tab",
    "fieldtype": "Tab Break",
    "label": "Resolution"
@@ -323,6 +331,13 @@
    "options": "Sales Invoice"
   },
   {
+   "fieldname": "replacement_sales_order",
+   "fieldtype": "Link",
+   "label": "Replacement Sales Order",
+   "options": "Sales Order",
+   "read_only": 1
+  },
+  {
    "fieldname": "replacement_delivery_reference",
    "fieldtype": "Link",
    "label": "Follow-up Delivery Order",
@@ -346,9 +361,10 @@
   }
  ],
  "grid_page_length": 50,
+ "is_submittable": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-15 21:50:34.737287",
+ "modified": "2026-09-17 03:30:00.000000",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Delivery Exception",
@@ -364,6 +380,7 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
+   "submit": 1,
    "share": 1,
    "write": 1
   },
@@ -382,6 +399,7 @@
    "read": 1,
    "report": 1,
    "role": "Transport Dispatcher",
+   "submit": 1,
    "write": 1
   },
   {
@@ -393,6 +411,7 @@
    "read": 1,
    "report": 1,
    "role": "Transport Manager",
+   "submit": 1,
    "share": 1,
    "write": 1
   }

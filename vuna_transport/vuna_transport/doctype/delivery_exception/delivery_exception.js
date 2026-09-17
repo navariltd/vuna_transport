@@ -27,6 +27,33 @@ frappe.ui.form.on("Delivery Exception", {
 	refresh(frm) {
 		add_view_buttons(frm);
 		if (frm.is_new()) return;
+		if (frm.doc.docstatus === 0 && (frm.doc.items || []).length) {
+			frm.add_custom_button(
+				__("Prepare Resolution Plan"),
+				() => prepare_resolution_plan(frm),
+				__("Resolve")
+			);
+		}
+		if (
+			frm.doc.docstatus === 1 &&
+			has_commercial_resolution(frm.doc, "Replacement") ||
+			frm.doc.docstatus === 1 &&
+			has_commercial_resolution(frm.doc, "Re-delivery")
+		) {
+			if (frm.doc.replacement_sales_order) {
+				frm.add_custom_button(
+					__("Replacement Sales Order"),
+					() => frappe.set_route("Form", "Sales Order", frm.doc.replacement_sales_order),
+					__("View")
+				);
+			} else {
+				frm.add_custom_button(
+					__("Create Replacement Sales Order"),
+					() => create_replacement_sales_order(frm),
+					__("Resolve")
+				);
+			}
+		}
 		if (requires_stock_return(frm.doc)) {
 			if (frm.doc.return_request) {
 				frm.add_custom_button(
@@ -108,6 +135,7 @@ function add_view_buttons(frm) {
 		["delivery_order", "Delivery Order", __("Delivery Order")],
 		["return_document", "Delivery Note", __("Return Document")],
 		["credit_note", "Sales Invoice", __("Credit Note")],
+		["replacement_sales_order", "Sales Order", __("Replacement Sales Order")],
 		["replacement_delivery_reference", "Delivery Order", __("Follow-up Delivery")],
 		["return_request", "Return Request", __("Return Request")],
 	].forEach(([fieldname, doctype, label]) => {
@@ -133,6 +161,38 @@ function create_return_request(frm) {
 	});
 }
 
+function create_replacement_sales_order(frm) {
+	frappe.call({
+		method: "vuna_transport.services.execution.return_service.create_replacement_sales_order_from_exception",
+		args: { delivery_exception: frm.doc.name },
+		freeze: true,
+		callback: ({ message }) => {
+			if (message) frappe.set_route("Form", "Sales Order", message);
+		},
+	});
+}
+
+function prepare_resolution_plan(frm) {
+	frm.clear_table("resolutions");
+	(frm.doc.items || []).forEach((item) => {
+		if (!flt(item.unresolved_qty)) return;
+		const row = frm.add_child("resolutions");
+		row.delivery_exception_item = item.name;
+		row.item_code = item.item_code;
+		row.item_name = item.item_name;
+		row.delivery_order_item = item.delivery_order_item;
+		row.delivery_note_item = item.delivery_note_item;
+		row.quantity = item.unresolved_qty;
+		row.custody = item.custody || frm.doc.custody;
+		row.responsible_party = item.responsible_party || frm.doc.responsible_party;
+		row.physical_resolution = item.physical_resolution || frm.doc.physical_resolution;
+		row.resolution_warehouse = frm.doc.resolution_warehouse;
+		row.commercial_resolution = item.commercial_resolution || frm.doc.commercial_resolution;
+	});
+	frm.refresh_field("resolutions");
+	frm.dirty();
+}
+
 function requires_stock_return(doc) {
 	const resolutions = [
 		"Return to Original Depot",
@@ -141,13 +201,15 @@ function requires_stock_return(doc) {
 	];
 	return (
 		resolutions.includes(doc.physical_resolution) ||
-		(doc.items || []).some((row) => resolutions.includes(row.physical_resolution))
+		(doc.items || []).some((row) => resolutions.includes(row.physical_resolution)) ||
+		(doc.resolutions || []).some((row) => resolutions.includes(row.physical_resolution))
 	);
 }
 
 function has_commercial_resolution(doc, resolution) {
 	return (
 		doc.commercial_resolution === resolution ||
-		(doc.items || []).some((row) => row.commercial_resolution === resolution)
+		(doc.items || []).some((row) => row.commercial_resolution === resolution) ||
+		(doc.resolutions || []).some((row) => row.commercial_resolution === resolution)
 	);
 }
