@@ -56,3 +56,5 @@ jspm_packages/
 
 docs/
 doctype_definitions/
+frontend/node_modules/
+frontend/dist/
