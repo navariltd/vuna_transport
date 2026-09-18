@@ -10,6 +10,7 @@ from vuna_transport.services.costing.transport_cost_estimation_service import (
 	CostContext,
 	_destination_rate,
 	estimate_cost_component,
+	estimate_transport_cost_for_loads,
 )
 
 
@@ -46,6 +47,50 @@ class TestTransportCostEstimationService(UnitTestCase):
 		self.assertEqual(result["quantity"], 300)
 		self.assertEqual(result["amount"], 22500)
 		self.assertEqual(result["uom"], "Kilometer")
+
+	@patch("vuna_transport.services.costing.transport_cost_estimation_service.estimate_transport_cost")
+	@patch("vuna_transport.services.costing.transport_cost_estimation_service._resolve_document")
+	def test_combined_load_estimate_sums_loads_and_fixed_cost_once(
+		self, resolve_document, estimate_transport_cost
+	):
+		load_one = SimpleNamespace(name="DL-001")
+		load_two = SimpleNamespace(name="DL-002")
+		vehicle = SimpleNamespace(name="KDA 123A", vuna_vehicle_category="Tanker")
+		resolve_document.side_effect = [load_one, load_two, vehicle]
+		estimate_transport_cost.side_effect = [
+			{
+				"cost_structure": "Union",
+				"cost_structure_assignment": "Union Meru",
+				"currency": "KES",
+				"distance": 100,
+				"distance_uom": "Kilometer",
+				"distance_source": "Geographic Estimate",
+				"marginal_cost": 10000,
+				"fixed_cost": 500,
+				"components": [{"component": "Fuel", "amount": 10000}],
+				"warnings": [],
+			},
+			{
+				"cost_structure": "Union",
+				"cost_structure_assignment": "Union Meru",
+				"currency": "KES",
+				"distance": 150,
+				"distance_uom": "Kilometer",
+				"distance_source": "Geographic Estimate",
+				"marginal_cost": 12000,
+				"fixed_cost": 500,
+				"components": [{"component": "Parking", "amount": 12000}],
+				"warnings": [],
+			},
+		]
+
+		result = estimate_transport_cost_for_loads(["DL-001", "DL-002"], "KDA 123A")
+
+		self.assertEqual(result["distance"], 250)
+		self.assertEqual(result["marginal_cost"], 22000)
+		self.assertEqual(result["fixed_cost"], 500)
+		self.assertEqual(len(result["components"]), 2)
+		self.assertTrue(any("not a route-optimized" in warning for warning in result["warnings"]))
 
 	def test_fuel_component_uses_distance_and_efficiency(self):
 		component = SimpleNamespace(

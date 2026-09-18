@@ -6,7 +6,10 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, getdate
 
-from vuna_transport.services.costing.transport_cost_estimation_service import estimate_transport_cost
+from vuna_transport.services.costing.transport_cost_estimation_service import (
+	estimate_transport_cost,
+	estimate_transport_cost_for_cost_structure,
+)
 from vuna_transport.services.fleet.driver_availability_service import (
 	get_driver_availability_map,
 )
@@ -339,6 +342,62 @@ def get_costed_vehicle_candidates(allocations, vehicle_category=None):
 	return sorted(
 		candidates, key=lambda row: (row["marginal_cost"] is None, row["marginal_cost"], row["vehicle"])
 	)
+
+
+@frappe.whitelist()
+def get_cost_structure_estimates(allocations, vehicle_category=None):
+	"""Compare applicable Cost Structures before a physical Vehicle is selected."""
+	require_doctype_permission("Delivery Load", "read")
+	require_doctype_permission("Transport Cost Structure", "read")
+	load = build_delivery_load_from_allocations(allocations, vehicle_category)
+	validate_load_allocations(load, lock=False)
+	calculate_load_totals(load)
+	structures = frappe.get_all(
+		"Transport Cost Structure",
+		filters={"disabled": 0, "docstatus": 1},
+		or_filters=[{"company": load.company}, {"company": ["is", "not set"]}],
+		fields=["name", "cost_structure_name", "vehicle_owner"],
+		order_by="cost_structure_name asc, name asc",
+		limit_page_length=100,
+	)
+	results = []
+	for structure in structures:
+		estimate = estimate_transport_cost_for_cost_structure(
+			load,
+			structure.name,
+			vehicle_category=vehicle_category,
+		)
+		results.append(
+			{
+				"cost_structure": structure.name,
+				"cost_structure_label": structure.cost_structure_name or structure.name,
+				"vehicle_owner": structure.vehicle_owner,
+				"cost_structure_assignment": estimate.get("cost_structure_assignment"),
+				"currency": estimate.get("currency"),
+				"estimated_distance": estimate.get("distance"),
+				"distance_uom": estimate.get("distance_uom"),
+				"distance_source": estimate.get("distance_source"),
+				"marginal_cost": estimate.get("marginal_cost"),
+				"estimated_full_cost": estimate.get("estimated_full_cost"),
+				"cost_breakdown": estimate.get("components", []),
+				"warnings": estimate.get("warnings", []),
+			}
+		)
+	available = [row for row in results if row["cost_structure_assignment"] and not row["warnings"]]
+	if not available:
+		available = [row for row in results if row["cost_structure_assignment"]]
+	if available:
+		recommended = min(available, key=lambda row: (row["estimated_full_cost"], row["cost_structure"]))
+		for row in results:
+			row["recommended"] = row["cost_structure"] == recommended["cost_structure"]
+	return {
+		"distance": getattr(load, "estimated_distance", None),
+		"distance_uom": getattr(load, "distance_uom", None),
+		"cost_structures": sorted(
+			results,
+			key=lambda row: (not bool(row["cost_structure_assignment"]), row["estimated_full_cost"], row["cost_structure"]),
+		),
+	}
 
 
 @frappe.whitelist()

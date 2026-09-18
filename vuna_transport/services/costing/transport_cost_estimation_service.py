@@ -12,6 +12,7 @@ from vuna_transport.services.shared.security_service import (
 	require_document_permission,
 )
 from vuna_transport.services.routing.location_service import get_address_planning_data
+from vuna_transport.services.routing.distance_estimation_service import estimate_delivery_load_distance
 
 
 @dataclass
@@ -150,6 +151,158 @@ def get_applicable_cost_structure_assignment(vehicle, company, date=None):
 	return frappe.get_doc("Transport Cost Structure Assignment", best[0])
 
 
+def get_applicable_cost_structure_assignment_for_load(load, cost_structure, date=None, vehicle_category=None):
+	"""Resolve a load-level assignment without requiring a physical Vehicle."""
+	date = getdate(date or getattr(load, "dispatch_date", None) or nowdate())
+	profiles = frappe.get_all(
+		"Transport Cost Structure Assignment",
+		filters={
+			"company": load.company,
+			"cost_structure": cost_structure,
+			"disabled": 0,
+			"docstatus": 1,
+		},
+		fields=["name", "vehicle", "supplier", "vehicle_category", "valid_from", "valid_to"],
+	)
+	candidates = []
+	for profile in profiles:
+		if not _profile_is_active(profile, load.company, date):
+			continue
+		# A vehicle- or supplier-specific assignment cannot be selected before
+		# the actual transport resource is known.
+		if profile.vehicle or profile.supplier:
+			continue
+		if profile.vehicle_category and profile.vehicle_category != vehicle_category:
+			continue
+		precedence = 1 if profile.vehicle_category else 0
+		candidates.append((precedence, profile.name))
+	if not candidates:
+		return None
+	best_precedence = max(item[0] for item in candidates)
+	best = [name for precedence, name in candidates if precedence == best_precedence]
+	if len(best) > 1:
+		frappe.throw(
+			_("Multiple active Cost Structure Assignments match Cost Structure {0}: {1}.").format(
+				cost_structure, ", ".join(best)
+			)
+		)
+	return frappe.get_doc("Transport Cost Structure Assignment", best[0])
+
+
+def estimate_transport_cost_for_cost_structure(
+	delivery_load, cost_structure, *, vehicle_category=None, as_of_date=None
+):
+	"""Estimate a load against a Cost Structure before a physical Vehicle is selected."""
+	load = _resolve_document("Delivery Load", delivery_load)
+	require_document_permission(load, "read")
+	require_company_access(load.company)
+	uoms = get_transport_uoms()
+	vehicle = frappe._dict(
+		name=None,
+		vuna_vehicle_category=vehicle_category,
+		vuna_expected_fuel_efficiency=None,
+	)
+	context = _build_context(
+		load,
+		vehicle,
+		uoms,
+		as_of_date=as_of_date,
+		distance=None,
+		distance_source=None,
+	)
+	profile = get_applicable_cost_structure_assignment_for_load(
+		load, cost_structure, context.date, vehicle_category
+	)
+	warnings = list(context_warnings(context))
+	if not profile:
+		warnings.append(
+			_("No active Cost Structure Assignment applies to {0} for this load.").format(cost_structure)
+		)
+		return _empty_structure_estimate(cost_structure, vehicle_category, context, warnings)
+
+	components = []
+	for component in profile.components:
+		result = estimate_cost_component(component, context, profile)
+		components.append(result)
+		warnings.extend(result.pop("warnings", []))
+	marginal_cost = sum(flt(row["amount"]) for row in components if row["basis"] != "Monthly Fixed")
+	fixed_cost = sum(flt(row["amount"]) for row in components if row["basis"] == "Monthly Fixed")
+	return {
+		"vehicle": None,
+		"vehicle_category": vehicle_category,
+		"cost_structure": cost_structure,
+		"cost_structure_assignment": profile.name,
+		"currency": profile.currency,
+		"distance": context.distance,
+		"distance_uom": context.distance_uom,
+		"distance_source": context.distance_source,
+		"components": components,
+		"marginal_cost": flt(marginal_cost),
+		"fixed_cost": flt(fixed_cost),
+		"allocated_fixed_cost": 0,
+		"unallocated_fixed_cost": flt(fixed_cost),
+		"estimated_full_cost": flt(marginal_cost),
+		"warnings": _unique(warnings),
+	}
+
+
+def estimate_transport_cost_for_loads(delivery_loads, vehicle):
+	"""Estimate one vehicle allocation containing multiple Delivery Loads.
+
+	Each load keeps its own destination-rate context. The allocation snapshot
+	combines the results and explicitly warns that the distance is not a
+	route-optimized total.
+	"""
+	load_documents = [
+		_resolve_document("Delivery Load", load) for load in (delivery_loads or [])
+	]
+	if not load_documents:
+		frappe.throw(_("At least one Delivery Load is required for a combined estimate."))
+	vehicle_doc = _resolve_document("Vehicle", vehicle)
+	results = [estimate_transport_cost(load, vehicle_doc) for load in load_documents]
+	assignments = {row.get("cost_structure_assignment") for row in results if row.get("cost_structure_assignment")}
+	structures = {row.get("cost_structure") for row in results if row.get("cost_structure")}
+	currencies = {row.get("currency") for row in results if row.get("currency")}
+	warnings = _unique(
+		warning
+		for result in results
+		for warning in result.get("warnings", [])
+	)
+	if len(load_documents) > 1:
+		warnings.append(
+			_("Combined distance sums the individual load estimates; it is not a route-optimized distance.")
+		)
+	if len(assignments) > 1:
+		warnings.append(_("Attached loads resolved to different Cost Structure Assignments."))
+	if len(currencies) > 1:
+		warnings.append(_("Attached loads resolved to different currencies."))
+
+	components = []
+	for load, result in zip(load_documents, results, strict=False):
+		for component in result.get("components", []):
+			components.append({"delivery_load": load.name, **component})
+	# Monthly fixed costs belong to the assignment, not to every attached load.
+	fixed_cost = results[0].get("fixed_cost", 0)
+	marginal_cost = sum(flt(result.get("marginal_cost")) for result in results)
+	return {
+		"vehicle": vehicle_doc.name,
+		"vehicle_category": getattr(vehicle_doc, "vuna_vehicle_category", None),
+		"cost_structure": next(iter(structures), None) if len(structures) == 1 else None,
+		"cost_structure_assignment": next(iter(assignments), None) if len(assignments) == 1 else None,
+		"currency": next(iter(currencies), None) if len(currencies) == 1 else None,
+		"distance": sum(flt(result.get("distance")) for result in results),
+		"distance_uom": results[0].get("distance_uom"),
+		"distance_source": "Estimated" if len(load_documents) > 1 else results[0].get("distance_source"),
+		"components": components,
+		"marginal_cost": flt(marginal_cost),
+		"fixed_cost": flt(fixed_cost),
+		"allocated_fixed_cost": 0,
+		"unallocated_fixed_cost": flt(fixed_cost),
+		"estimated_full_cost": flt(marginal_cost),
+		"warnings": _unique(warnings),
+	}
+
+
 def estimate_cost_component(component, context, profile=None):
 	"""Calculate one configured component and return an explainable result."""
 	basis = component.calculation_basis
@@ -164,7 +317,7 @@ def estimate_cost_component(component, context, profile=None):
 		quantity = _distance_in_rate_uom(context.distance, context.distance_uom, component.rate_uom)
 		uom = component.rate_uom or context.distance_uom
 		amount = quantity * rate
-		if context.distance_source in {"Estimated", "Haversine", ""}:
+		if context.distance_source in {"Estimated", "Haversine", "Geographic Estimate", ""}:
 			warnings.append(_("Distance Charge uses an estimated distance."))
 		explanation = _multiplication_explanation(quantity, uom, rate, amount)
 	elif basis == "Per Fuel Quantity":
@@ -209,7 +362,13 @@ def estimate_cost_component(component, context, profile=None):
 
 def _build_context(load, vehicle, uoms, *, as_of_date, distance, distance_source):
 	load_distance = distance if distance is not None else getattr(load, "estimated_distance", None)
-	source = distance_source or ("Planned Distance" if load_distance else "Estimated")
+	source = distance_source or getattr(load, "distance_estimate_method", None)
+	if not load_distance:
+		distance_estimate = estimate_delivery_load_distance(load)
+		if distance_estimate["available"]:
+			load_distance = distance_estimate["distance_km"]
+			source = source or "Haversine"
+	source = source or ("Planned Distance" if load_distance else "Estimated")
 	addresses = sorted(
 		{row.delivery_address for row in getattr(load, "delivery_orders", []) if row.delivery_address}
 	)
@@ -321,6 +480,26 @@ def _empty_estimate(vehicle, context, warnings):
 		"vehicle": vehicle.name,
 		"vehicle_category": getattr(vehicle, "vuna_vehicle_category", None),
 		"cost_structure": None,
+		"cost_structure_assignment": None,
+		"currency": None,
+		"distance": context.distance,
+		"distance_uom": context.distance_uom,
+		"distance_source": context.distance_source,
+		"components": [],
+		"marginal_cost": 0,
+		"fixed_cost": 0,
+		"allocated_fixed_cost": 0,
+		"unallocated_fixed_cost": 0,
+		"estimated_full_cost": 0,
+		"warnings": _unique(warnings),
+	}
+
+
+def _empty_structure_estimate(cost_structure, vehicle_category, context, warnings):
+	return {
+		"vehicle": None,
+		"vehicle_category": vehicle_category,
+		"cost_structure": cost_structure,
 		"cost_structure_assignment": None,
 		"currency": None,
 		"distance": context.distance,

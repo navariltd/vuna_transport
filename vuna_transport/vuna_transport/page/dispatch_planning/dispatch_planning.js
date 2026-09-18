@@ -793,54 +793,52 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			? this.plan.selected_vehicle_category_compatible
 			: Boolean(this.plan.recommended_vehicle_category);
 		this.$root.find(".btn-create-load").prop("disabled", !can_create);
-		this.load_costed_candidates();
+		this.load_cost_structure_estimates();
 	}
 
-	async load_costed_candidates() {
+	async load_cost_structure_estimates() {
 		const request_id = ++this.cost_request_id;
 		const rows = [...this.allocations.values()];
 		const $target = this.$root.find(".dp-costed-vehicles");
 		if (!rows.length || !this.plan) return $target.empty();
-		$target.html(`<div class="text-muted small">${__("Loading costed vehicles...")}</div>`);
+		$target.html(`<div class="text-muted small">${__("Loading cost structure estimates...")}</div>`);
 		try {
-			const response = await this.call("get_costed_vehicle_candidates", {
+			const response = await this.call("get_cost_structure_estimates", {
 				allocations: rows,
 				vehicle_category:
 					this.selected_vehicle_category() || this.plan.recommended_vehicle_category,
 			});
 			if (request_id !== this.cost_request_id) return;
-			const candidates = response || [];
+			const candidates = response?.cost_structures || [];
 			$target.html(
 				candidates.length
 					? `<div class="small text-muted">${__(
-							"Eligible vehicles ranked by estimated marginal cost"
+							"Applicable Cost Structures ranked by estimated cost"
 					  )}</div>${candidates
 							.map(
 								(row, index) =>
 									`<div class="dp-costed-vehicle"><strong>${
 										index + 1
-									}. ${this.escape(
-										row.license_plate
-									)}</strong><span>${this.escape(
-										row.cost_structure || __("No assignment")
-									)}</span><b>${
+									}. ${this.escape(row.cost_structure_label || row.cost_structure)}</strong><span>${
+										row.cost_structure_assignment || __("No applicable assignment")
+									}</span><b>${
 										row.currency
-											? `${this.number(row.marginal_cost)} ${this.escape(
-													row.currency
-											  )}`
+											? `${this.number(row.estimated_full_cost)} ${this.escape(row.currency)}`
 											: __("Not estimated")
-									}</b></div>`
+									}</b>${
+										row.recommended ? `<small class="text-success">${__("Recommended")}</small>` : ""
+									}${row.warnings?.length ? `<small class="text-warning">${this.escape(row.warnings[0])}</small>` : ""}</div>`
 							)
 							.join("")}`
 					: `<div class="text-muted small">${__(
-							"No eligible costed vehicles found."
+							"No applicable Cost Structure estimates found."
 					  )}</div>`
 			);
 		} catch (error) {
 			if (request_id === this.cost_request_id)
 				$target.html(
 					`<div class="text-muted small">${this.escape(
-						error.message || __("Cost estimates unavailable.")
+						error.message || __("Cost Structure estimates unavailable.")
 					)}</div>`
 				);
 		}
