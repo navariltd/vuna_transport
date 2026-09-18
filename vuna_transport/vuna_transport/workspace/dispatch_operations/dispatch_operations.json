@@ -77,12 +77,6 @@
    "type": "Link"
   },
   {
-   "label": "Delivery Exception",
-   "link_to": "Delivery Exception",
-   "link_type": "DocType",
-   "type": "Link"
-  },
-  {
    "label": "Return Requests",
    "link_to": "Return Request",
    "link_type": "DocType",
@@ -183,13 +177,6 @@
    "type": "Link"
   },
   {
-   "label": "Open Delivery Exceptions",
-   "link_to": "Open Delivery Exceptions",
-   "link_type": "Report",
-   "is_query_report": 0,
-   "type": "Link"
-  },
-  {
    "label": "Dispatch Readiness",
    "link_to": "Dispatch Readiness",
    "link_type": "Report",
@@ -197,7 +184,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-10 07:41:49.318085",
+ "modified": "2026-09-17 17:54:58.505372",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Dispatch Operations",

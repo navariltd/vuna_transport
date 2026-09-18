@@ -214,16 +214,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Delivery Exception",
-   "link_count": 0,
-   "link_to": "Delivery Exception",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Warehouse & Addresses",
    "link_count": 2,
    "link_type": "DocType",
@@ -300,7 +290,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-08-27 08:40:13.001202",
+ "modified": "2026-09-17 17:54:58.505372",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vuna Transport",

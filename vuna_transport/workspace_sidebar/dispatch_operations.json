@@ -156,18 +156,6 @@
    "type": "Section Break"
   },
   {
-   "child": 1,
-   "collapsible": 1,
-   "icon": "alert-triangle",
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Delivery Exceptions",
-   "link_to": "Delivery Exception",
-   "link_type": "DocType",
-   "show_arrow": 0,
-   "type": "Link"
-  },
-  {
    "child": 0,
    "collapsible": 1,
    "icon": "package-check",
@@ -368,18 +356,6 @@
   {
    "child": 1,
    "collapsible": 1,
-   "icon": "alert-triangle",
-   "indent": 0,
-   "keep_closed": 0,
-   "label": "Open Delivery Exceptions",
-   "link_to": "Open Delivery Exceptions",
-   "link_type": "Report",
-   "show_arrow": 0,
-   "type": "Link"
-  },
-  {
-   "child": 1,
-   "collapsible": 1,
    "icon": "clipboard-check",
    "indent": 0,
    "keep_closed": 0,
@@ -402,7 +378,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-15 15:22:36.208815",
+ "modified": "2026-09-17 17:54:58.505372",
  "modified_by": "Administrator",
  "name": "Dispatch Operations",
  "owner": "Administrator",
