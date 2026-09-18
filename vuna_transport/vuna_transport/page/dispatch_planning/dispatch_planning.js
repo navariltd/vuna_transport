@@ -1,11 +1,17 @@
 frappe.provide("vuna_transport.DispatchPlanning");
 
 frappe.pages["dispatch-planning"].on_page_load = function (wrapper) {
+	$(wrapper).addClass("dispatch-planning-page");
+	$(wrapper).closest(".page-container").addClass("dispatch-planning-page").find("footer").remove();
 	frappe.ui.make_app_page({
 		parent: wrapper,
 		title: __("Dispatch Planning"),
 		single_column: true,
 	});
+	// This planning page has its own full-height workspace and does not need the
+	// standard empty page footer reserved by make_app_page.
+	$(wrapper).find(".layout-footer, .page-footer").remove();
+	$(wrapper).closest(".page-container").find("footer").remove();
 	load_vue(wrapper);
 };
 
@@ -51,7 +57,6 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.suggestion_request_id = 0;
 		this.cost_request_id = 0;
 		this.details_requests = new Map();
-		this.warehouse_summary_expanded = false;
 		this.configured_filter_keys = new Set();
 		this.configured_filter_company = null;
 		this.make_layout();
@@ -73,8 +78,8 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.$root = $(
 			`<div class="dispatch-planning">
 				<div class="dp-toolbar">
-					<div class="dp-toolbar-header">
-						<div class="dp-filter-title">${__("Planning Filters")}</div>
+					<div class="dp-toolbar-header dp-collapsible-header" role="button" tabindex="0" aria-expanded="false">
+						<div class="dp-filter-title">${__("Planning Filters")} <span class="text-muted dp-filter-toggle-icon">▸</span></div>
 						<div class="dp-toolbar-actions">
 							<button class="btn btn-default btn-sm btn-toggle-filters">${__("Show Filters")}</button>
 							<button class="btn btn-default btn-sm btn-native-filter">${__("Add Filter")}</button>
@@ -84,15 +89,6 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 						</div>
 					</div>
 					<div class="dp-filter-grid dp-filter-grid-collapsed"></div>
-				</div>
-				<div class="dp-section dp-warehouse-section dp-collapsed">
-					<div class="dp-section-heading">
-						<div class="dp-section-title">${__("Warehouse Demand")}</div>
-						<button class="btn btn-default btn-xs btn-toggle-warehouse" aria-expanded="false">
-							${__("Show")}
-						</button>
-					</div>
-					<div class="dp-warehouse-cards"></div>
 				</div>
 				<div class="dp-grid">
 					<div class="dp-main">
@@ -112,7 +108,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					</div>
 					<div class="dp-sidebar">
 						<div class="dp-section dp-plan">
-							<div class="dp-section-title">${__("Manual Load Plan")}</div>
+							<div class="dp-section-title">${__("Loading Plan")}</div>
 							<div class="dp-category-picker"><label>${__(
 								"Vehicle Category"
 							)} <span class="text-muted">→</span></label><select class="form-control dp-category-select"><option value="">${__(
@@ -149,19 +145,10 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			["required_delivery_date_from", "Date", __("Delivery Date From")],
 			["required_delivery_date_to", "Date", __("Delivery Date To")],
 			["source_warehouse", "Link", __("Source Warehouse"), "Warehouse"],
-			["delivery_address", "Link", __("Delivery Address"), "Address"],
 			["territory", "Link", __("Territory"), "Territory"],
 			["county", "Link", __("County"), "County"],
-			["constituency", "Link", __("Constituency / Sub-county"), "Constituency"],
 			["town", "Link", __("Town"), "Town"],
-			["priority", "Select", __("Priority"), "\nLow\nMedium\nHigh\nUrgent"],
 			["customer", "Link", __("Customer"), "Customer"],
-			[
-				"allocation_state",
-				"Select",
-				__("Allocation State"),
-				"\nUnallocated\nPartially Allocated",
-			],
 		];
 		this.filters = {};
 		for (const [fieldname, fieldtype, label, options, default_value] of definitions) {
@@ -181,33 +168,6 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			this.filters[fieldname] = field;
 		}
 		this.filters.territory.get_query = () => ({ filters: { is_group: 0 } });
-		this.filters.county.get_query = () => ({
-			filters: this.filters.territory.get_value()
-				? { territory: this.filters.territory.get_value(), disabled: 0 }
-				: { disabled: 0 },
-		});
-		this.filters.town.get_query = () => ({
-			filters: this.filters.constituency.get_value()
-				? { constituency: this.filters.constituency.get_value(), disabled: 0 }
-				: this.filters.county.get_value()
-					? { county: this.filters.county.get_value(), disabled: 0 }
-				: { disabled: 0 },
-		});
-		this.filters.constituency.get_query = () => ({
-			filters: this.filters.county.get_value()
-				? { county: this.filters.county.get_value(), disabled: 0 }
-				: { disabled: 0 },
-		});
-		this.filters.territory.$input?.on("change", () => {
-			this.filters.county.set_value("");
-			this.filters.constituency.set_value("");
-			this.filters.town.set_value("");
-		});
-		this.filters.county.$input?.on("change", () => {
-			this.filters.constituency.set_value("");
-			this.filters.town.set_value("");
-		});
-		this.filters.constituency.$input?.on("change", () => this.filters.town.set_value(""));
 	}
 
 	async make_native_filter_group() {
@@ -326,8 +286,16 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	bind_events() {
-		this.$root.on("click", ".btn-toggle-filters", () => this.toggle_filters());
-		this.$root.on("click", ".btn-toggle-warehouse", () => this.toggle_warehouse_summary());
+		this.$root.on("click keydown", ".dp-collapsible-header", (event) => {
+			if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+			if (event.target.closest("button")) return;
+			event.preventDefault();
+			this.toggle_filters();
+		});
+		this.$root.on("click", ".btn-toggle-filters", (event) => {
+			event.stopPropagation();
+			this.toggle_filters();
+		});
 		this.$root.on("click", ".btn-refresh", () => this.refresh(true));
 		this.$root.on("click", ".btn-suggest", () => this.load_suggestions());
 		this.$root.on("click", ".btn-evaluate", () => this.evaluate_plan());
@@ -335,6 +303,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.$root.on("click", ".btn-prev", () => this.change_page(-1));
 		this.$root.on("click", ".btn-next", () => this.change_page(1));
 		this.$root.on("change", ".dp-order-select", (event) => this.toggle_order(event));
+		this.$root.on("change", ".dp-select-all-orders", (event) => this.toggle_all_orders(event));
 		this.$root.on("click", ".dp-expand-order", (event) => this.toggle_details(event));
 		this.$root.on("change", ".dp-allocation-qty", (event) => this.change_quantity(event));
 		this.$root.on("change", ".dp-category-select", () => this.category_changed());
@@ -346,15 +315,6 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.$root.on("click", ".dp-driver-details", () => this.show_driver_details());
 	}
 
-	toggle_warehouse_summary() {
-		this.warehouse_summary_expanded = !this.warehouse_summary_expanded;
-		const $section = this.$root.find(".dp-warehouse-section");
-		$section.toggleClass("dp-collapsed", !this.warehouse_summary_expanded);
-		const $button = $section.find(".btn-toggle-warehouse");
-		$button.attr("aria-expanded", this.warehouse_summary_expanded ? "true" : "false");
-		$button.text(this.warehouse_summary_expanded ? __("Hide") : __("Show"));
-	}
-
 	category_changed() {
 		this.clear_suggestions();
 		this.plan = null;
@@ -364,7 +324,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.schedule_plan_evaluation();
 	}
 
-	toggle_filters() {
+		toggle_filters() {
 		const $filters = this.$root.find(".dp-filter-grid");
 		const collapsed = $filters
 			.toggleClass("dp-filter-grid-collapsed")
@@ -372,6 +332,8 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.$root
 			.find(".btn-toggle-filters")
 			.text(collapsed ? __("Show Filters") : __("Hide Filters"));
+		this.$root.find(".dp-collapsible-header").attr("aria-expanded", collapsed ? "false" : "true");
+		this.$root.find(".dp-filter-toggle-icon").text(collapsed ? "▸" : "▾");
 	}
 
 	filters_changed() {
@@ -454,7 +416,6 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			if (request_id !== this.refresh_request_id) return;
 			this.orders = demand.orders || [];
 			this.has_more = demand.has_more;
-			this.render_warehouses(demand.warehouse_summaries || [], demand.summary_truncated);
 			this.render_demand();
 		} catch (error) {
 			if (request_id !== this.refresh_request_id) return;
@@ -513,40 +474,6 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		);
 	}
 
-	render_warehouses(rows, truncated) {
-		const html = rows.length
-			? rows
-					.map(
-						(row) => `<button class="dp-summary-card" data-warehouse="${this.escape(
-							row.source_warehouse
-						)}">
-				<strong>${this.escape(row.source_warehouse || __("No Warehouse"))}</strong>
-				<span>${row.delivery_order_count} ${__("orders")}</span>
-				<span>${this.number(row.weight)} ${__("weight")} · ${this.number(row.volume)} ${__(
-							"volume"
-						)}</span>
-				<span>${this.number(row.unallocated_quantity)} ${__("remaining")}</span>
-			</button>`
-					)
-					.join("")
-			: `<div class="dp-empty">${__(
-					"No open delivery demand matches these filters."
-			  )}</div>`;
-		this.$root
-			.find(".dp-warehouse-cards")
-			.html(
-				html +
-					(truncated
-						? `<div class="text-muted small">${__(
-								"Summary limited to the first 500 orders."
-						  )}</div>`
-						: "")
-			);
-		this.$root.find(".dp-summary-card").on("click", (event) => {
-			this.filters.source_warehouse.set_value($(event.currentTarget).data("warehouse"));
-		});
-	}
-
 	render_demand() {
 		if (!this.orders.length) {
 			this.$root
@@ -582,7 +509,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					order.customer_name || order.customer
 				)}</small></div>
 				<div><span>${this.escape(order.source_warehouse)}</span><small>${this.escape(
-					order.transport_zone || __("No zone")
+					order.territory || __("No territory")
 				)}</small></div>
 				<div><span>${frappe.datetime.str_to_user(order.required_delivery_date)}</span><small>${this.escape(
 					order.priority || __("Normal")
@@ -605,14 +532,17 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.$root
 			.find(".dp-demand")
 			.html(
-				`<div class="dp-demand-header"><span></span><span>${__(
+				`<div class="dp-demand-header"><span><input type="checkbox" class="dp-select-all-orders" title="${__(
+					"Select all visible Delivery Orders"
+				)}" aria-label="${__("Select all visible Delivery Orders")}"></span><span>${__(
 					"Order / Customer"
-				)}</span><span>${__("Warehouse / Zone")}</span><span>${__(
+				)}</span><span>${__("Warehouse / Territory")}</span><span>${__(
 					"Date / Priority"
 				)}</span><span>${__("Weight / Volume")}</span><span>${__(
 					"Allocated / Requested"
 				)}</span><span>${__("Requirements")}</span><span></span></div>${rows}`
 			);
+		this.update_select_all_state();
 		this.render_pagination();
 	}
 
@@ -658,18 +588,57 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.clear_suggestions();
 		this.render_plan();
 		this.schedule_plan_evaluation();
+		this.update_select_all_state();
+	}
+
+	async toggle_all_orders(event) {
+		const names = this.orders.map((order) => order.name);
+		if (!names.length) return;
+		if (event.currentTarget.checked) {
+			await this.ensure_details(names);
+			for (const name of names) {
+				for (const item of this.details[name]?.items || []) {
+					if (item.available_quantity > 0) {
+						this.allocations.set(item.name, {
+							delivery_order: name,
+							delivery_order_item: item.name,
+							allocated_quantity: item.available_quantity,
+						});
+					}
+				}
+			}
+		} else {
+			for (const [key, row] of this.allocations) {
+				if (names.includes(row.delivery_order)) this.allocations.delete(key);
+			}
+		}
+		this.plan_evaluation_id += 1;
+		this.plan = null;
+		this.clear_suggestions();
+		this.render_demand();
+		this.render_plan();
+		this.schedule_plan_evaluation();
+	}
+
+	update_select_all_state() {
+		const total = this.orders.length;
+		const selected = this.orders.filter((order) => this.order_selected(order.name)).length;
+		const checkbox = this.$root.find(".dp-select-all-orders").get(0);
+		if (!checkbox) return;
+		checkbox.checked = total > 0 && selected === total;
+		checkbox.indeterminate = selected > 0 && selected < total;
 	}
 
 	async toggle_details(event) {
 		const name = $(event.currentTarget).closest(".dp-demand-row").data("order");
 		const $target = this.$root.find(`[data-details="${this.selector(name)}"]`);
 		if ($target.children().length) return $target.toggle();
-		$target.html(this.loading()).show();
+		$target.addClass("dp-details-loading").html(this.loading()).show();
 		try {
 			await this.ensure_details([name]);
-			$target.html(this.render_item_table(this.details[name]));
+			$target.removeClass("dp-details-loading").html(this.render_item_table(this.details[name]));
 		} catch (error) {
-			$target.html(this.error_message(error));
+			$target.removeClass("dp-details-loading").html(this.error_message(error));
 		}
 	}
 
@@ -913,9 +882,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			)
 			.join("");
 		return rows
-			? `<div class="dp-capacity-breakdown"><div class="dp-capacity-status dp-capacity-${overall_status}"><strong>${overall_label}</strong></div><div class="text-muted small">${__(
-					"Selected Category Capacity"
-			  )}</div>${rows}</div>`
+			? `<div class="dp-capacity-breakdown"><div class="dp-capacity-status dp-capacity-${overall_status}"><strong>${overall_label}</strong></div>${rows}</div>`
 			: "";
 	}
 
@@ -1294,7 +1261,9 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	loading() {
-		return `<div class="dp-empty">${__("Loading...")}</div>`;
+		return `<div class="dp-loading"><span class="dp-spinner" aria-hidden="true"></span><span>${__(
+			"Loading..."
+		)}</span></div>`;
 	}
 	error_message(error) {
 		return `<div class="dp-empty text-danger">${this.escape(
