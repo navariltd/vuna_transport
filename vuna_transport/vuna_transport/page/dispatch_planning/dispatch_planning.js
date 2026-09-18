@@ -7,7 +7,13 @@ frappe.pages["dispatch-planning"].on_page_load = function (wrapper) {
 		parent: wrapper,
 		title: __("Dispatch Planning"),
 		single_column: true,
+		hide_sidebar: true,
 	});
+	wrapper.page.set_secondary_action(
+		__("Back to Delivery Loads"),
+		() => frappe.set_route("List", "Delivery Load"),
+		"arrow-left"
+	);
 	// This planning page has its own full-height workspace and does not need the
 	// standard empty page footer reserved by make_app_page.
 	$(wrapper).find(".layout-footer, .page-footer").remove();
