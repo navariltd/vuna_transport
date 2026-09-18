@@ -158,6 +158,7 @@ doc_events = {
 		"on_cancel": "vuna_transport.services.execution.lineage_service.reconcile_load_after_delivery_note_cancel",
 	},
 	"Delivery Trip": {
+		"before_cancel": "vuna_transport.services.execution.lineage_service.prepare_delivery_trip_cancellation",
 		"validate": "vuna_transport.services.execution.lineage_service.validate_delivery_trip",
 		"on_update": [
 			"vuna_transport.services.execution.lineage_service.link_delivery_trip",
