@@ -10,18 +10,18 @@
   "load_section",
   "naming_series",
   "company",
+  "column_break_prku",
+  "required_vehicle_category",
+  "cost_structure",
   "column_break_allocation",
   "allocation_type",
   "vehicle_owner",
-  "required_vehicle_category",
+  "supplier",
   "status",
   "owned_fleet_section",
   "vehicle",
   "column_break_zvtf",
   "driver",
-  "subcontractor_section",
-  "supplier",
-  "column_break_subcontractor",
   "delivery_load_section",
   "delivery_loads",
   "section_break_garp",
@@ -44,7 +44,6 @@
   "replaced_by",
   "cost_estimate_section",
   "cost_structure_assignment",
-  "cost_structure",
   "estimated_cost_currency",
   "estimated_on",
   "column_break_spyh",
@@ -101,7 +100,7 @@
    "in_standard_filter": 1,
    "label": "Company",
    "options": "Company",
-   "read_only": 1,
+   "read_only_depends_on": "eval:doc.docstatus == 1",
    "reqd": 1
   },
   {
@@ -109,13 +108,13 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "Owned Fleet",
    "fieldname": "allocation_type",
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Allocation Type",
    "options": "Owned Fleet\nSubcontractor",
+   "read_only": 1,
    "reqd": 1
   },
   {
@@ -130,7 +129,15 @@
    "fieldtype": "Link",
    "label": "Required Vehicle Category",
    "options": "Vehicle Category",
-   "read_only": 1
+   "reqd": 1
+  },
+  {
+   "fieldname": "cost_structure",
+   "fieldtype": "Link",
+   "label": "Transport Cost Structure",
+   "options": "Transport Cost Structure",
+   "read_only": 1,
+   "read_only_depends_on": "eval:doc.docstatus == 1"
   },
   {
    "default": "Draft",
@@ -214,7 +221,8 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Vehicle",
-   "options": "Vehicle"
+   "options": "Vehicle",
+   "reqd": 1
   },
   {
    "fieldname": "driver",
@@ -225,21 +233,12 @@
   },
   {
    "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
-   "fieldname": "subcontractor_section",
-   "fieldtype": "Section Break",
-   "label": "Subcontractor Details"
-  },
-  {
-   "depends_on": "eval:doc.allocation_type == 'Subcontractor'",
    "fieldname": "supplier",
    "fieldtype": "Link",
    "label": "Supplier",
    "mandatory_depends_on": "eval:doc.allocation_type == 'Subcontractor'",
-   "options": "Supplier"
-  },
-  {
-   "fieldname": "column_break_subcontractor",
-   "fieldtype": "Column Break"
+   "options": "Supplier",
+   "read_only": 1
   },
   {
    "fieldname": "planning_section",
@@ -300,12 +299,6 @@
    "fieldtype": "Link",
    "label": "Cost Structure Assignment",
    "options": "Transport Cost Structure Assignment",
-   "read_only": 1
-  },
-  {
-   "fieldname": "cost_structure",
-   "fieldtype": "Data",
-   "label": "Cost Structure",
    "read_only": 1
   },
   {
@@ -421,6 +414,10 @@
   {
    "fieldname": "section_break_garp",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_prku",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
@@ -436,7 +433,7 @@
    "link_fieldname": "vuna_current_vehicle_allocation"
   }
  ],
- "modified": "2026-09-16 07:52:50.539715",
+ "modified": "2026-09-18 09:22:03.495208",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Allocation",

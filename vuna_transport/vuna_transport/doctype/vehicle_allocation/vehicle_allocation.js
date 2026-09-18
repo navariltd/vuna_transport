@@ -3,6 +3,13 @@
 
 frappe.ui.form.on("Vehicle Allocation", {
 	setup(frm) {
+		frm.set_query("cost_structure", () => ({
+			filters: {
+				docstatus: 1,
+				disabled: 0,
+				...(frm.doc.company ? { company: ["in", [frm.doc.company, "", null]] } : {}),
+			},
+		}));
 		frm.set_query("delivery_load", "delivery_loads", () => ({
 			query: "vuna_transport.api.get_delivery_loads_for_allocation",
 			filters: {
@@ -19,8 +26,6 @@ frappe.ui.form.on("Vehicle Allocation", {
 			filters: {
 				company: frm.doc.company,
 				required_vehicle_category: frm.doc.required_vehicle_category,
-				delivery_loads: (frm.doc.delivery_loads || []).map((row) => row.delivery_load).filter(Boolean),
-				allocation_type: frm.doc.allocation_type,
 			},
 		}));
 		frm.set_query("driver", () => ({
@@ -33,6 +38,7 @@ frappe.ui.form.on("Vehicle Allocation", {
 	},
 
 	refresh(frm) {
+		update_load_selection_button(frm);
 		const loads = (frm.doc.delivery_loads || []).map((row) => row.delivery_load).filter(Boolean);
 		if (frm.doc.docstatus === 1 && loads.length) {
 			frappe.db.get_single_value("Transport Settings", "vehicle_allocation_timing").then((timing) => {
@@ -92,23 +98,140 @@ frappe.ui.form.on("Vehicle Allocation", {
 		const vehicle_name = frm.doc.vehicle;
 		if (!vehicle_name) return;
 		frm._vehicle_used_for_allocation_defaults = vehicle_name;
-		frappe.db.get_value("Vehicle", vehicle_name, ["vuna_supplier", "vuna_vehicle_owner"]).then(({ message }) => {
+		frappe.db
+			.get_value("Vehicle", vehicle_name, ["vuna_supplier", "vuna_vehicle_owner", "vuna_vehicle_category", "vuna_transport_cost_structure"])
+			.then(({ message }) => {
 			if (!message || frm.doc.vehicle !== frm._vehicle_used_for_allocation_defaults) return;
-			frm.set_value("vehicle_owner", message.vuna_vehicle_owner || null);
-			if (frm.doc.allocation_type === "Subcontractor") {
-				frm.set_value("supplier", message.vuna_supplier || null);
+			if (
+				frm.doc.required_vehicle_category &&
+				message.vuna_vehicle_category !== frm.doc.required_vehicle_category
+			) {
+				frm.set_value("vehicle", null);
+				frappe.msgprint(
+					__("Vehicle {0} belongs to category {1}, but this allocation requires {2}.", [
+						vehicle_name,
+						message.vuna_vehicle_category || __("Not Set"),
+						frm.doc.required_vehicle_category,
+					])
+				);
+				return;
 			}
+			frm.set_value("vehicle_owner", message.vuna_vehicle_owner || null);
+			frm.set_value("allocation_type", message.vuna_vehicle_owner === "Supplier" ? "Subcontractor" : "Owned Fleet");
+			frm.set_value("supplier", message.vuna_supplier || null);
+			if (!frm.doc.cost_structure && message.vuna_transport_cost_structure)
+				frm.set_value("cost_structure", message.vuna_transport_cost_structure);
 		});
+	},
+
+	required_vehicle_category(frm) {
+		update_load_selection_button(frm);
+		if (frm.doc.vehicle) frm.trigger("vehicle");
 	},
 
 	allocation_type(frm) {
 		frm.toggle_reqd("vehicle", ["Owned Fleet", "Subcontractor"].includes(frm.doc.allocation_type));
 		frm.toggle_reqd("driver", true);
 	},
+
+	cost_structure(frm) {
+		if (!frm.doc.vehicle || !frm.doc.cost_structure) return;
+		frappe.db.get_value("Vehicle", frm.doc.vehicle, "vuna_transport_cost_structure").then(({ message }) => {
+			if (message?.vuna_transport_cost_structure === frm.doc.cost_structure) return;
+			frm.set_value("cost_structure", message?.vuna_transport_cost_structure || null);
+			frappe.msgprint(
+				__("The selected cost structure must match the Vehicle's configured Transport Cost Structure.")
+			);
+		});
+	},
 });
 
+function select_delivery_loads(frm) {
+	if (!frm.doc.company) {
+		frappe.msgprint(__("Select a Company before selecting Delivery Loads."));
+		return;
+	}
+	if (!frm.doc.required_vehicle_category) {
+		frappe.msgprint(__("Select a Required Vehicle Category first."));
+		return;
+	}
+
+	new frappe.ui.form.MultiSelectDialog({
+		doctype: "Delivery Load",
+		target: frm,
+		size: "extra-large",
+		add_filters_group: 1,
+		columns: ["name", "company", "required_vehicle_category"],
+		setters: {
+			company: frm.doc.company,
+			required_vehicle_category: frm.doc.required_vehicle_category,
+		},
+		get_query() {
+			return {
+				query: "vuna_transport.api.get_delivery_loads_for_allocation",
+				filters: {
+					company: frm.doc.company,
+					required_vehicle_category: frm.doc.required_vehicle_category,
+					selected_delivery_loads: (frm.doc.delivery_loads || [])
+						.map((row) => row.delivery_load)
+						.filter(Boolean),
+				},
+			};
+		},
+		action(selections) {
+			if (!selections.length) {
+				frappe.msgprint(__("Select at least one Delivery Load."));
+				return;
+			}
+			const existing = new Set(
+				(frm.doc.delivery_loads || []).map((row) => row.delivery_load).filter(Boolean)
+			);
+			selections.forEach((name) => {
+				if (!existing.has(name)) frm.add_child("delivery_loads", { delivery_load: name });
+			});
+			frm.refresh_field("delivery_loads");
+			refresh_load_context(frm);
+			cur_dialog.hide();
+		},
+	});
+}
+
+function update_load_selection_button(frm) {
+	frm.remove_custom_button(__("Select Delivery Loads"), __("Planning"));
+	if (frm.doc.docstatus === 0 && frm.doc.required_vehicle_category) {
+		frm.add_custom_button(
+			__("Select Delivery Loads"),
+			() => select_delivery_loads(frm),
+			__("Planning")
+		);
+	}
+}
+
+function refresh_load_context(frm) {
+	const loads = (frm.doc.delivery_loads || []).map((row) => row.delivery_load).filter(Boolean);
+	if (!loads.length) return;
+	frappe.call({
+		method: "vuna_transport.services.fleet.vehicle_allocation_service.get_allocation_load_context",
+		args: { delivery_loads: loads },
+	}).then(({ message }) => {
+		if (!message) return;
+		frm.set_value("company", message.company || null);
+		if (!frm.doc.required_vehicle_category) {
+			frm.set_value("required_vehicle_category", message.required_vehicle_category || null);
+		}
+		if (!frm.doc.planned_reporting_time && message.planned_reporting_time)
+			frm.set_value("planned_reporting_time", message.planned_reporting_time);
+		render_capacity_summary(frm, message);
+	});
+}
+
 frappe.ui.form.on("Vehicle Allocation Load", {
-	delivery_load(frm) {
+	delivery_load(frm, cdt, cdn) {
+		if (!frm.doc.required_vehicle_category) {
+			frm.fields_dict.delivery_loads.grid.grid_rows_by_docname[cdn]?.remove();
+			frappe.msgprint(__("Select a Required Vehicle Category before selecting Delivery Loads."));
+			return;
+		}
 		frappe.call({
 			method: "vuna_transport.services.fleet.vehicle_allocation_service.get_allocation_load_context",
 			args: {

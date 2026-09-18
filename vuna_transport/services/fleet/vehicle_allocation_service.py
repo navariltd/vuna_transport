@@ -108,6 +108,7 @@ def get_allocation_loads(allocation, *, lock=False):
 def validate_allocation_load_set(load_names, vehicle_category=None):
 	"""Validate candidate loads without creating or reserving an allocation."""
 	names = list(dict.fromkeys(load_names or []))
+	names = [name for name in names if name]
 	loads = [frappe.get_doc("Delivery Load", name) for name in names]
 	_validate_selected_load_compatibility(loads)
 	if vehicle_category:
@@ -147,7 +148,8 @@ def make_vehicle_allocation_from_load(source_name):
 	allocation = frappe.new_doc("Vehicle Allocation")
 	_append_load(allocation, load)
 	allocation.company = load.company
-	allocation.required_vehicle_category = load.required_vehicle_category
+	if load.required_vehicle_category:
+		allocation.required_vehicle_category = load.required_vehicle_category
 	allocation.planned_reporting_time = load.planned_departure
 	allocation.allocation_type = "Owned Fleet"
 	return allocation
@@ -256,11 +258,20 @@ def validate_allocation(allocation):
 	_validate_selected_load_compatibility(loads)
 
 	allocation.company = load.company
-	allocation.required_vehicle_category = load.required_vehicle_category
+	selected_category = allocation.required_vehicle_category
+	if load.required_vehicle_category:
+		if selected_category and selected_category != load.required_vehicle_category:
+			frappe.throw(
+				_("Selected Vehicle Category {0} does not match Delivery Load {1}'s required category {2}.").format(
+					selected_category, load.name, load.required_vehicle_category
+				)
+			)
+		allocation.required_vehicle_category = load.required_vehicle_category
 	allocation.allocated_by = allocation.allocated_by or frappe.session.user
 	allocation.allocated_on = allocation.allocated_on or now_datetime()
 	allocation.planned_reporting_time = allocation.planned_reporting_time or _earliest_planned_departure(loads)
 	_set_assignment_context(allocation, loads)
+	_derive_vehicle_source(allocation)
 
 	if allocation.allocation_type == "Owned Fleet":
 		_validate_owned_fleet(allocation, loads)
@@ -352,6 +363,35 @@ def _validate_subcontractor(allocation, loads):
 	_validate_vehicle_is_available(allocation, loads)
 	lock_document("Driver", allocation.driver)
 	_validate_driver_is_available(allocation, loads)
+
+
+def _derive_vehicle_source(allocation):
+	"""Derive allocation source and costing context from the selected Vehicle."""
+	if not allocation.vehicle:
+		return
+	vehicle = frappe.get_doc("Vehicle", allocation.vehicle)
+	owner = getattr(vehicle, "vuna_vehicle_owner", None)
+	derived_type = "Subcontractor" if owner == "Supplier" else "Owned Fleet"
+	allocation.allocation_type = derived_type
+	allocation.vehicle_owner = owner or "Company"
+	vehicle_category = getattr(vehicle, "vuna_vehicle_category", None)
+	if allocation.required_vehicle_category and vehicle_category != allocation.required_vehicle_category:
+		frappe.throw(
+			_("Vehicle {0} belongs to category {1}, but this allocation requires {2}.").format(
+				vehicle.name, vehicle_category or _("Not Set"), allocation.required_vehicle_category
+			)
+		)
+	if getattr(vehicle, "vuna_supplier", None):
+		allocation.supplier = vehicle.vuna_supplier
+	vehicle_structure = getattr(vehicle, "vuna_transport_cost_structure", None)
+	if allocation.cost_structure and allocation.cost_structure != vehicle_structure:
+		frappe.throw(
+			_("Transport Cost Structure {0} does not match Vehicle {1}'s configured structure {2}.").format(
+				allocation.cost_structure, vehicle.name, vehicle_structure or _("Not Set")
+			)
+		)
+	if vehicle_structure:
+		allocation.cost_structure = vehicle_structure
 
 
 def _validate_planning_window(load):
@@ -494,24 +534,42 @@ def _validate_initial_allocation_sequence(load, allocation=None):
 	):
 		return
 
-	expected_orders = {row.delivery_order for row in load.delivery_orders if row.delivery_order}
-	covered_orders = set(
-		frappe.get_all(
-			"Delivery Note",
-			filters={
-				"vuna_delivery_load": load.name,
-				"docstatus": ["!=", 2],
-			},
-			pluck="vuna_delivery_order",
-		)
-	)
-	missing = sorted(expected_orders - covered_orders)
-	if missing:
+	status = get_delivery_note_submission_status(load)
+	if status["missing_delivery_orders"]:
 		frappe.throw(
 			_(
 				"Generate Delivery Notes for every Delivery Order before allocating a vehicle. Missing: {0}."
-			).format(", ".join(missing))
+			).format(", ".join(status["missing_delivery_orders"]))
 		)
+	if status["draft_delivery_notes"]:
+		frappe.throw(
+			_("Submit all Delivery Notes for Delivery Load {0} before allocating a vehicle. Draft: {1}.").format(
+				load.name, ", ".join(status["draft_delivery_notes"])
+			)
+		)
+
+
+def get_delivery_note_submission_status(load):
+	"""Return whether a load's active Delivery Notes are submitted and complete."""
+	expected_orders = {row.delivery_order for row in load.delivery_orders if row.delivery_order}
+	notes = frappe.get_all(
+		"Delivery Note",
+		filters={"vuna_delivery_load": load.name},
+		fields=["name", "docstatus", "vuna_delivery_order"],
+	)
+	active_notes = [note for note in notes if note.docstatus != 2]
+	submitted_notes = [note for note in active_notes if note.docstatus == 1]
+	draft_notes = [note for note in active_notes if note.docstatus == 0]
+	submitted_orders = {note.vuna_delivery_order for note in submitted_notes if note.vuna_delivery_order}
+	return {
+		"expected_delivery_orders": sorted(expected_orders),
+		"submitted_delivery_orders": sorted(expected_orders & submitted_orders),
+		"missing_delivery_orders": sorted(expected_orders - submitted_orders),
+		"draft_delivery_notes": sorted(note.name for note in draft_notes),
+		"active_delivery_notes": sorted(note.name for note in active_notes),
+		"submitted_delivery_notes": sorted(note.name for note in submitted_notes),
+		"ready": not (expected_orders - submitted_orders) and not draft_notes,
+	}
 
 
 def _validate_vehicle_category_for_loads(loads, vehicle_category):

@@ -1,4 +1,5 @@
 import frappe
+from frappe.utils import add_to_date, now_datetime
 
 from vuna_transport.services.fleet.driver_availability_service import (
 	get_driver_availability_map,
@@ -13,13 +14,20 @@ from vuna_transport.services.fleet.vehicle_availability_service import (
 )
 from vuna_transport.services.planning.delivery_load_service import get_compatible_vehicle_category_names
 from vuna_transport.services.shared.security_service import require_document_permission
+from vuna_transport.services.shared.workflow_policy_service import (
+	ALLOCATION_AFTER_DELIVERY_NOTES,
+	get_vehicle_allocation_timing,
+)
 
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
 	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
-	load = frappe.get_doc("Delivery Load", filters.get("delivery_load"))
+	load_name = filters.get("delivery_load")
+	if not load_name:
+		return []
+	load = frappe.get_doc("Delivery Load", load_name)
 	require_document_permission(load, "read")
 	if filters.get("company") and filters.get("company") != load.company:
 		return []
@@ -69,7 +77,10 @@ def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def get_drivers_for_load(doctype, txt, searchfield, start, page_len, filters):
-	load = frappe.get_doc("Delivery Load", filters.get("delivery_load"))
+	load_name = filters.get("delivery_load")
+	if not load_name:
+		return []
+	load = frappe.get_doc("Delivery Load", load_name)
 	require_document_permission(load, "read")
 	from_time, to_time = get_load_resource_window(load)
 	driver_names = frappe.get_list(
@@ -104,17 +115,20 @@ def get_drivers_for_load(doctype, txt, searchfield, start, page_len, filters):
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def get_delivery_loads_for_allocation(doctype, txt, searchfield, start, page_len, filters):
+def get_delivery_loads_for_allocation(doctype, txt, searchfield, start, page_len, filters, as_dict=False, **kwargs):
 	"""Offer only operational loads compatible with the current allocation composition."""
 	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
 	selected = filters.get("selected_delivery_loads") or []
 	if isinstance(selected, str):
 		selected = frappe.parse_json(selected) or []
+	selected = [name for name in selected if name]
 	company = filters.get("company")
 	vehicle_category = filters.get("required_vehicle_category")
 	vehicle_name = filters.get("vehicle")
 	if vehicle_name:
 		vehicle_category = frappe.db.get_value("Vehicle", vehicle_name, "vuna_vehicle_category") or vehicle_category
+	if not vehicle_category:
+		return []
 	load_filters = {"docstatus": 1, "status": ["not in", ["Completed", "Completed with Exceptions", "Cancelled"]]}
 	if company:
 		load_filters["company"] = company
@@ -124,10 +138,17 @@ def get_delivery_loads_for_allocation(doctype, txt, searchfield, start, page_len
 		"Delivery Load",
 		filters=load_filters,
 		or_filters={"name": ["like", f"%{txt}%"]},
-		fields=["name", "company", "required_vehicle_category", "active_vehicle_allocation"],
+		fields=[
+			"name",
+			"company",
+			"required_vehicle_category",
+			"active_vehicle_allocation",
+			"delivery_method",
+		],
 		order_by="dispatch_date asc, creation asc",
 		limit_page_length=min(max(int(start or 0) + int(page_len or 20) + 50, 100), 300),
 	)
+	candidates = _loads_at_vehicle_allocation_step(candidates)
 	results = []
 	for candidate in candidates:
 		if candidate.name in selected:
@@ -140,8 +161,95 @@ def get_delivery_loads_for_allocation(doctype, txt, searchfield, start, page_len
 				require_document_permission(load, "read")
 		except frappe.ValidationError:
 			continue
-		results.append((candidate.name, candidate.name))
+		if as_dict:
+			results.append(
+				{
+					"name": candidate.name,
+					"company": candidate.company,
+					"required_vehicle_category": candidate.required_vehicle_category,
+				}
+			)
+		else:
+			results.append((candidate.name, candidate.name))
 	return results[int(start or 0) : int(start or 0) + int(page_len or 20)]
+
+
+def _loads_at_vehicle_allocation_step(candidates):
+	"""Keep only submitted loads whose current workflow action is vehicle allocation."""
+	if not candidates:
+		return []
+
+	method_names = list({row.delivery_method for row in candidates if row.delivery_method}) or [""]
+	methods = {
+		row.name: bool(row.requires_vehicle_allocation)
+		for row in frappe.get_all(
+			"Delivery Method",
+			filters={"name": ["in", method_names]},
+			fields=["name", "requires_vehicle_allocation"],
+		)
+	}
+	method_required = {
+		row.name: methods.get(row.delivery_method, True)
+		for row in candidates
+	}
+	eligible = [row for row in candidates if method_required[row.name]]
+	if not eligible:
+		return []
+
+	# A draft allocation already owns the workflow step and should not be offered
+	# as a second allocation candidate.
+	allocation_rows = frappe.get_all(
+		"Vehicle Allocation Load",
+		filters={"delivery_load": ["in", [row.name for row in eligible]]},
+		fields=["parent", "delivery_load"],
+	)
+	draft_allocations = set(
+		frappe.get_all(
+			"Vehicle Allocation",
+			filters={
+				"name": ["in", list({row.parent for row in allocation_rows}) or [""]],
+				"docstatus": 0,
+			},
+			pluck="name",
+		)
+	)
+	draft_loads = {row.delivery_load for row in allocation_rows if row.parent in draft_allocations}
+	eligible = [row for row in eligible if row.name not in draft_loads]
+	if get_vehicle_allocation_timing() != ALLOCATION_AFTER_DELIVERY_NOTES:
+		return eligible
+
+	# In the after-notes flow, the allocation step begins only after every
+	# Delivery Order on the load has a submitted Delivery Note and no draft note.
+	load_order_rows = frappe.get_all(
+		"Delivery Load Order",
+		filters={"parent": ["in", [row.name for row in eligible]]},
+		fields=["parent", "delivery_order"],
+	)
+	expected = {}
+	for row in load_order_rows:
+		if row.delivery_order:
+			expected.setdefault(row.parent, set()).add(row.delivery_order)
+
+	notes = frappe.get_all(
+		"Delivery Note",
+		filters={"vuna_delivery_load": ["in", [row.name for row in eligible]]},
+		fields=["vuna_delivery_load", "vuna_delivery_order", "docstatus"],
+	)
+	submitted = {}
+	draft_loads = set()
+	for note in notes:
+		if note.docstatus == 0:
+			draft_loads.add(note.vuna_delivery_load)
+		elif note.docstatus == 1 and note.vuna_delivery_order:
+			submitted.setdefault(note.vuna_delivery_load, set()).add(note.vuna_delivery_order)
+
+	return [
+		row
+		for row in eligible
+		if expected.get(row.name)
+		and expected[row.name].issubset(submitted.get(row.name, set()))
+		and row.name not in draft_loads
+	]
 
 
 @frappe.whitelist()
@@ -151,25 +259,29 @@ def get_vehicles_for_allocation(doctype, txt, searchfield, start, page_len, filt
 	load_names = filters.get("delivery_loads") or []
 	if isinstance(load_names, str):
 		load_names = frappe.parse_json(load_names) or []
-	if not load_names:
+	load_names = [name for name in load_names if name]
+	category = filters.get("required_vehicle_category")
+	if not category:
 		return []
-	loads = validate_allocation_load_set(load_names, filters.get("required_vehicle_category"))
-	for load in loads:
-		require_document_permission(load, "read")
-	from_time, to_time = get_allocation_resource_window(loads)
-	category = filters.get("required_vehicle_category") or loads[0].required_vehicle_category
+	if load_names:
+		loads = validate_allocation_load_set(load_names, category)
+		for load in loads:
+			require_document_permission(load, "read")
+		from_time, to_time = get_allocation_resource_window(loads)
+	else:
+		now = now_datetime()
+		from_time, to_time = now, add_to_date(now, seconds=1)
 	availability = get_vehicle_availability_map(
-		company=loads[0].company,
+		company=filters.get("company"),
 		vehicle_category=category,
 		from_time=from_time,
 		to_time=to_time,
+		delivery_load=loads[0] if load_names else None,
 	)
 	available = [row.vehicle for row in availability.values() if row.dispatch_eligible]
 	if not available:
 		return []
 	vehicle_filters = {"name": ["in", available]}
-	if filters.get("allocation_type") != "Subcontractor":
-		vehicle_filters["vuna_transport_enabled"] = 1
 	return frappe.get_list(
 		"Vehicle",
 		filters=vehicle_filters,
@@ -188,6 +300,7 @@ def get_drivers_for_allocation(doctype, txt, searchfield, start, page_len, filte
 	load_names = filters.get("delivery_loads") or []
 	if isinstance(load_names, str):
 		load_names = frappe.parse_json(load_names) or []
+	load_names = [name for name in load_names if name]
 	if not load_names:
 		return []
 	loads = validate_allocation_load_set(load_names)
