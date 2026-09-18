@@ -142,6 +142,18 @@ after_install = "vuna_transport.install.after_install"
 # Hook on document methods and events
 
 doc_events = {
+	"Territory": {
+		"validate": "vuna_transport.services.routing.location_service.validate_reference_coordinates",
+	},
+	"County": {
+		"validate": "vuna_transport.services.routing.location_service.validate_reference_coordinates",
+	},
+	"Constituency": {
+		"validate": "vuna_transport.services.routing.location_service.validate_reference_coordinates",
+	},
+	"Town": {
+		"validate": "vuna_transport.services.routing.location_service.validate_reference_coordinates",
+	},
 	"Address": {
 		"validate": "vuna_transport.services.routing.location_service.synchronize_address_location",
 	},

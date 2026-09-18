@@ -30,6 +30,10 @@
   "column_break_fpwz",
   "estimated_distance",
   "estimated_duration",
+  "distance_estimate_method",
+  "distance_estimate_basis",
+  "distance_estimate_confidence",
+  "distance_estimate_warning",
   "column_break_fsyc",
   "refrigeration_required",
   "tail_lift_required",
@@ -313,6 +317,31 @@
    "fieldname": "estimated_duration",
    "fieldtype": "Float",
    "label": "Estimated Duration (Hours)"
+  },
+  {
+   "fieldname": "distance_estimate_method",
+   "fieldtype": "Data",
+   "label": "Distance Estimate Method",
+   "read_only": 1
+  },
+  {
+   "fieldname": "distance_estimate_basis",
+   "fieldtype": "Data",
+   "label": "Distance Estimate Basis",
+   "read_only": 1
+  },
+  {
+   "fieldname": "distance_estimate_confidence",
+   "fieldtype": "Select",
+   "label": "Distance Estimate Confidence",
+   "options": "\nHigh\nMedium\nLow\nVery Low\nNone",
+   "read_only": 1
+  },
+  {
+   "fieldname": "distance_estimate_warning",
+   "fieldtype": "Small Text",
+   "label": "Distance Estimate Warning",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_fsyc",

@@ -24,12 +24,16 @@ from vuna_transport.services.planning.delivery_load_service import (
 	validate_load_allocations,
 )
 from vuna_transport.services.routing.route_service import apply_route_defaults
+from vuna_transport.services.routing.distance_estimation_service import (
+	apply_delivery_load_distance_estimate,
+)
 
 
 class DeliveryLoad(Document):
 	def validate(self):
 		_validate_source_warehouse_change(self)
 		apply_route_defaults(self)
+		apply_delivery_load_distance_estimate(self)
 		if self.delivery_orders:
 			validate_load_allocations(self)
 		calculate_load_totals(self)

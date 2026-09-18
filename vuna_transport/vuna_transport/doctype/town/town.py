@@ -5,9 +5,12 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
+from vuna_transport.services.routing.location_service import validate_reference_coordinates
+
 
 class Town(Document):
 	def validate(self):
+		validate_reference_coordinates(self)
 		if self.constituency:
 			constituency = frappe.db.get_value(
 				"Constituency", self.constituency, ["county", "disabled"], as_dict=True

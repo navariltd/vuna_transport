@@ -11,6 +11,8 @@
   "county",
   "constituency",
   "company",
+  "latitude",
+  "longitude",
   "disabled",
   "description"
  ],
@@ -47,6 +49,18 @@
    "in_standard_filter": 1,
    "label": "Company",
    "options": "Company"
+  },
+  {
+   "fieldname": "latitude",
+   "fieldtype": "Float",
+   "label": "Latitude",
+   "precision": "6"
+  },
+  {
+   "fieldname": "longitude",
+   "fieldtype": "Float",
+   "label": "Longitude",
+   "precision": "6"
   },
   {
    "default": "0",

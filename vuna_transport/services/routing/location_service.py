@@ -7,6 +7,103 @@ from frappe import _
 from frappe.contacts.doctype.address.address import get_default_address
 
 
+def validate_reference_coordinates(doc, method=None):
+	"""Validate optional reference coordinates on geography masters."""
+	latitude = doc.get("latitude")
+	longitude = doc.get("longitude")
+	if doc.doctype == "Territory":
+		latitude = doc.get("vuna_latitude")
+		longitude = doc.get("vuna_longitude")
+	if latitude in (None, "") and longitude in (None, ""):
+		return
+	if latitude in (None, "") or longitude in (None, ""):
+		frappe.throw(_("Reference latitude and longitude must be provided together."))
+	try:
+		latitude = float(latitude)
+		longitude = float(longitude)
+	except (TypeError, ValueError):
+		frappe.throw(_("Reference latitude and longitude must be valid numbers."))
+	if not -90 <= latitude <= 90:
+		frappe.throw(_("Reference latitude must be between -90 and 90."))
+	if not -180 <= longitude <= 180:
+		frappe.throw(_("Reference longitude must be between -180 and 180."))
+
+
+def resolve_geography_reference(geography):
+	"""Resolve the best available reference point for a geography link.
+
+	Returns coordinates, the geography basis, and confidence for explainable estimates.
+	"""
+	if not geography:
+		return frappe._dict()
+	for doctype, fields, basis, confidence in (
+		("Town", ("latitude", "longitude"), "Town", "Medium"),
+		("Constituency", ("latitude", "longitude"), "Constituency", "Low"),
+		("County", ("latitude", "longitude"), "County", "Low"),
+		("Territory", ("vuna_latitude", "vuna_longitude"), "Territory", "Very Low"),
+	):
+		if frappe.db.exists(doctype, geography):
+			row = frappe.db.get_value(doctype, geography, list(fields), as_dict=True)
+			latitude = row.get(fields[0]) if row else None
+			longitude = row.get(fields[1]) if row else None
+			if latitude not in (None, "") and longitude not in (None, ""):
+				return frappe._dict(
+					latitude=float(latitude),
+					longitude=float(longitude),
+					basis=basis,
+					confidence=confidence,
+					reference=geography,
+				)
+	return frappe._dict()
+
+
+def resolve_planning_location(*, latitude=None, longitude=None, town=None, constituency=None, county=None, territory=None):
+	"""Resolve exact coordinates first, then the most precise configured geography point."""
+	if latitude not in (None, "") and longitude not in (None, ""):
+		return frappe._dict(
+			latitude=float(latitude),
+			longitude=float(longitude),
+			basis="Exact Coordinates",
+			confidence="High",
+			reference=None,
+		)
+	geographies = []
+	if town:
+		geographies.append(("Town", town))
+		parents = frappe.db.get_value("Town", town, ["constituency", "county"], as_dict=True)
+		if parents:
+			constituency = constituency or parents.constituency
+			county = county or parents.county
+	if constituency:
+		geographies.append(("Constituency", constituency))
+		parent = frappe.db.get_value("Constituency", constituency, "county")
+		county = county or parent
+	if county:
+		geographies.append(("County", county))
+		parent = frappe.db.get_value("County", county, "territory")
+		territory = territory or parent
+	if territory:
+		geographies.append(("Territory", territory))
+	for doctype, value in geographies:
+		fields = ("vuna_latitude", "vuna_longitude") if doctype == "Territory" else ("latitude", "longitude")
+		if not frappe.db.exists(doctype, value):
+			continue
+		row = frappe.db.get_value(doctype, value, list(fields), as_dict=True)
+		if row and row.get(fields[0]) not in (None, "") and row.get(fields[1]) not in (None, ""):
+			return frappe._dict(
+				latitude=float(row[fields[0]]),
+				longitude=float(row[fields[1]]),
+				basis=doctype,
+				confidence={"Town": "Medium", "Constituency": "Low", "County": "Low", "Territory": "Very Low"}[doctype],
+				reference=value,
+			)
+	return frappe._dict(
+		basis="Unavailable",
+		confidence="None",
+		warning=_("No exact coordinates or configured geography reference point is available."),
+	)
+
+
 def get_address_planning_data(address_name):
 	if not address_name or not frappe.db.exists("Address", address_name):
 		return frappe._dict()
@@ -16,6 +113,14 @@ def get_address_planning_data(address_name):
 	map_latitude, map_longitude = get_point_coordinates(location)
 	latitude = _coordinate_or_fallback(getattr(address, "vuna_latitude", None), map_latitude)
 	longitude = _coordinate_or_fallback(getattr(address, "vuna_longitude", None), map_longitude)
+	planning_location = resolve_planning_location(
+		latitude=latitude,
+		longitude=longitude,
+		town=getattr(address, "vuna_town", None),
+		constituency=getattr(address, "vuna_constituency", None),
+		county=getattr(address, "vuna_county", None),
+		territory=getattr(address, "vuna_territory", None),
+	)
 	return frappe._dict(
 		address=address.name,
 		territory=getattr(address, "vuna_territory", None),
@@ -26,6 +131,11 @@ def get_address_planning_data(address_name):
 		location=location,
 		latitude=latitude,
 		longitude=longitude,
+		planning_latitude=planning_location.get("latitude"),
+		planning_longitude=planning_location.get("longitude"),
+		planning_basis=planning_location.get("basis"),
+		planning_confidence=planning_location.get("confidence"),
+		planning_warning=planning_location.get("warning"),
 		delivery_from_time=getattr(address, "vuna_preferred_delivery_from", None),
 		delivery_to_time=getattr(address, "vuna_preferred_delivery_to", None),
 		average_service_duration=getattr(address, "vuna_average_service_duration", None),

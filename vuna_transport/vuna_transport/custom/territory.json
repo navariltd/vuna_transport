@@ -1,0 +1,28 @@
+{
+ "custom_fields": [
+  {
+   "doctype": "Custom Field",
+   "dt": "Territory",
+   "fieldname": "vuna_latitude",
+   "fieldtype": "Float",
+   "insert_after": "territory_name",
+   "label": "Reference Latitude",
+   "module": "Vuna Transport",
+   "name": "Territory-vuna_latitude",
+   "precision": "6",
+   "owner": "Administrator"
+  },
+  {
+   "doctype": "Custom Field",
+   "dt": "Territory",
+   "fieldname": "vuna_longitude",
+   "fieldtype": "Float",
+   "insert_after": "vuna_latitude",
+   "label": "Reference Longitude",
+   "module": "Vuna Transport",
+   "name": "Territory-vuna_longitude",
+   "precision": "6",
+   "owner": "Administrator"
+  }
+ ]
+}

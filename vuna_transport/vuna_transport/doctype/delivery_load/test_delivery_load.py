@@ -34,6 +34,10 @@ from vuna_transport.services.routing.geography_service import (
 	calculate_delivery_window_compatibility,
 	calculate_geographic_cohesion,
 )
+from vuna_transport.services.routing.distance_estimation_service import (
+	estimate_origin_to_destinations,
+	resolve_location_point,
+)
 from vuna_transport.services.shared.workflow_policy_service import (
 	ALLOCATION_AFTER_DELIVERY_NOTES,
 	ALLOCATION_BEFORE_DELIVERY_NOTES,
@@ -54,6 +58,25 @@ class TestDeliveryLoad(UnitTestCase):
 
 	def test_capacity_fit_allows_unlimited_dimension(self):
 		self.assertTrue(_fits(100, 0))
+
+	def test_exact_location_point_is_high_confidence(self):
+		point = resolve_location_point({"latitude": -1.2864, "longitude": 36.8172})
+		self.assertTrue(point["available"])
+		self.assertEqual(point["basis"], "Exact Coordinates")
+		self.assertEqual(point["confidence"], "High")
+
+	def test_multi_destination_estimate_uses_farthest_destination(self):
+		result = estimate_origin_to_destinations(
+			{"latitude": -1.2864, "longitude": 36.8172},
+			[
+				{"name": "near", "latitude": -1.2921, "longitude": 36.8219},
+				{"name": "far", "latitude": -0.3031, "longitude": 36.0800},
+			],
+		)
+		self.assertTrue(result["available"])
+		self.assertEqual(result["method"], "Origin to Farthest Destination")
+		self.assertEqual(result["selected_destination"]["label"], "far")
+		self.assertEqual(len(result["warnings"]), 2)
 
 	def test_capacity_fit_rejects_over_capacity(self):
 		self.assertFalse(_fits(101, 100))

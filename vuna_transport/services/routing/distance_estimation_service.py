@@ -1,0 +1,174 @@
+"""Explainable distance estimates for transport planning.
+
+This service intentionally estimates straight-line planning distance. It does not
+claim to provide road distance or an ordered multi-stop route.
+"""
+
+from collections.abc import Mapping
+
+from frappe import _
+from frappe.utils import flt
+
+from vuna_transport.services.routing.geography_service import haversine_distance_km
+from vuna_transport.services.routing.location_service import (
+	get_address_planning_data,
+	get_warehouse_planning_data,
+	resolve_planning_location,
+)
+
+
+def resolve_location_point(location):
+	"""Resolve an object or mapping into an explainable planning point."""
+	resolved = resolve_planning_location(
+		latitude=_value(location, "latitude", "planning_latitude", "destination_latitude", "source_latitude"),
+		longitude=_value(location, "longitude", "planning_longitude", "destination_longitude", "source_longitude"),
+		town=_value(location, "town", "destination_town"),
+		constituency=_value(location, "constituency", "destination_constituency"),
+		county=_value(location, "county", "destination_county"),
+		territory=_value(location, "territory", "destination_territory"),
+	)
+	if not resolved or resolved.get("basis") == "Unavailable":
+		return {
+			"available": False,
+			"basis": "Unavailable",
+			"confidence": "None",
+			"warning": resolved.get("warning") if resolved else _("Location is unavailable."),
+		}
+	return {
+		"available": True,
+		"latitude": resolved.latitude,
+		"longitude": resolved.longitude,
+		"basis": resolved.basis,
+		"confidence": resolved.confidence,
+		"reference": resolved.get("reference"),
+	}
+
+
+def estimate_origin_to_destinations(origin, destinations):
+	"""Estimate origin-to-farthest-destination distance for a planning load.
+
+	The result is deliberately labelled as a planning estimate. For multiple
+	destinations it is not the distance of an ordered road route.
+	"""
+	origin_point = resolve_location_point(origin)
+	destination_points = []
+	for index, destination in enumerate(destinations or [], start=1):
+		point = resolve_location_point(destination)
+		point["index"] = index
+		point["label"] = _value(destination, "name", "delivery_address", "town", "county")
+		if point["available"] and origin_point["available"]:
+			point["distance_km"] = round(
+				haversine_distance_km(
+					origin_point["latitude"],
+					origin_point["longitude"],
+					point["latitude"],
+					point["longitude"],
+				),
+				2,
+			)
+		destination_points.append(point)
+
+	if not origin_point["available"]:
+		return _empty_result(origin_point, destination_points, _("Origin location is unavailable."))
+	available_destinations = [row for row in destination_points if row.get("available")]
+	if not available_destinations:
+		return _empty_result(
+			origin_point,
+			destination_points,
+			_("No destination has exact coordinates or a configured geography reference point."),
+		)
+
+	farthest = max(available_destinations, key=lambda row: row["distance_km"])
+	warnings = [
+		_("This is a straight-line planning estimate, not road distance."),
+		_("For multiple destinations, the estimate uses the farthest destination from the origin."),
+	]
+	missing_count = len(destination_points) - len(available_destinations)
+	if missing_count:
+		warnings.append(_("{0} destination(s) could not be included in the estimate.").format(missing_count))
+	return {
+		"available": True,
+		"distance_km": flt(farthest["distance_km"]),
+		"method": "Origin to Farthest Destination",
+		"basis": farthest["basis"],
+		"confidence": _lowest_confidence([origin_point, farthest]),
+		"origin": origin_point,
+		"destinations": destination_points,
+		"selected_destination": farthest,
+		"warnings": warnings,
+	}
+
+
+def estimate_delivery_load_distance(load):
+	"""Estimate a Delivery Load distance from its source warehouse and order snapshots."""
+	origin = get_warehouse_planning_data(getattr(load, "source_warehouse", None))
+	destinations = []
+	for order in getattr(load, "delivery_orders", []) or []:
+		address_data = get_address_planning_data(getattr(order, "delivery_address", None))
+		destinations.append(
+			{
+				"name": getattr(order, "delivery_order", None),
+				"delivery_address": getattr(order, "delivery_address", None),
+				"destination_latitude": getattr(order, "destination_latitude", None)
+				or address_data.latitude,
+				"destination_longitude": getattr(order, "destination_longitude", None)
+				or address_data.longitude,
+				"town": getattr(order, "town", None) or address_data.town,
+				"constituency": getattr(order, "constituency", None) or address_data.constituency,
+				"county": getattr(order, "county", None) or address_data.county,
+				"territory": getattr(order, "territory", None) or address_data.territory,
+			}
+		)
+	return estimate_origin_to_destinations(origin, destinations)
+
+
+def apply_delivery_load_distance_estimate(load):
+	"""Populate a load's automatic distance estimate and explanation metadata.
+
+	Explicit distances remain untouched. An estimate previously generated by
+	this service is recalculated when the load's destinations change.
+	"""
+	if getattr(load, "estimated_distance", None) and getattr(load, "distance_estimate_method", None) not in {
+		"Geographic Estimate",
+	}:
+		return
+
+	result = estimate_delivery_load_distance(load)
+	load.distance_estimate_method = "Geographic Estimate" if result["available"] else "Unavailable"
+	load.distance_estimate_basis = result.get("basis")
+	load.distance_estimate_confidence = result.get("confidence")
+	load.distance_estimate_warning = "\n".join(result.get("warnings") or [])
+	if result["available"]:
+		load.estimated_distance = result["distance_km"]
+	else:
+		load.estimated_distance = None
+
+
+def _empty_result(origin, destinations, warning):
+	return {
+		"available": False,
+		"distance_km": 0,
+		"method": "Unavailable",
+		"basis": "Unavailable",
+		"confidence": "None",
+		"origin": origin,
+		"destinations": destinations,
+		"selected_destination": None,
+		"warnings": [warning],
+	}
+
+
+def _lowest_confidence(points):
+	order = {"None": 0, "Very Low": 1, "Low": 2, "Medium": 3, "High": 4}
+	return min((point.get("confidence", "None") for point in points), key=lambda value: order[value])
+
+
+def _value(document, *fieldnames):
+	for fieldname in fieldnames:
+		if isinstance(document, Mapping):
+			value = document.get(fieldname)
+		else:
+			value = getattr(document, fieldname, None)
+		if value not in (None, ""):
+			return value
+	return None
