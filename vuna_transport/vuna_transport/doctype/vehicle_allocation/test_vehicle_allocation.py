@@ -18,6 +18,7 @@ from vuna_transport.services.fleet.vehicle_allocation_service import (
 	time_windows_overlap,
 )
 from vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation import (
+	VehicleAllocation,
 	snapshot_transport_cost,
 )
 
@@ -34,6 +35,23 @@ class TestVehicleAllocation(UnitTestCase):
 		self.assertEqual(get_allocation_load_names(allocation), ["DL-001", "DL-002"])
 
 	@patch(
+		"vuna_transport.services.integrations.erpnext_integration.create_delivery_notes_for_load",
+		side_effect=[["DN-001"], ["DN-002", "DN-003"]],
+	)
+	@patch(
+		"vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation.get_allocation_load_names",
+		return_value=["DL-001", "DL-002"],
+	)
+	def test_create_delivery_notes_processes_every_attached_load(self, _get_load_names, create_notes):
+		allocation = VehicleAllocation({"doctype": "Vehicle Allocation", "docstatus": 1})
+		allocation.check_permission = MagicMock()
+
+		created = allocation.create_delivery_notes()
+
+		self.assertEqual(created, ["DN-001", "DN-002", "DN-003"])
+		self.assertEqual(create_notes.call_count, 2)
+
+	@patch(
 		"vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation.frappe.db.get_single_value",
 		return_value=0,
 	)
@@ -47,7 +65,7 @@ class TestVehicleAllocation(UnitTestCase):
 		self.assertFalse(hasattr(allocation, "estimated_marginal_cost"))
 
 	@patch(
-		"vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation.estimate_transport_cost",
+		"vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation.estimate_transport_cost_for_loads",
 		return_value={
 			"cost_structure_assignment": "Mileage 2026",
 			"cost_structure": "Mileage",

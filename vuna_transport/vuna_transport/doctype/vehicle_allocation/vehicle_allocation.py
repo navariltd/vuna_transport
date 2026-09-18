@@ -6,7 +6,7 @@ from frappe.model.document import Document
 from frappe.utils import now_datetime
 
 from vuna_transport.services.costing.transport_cost_estimation_service import (
-	estimate_transport_cost,
+	estimate_transport_cost_for_loads,
 )
 from vuna_transport.services.fleet.vehicle_allocation_service import (
 	activate_allocation,
@@ -88,13 +88,7 @@ def snapshot_transport_cost(allocation):
 	load_names = get_allocation_load_names(allocation)
 	if not allocation.vehicle or not load_names:
 		return
-	if len(load_names) > 1:
-		allocation.cost_warnings = (
-			"A combined allocation cost estimate is not yet calculated. "
-			"The current estimator remains Delivery Load-specific."
-		)
-		return
-	result = estimate_transport_cost(load_names[0], allocation.vehicle)
+	result = estimate_transport_cost_for_loads(load_names, allocation.vehicle)
 	allocation.cost_structure_assignment = result.get("cost_structure_assignment")
 	allocation.cost_structure = result.get("cost_structure")
 	allocation.estimated_distance = result.get("distance")
