@@ -419,6 +419,26 @@ def cancel_delivery_trip(doc, method=None):
 			_recompute_delivery_order_statuses(load_name)
 
 
+def prepare_delivery_trip_cancellation(doc, method=None):
+	"""Keep submitted POD history in order while releasing planning links."""
+	submitted_pods = frappe.get_all(
+		"Proof of Delivery",
+		filters={"delivery_trip": doc.name, "docstatus": 1},
+		pluck="name",
+	)
+	if submitted_pods:
+		frappe.throw(
+			_("Cancel the submitted Proofs of Delivery before cancelling Delivery Trip {0}: {1}.").format(
+				doc.name, ", ".join(submitted_pods)
+			)
+		)
+
+	# Delivery Trip cancellation unlinks Delivery Load in the on_cancel flow.
+	# Vehicle Allocation remains historical and must not make trip cancellation
+	# impossible merely because it references this execution trip.
+	doc.ignore_linked_doctypes = ["Delivery Load", "Vehicle Allocation"]
+
+
 def unlink_delivery_trip(doc, method=None):
 	if not get_delivery_trip_load_names(doc):
 		return

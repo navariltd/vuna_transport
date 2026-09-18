@@ -521,7 +521,7 @@
    "fieldtype": "Select",
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nOpen\nPartially Allocated\nAllocated\nDispatched\nPartially Delivered\nDelivery Exception\nResolved with Exceptions\nDelivered\nCancelled",
+   "options": "Draft\nOpen\nPartially Allocated\nAllocated\nDispatched\nPartially Delivered\nDelivered\nCancelled",
    "read_only": 1
   },
   {
@@ -565,12 +565,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
- "links": [
-  {
-   "link_doctype": "Delivery Exception",
-   "link_fieldname": "delivery_order"
-  }
- ],
+ "links": [],
  "modified": "2026-09-03 05:52:12.488111",
  "modified_by": "Administrator",
  "module": "Vuna Transport",

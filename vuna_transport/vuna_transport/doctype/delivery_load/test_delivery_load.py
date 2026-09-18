@@ -156,7 +156,7 @@ class TestDeliveryLoad(UnitTestCase):
 	@patch(
 		"vuna_transport.services.execution.execution_service._requires_vehicle_allocation", return_value=True
 	)
-	def test_after_notes_policy_allocates_after_draft_notes_exist(self, _requires_allocation):
+	def test_after_notes_policy_requires_submitting_draft_notes_before_allocation(self, _requires_allocation):
 		draft_note = SimpleNamespace(name="DN-1", docstatus=0)
 		result = _get_next_action(
 			self._submitted_scheduled_load(),
@@ -172,11 +172,33 @@ class TestDeliveryLoad(UnitTestCase):
 			[],
 			ALLOCATION_AFTER_DELIVERY_NOTES,
 		)
+		self.assertEqual(result["key"], "review_delivery_notes")
+
+	@patch(
+		"vuna_transport.services.execution.execution_service._requires_vehicle_allocation", return_value=True
+	)
+	def test_after_notes_policy_exposes_allocation_after_submitted_notes(self, _requires_allocation):
+		submitted_note = SimpleNamespace(name="DN-1", docstatus=1, vuna_delivery_order="DO-1")
+		result = _get_next_action(
+			self._submitted_scheduled_load(),
+			None,
+			None,
+			{"DO-1"},
+			[submitted_note],
+			[submitted_note],
+			[],
+			None,
+			[],
+			[],
+			[],
+			ALLOCATION_AFTER_DELIVERY_NOTES,
+		)
 		self.assertEqual(result["key"], "create_vehicle_allocation")
 
-	def test_open_delivery_exception_is_the_next_action(self):
+	def test_return_follow_up_does_not_block_load_execution(self):
 		load = self._submitted_scheduled_load()
-		load.status = "Exception Resolution"
+		load.status = "Approved"
+		load.delivery_method = "Company Delivery"
 		result = _get_next_action(
 			load,
 			None,
@@ -188,10 +210,10 @@ class TestDeliveryLoad(UnitTestCase):
 			None,
 			[],
 			[],
-			[SimpleNamespace(name="DEX-1")],
+			[],
 			ALLOCATION_AFTER_DELIVERY_NOTES,
 		)
-		self.assertEqual(result["key"], "resolve_delivery_exceptions")
+		self.assertNotEqual(result["key"], "resolve_return_requests")
 
 	@staticmethod
 	def _submitted_scheduled_load():

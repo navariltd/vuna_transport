@@ -8,7 +8,6 @@ frappe.listview_settings["Delivery Order"] = {
 			Allocated: [__("Allocated"), "green"],
 			Dispatched: [__("Dispatched"), "blue"],
 			"Partially Delivered": [__("Partially Delivered"), "orange"],
-			"Delivery Exception": [__("Delivery Exception"), "red"],
 			Delivered: [__("Delivered"), "green"],
 			Cancelled: [__("Cancelled"), "red"],
 		};

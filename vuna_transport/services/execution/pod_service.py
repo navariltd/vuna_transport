@@ -139,10 +139,6 @@ def update_delivery_stop_from_pod(pod, status):
 	)
 	trip = frappe.get_doc("Delivery Trip", pod.delivery_trip)
 	trip.update_status()
-	from vuna_transport.services.execution.delivery_exception_service import (
-		recompute_delivery_load_completion,
-	)
-
 	recompute_delivery_load_completion(pod.delivery_load, pod.delivery_trip)
 	if pod.delivery_order:
 		recompute_delivery_order_status(pod.delivery_order)
@@ -169,6 +165,44 @@ def reset_delivery_stop_from_pod(pod):
 	)
 	if pod.delivery_order:
 		recompute_delivery_order_status(pod.delivery_order)
+
+
+def prepare_pod_cancellation(pod):
+	"""Allow a POD correction without requiring its parent trip to be cancelled first."""
+	# An active return case depends on this POD as its source evidence. Keep that
+	# case intact and require it to be cancelled before the source POD changes.
+	if frappe.db.table_exists("Return Request"):
+		active_return = frappe.db.get_value(
+			"Return Request",
+			{"proof_of_delivery": pod.name, "docstatus": ["!=", 2]},
+			"name",
+		)
+		if active_return:
+			frappe.throw(
+				_("Cancel or close Return Request {0} before cancelling Proof of Delivery {1}.").format(
+					active_return, pod.name
+				)
+			)
+
+	# Delivery Stop is a child of the submitted Delivery Trip and stores the
+	# POD back-reference. reset_delivery_stop_from_pod clears that reference on
+	# cancel; this flag prevents Frappe's generic back-link check from creating
+	# a parent/child cancellation cycle.
+	pod.ignore_linked_doctypes = ["Delivery Trip"]
+
+
+def clear_pod_stop_reference(pod):
+	"""Remove the draft POD backlink before Frappe checks links on deletion."""
+	if not pod.delivery_stop or not frappe.db.exists("Delivery Stop", pod.delivery_stop):
+		return
+	if frappe.db.get_value("Delivery Stop", pod.delivery_stop, "vuna_proof_of_delivery") == pod.name:
+		frappe.db.set_value(
+			"Delivery Stop",
+			pod.delivery_stop,
+			"vuna_proof_of_delivery",
+			None,
+			update_modified=False,
+		)
 
 
 def recompute_delivery_order_status(delivery_order_name):
@@ -199,18 +233,12 @@ def recompute_delivery_order_status(delivery_order_name):
 		filters={"delivery_order": delivery_order_name, "docstatus": 1},
 		fields=["delivery_load", "status"],
 	)
-	from vuna_transport.services.execution.delivery_exception_service import (
-		get_delivery_order_exception_outcomes,
-	)
-
-	exception_outcomes = get_delivery_order_exception_outcomes(delivery_order_name)
 	status = derive_delivery_order_execution_status(
 		requested_quantity=delivery_order.requested_quantity,
 		allocated_quantity=delivery_order.allocated_quantity,
 		reserved_quantity=delivery_order.reserved_quantity,
 		loads=loads,
 		pod_outcomes=pods,
-		delivery_exceptions=exception_outcomes,
 	)
 	frappe.db.set_value("Delivery Order", delivery_order_name, "status", status, update_modified=False)
 
@@ -221,7 +249,6 @@ def derive_delivery_order_execution_status(
 	reserved_quantity,
 	loads,
 	pod_outcomes,
-	delivery_exceptions=None,
 ):
 	"""Pure status rule supporting one Delivery Order split across many loads."""
 	load_statuses = {load.name: load.status for load in loads}
@@ -241,28 +268,17 @@ def derive_delivery_order_execution_status(
 	)
 	positive = any(status in ("Accepted", "Partially Delivered") for status in outcomes.values())
 	exceptions = any(status in ("Rejected", "Failed") for status in outcomes.values())
-	delivery_exceptions = delivery_exceptions or []
-	all_exceptions_resolved = bool(delivery_exceptions) and all(
-		exception.resolution_status in ("Resolved", "Closed") for exception in delivery_exceptions
-	)
-
 	if all_covered and fully_allocated:
 		if outcomes and all(status == "Accepted" for status in outcomes.values()):
 			return "Delivered"
-		if all_exceptions_resolved:
-			return "Resolved with Exceptions"
 		if positive:
 			return "Partially Delivered"
 		if exceptions:
-			return "Delivery Exception"
+			return "Partially Delivered"
 	if positive:
-		if all_exceptions_resolved:
-			return "Resolved with Exceptions"
 		return "Partially Delivered"
 	if exceptions:
-		if all_exceptions_resolved:
-			return "Resolved with Exceptions"
-		return "Delivery Exception"
+		return "Partially Delivered"
 	if any(
 		status in ("Dispatched", "Completed", "Completed with Exceptions")
 		for status in load_statuses.values()
@@ -273,3 +289,42 @@ def derive_delivery_order_execution_status(
 	if flt(allocated_quantity):
 		return "Partially Allocated"
 	return "Open"
+
+
+def recompute_delivery_load_completion(delivery_load, delivery_trip=None):
+	"""Complete a load when every stop has a submitted POD.
+
+	Return Requests are follow-up cases and do not keep the trip or vehicle
+	blocked after the delivery event has been recorded.
+	"""
+	if not delivery_load or not frappe.db.exists("Delivery Load", delivery_load):
+		return
+	trip_name = delivery_trip or frappe.db.get_value(
+		"Delivery Stop",
+		{"vuna_delivery_load": delivery_load, "parenttype": "Delivery Trip", "docstatus": ["!=", 2]},
+		"parent",
+	)
+	if not trip_name:
+		return
+	stops = frappe.get_all(
+		"Delivery Stop",
+		filters={"parent": trip_name, "parenttype": "Delivery Trip", "vuna_delivery_load": delivery_load},
+		fields=["name", "visited"],
+	)
+	if not stops or not all(stop.visited for stop in stops):
+		return
+	pod_statuses = frappe.get_all(
+		"Proof of Delivery",
+		filters={"delivery_load": delivery_load, "delivery_trip": trip_name, "docstatus": 1},
+		pluck="status",
+	)
+	if len(pod_statuses) < len(stops):
+		return
+	from vuna_transport.services.execution.dispatch_guard_service import set_delivery_load_status
+
+	target = "Completed" if pod_statuses and all(status == "Accepted" for status in pod_statuses) else "Completed with Exceptions"
+	set_delivery_load_status(
+		delivery_load,
+		target,
+		_("Every delivery stop has a submitted Proof of Delivery."),
+	)

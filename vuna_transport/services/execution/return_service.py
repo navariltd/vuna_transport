@@ -52,7 +52,6 @@ def validate_return_request(request):
 	_validate_status_change(request)
 	delivery_note = _get_source_delivery_note(request)
 	_populate_request_context(request, delivery_note)
-	_validate_delivery_exception_context(request, delivery_note)
 	_validate_return_warehouse(request)
 	_validate_items(request, delivery_note)
 	_validate_follow_up_documents(request, delivery_note)
@@ -100,33 +99,6 @@ def _populate_request_context(request, delivery_note):
 		pod = frappe.get_doc("Proof of Delivery", request.proof_of_delivery)
 		if pod.docstatus != 1 or pod.delivery_note != delivery_note.name:
 			frappe.throw(_("Proof of Delivery must be submitted for the selected Delivery Note."))
-
-
-def _validate_delivery_exception_context(request, delivery_note):
-	"""Keep an exception-created return request tied to its source delivery outcome."""
-	if not request.delivery_exception:
-		return
-	exception = frappe.get_doc("Delivery Exception", request.delivery_exception)
-	require_document_permission(exception, "read")
-	if exception.company != request.company or exception.customer != request.customer:
-		frappe.throw(_("Delivery Exception must belong to the same Company and Customer."))
-	if exception.delivery_note != delivery_note.name:
-		frappe.throw(_("Delivery Exception must reference the selected Delivery Note."))
-	for fieldname in ("delivery_order", "delivery_trip", "proof_of_delivery", "delivery_address"):
-		expected = exception.get(fieldname)
-		if expected and request.get(fieldname) and request.get(fieldname) != expected:
-			frappe.throw(_("{0} must match Delivery Exception {1}.").format(fieldname.replace("_", " ").title(), exception.name))
-		if expected:
-			request.set(fieldname, expected)
-	for fieldname in ("custody", "responsible_party", "physical_resolution", "commercial_resolution"):
-		expected = exception.get(fieldname)
-		if expected and request.get(fieldname) and request.get(fieldname) != expected:
-			frappe.throw(_("{0} must match Delivery Exception {1}.").format(fieldname.replace("_", " ").title(), exception.name))
-		if expected:
-			request.set(fieldname, expected)
-	request.return_warehouse = request.return_warehouse or exception.resolution_warehouse
-	if exception.return_request and exception.return_request != request.name:
-		frappe.throw(_("Delivery Exception {0} already has Return Request {1}.").format(exception.name, exception.return_request))
 
 
 def _validate_return_warehouse(request):
@@ -421,7 +393,6 @@ def create_return_stock_document(return_request):
 		frappe.throw(_("No return items could be mapped to the original Delivery Note."))
 	target.insert()
 	request.db_set("return_stock_document", target.name, update_modified=True)
-	_link_stock_return_to_exception(request, target.name)
 	return target.name
 
 
@@ -468,54 +439,31 @@ def create_return_quality_inspections(return_request):
 	return inspections
 
 
-def _link_stock_return_to_exception(request, return_document):
-	if not request.delivery_exception:
-		return
-	exception = frappe.get_doc("Delivery Exception", request.delivery_exception)
-	if exception.return_document and exception.return_document != return_document:
-		frappe.throw(_("Delivery Exception {0} already links a different Return Delivery Note.").format(exception.name))
-	exception.db_set("return_document", return_document, update_modified=True)
-	for resolution in getattr(exception, "resolutions", None) or []:
-		if resolution.physical_resolution in RETURN_PHYSICAL_RESOLUTIONS and not resolution.return_document:
-			frappe.db.set_value(
-				"Delivery Exception Resolution",
-				resolution.name,
-				"return_document",
-				return_document,
-				update_modified=False,
-			)
-
-
 @frappe.whitelist()
-def create_return_request_from_exception(delivery_exception):
-	"""Create the one physical-return case for an approved delivery exception.
+def create_return_request_from_pod(proof_of_delivery):
+	"""Create one draft physical-return case for a non-accepted submitted POD.
 
 	The request remains a draft. Users still review quantities and explicitly
 	advance it before ERPNext stock or accounting documents are prepared.
 	"""
 	require_doctype_permission("Return Request", "create")
-	frappe.db.sql("select name from `tabDelivery Exception` where name = %s for update", delivery_exception)
-	exception = frappe.get_doc("Delivery Exception", delivery_exception)
-	require_document_permission(exception, "write")
-	require_company_access(exception.company)
-	if exception.return_request:
-		return exception.return_request
-	if exception.resolution_status not in {"Open", "In Resolution"}:
-		frappe.throw(_("A Return Request can only be created for an open Delivery Exception."))
-	if not exception.resolution_warehouse:
-		frappe.throw(_("Set Resolution Warehouse before creating a Return Request."))
-
+	frappe.db.sql("select name from `tabProof of Delivery` where name = %s for update", proof_of_delivery)
+	pod = frappe.get_doc("Proof of Delivery", proof_of_delivery)
+	require_document_permission(pod, "read")
+	require_company_access(pod.company)
+	if pod.docstatus != 1 or pod.status not in {"Partially Delivered", "Rejected", "Failed"}:
+		frappe.throw(_("A Return Request requires a submitted non-accepted Proof of Delivery."))
+	existing = frappe.db.get_value(
+		"Return Request",
+		{"proof_of_delivery": pod.name, "docstatus": ["!=", 2]},
+		"name",
+	)
+	if existing:
+		return existing
+	delivery_note = frappe.get_doc("Delivery Note", pod.delivery_note)
 	request_rows = []
-	resolution_rows = getattr(exception, "resolutions", None) or []
-	if not resolution_rows:
-		resolution_rows = exception.items
-	for row in resolution_rows:
-		physical_resolution = getattr(row, "physical_resolution", None) or exception.physical_resolution
-		if physical_resolution not in RETURN_PHYSICAL_RESOLUTIONS:
-			continue
-		quantity = flt(getattr(row, "quantity", None) or getattr(row, "resolution_qty", None))
-		if not quantity:
-			quantity = flt(getattr(row, "unresolved_qty", None))
+	for row in pod.items:
+		quantity = flt(row.rejected_qty)
 		if quantity <= 0:
 			continue
 		request_rows.append(
@@ -524,173 +472,47 @@ def create_return_request_from_exception(delivery_exception):
 				"item_name": row.item_name,
 				"delivery_note_item": row.delivery_note_item,
 				"delivery_order_item": row.delivery_order_item,
-				"delivered_qty": getattr(row, "delivered_qty", None) or 0,
+				"delivered_qty": row.delivered_qty,
 				"requested_return_qty": quantity,
-				"return_reason": exception.exception_reason,
+				"return_reason": pod.exception_reason,
 			}
 		)
 	if not request_rows:
-		frappe.throw(_("This Delivery Exception has no item approved for physical return."))
+		frappe.throw(_("This Proof of Delivery has no rejected quantity for return."))
 
 	request = frappe.new_doc("Return Request")
 	request.update(
 		{
-			"delivery_exception": exception.name,
-			"company": exception.company,
-			"customer": exception.customer,
-			"sales_order": frappe.db.get_value("Delivery Note", exception.delivery_note, "against_sales_order"),
-			"delivery_order": exception.delivery_order,
-			"delivery_note": exception.delivery_note,
-			"delivery_trip": exception.delivery_trip,
-			"proof_of_delivery": exception.proof_of_delivery,
-			"delivery_address": exception.delivery_address,
-			"custody": exception.custody,
-			"responsible_party": exception.responsible_party,
-			"physical_resolution": exception.physical_resolution,
-			"commercial_resolution": exception.commercial_resolution,
-			"return_warehouse": exception.resolution_warehouse,
+			"company": pod.company,
+			"customer": pod.customer,
+			"sales_order": next((row.against_sales_order for row in delivery_note.items if row.against_sales_order), None),
+			"delivery_order": pod.delivery_order,
+			"delivery_note": pod.delivery_note,
+			"delivery_trip": pod.delivery_trip,
+			"proof_of_delivery": pod.name,
+			"delivery_address": pod.delivery_address,
+			"return_warehouse": _default_return_warehouse(pod.delivery_note),
 			"initiated_by": "Dispatcher",
-			"return_method": _return_method_from_custody(exception.custody),
-			"return_remarks": exception.notes,
+			"return_method": "Driver Return",
+			"return_remarks": pod.remarks or pod.notes,
 		}
 	)
 	for row in request_rows:
 		request.append("items", row)
-	for reason in _get_exception_rejection_reasons(exception):
+	for reason in _get_pod_rejection_reasons(pod):
 		request.append("return_reasons", {"rejection_reason": reason})
-	request.append_activity("Created", _("Created from Delivery Exception {0}").format(exception.name), exception)
+	request.append_activity("Created", _("Created from Proof of Delivery {0}").format(pod.name), pod)
 	request.insert()
-	exception.db_set("return_request", request.name, update_modified=True)
-	for resolution in resolution_rows:
-		if resolution.physical_resolution in RETURN_PHYSICAL_RESOLUTIONS and not resolution.return_request:
-			frappe.db.set_value(
-				"Delivery Exception Resolution",
-				resolution.name,
-				"return_request",
-				request.name,
-				update_modified=False,
-			)
+	pod.db_set("return_request", request.name, update_modified=True)
 	return request.name
 
 
-@frappe.whitelist()
-def create_replacement_sales_order_from_exception(delivery_exception):
-	"""Prepare one draft Sales Order containing only approved replacement quantities."""
-	require_doctype_permission("Sales Order", "create")
-	frappe.db.sql("select name from `tabDelivery Exception` where name = %s for update", delivery_exception)
-	exception = frappe.get_doc("Delivery Exception", delivery_exception)
-	require_document_permission(exception, "write")
-	require_company_access(exception.company)
-	if exception.docstatus != 1:
-		frappe.throw(_("Submit Delivery Exception {0} before creating replacement demand.").format(exception.name))
-	if exception.replacement_sales_order:
-		return exception.replacement_sales_order
-
-	resolution_rows = getattr(exception, "resolutions", None) or []
-	if not resolution_rows:
-		frappe.throw(_("Add and submit an item-level resolution plan first."))
-	replacement_rows = [
-		row
-		for row in resolution_rows
-		if row.commercial_resolution in {"Replacement", "Re-delivery"} and flt(row.quantity) > 0
-	]
-	if not replacement_rows:
-		frappe.throw(_("No resolution quantity is approved for replacement or re-delivery."))
-
-	sales_order_name = _get_exception_sales_order(exception)
-	source_sales_order = frappe.get_doc("Sales Order", sales_order_name)
-	if source_sales_order.docstatus != 1:
-		frappe.throw(_("Source Sales Order {0} must be submitted.").format(source_sales_order.name))
-	source_items = {row.name: row for row in source_sales_order.items}
-	resolution_items = {
-		row.delivery_order_item: row
-		for row in exception.items
-		if row.delivery_order_item
-	}
-	replacement_quantities = defaultdict(float)
-	for resolution in replacement_rows:
-		item = resolution_items.get(resolution.delivery_order_item)
-		if item:
-			replacement_quantities[item.delivery_order_item] += flt(resolution.quantity)
-	replacement = frappe.copy_doc(source_sales_order)
-	replacement.name = None
-	replacement.docstatus = 0
-	replacement.amended_from = None
-	replacement.transaction_date = nowdate()
-	if exception.follow_up_date:
-		replacement.delivery_date = exception.follow_up_date
-	replacement.items = []
-	replacement.remarks = _(
-		"Replacement demand for Delivery Exception {0}, originating from Sales Order {1}."
-	).format(exception.name, source_sales_order.name)
-
-	for delivery_order_item_name, replacement_quantity in replacement_quantities.items():
-		exception_item = resolution_items.get(delivery_order_item_name)
-		delivery_order_item = (
-			frappe.get_doc("Delivery Order Item", delivery_order_item_name)
-			if exception_item
-			else None
-		)
-		if not delivery_order_item or not delivery_order_item.sales_order_item:
-			frappe.throw(
-				_("Replacement quantity does not have valid Sales Order Item lineage.")
-			)
-		sales_order_item = source_items.get(delivery_order_item.sales_order_item)
-		if not sales_order_item:
-			frappe.throw(
-				_("Sales Order Item {0} could not be found for replacement quantity.").format(
-					delivery_order_item.sales_order_item
-				)
-			)
-		conversion_factor = flt(getattr(delivery_order_item, "conversion_factor", None)) or 1
-		transaction_qty = replacement_quantity / conversion_factor
-		if transaction_qty <= 0:
-			continue
-		item_values = sales_order_item.as_dict()
-		for fieldname in ("name", "parent", "parentfield", "parenttype", "idx", "doctype"):
-			item_values.pop(fieldname, None)
-		item_values["qty"] = transaction_qty
-		item_values["delivered_qty"] = 0
-		item_values["billed_amt"] = 0
-		replacement.append("items", item_values)
-
-	if not replacement.items:
-		frappe.throw(_("No positive replacement quantities were available."))
-	replacement.insert()
-	exception.db_set("replacement_sales_order", replacement.name, update_modified=True)
-	for resolution in replacement_rows:
-		frappe.db.set_value(
-			"Delivery Exception Resolution",
-			resolution.name,
-			"replacement_sales_order",
-			replacement.name,
-			update_modified=False,
-		)
-	return replacement.name
+def _default_return_warehouse(delivery_note_name):
+	"""Use the first source warehouse only as a draft-return default."""
+	return frappe.db.get_value("Delivery Note Item", {"parent": delivery_note_name}, "warehouse")
 
 
-def _get_exception_sales_order(exception):
-	if exception.delivery_note:
-		sales_order = frappe.db.get_value(
-			"Delivery Note Item",
-			{"parent": exception.delivery_note, "against_sales_order": ["is", "set"]},
-			"against_sales_order",
-		)
-		if sales_order:
-			return sales_order
-	for row in exception.items:
-		if not row.delivery_order_item:
-			continue
-		sales_order_item = frappe.db.get_value("Delivery Order Item", row.delivery_order_item, "sales_order_item")
-		if sales_order_item:
-			return frappe.db.get_value("Sales Order Item", sales_order_item, "parent")
-	frappe.throw(_("The Delivery Exception has no Sales Order lineage."))
-
-
-def _get_exception_rejection_reasons(exception):
-	if not exception.proof_of_delivery:
-		return []
-	pod = frappe.get_doc("Proof of Delivery", exception.proof_of_delivery)
+def _get_pod_rejection_reasons(pod):
 	return list(
 		dict.fromkeys(
 			reason.rejection_reason

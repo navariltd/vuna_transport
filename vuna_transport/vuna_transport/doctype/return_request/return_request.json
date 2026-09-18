@@ -21,7 +21,6 @@
   "source_section",
   "sales_order",
   "delivery_note",
-  "delivery_exception",
   "column_break_source",
   "delivery_order",
   "delivery_trip",
@@ -141,15 +140,6 @@
    "label": "Delivery Note",
    "options": "Delivery Note",
    "reqd": 1
-  },
-  {
-   "fieldname": "delivery_exception",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Delivery Exception",
-   "options": "Delivery Exception",
-   "read_only": 1,
-   "unique": 1
   },
   {
    "fieldname": "column_break_source",

@@ -4,7 +4,10 @@ import frappe
 from frappe import _
 
 from vuna_transport.services.shared.security_service import require_document_permission
-from vuna_transport.services.fleet.vehicle_allocation_service import get_allocation_names_for_load
+from vuna_transport.services.fleet.vehicle_allocation_service import (
+	get_allocation_names_for_load,
+	get_delivery_note_submission_status,
+)
 from vuna_transport.services.shared.workflow_policy_service import (
 	ALLOCATION_AFTER_DELIVERY_NOTES,
 	get_vehicle_allocation_timing,
@@ -50,6 +53,7 @@ def get_load_execution_summary(load):
 	active_notes = [note for note in delivery_notes if note.docstatus != 2]
 	submitted_notes = [note for note in active_notes if note.docstatus == 1]
 	draft_notes = [note for note in active_notes if note.docstatus == 0]
+	delivery_note_status = get_delivery_note_submission_status(load)
 
 	delivery_trip = _get_delivery_trip(load)
 	stops = []
@@ -75,19 +79,12 @@ def get_load_execution_summary(load):
 		order_by="creation asc",
 	)
 	submitted_pods = [pod for pod in pods if pod.docstatus == 1]
-	delivery_exceptions = []
-	if frappe.db.table_exists("Delivery Exception"):
-		delivery_exceptions = frappe.get_all(
-			"Delivery Exception",
-			filters={"delivery_load": load.name},
-			fields=["name", "resolution_status", "total_unresolved_quantity"],
-			order_by="creation asc",
-		)
-	open_exceptions = [
-		exception
-		for exception in delivery_exceptions
-		if exception.resolution_status in ("Open", "In Resolution")
-	]
+	return_requests = frappe.get_all(
+		"Return Request",
+		filters={"delivery_trip": delivery_trip.name} if delivery_trip else {"name": ""},
+		fields=["name", "status", "proof_of_delivery"],
+		order_by="creation asc",
+	) if delivery_trip else []
 	vehicle_allocation_timing = get_vehicle_allocation_timing()
 
 	next_action = _get_next_action(
@@ -101,8 +98,9 @@ def get_load_execution_summary(load):
 		delivery_trip,
 		stops,
 		submitted_pods,
-		open_exceptions,
+		[],
 		vehicle_allocation_timing,
+		delivery_note_status["ready"],
 	)
 
 	return {
@@ -126,6 +124,9 @@ def get_load_execution_summary(load):
 			"submitted": len(submitted_notes),
 			"cancelled": len([note for note in delivery_notes if note.docstatus == 2]),
 			"names": [note.name for note in active_notes],
+			"ready_for_vehicle_allocation": delivery_note_status["ready"],
+			"missing_delivery_orders": delivery_note_status["missing_delivery_orders"],
+			"draft_names": delivery_note_status["draft_delivery_notes"],
 		},
 		"delivery_trip": _serialize_doc(delivery_trip, ("vehicle", "driver")),
 		"stops": {
@@ -138,11 +139,7 @@ def get_load_execution_summary(load):
 			"submitted": len(submitted_pods),
 			"draft": len([pod for pod in pods if pod.docstatus == 0]),
 		},
-		"delivery_exceptions": {
-			"total": len(delivery_exceptions),
-			"open": len(open_exceptions),
-			"names": [exception.name for exception in open_exceptions],
-		},
+		"return_requests": {"total": len(return_requests), "names": [row.name for row in return_requests]},
 		"next_action": next_action,
 	}
 
@@ -226,17 +223,21 @@ def _get_next_action(
 	submitted_pods,
 	open_exceptions,
 	vehicle_allocation_timing,
+	delivery_notes_ready=None,
 ):
+	if delivery_notes_ready is None:
+		submitted_orders = {
+			note.vuna_delivery_order
+			for note in submitted_notes
+			if getattr(note, "vuna_delivery_order", None)
+		}
+		delivery_notes_ready = (
+			not draft_notes and delivery_orders.issubset(submitted_orders)
+		)
 	if load.docstatus == 0:
 		return _action("submit_load", _("Submit Delivery Load"), _("Review capacity and submit this load."))
 	if load.docstatus == 2:
 		return _action("cancelled", _("Delivery Load Cancelled"), _("Amend the load to continue."))
-	if open_exceptions:
-		return _action(
-			"resolve_delivery_exceptions",
-			_("Resolve Delivery Exceptions"),
-			_("Confirm custody and complete the physical and commercial resolution."),
-		)
 	if load.status in ("Completed", "Completed with Exceptions"):
 		return _action("completed", _("Execution Completed"), _("This Delivery Load is closed."))
 	requires_vehicle_allocation = _requires_vehicle_allocation(load)
@@ -249,16 +250,28 @@ def _get_next_action(
 		return _action(
 			"open_pick_list", _("Complete Pick List"), _("Pick and submit the warehouse document.")
 		)
+	if requires_vehicle_allocation and allocation_after_notes:
+		if draft_notes:
+			return _action(
+				"review_delivery_notes",
+				_("Review Delivery Notes"),
+				_("Submit every Delivery Note before allocating a vehicle."),
+			)
+		if not delivery_notes_ready:
+			return _action(
+				"create_delivery_notes",
+				_("Create Delivery Notes"),
+				_("Create and submit Delivery Notes before allocating a vehicle."),
+			)
+		action = _get_vehicle_allocation_action(load, vehicle_allocation)
+		if action:
+			return action
 	if len(active_notes) < len(delivery_orders):
 		return _action(
 			"create_delivery_notes",
 			_("Create Delivery Notes"),
 			_("Create one stock movement per delivery stop."),
 		)
-	if requires_vehicle_allocation and allocation_after_notes:
-		action = _get_vehicle_allocation_action(load, vehicle_allocation)
-		if action:
-			return action
 	if draft_notes:
 		return _action(
 			"review_delivery_notes", _("Review Delivery Notes"), _("Review and submit every Delivery Note.")

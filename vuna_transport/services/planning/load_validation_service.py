@@ -426,7 +426,6 @@ def sync_delivery_order_allocations(delivery_order_names=None):
 		if current_status not in (
 			"Dispatched",
 			"Partially Delivered",
-			"Delivery Exception",
 			"Delivered",
 			"Cancelled",
 		):

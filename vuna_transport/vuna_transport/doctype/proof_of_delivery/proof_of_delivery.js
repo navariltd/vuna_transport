@@ -8,6 +8,21 @@ frappe.ui.form.on("Proof of Delivery", {
 		// offer to cancel the submitted trip; the server-side on_cancel handler
 		// resets only this POD's Delivery Stop outcome.
 		frm.ignore_doctypes_on_cancel_all = ["Delivery Trip"];
+		if (frm.doc.docstatus === 1 && ["Partially Delivered", "Rejected", "Failed"].includes(frm.doc.status)) {
+			frappe.db
+				.get_value("Return Request", { proof_of_delivery: frm.doc.name, docstatus: ["!=", 2] }, ["name", "docstatus"])
+				.then(({ message }) => {
+					if (message?.name) return;
+					frm.add_custom_button(
+						__("Create Return Request"),
+						() =>
+							frm.call("create_return_request").then(({ message: request }) => {
+								if (request) frappe.set_route("Form", "Return Request", request);
+							}),
+						__("Resolve")
+					);
+				});
+		}
 	},
 
 	delivery_stop(frm) {

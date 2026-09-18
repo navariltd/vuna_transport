@@ -6,21 +6,19 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
 
-from vuna_transport.services.execution.delivery_exception_service import (
-	cancel_delivery_exception_from_pod,
-	sync_delivery_exception_from_pod,
-)
 from vuna_transport.services.execution.pod_service import (
 	derive_pod_status,
 	reset_delivery_stop_from_pod,
 	update_delivery_stop_from_pod,
 	validate_pod_items,
 )
+from vuna_transport.services.execution.return_service import create_return_request_from_pod
 
 
 class ProofofDelivery(Document):
 	def validate(self):
 		self.populate_stop_details()
+		self.validate_unique_active_pod()
 		self.populate_item_details()
 		validate_pod_items(self.items, self.rejection_reasons)
 		self.total_accepted_qty = sum(flt(item.delivered_qty) for item in self.items)
@@ -53,6 +51,24 @@ class ProofofDelivery(Document):
 			"Delivery Note", self.delivery_note, "vuna_delivery_load"
 		)
 
+	def validate_unique_active_pod(self):
+		duplicate = frappe.db.get_value(
+			"Proof of Delivery",
+			{
+				"delivery_trip": self.delivery_trip,
+				"delivery_stop": self.delivery_stop,
+				"docstatus": ["!=", 2],
+				"name": ["!=", self.name or ""],
+			},
+			"name",
+		)
+		if duplicate:
+			frappe.throw(
+				_("Delivery Stop {0} already has active Proof of Delivery {1}.").format(
+					self.delivery_stop, duplicate
+				)
+			)
+
 	def populate_item_details(self):
 		"""Populate item snapshots with one batched query instead of one query per row."""
 		item_names = {item.delivery_order_item for item in self.items if item.delivery_order_item}
@@ -83,9 +99,28 @@ class ProofofDelivery(Document):
 			frappe.throw(_("An exception reason is required for {0} deliveries.").format(self.status.lower()))
 
 	def on_submit(self):
-		sync_delivery_exception_from_pod(self)
 		update_delivery_stop_from_pod(self, self.status)
+		if self.status in ("Partially Delivered", "Rejected", "Failed"):
+			create_return_request_from_pod(self.name)
+
+	@frappe.whitelist()
+	def create_return_request(self):
+		self.check_permission("read")
+		if self.docstatus != 1:
+			frappe.throw(_("Submit the Proof of Delivery before creating a Return Request."))
+		if self.status not in ("Partially Delivered", "Rejected", "Failed"):
+			frappe.throw(_("Accepted Proofs of Delivery do not require a Return Request."))
+		return create_return_request_from_pod(self.name)
+
+	def before_cancel(self):
+		from vuna_transport.services.execution.pod_service import prepare_pod_cancellation
+
+		prepare_pod_cancellation(self)
+
+	def on_trash(self):
+		from vuna_transport.services.execution.pod_service import clear_pod_stop_reference
+
+		clear_pod_stop_reference(self)
 
 	def on_cancel(self):
-		cancel_delivery_exception_from_pod(self)
 		reset_delivery_stop_from_pod(self)

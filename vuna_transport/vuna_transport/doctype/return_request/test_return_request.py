@@ -13,7 +13,7 @@ from vuna_transport.services.execution.return_service import (
 	_return_method_from_custody,
 	_validate_status_requirements,
 	create_return_quality_inspections,
-	create_return_request_from_exception,
+	create_return_request_from_pod,
 	get_remaining_returnable_quantity,
 )
 
@@ -22,26 +22,25 @@ class TestReturnRequest(UnitTestCase):
 	def test_return_request_is_submittable(self):
 		self.assertTrue(frappe.get_meta("Return Request").is_submittable)
 
-	def test_delivery_exception_link_is_unique(self):
-		self.assertTrue(frappe.get_meta("Return Request").get_field("delivery_exception").unique)
-
 	def test_exception_return_methods_follow_custody(self):
 		self.assertEqual(_return_method_from_custody("Still With Vehicle"), "Driver Return")
 		self.assertEqual(_return_method_from_custody("Left With Customer"), "Customer Drop-off")
 		self.assertIn("Return to Nearest Depot", RETURN_PHYSICAL_RESOLUTIONS)
 
-	@patch("vuna_transport.services.execution.return_service.require_document_permission")
-	@patch("vuna_transport.services.execution.return_service.frappe.get_doc")
+	@patch("vuna_transport.services.execution.return_service.frappe.db.get_value", return_value="RR-0001")
 	@patch("vuna_transport.services.execution.return_service.frappe.db.sql")
+	@patch("vuna_transport.services.execution.return_service.frappe.get_doc")
+	@patch("vuna_transport.services.execution.return_service.require_document_permission")
 	@patch("vuna_transport.services.execution.return_service.require_doctype_permission")
-	def test_exception_return_request_creation_is_idempotent(
-		self, require_doctype_permission, lock_exception, get_doc, require_document_permission
+	def test_pod_return_request_creation_is_idempotent(
+		self, require_doctype_permission, require_document_permission, get_doc, lock_pod, get_value
 	):
-		get_doc.return_value = SimpleNamespace(company="Test Company", return_request="RR-0001")
-		self.assertEqual(create_return_request_from_exception("DEX-0001"), "RR-0001")
-		lock_exception.assert_called_once()
+		get_doc.return_value = SimpleNamespace(
+			name="POD-0001", company="Test Company", docstatus=1, status="Rejected"
+		)
+		self.assertEqual(create_return_request_from_pod("POD-0001"), "RR-0001")
+		lock_pod.assert_called_once()
 		require_doctype_permission.assert_called_once_with("Return Request", "create")
-		require_document_permission.assert_called_once_with(get_doc.return_value, "write")
 
 	def test_received_quantity_must_be_inspected_before_resolution(self):
 		request = SimpleNamespace(

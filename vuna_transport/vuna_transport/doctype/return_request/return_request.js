@@ -31,7 +31,6 @@ frappe.ui.form.on("Return Request", {
 	},
 
 	refresh(frm) {
-		set_exception_context_read_only(frm);
 		add_view_buttons(frm);
 		add_get_delivered_items_button(frm);
 		if (frm.is_new()) return;
@@ -245,13 +244,6 @@ function record_custody_change(frm) {
 	);
 }
 
-function set_exception_context_read_only(frm) {
-	const read_only = Boolean(frm.doc.delivery_exception);
-	["custody", "responsible_party", "physical_resolution", "commercial_resolution"].forEach(
-		(fieldname) => frm.set_df_property(fieldname, "read_only", read_only)
-	);
-}
-
 function add_resolution_actions(frm) {
 	if (frm.doc.commercial_resolution === "Credit Note" && !frm.doc.credit_note) {
 		frm.add_custom_button(
@@ -274,7 +266,6 @@ function add_resolution_actions(frm) {
 
 function add_view_buttons(frm) {
 	[
-		["delivery_exception", "Delivery Exception", __("Delivery Exception")],
 		["delivery_note", "Delivery Note", __("Original Delivery Note")],
 		["sales_order", "Sales Order", __("Sales Order")],
 		["delivery_trip", "Delivery Trip", __("Delivery Trip")],

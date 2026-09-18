@@ -2,6 +2,7 @@
 # See license.txt
 
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
@@ -9,6 +10,7 @@ from frappe.tests import UnitTestCase
 from vuna_transport.services.execution.pod_service import (
 	derive_delivery_order_execution_status,
 	derive_pod_status,
+	prepare_pod_cancellation,
 	validate_pod_items,
 )
 
@@ -28,6 +30,37 @@ class TestProofOfDelivery(UnitTestCase):
 	def test_accepted_status(self):
 		items = [SimpleNamespace(ordered_qty=10, delivered_qty=10, rejected_qty=0)]
 		self.assertEqual(derive_pod_status(items), "Accepted")
+
+	@patch("vuna_transport.vuna_transport.doctype.proof_of_delivery.proof_of_delivery.frappe.db.get_value")
+	def test_duplicate_active_pod_is_rejected(self, get_value):
+		from vuna_transport.vuna_transport.doctype.proof_of_delivery.proof_of_delivery import (
+			ProofofDelivery,
+		)
+
+		get_value.return_value = "POD-EXISTING"
+		pod = SimpleNamespace(
+			name="POD-COPY",
+			delivery_trip="DT-1",
+			delivery_stop="STOP-1",
+		)
+
+		with self.assertRaises(ValidationError):
+			ProofofDelivery.validate_unique_active_pod(pod)
+
+	@patch("vuna_transport.services.execution.pod_service.frappe.db.set_value")
+	@patch(
+		"vuna_transport.services.execution.pod_service.frappe.db.get_value",
+		return_value="POD-DRAFT",
+	)
+	@patch("vuna_transport.services.execution.pod_service.frappe.db.exists", return_value=True)
+	def test_deleted_draft_pod_clears_delivery_stop_reference(self, _exists, _get_value, set_value):
+		from vuna_transport.services.execution.pod_service import clear_pod_stop_reference
+
+		clear_pod_stop_reference(SimpleNamespace(delivery_stop="STOP-1", name="POD-DRAFT"))
+
+		set_value.assert_called_once_with(
+			"Delivery Stop", "STOP-1", "vuna_proof_of_delivery", None, update_modified=False
+		)
 
 	def test_partial_status(self):
 		items = [SimpleNamespace(ordered_qty=10, delivered_qty=7, rejected_qty=0)]
@@ -95,16 +128,31 @@ class TestProofOfDelivery(UnitTestCase):
 		status = derive_delivery_order_execution_status(100, 100, 0, loads, pods)
 		self.assertEqual(status, "Delivered")
 
-	def test_open_exception_prevents_false_completion(self):
+	def test_partial_delivery_remains_partial_after_follow_up_return(self):
 		loads = [SimpleNamespace(name="LOAD-1", status="Completed with Exceptions")]
 		pods = [SimpleNamespace(delivery_load="LOAD-1", status="Partially Delivered")]
-		exceptions = [SimpleNamespace(resolution_status="Open")]
-		status = derive_delivery_order_execution_status(100, 100, 0, loads, pods, exceptions)
+		status = derive_delivery_order_execution_status(100, 100, 0, loads, pods)
 		self.assertEqual(status, "Partially Delivered")
 
-	def test_resolved_exception_updates_completion(self):
+	def test_failed_delivery_remains_a_delivery_outcome(self):
 		loads = [SimpleNamespace(name="LOAD-1", status="Completed with Exceptions")]
-		pods = [SimpleNamespace(delivery_load="LOAD-1", status="Partially Delivered")]
-		exceptions = [SimpleNamespace(resolution_status="Resolved")]
-		status = derive_delivery_order_execution_status(100, 100, 0, loads, pods, exceptions)
-		self.assertEqual(status, "Resolved with Exceptions")
+		pods = [SimpleNamespace(delivery_load="LOAD-1", status="Failed")]
+		status = derive_delivery_order_execution_status(100, 100, 0, loads, pods)
+		self.assertEqual(status, "Partially Delivered")
+
+	@patch("vuna_transport.services.execution.pod_service.frappe.db.table_exists", return_value=False)
+	def test_pod_cancellation_ignores_parent_trip_link_after_own_checks(self, _table_exists):
+		pod = SimpleNamespace(name="POD-1")
+
+		prepare_pod_cancellation(pod)
+
+		self.assertEqual(pod.ignore_linked_doctypes, ["Delivery Trip"])
+
+	@patch(
+		"vuna_transport.services.execution.pod_service.frappe.db.get_value",
+		return_value="RR-1",
+	)
+	@patch("vuna_transport.services.execution.pod_service.frappe.db.table_exists", return_value=True)
+	def test_pod_cancellation_rejects_active_return_request(self, _table_exists, _get_value):
+		with self.assertRaises(ValidationError):
+			prepare_pod_cancellation(SimpleNamespace(name="POD-1"))

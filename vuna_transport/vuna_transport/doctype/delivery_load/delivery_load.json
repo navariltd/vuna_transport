@@ -411,13 +411,8 @@
    "group": "Dispatch Execution",
    "link_doctype": "Delivery Trip",
    "link_fieldname": "vuna_delivery_load"
-  },
-  {
-   "group": "Delivery Resolution",
-   "link_doctype": "Delivery Exception",
-   "link_fieldname": "delivery_load"
   }
- ],
+],
  "modified": "2026-09-15 21:27:15.257718",
  "modified_by": "Administrator",
  "module": "Vuna Transport",

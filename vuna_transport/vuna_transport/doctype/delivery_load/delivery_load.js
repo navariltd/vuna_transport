@@ -271,11 +271,6 @@ function run_next_action(frm, summary) {
 			});
 		case "open_delivery_trip":
 			return frappe.set_route("Form", "Delivery Trip", summary.delivery_trip.name);
-		case "resolve_delivery_exceptions":
-			return frappe.set_route("List", "Delivery Exception", {
-				delivery_load: frm.doc.name,
-				resolution_status: ["in", ["Open", "In Resolution"]],
-			});
 	}
 }
 
@@ -368,21 +363,19 @@ function render_execution_progress(frm, summary) {
 			? "current"
 			: "pending",
 	};
-	const exception_step = {
-		label: __("Exceptions"),
-		value: summary.delivery_exceptions.open
-			? __("{0} open", [summary.delivery_exceptions.open])
-			: summary.delivery_exceptions.total
-			? __("Resolved")
+	const return_step = {
+		label: __("Return Requests"),
+		value: summary.return_requests?.total
+			? __("{0} follow-up", [summary.return_requests.total])
 			: __("None"),
-		state: summary.delivery_exceptions.open ? "current" : "complete",
+		state: "complete",
 	};
 	const allocation_after_notes =
 		summary.workflow.vehicle_allocation_timing === "After Delivery Notes";
 	const operational_steps = allocation_after_notes
 		? [picking_step, delivery_notes_step, allocation_step]
 		: [allocation_step, picking_step, delivery_notes_step];
-	const steps = [load_step, ...operational_steps, trip_step, pod_step, exception_step];
+	const steps = [load_step, ...operational_steps, trip_step, pod_step, return_step];
 
 	const colors = { complete: "green", current: "blue", pending: "gray" };
 	const cards = steps
