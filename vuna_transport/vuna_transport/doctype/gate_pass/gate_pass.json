@@ -95,7 +95,8 @@
    "fieldname": "delivery_trip",
    "fieldtype": "Link",
    "label": "Delivery Trip",
-   "options": "Delivery Trip"
+   "options": "Delivery Trip",
+   "reqd": 1
   },
   {
    "fieldname": "vehicle",

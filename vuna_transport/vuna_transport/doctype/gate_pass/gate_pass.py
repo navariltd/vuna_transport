@@ -59,9 +59,8 @@ class GatePass(Document):
 		return self
 
 	def _validate_references(self):
-		references = [self.delivery_load, self.vehicle_allocation, self.delivery_trip]
-		if not any(references):
-			frappe.throw(_("Link a Delivery Load, Vehicle Allocation, or Delivery Trip."))
+		if not self.delivery_trip:
+			frappe.throw(_("Create the Gate Pass from a Delivery Trip."))
 
 		if self.delivery_load:
 			load = frappe.get_doc("Delivery Load", self.delivery_load)
@@ -83,27 +82,36 @@ class GatePass(Document):
 				frappe.throw(_("Cancelled Delivery Trip {0} cannot be used for a Gate Pass.").format(trip.name))
 			if self.company and trip.company != self.company:
 				frappe.throw(_("Gate Pass and Delivery Trip must belong to the same Company."))
+			trip_load_names = get_delivery_trip_load_names(trip)
+			if self.delivery_load and trip_load_names and self.delivery_load not in trip_load_names:
+				frappe.throw(
+					_("Delivery Load {0} is not part of Delivery Trip {1}.").format(
+						self.delivery_load, trip.name
+					)
+				)
+			if self.vehicle_allocation:
+				allocation_load_names = set(
+					get_allocation_load_names(frappe.get_doc("Vehicle Allocation", self.vehicle_allocation))
+				)
+				if trip_load_names and not trip_load_names.issubset(allocation_load_names):
+					frappe.throw(
+						_("Vehicle Allocation {0} does not contain every Delivery Load on Delivery Trip {1}.").format(
+							self.vehicle_allocation, trip.name
+						)
+					)
 
 	def _populate_execution_context(self):
-		if self.vehicle_allocation:
-			allocation = frappe.get_doc("Vehicle Allocation", self.vehicle_allocation)
-			self.company = self.company or allocation.company
-			self.vehicle = self.vehicle or allocation.vehicle
-			self.driver = self.driver or allocation.driver
-			load_names = get_allocation_load_names(allocation)
-			if self.delivery_load and self.delivery_load not in load_names:
-				frappe.throw(_("Delivery Load {0} is not part of Vehicle Allocation {1}.").format(self.delivery_load, allocation.name))
-			if not self.delivery_load and len(load_names) == 1:
-				self.delivery_load = load_names[0]
-
 		if self.delivery_trip:
 			trip = frappe.get_doc("Delivery Trip", self.delivery_trip)
 			self.company = self.company or trip.company
 			self.vehicle = self.vehicle or trip.vehicle
 			self.driver = self.driver or trip.driver
+			self.vehicle_allocation = (
+				self.vehicle_allocation
+				or getattr(trip, "vuna_current_vehicle_allocation", None)
+				or getattr(trip, "vuna_vehicle_allocation", None)
+			)
 			trip_load_names = get_delivery_trip_load_names(trip)
-			if self.delivery_load and trip_load_names and self.delivery_load not in trip_load_names:
-				frappe.throw(_("Delivery Load {0} is not part of Delivery Trip {1}.").format(self.delivery_load, trip.name))
 			if not self.delivery_load and len(trip_load_names) == 1:
 				self.delivery_load = trip_load_names[0]
 
@@ -117,15 +125,9 @@ class GatePass(Document):
 			frappe.throw(_("A Gate Pass requires a Vehicle and Driver."))
 
 	def _validate_outbound_documents(self):
-		load_names = set()
-		if self.delivery_load:
-			load_names.add(self.delivery_load)
-		if self.vehicle_allocation:
-			load_names.update(get_allocation_load_names(frappe.get_doc("Vehicle Allocation", self.vehicle_allocation)))
-		if self.delivery_trip:
-			load_names.update(get_delivery_trip_load_names(frappe.get_doc("Delivery Trip", self.delivery_trip)))
+		load_names = set(get_delivery_trip_load_names(frappe.get_doc("Delivery Trip", self.delivery_trip)))
 		if not load_names:
-			frappe.throw(_("An outbound Gate Pass must reference a Delivery Load, Allocation, or Trip with a load."))
+			frappe.throw(_("The Delivery Trip must contain at least one Delivery Load."))
 		delivery_notes = frappe.get_all(
 			"Delivery Note",
 			filters={"vuna_delivery_load": ["in", sorted(load_names)], "docstatus": 1},

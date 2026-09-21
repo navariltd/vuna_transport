@@ -14,12 +14,17 @@ class TestGatePass(UnitTestCase):
 			gate_pass.validate()
 
 	@patch("vuna_transport.vuna_transport.doctype.gate_pass.gate_pass.frappe.get_all", return_value=[])
-	def test_outbound_gate_pass_requires_submitted_delivery_note(self, _get_all):
+	@patch(
+		"vuna_transport.vuna_transport.doctype.gate_pass.gate_pass.get_delivery_trip_load_names",
+		return_value=["DL-1"],
+	)
+	@patch("vuna_transport.vuna_transport.doctype.gate_pass.gate_pass.frappe.get_doc")
+	def test_outbound_gate_pass_requires_submitted_delivery_note(self, _get_doc, _get_load_names, _get_all):
 		gate_pass = GatePass(
 			{
 				"doctype": "Gate Pass",
 				"direction": "Outbound",
-				"delivery_load": "DL-1",
+				"delivery_trip": "DT-1",
 				"vehicle": "KDA 123A",
 				"driver": "DR-1",
 			}
@@ -32,12 +37,17 @@ class TestGatePass(UnitTestCase):
 		"vuna_transport.vuna_transport.doctype.gate_pass.gate_pass.frappe.get_all",
 		return_value=["DN-1"],
 	)
-	def test_outbound_gate_pass_accepts_submitted_delivery_note(self, _get_all):
+	@patch(
+		"vuna_transport.vuna_transport.doctype.gate_pass.gate_pass.get_delivery_trip_load_names",
+		return_value=["DL-1"],
+	)
+	@patch("vuna_transport.vuna_transport.doctype.gate_pass.gate_pass.frappe.get_doc")
+	def test_outbound_gate_pass_accepts_submitted_delivery_note(self, _get_doc, _get_load_names, _get_all):
 		gate_pass = GatePass(
 			{
 				"doctype": "Gate Pass",
 				"direction": "Outbound",
-				"delivery_load": "DL-1",
+				"delivery_trip": "DT-1",
 				"vehicle": "KDA 123A",
 				"driver": "DR-1",
 			}
@@ -50,7 +60,7 @@ class TestGatePass(UnitTestCase):
 			{
 				"doctype": "Gate Pass",
 				"direction": "Inbound",
-				"delivery_load": "DL-1",
+				"delivery_trip": "DT-1",
 				"gate_out_datetime": "2026-09-17 12:00:00",
 				"gate_in_datetime": "2026-09-17 11:00:00",
 			}
@@ -69,7 +79,7 @@ class TestGatePass(UnitTestCase):
 				"doctype": "Gate Pass",
 				"docstatus": 1,
 				"status": "Issued",
-				"delivery_load": "DL-1",
+				"delivery_trip": "DT-1",
 				"vehicle": "KDA 123A",
 				"driver": "DR-1",
 			}

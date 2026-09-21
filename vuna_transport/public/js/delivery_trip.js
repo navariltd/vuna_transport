@@ -59,6 +59,18 @@ frappe.ui.form.on("Delivery Trip", {
 		}
 
 		if (frm.doc.docstatus === 1) {
+			frm.add_custom_button(
+				__("Create Gate Pass"),
+				() => {
+					frappe.route_options = {
+						company: frm.doc.company,
+						delivery_trip: frm.doc.name,
+						direction: "Outbound",
+					};
+					frappe.new_doc("Gate Pass");
+				},
+				__("Vuna Transport")
+			);
 			const pending_stops = (frm.doc.delivery_stops || []).filter(
 				(stop) => stop.delivery_note && !stop.vuna_proof_of_delivery
 			);

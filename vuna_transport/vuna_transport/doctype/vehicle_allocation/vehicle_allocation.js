@@ -39,47 +39,31 @@ frappe.ui.form.on("Vehicle Allocation", {
 
 	refresh(frm) {
 		update_load_selection_button(frm);
+		frm.remove_custom_button(__("Create Delivery Notes"), __("Execution"));
+		frm.remove_custom_button(__("Create Delivery Trip"), __("Execution"));
 		const loads = (frm.doc.delivery_loads || []).map((row) => row.delivery_load).filter(Boolean);
 		if (frm.doc.docstatus === 1 && loads.length) {
-			frappe.db.get_single_value("Transport Settings", "vehicle_allocation_timing").then((timing) => {
-				frm.remove_custom_button(__("Create Delivery Notes"), __("Execution"));
-				frm.remove_custom_button(__("Create Delivery Trip"), __("Execution"));
-				const label = timing === "Before Delivery Notes" ? __("Create Delivery Notes") : __("Create Delivery Trip");
-				const method = timing === "Before Delivery Notes" ? "create_delivery_notes" : "create_delivery_trip";
-				frm.add_custom_button(
-					label,
-					() => {
-						if (method === "create_delivery_trip") {
-							return frappe.model.open_mapped_doc({
-								method: "vuna_transport.services.fleet.vehicle_allocation_service.make_delivery_trip_from_allocation",
-								frm,
-								freeze_message: __("Preparing Delivery Trip..."),
-							});
-						}
-						return frm.call(method).then(({ message }) => {
-							if (!message) return;
-							if (message.length === 1) {
-								frappe.set_route("Form", "Delivery Note", message[0]);
-							} else {
-								frappe.set_route("List", "Delivery Note", { name: ["in", message] });
-							}
-						});
-					},
-					__("Execution")
-				);
-				frm.add_custom_button(
-					__("Create Gate Pass"),
-					() => {
-						frappe.route_options = {
-							company: frm.doc.company,
-							vehicle_allocation: frm.doc.name,
-							direction: "Outbound",
-						};
-						frappe.new_doc("Gate Pass");
-					},
-					__("Execution")
-				);
-			});
+			frm.add_custom_button(
+				__("Create Delivery Notes"),
+				() => frm.call("create_delivery_notes").then(({ message }) => {
+					if (!message) return;
+					if (message.length === 1) {
+						frappe.set_route("Form", "Delivery Note", message[0]);
+					} else {
+						frappe.set_route("List", "Delivery Note", { name: ["in", message] });
+					}
+				}),
+				__("Execution")
+			);
+			frm.add_custom_button(
+				__("Create Delivery Trip"),
+				() => frappe.model.open_mapped_doc({
+					method: "vuna_transport.services.fleet.vehicle_allocation_service.make_delivery_trip_from_allocation",
+					frm,
+					freeze_message: __("Preparing Delivery Trip..."),
+				}),
+				__("Execution")
+			);
 		}
 		if (loads.length) {
 			frappe.call({
