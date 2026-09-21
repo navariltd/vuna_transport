@@ -32,7 +32,7 @@
    "fieldname": "default_cost_nature",
    "fieldtype": "Select",
    "label": "Default Cost Nature",
-   "options": "Fixed\nVariable\nAccessorial / Actual",
+   "options": "Fixed\nVariable",
    "reqd": 1
   },
   {

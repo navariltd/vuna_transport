@@ -7,9 +7,6 @@ import frappe
 from frappe.tests import UnitTestCase
 
 from vuna_transport.services.costing.transport_cost_estimation_service import _profile_is_active
-from vuna_transport.vuna_transport.doctype.transport_cost_structure_assignment.transport_cost_structure_assignment import (
-	_date_ranges_overlap,
-)
 
 
 class TestTransportCostStructureAssignment(UnitTestCase):
@@ -17,12 +14,6 @@ class TestTransportCostStructureAssignment(UnitTestCase):
 		meta = frappe.get_meta("Transport Cost Structure Assignment")
 		self.assertEqual(meta.autoname, "field:assignment_name")
 		self.assertIsNotNone(meta.get_field("assignment_name"))
-
-	def test_adjacent_validity_ranges_do_not_overlap(self):
-		self.assertFalse(_date_ranges_overlap("2026-01-01", "2026-06-30", "2026-07-01", "2026-12-31"))
-
-	def test_open_ended_validity_ranges_overlap(self):
-		self.assertTrue(_date_ranges_overlap("2026-01-01", None, "2026-07-01", None))
 
 	def test_empty_assignment_copies_components_from_structure(self):
 		structure = frappe._dict(

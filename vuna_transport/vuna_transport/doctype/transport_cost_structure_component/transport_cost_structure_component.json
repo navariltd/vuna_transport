@@ -34,7 +34,8 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Cost Nature",
-   "options": "Fixed\nVariable\nAccessorial / Actual",
+   "options": "Fixed\nVariable",
+   "read_only": 1,
    "reqd": 1
   },
   {

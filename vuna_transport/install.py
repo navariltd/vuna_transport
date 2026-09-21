@@ -12,6 +12,7 @@ DEFAULT_TRANSPORT_UOMS = {
 
 def after_install():
 	ensure_transport_uoms()
+	normalize_transport_cost_natures()
 
 
 def ensure_transport_uoms():
@@ -29,6 +30,25 @@ def ensure_transport_uoms():
 	for fieldname, uom_name in DEFAULT_TRANSPORT_UOMS.items():
 		if not frappe.db.get_single_value("Transport Settings", fieldname):
 			frappe.db.set_single_value("Transport Settings", fieldname, uom_name)
+
+	frappe.db.commit()
+
+
+def normalize_transport_cost_natures():
+	"""Convert the retired Accessorial / Actual value to the supported Fixed nature."""
+	for doctype, fieldname in (
+		("Transport Cost Component", "default_cost_nature"),
+		("Transport Cost Structure Component", "cost_nature"),
+		("Transport Cost Structure Assignment Component", "cost_nature"),
+	):
+		if frappe.db.has_column(doctype, fieldname):
+			frappe.db.sql(
+				f"""
+				update `tab{doctype}`
+				set `{fieldname}` = 'Fixed'
+				where `{fieldname}` = 'Accessorial / Actual'
+				"""
+			)
 
 	frappe.db.commit()
 

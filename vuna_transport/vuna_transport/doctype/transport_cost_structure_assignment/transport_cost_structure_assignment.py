@@ -10,6 +10,7 @@ from frappe.utils import getdate
 class TransportCostStructureAssignment(Document):
 	def before_validate(self):
 		self._populate_components_from_structure()
+		self._sync_component_natures()
 
 	def validate(self):
 		if self.valid_from and self.valid_to and getdate(self.valid_to) < getdate(self.valid_from):
@@ -62,7 +63,7 @@ class TransportCostStructureAssignment(Document):
 				frappe.throw(_("Add destination rates for a Destination Rate component."))
 			dimension = row.calculation_basis
 			if dimension in {"Per Distance", "Per Fuel Quantity"} and (not row.rate or not row.rate_uom):
-				frappe.throw(_("Rate and Rate UOM are required for {0}.").format(dimension))
+				frappe.throw(_("Rate and UOM are required for {0}.").format(dimension))
 			if dimension in {"Flat Per Trip", "Monthly Fixed"} and row.flat_amount is None:
 				frappe.throw(_("Flat Amount is required for {0}.").format(dimension))
 		if unknown_components:
@@ -130,7 +131,6 @@ class TransportCostStructureAssignment(Document):
 						self.cost_structure,
 					)
 				)
-		self._validate_overlapping_profiles()
 
 	def _populate_components_from_structure(self):
 		if not self.cost_structure or self.components:
@@ -146,42 +146,17 @@ class TransportCostStructureAssignment(Document):
 				},
 			)
 
-	def _validate_overlapping_profiles(self):
-		profiles = frappe.get_all(
-			"Transport Cost Structure Assignment",
-			filters={
-				"company": self.company,
-				"cost_structure": self.cost_structure,
-				"disabled": 0,
-				"docstatus": 1,
-				"name": ["!=", self.name],
-			},
-			fields=[
-				"name",
-				"cost_structure",
-				"vehicle",
-				"supplier",
-				"vehicle_category",
-				"valid_from",
-				"valid_to",
-			],
-		)
-		for profile in profiles:
-			if any(
-				getattr(self, field, None) != getattr(profile, field, None)
-				for field in ("cost_structure", "vehicle", "supplier", "vehicle_category")
-			):
-				continue
-			if _date_ranges_overlap(self.valid_from, self.valid_to, profile.valid_from, profile.valid_to):
-				frappe.throw(
-					_(
-						"Cost Structure Assignment {0} overlaps this assignment's validity period for the same scope."
-					).format(profile.name)
-				)
-
-
-def _date_ranges_overlap(first_from, first_to, second_from, second_to):
-	return not (
-		(first_to and second_from and getdate(first_to) < getdate(second_from))
-		or (second_to and first_from and getdate(second_to) < getdate(first_from))
-	)
+	def _sync_component_natures(self):
+		if not self.cost_structure:
+			return
+		structure_components = {
+			row.cost_component: row.cost_nature
+			for row in frappe.get_all(
+				"Transport Cost Structure Component",
+				filters={"parent": self.cost_structure, "parenttype": "Transport Cost Structure"},
+				fields=["cost_component", "cost_nature"],
+			)
+		}
+		for row in self.components:
+			if row.cost_component in structure_components:
+				row.cost_nature = structure_components[row.cost_component]

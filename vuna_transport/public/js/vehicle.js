@@ -7,6 +7,7 @@ frappe.ui.form.on("Vehicle", {
 			filters: {
 				company: frm.doc.company,
 				disabled: 0,
+				docstatus: 1,
 			},
 		}));
 		frm.set_query("vuna_asset", () => ({

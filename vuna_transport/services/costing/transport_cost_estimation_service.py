@@ -137,18 +137,11 @@ def get_applicable_cost_structure_assignment(vehicle, company, date=None):
 			precedence = 0
 		else:
 			continue
-		candidates.append((precedence, profile.name))
+		candidates.append((precedence, getdate(profile.valid_from), profile.name))
 	if not candidates:
 		return None
-	best_precedence = max(item[0] for item in candidates)
-	best = [name for precedence, name in candidates if precedence == best_precedence]
-	if len(best) > 1:
-		frappe.throw(
-			_("Multiple active Cost Structure Assignments match Vehicle {0}: {1}.").format(
-				vehicle.name, ", ".join(best)
-			)
-		)
-	return frappe.get_doc("Transport Cost Structure Assignment", best[0])
+	best = max(candidates)
+	return frappe.get_doc("Transport Cost Structure Assignment", best[2])
 
 
 def get_applicable_cost_structure_assignment_for_load(load, cost_structure, date=None, vehicle_category=None):
@@ -175,18 +168,11 @@ def get_applicable_cost_structure_assignment_for_load(load, cost_structure, date
 		if profile.vehicle_category and profile.vehicle_category != vehicle_category:
 			continue
 		precedence = 1 if profile.vehicle_category else 0
-		candidates.append((precedence, profile.name))
+		candidates.append((precedence, getdate(profile.valid_from), profile.name))
 	if not candidates:
 		return None
-	best_precedence = max(item[0] for item in candidates)
-	best = [name for precedence, name in candidates if precedence == best_precedence]
-	if len(best) > 1:
-		frappe.throw(
-			_("Multiple active Cost Structure Assignments match Cost Structure {0}: {1}.").format(
-				cost_structure, ", ".join(best)
-			)
-		)
-	return frappe.get_doc("Transport Cost Structure Assignment", best[0])
+	best = max(candidates)
+	return frappe.get_doc("Transport Cost Structure Assignment", best[2])
 
 
 def estimate_transport_cost_for_cost_structure(
@@ -340,8 +326,8 @@ def estimate_cost_component(component, context, profile=None):
 			)
 		explanation = _explanation(component, amount)
 	elif basis == "Manual / Actual":
-		amount = flt(getattr(component, "estimated_default_amount", None))
-		warnings.append(_("Manual / Actual uses the configured estimated default amount."))
+		amount = _flat_amount(component)
+		warnings.append(_("Manual / Actual uses the configured amount."))
 		explanation = _explanation(component, amount)
 	else:
 		frappe.throw(_("Unsupported calculation basis: {0}").format(basis))
@@ -463,8 +449,7 @@ def _legacy_destination_rate(context, profile):
 
 
 def _flat_amount(component):
-	value = getattr(component, "flat_amount", None)
-	return flt(value if value not in (None, "") else getattr(component, "estimated_default_amount", None))
+	return flt(getattr(component, "flat_amount", None))
 
 
 def _explanation(component, amount):
