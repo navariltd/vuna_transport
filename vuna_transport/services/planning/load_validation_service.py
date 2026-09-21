@@ -109,11 +109,6 @@ def _validate_delivery_order_for_load(load, delivery_order, first_order, for_exe
 		frappe.throw(
 			_("Delivery Order {0} must be submitted before it can be loaded.").format(delivery_order.name)
 		)
-	allowed_statuses = PLANNABLE_DELIVERY_ORDER_STATUSES
-	if for_execution:
-		allowed_statuses = (*allowed_statuses, "Allocated", "Ready for Dispatch")
-	if delivery_order.status not in allowed_statuses:
-		frappe.throw(_("Delivery Order {0} is not available for load planning.").format(delivery_order.name))
 	sales_order_state = frappe.db.get_value(
 		"Sales Order",
 		delivery_order.sales_order,
@@ -128,6 +123,11 @@ def _validate_delivery_order_for_load(load, delivery_order, first_order, for_exe
 				delivery_order.name, delivery_order.sales_order, sales_order_state.status or "Cancelled"
 			)
 		)
+	allowed_statuses = PLANNABLE_DELIVERY_ORDER_STATUSES
+	if for_execution:
+		allowed_statuses = (*allowed_statuses, "Allocated", "Ready for Dispatch")
+	if delivery_order.status not in allowed_statuses:
+		frappe.throw(_("Delivery Order {0} is not available for load planning.").format(delivery_order.name))
 
 	defaults = {
 		"company": first_order.company,

@@ -35,21 +35,21 @@ class TestVehicleAllocation(UnitTestCase):
 		self.assertEqual(get_allocation_load_names(allocation), ["DL-001", "DL-002"])
 
 	@patch(
-		"vuna_transport.services.integrations.erpnext_integration.create_delivery_notes_for_load",
-		side_effect=[["DN-001"], ["DN-002", "DN-003"]],
+		"vuna_transport.services.integrations.erpnext_integration.create_delivery_notes_for_allocation",
+		return_value=["DN-001", "DN-002", "DN-003"],
 	)
 	@patch(
 		"vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation.get_allocation_load_names",
 		return_value=["DL-001", "DL-002"],
 	)
-	def test_create_delivery_notes_processes_every_attached_load(self, _get_load_names, create_notes):
+	def test_create_delivery_notes_consolidates_at_allocation_scope(self, _get_load_names, create_notes):
 		allocation = VehicleAllocation({"doctype": "Vehicle Allocation", "docstatus": 1})
 		allocation.check_permission = MagicMock()
 
 		created = allocation.create_delivery_notes()
 
 		self.assertEqual(created, ["DN-001", "DN-002", "DN-003"])
-		self.assertEqual(create_notes.call_count, 2)
+		create_notes.assert_called_once_with(allocation)
 
 	@patch(
 		"vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation.frappe.db.get_single_value",

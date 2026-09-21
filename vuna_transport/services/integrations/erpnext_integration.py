@@ -16,6 +16,7 @@ from vuna_transport.services.execution.dispatch_guard_service import (
 from vuna_transport.services.fleet.vehicle_allocation_service import (
 	get_active_allocation,
 	get_allocation_loads,
+	get_allocation_load_names,
 )
 from vuna_transport.services.shared.security_service import (
 	require_doctype_permission,
@@ -95,16 +96,10 @@ def create_delivery_notes_for_load(load):
 
 	created = []
 	for delivery_order_name, load_rows in _group_load_rows(load).items():
-		existing = frappe.db.get_value(
-			"Delivery Note",
-			{
-				"vuna_delivery_load": load.name,
-				"vuna_delivery_order": delivery_order_name,
-				"docstatus": ["!=", 2],
-			},
-		)
-		if existing:
-			created.append(existing)
+		if _delivery_order_has_existing_note(load.name, delivery_order_name):
+			created.extend(
+				name for name in _get_delivery_notes_for_loads([load.name]) if name not in created
+			)
 			continue
 
 		if pick_list:
@@ -135,6 +130,170 @@ def create_delivery_notes_for_load(load):
 		_("Delivery Notes created or confirmed for this load"),
 	)
 	return created
+
+
+def create_delivery_notes_for_allocation(allocation):
+	"""Create consolidated Delivery Notes for all compatible loads on an allocation.
+
+	Items retain their exact Delivery Load Order lineage, so one note can safely
+	serve several Delivery Orders and loads without losing allocation history.
+	"""
+	load_names = get_allocation_load_names(allocation)
+	if not load_names:
+		frappe.throw(_("Add at least one Delivery Load before creating Delivery Notes."))
+	loads = [get_locked_delivery_load(name) for name in load_names]
+	if len(loads) == 1:
+		return create_delivery_notes_for_load(loads[0])
+	existing_notes = _get_delivery_notes_for_loads(load_names)
+	expected_load_orders = set(
+		frappe.get_all(
+			"Delivery Load Order",
+			filters={"parent": ["in", load_names], "parenttype": "Delivery Load"},
+			pluck="name",
+		)
+	)
+	linked_load_orders = set(
+		frappe.get_all(
+			"Delivery Note Item",
+			filters={"parent": ["in", existing_notes]},
+			pluck="vuna_delivery_load_order",
+		)
+		if existing_notes
+		else []
+	)
+	linked_load_orders.discard(None)
+	if existing_notes and expected_load_orders.issubset(linked_load_orders):
+		return existing_notes
+	if any(load.pick_list for load in loads):
+		# Pick Lists are load-specific; preserve the established path until a
+		# single multi-load Pick List is introduced.
+		created = []
+		for load in loads:
+			created.extend(create_delivery_notes_for_load(load))
+		return created
+
+	for load in loads:
+		validate_load_is_operational(load, _("creating Delivery Notes"))
+		_repair_single_item_load_rows(load)
+		from vuna_transport.services.planning.load_validation_service import validate_load_allocations
+
+		validate_load_allocations(load, for_execution=True)
+		_validate_delivery_orders_for_execution(load)
+		_validate_delivery_note_allocation(load)
+
+	load_groups = []
+	for load in loads:
+		for delivery_order_name, load_rows in _group_load_rows(load).items():
+			if _delivery_order_has_existing_note(load.name, delivery_order_name):
+				continue
+			delivery_note = _make_delivery_note_direct(
+				delivery_order_name, load_rows, load.source_warehouse
+			)
+			if not delivery_note or not delivery_note.items:
+				frappe.throw(_("No deliverable items were found for {0}.").format(delivery_order_name))
+			_set_delivery_note_source_warehouse(delivery_note, load.source_warehouse)
+			delivery_address = load_rows[0].delivery_address
+			delivery_note.shipping_address_name = delivery_address
+			delivery_note.shipping_address = get_address_display(
+				frappe.get_doc("Address", delivery_address).as_dict()
+			)
+			_set_delivery_note_load_lineage(delivery_note, load_rows)
+			load_groups.append((load, delivery_order_name, delivery_note, load_rows))
+
+	if not load_groups:
+		return _get_delivery_notes_for_loads(load_names)
+
+	grouped = defaultdict(list)
+	for load, delivery_order_name, delivery_note, load_rows in load_groups:
+		grouped[_delivery_note_compatibility_key(delivery_note, load)].append(
+			(load, delivery_order_name, delivery_note, load_rows)
+		)
+
+	created = []
+	for entries in grouped.values():
+		base_load, base_order, base_note, base_rows = entries[0]
+		for source_load, source_order, source_note, source_rows in entries[1:]:
+			for item in source_note.items:
+				values = item.as_dict()
+				for field in ("name", "parent", "parentfield", "parenttype", "idx", "doctype"):
+					values.pop(field, None)
+				base_note.append("items", values)
+		base_note.vuna_delivery_load = base_load.name
+		base_note.vuna_delivery_order = base_order
+		base_note.save()
+		created.append(base_note.name)
+
+	for load in loads:
+		requires_allocation = _delivery_method_requires_vehicle_allocation(load)
+		has_allocation = bool(get_active_allocation(load, required=False))
+		target_status = "Awaiting Vehicle" if requires_allocation and not has_allocation else "Ready for Dispatch"
+		set_delivery_load_status(load, target_status, _("Delivery Notes created or confirmed for this load"))
+	return created
+
+
+def _delivery_note_compatibility_key(delivery_note, load):
+	"""Return the conservative key used when consolidating Delivery Notes."""
+	return (
+		delivery_note.company,
+		delivery_note.customer,
+		delivery_note.shipping_address_name,
+		load.source_warehouse,
+		load.delivery_method,
+		delivery_note.currency,
+		delivery_note.conversion_rate,
+		delivery_note.taxes_and_charges,
+	)
+
+
+def _delivery_order_has_existing_note(load_name, delivery_order_name):
+	"""Check parent and item-level lineage before creating another note."""
+	if frappe.db.exists(
+		"Delivery Note",
+		{
+			"vuna_delivery_load": load_name,
+			"vuna_delivery_order": delivery_order_name,
+			"docstatus": ["!=", 2],
+		},
+	):
+		return True
+	return bool(
+		frappe.db.sql(
+			"""
+			select dni.parent
+			from `tabDelivery Note Item` dni
+			join `tabDelivery Note` dn on dn.name = dni.parent
+			join `tabDelivery Load Order` dlo on dlo.name = dni.vuna_delivery_load_order
+			where dlo.parent = %(load_name)s
+			and dlo.delivery_order = %(delivery_order_name)s
+			and dn.docstatus != 2
+			limit 1
+			""",
+			{"load_name": load_name, "delivery_order_name": delivery_order_name},
+		)
+	)
+
+
+def _get_delivery_notes_for_loads(load_names, docstatus=None):
+	"""Find notes through parent or item-level load lineage."""
+	filters = ""
+	values = {"load_names": tuple(load_names)}
+	if docstatus is not None:
+		filters = "and dn.docstatus = %(docstatus)s"
+		values["docstatus"] = docstatus
+	return frappe.db.sql(
+		f"""
+		select distinct dn.name
+		from `tabDelivery Note` dn
+		left join `tabDelivery Note Item` dni on dni.parent = dn.name
+		left join `tabDelivery Load Order` dlo on dlo.name = dni.vuna_delivery_load_order
+		where (dn.vuna_delivery_load in %(load_names)s or dlo.parent in %(load_names)s)
+		{filters}
+		and dn.docstatus != 2
+		order by dn.creation asc
+		""",
+		values,
+		pluck="name",
+	)
 
 
 def _set_delivery_note_load_lineage(delivery_note, load_rows):
@@ -282,18 +441,39 @@ def create_delivery_trip_for_load(load):
 				", ".join(sorted(trip_names))
 			)
 		)
-	delivery_note_rows = frappe.get_all(
-		"Delivery Note",
-		filters={"vuna_delivery_load": ["in", [selected_load.name for selected_load in loads]], "docstatus": 1},
-		fields=["name", "vuna_delivery_order", "vuna_delivery_load"],
-	)
-	delivery_notes = [row.name for row in delivery_note_rows]
+	load_names = [selected_load.name for selected_load in loads]
+	delivery_notes = _get_delivery_notes_for_loads(load_names, docstatus=1)
 	if not delivery_notes:
 		frappe.throw(_("Create and submit the Delivery Notes for this load first."))
 	expected_delivery_orders = {
 		row.delivery_order for selected_load in loads for row in selected_load.delivery_orders if row.delivery_order
 	}
-	note_delivery_orders = {row.vuna_delivery_order for row in delivery_note_rows if row.vuna_delivery_order}
+	note_delivery_orders = set(
+		frappe.get_all(
+			"Delivery Note",
+			filters={"name": ["in", delivery_notes]},
+			fields=["vuna_delivery_order"],
+			pluck="vuna_delivery_order",
+		)
+	)
+	note_delivery_orders.update(
+		frappe.get_all(
+			"Delivery Load Order",
+			filters={
+				"name": [
+					"in",
+					frappe.get_all(
+						"Delivery Note Item",
+						filters={"parent": ["in", delivery_notes]},
+						pluck="vuna_delivery_load_order",
+					),
+				]
+			},
+			fields=["delivery_order"],
+			pluck="delivery_order",
+		)
+	)
+	note_delivery_orders.discard(None)
 	if expected_delivery_orders != note_delivery_orders:
 		missing = sorted(expected_delivery_orders - note_delivery_orders)
 		frappe.throw(
@@ -354,6 +534,16 @@ def _populate_delivery_stop_links(delivery_trip, loads):
 			continue
 		delivery_order = delivery_note.vuna_delivery_order
 		load = next((row for row in loads if row.name == delivery_note.vuna_delivery_load), None)
+		if not load:
+			load_order = frappe.db.get_value(
+				"Delivery Note Item",
+				{"parent": stop.delivery_note, "vuna_delivery_load_order": ["is", "set"]},
+				"vuna_delivery_load_order",
+			)
+			load_name = frappe.db.get_value("Delivery Load Order", load_order, "parent") if load_order else None
+			load = next((row for row in loads if row.name == load_name), None)
+			if load and load_order:
+				delivery_order = frappe.db.get_value("Delivery Load Order", load_order, "delivery_order")
 		load_rows = [row for row in (load.delivery_orders if load else []) if row.delivery_order == delivery_order]
 		stop.vuna_delivery_order = delivery_order
 		stop.vuna_delivery_load = delivery_note.vuna_delivery_load
@@ -372,11 +562,6 @@ def _validate_delivery_orders_for_execution(load):
 		if (
 			not delivery_order
 			or delivery_order.docstatus != 1
-			or delivery_order.status
-			in (
-				"Cancelled",
-				"Delivered",
-			)
 		):
 			frappe.throw(
 				_("Delivery Order {0} is no longer eligible for execution.").format(delivery_order_name)
@@ -389,6 +574,12 @@ def _validate_delivery_orders_for_execution(load):
 			frappe.throw(
 				_("Delivery Order {0} cannot be executed because its Sales Order is {1}.").format(
 					delivery_order_name, sales_order.status or "Cancelled"
+				)
+			)
+		if delivery_order.status in ("Cancelled", "Delivered", "Closed"):
+			frappe.throw(
+				_("Delivery Order {0} is {1} and cannot be executed.").format(
+					delivery_order_name, delivery_order.status
 				)
 			)
 		if delivery_order.company != load.company:

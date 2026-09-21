@@ -233,11 +233,7 @@ def validate_delivery_trip(doc, method=None):
 
 	stop_delivery_notes = [stop.delivery_note for stop in doc.delivery_stops if stop.delivery_note]
 	expected_delivery_notes = set(
-		frappe.get_all(
-			"Delivery Note",
-			filters={"vuna_delivery_load": ["in", [selected_load.name for selected_load in loads]], "docstatus": 1},
-			pluck="name",
-		)
+		get_delivery_notes_for_loads([selected_load.name for selected_load in loads], docstatus=1)
 	)
 	validate_delivery_trip_note_set(expected_delivery_notes, stop_delivery_notes)
 	validate_delivery_note_quantities_for_loads(loads)
@@ -251,7 +247,13 @@ def validate_delivery_trip(doc, method=None):
 			["vuna_delivery_load", "vuna_delivery_order"],
 			as_dict=True,
 		)
-		if not delivery_note or delivery_note.vuna_delivery_load not in {selected_load.name for selected_load in loads}:
+		if not delivery_note or (
+			delivery_note.vuna_delivery_load not in {selected_load.name for selected_load in loads}
+			and not frappe.db.exists(
+				"Delivery Note Item",
+				{"parent": stop.delivery_note, "vuna_delivery_load_order": ["is", "set"]},
+			)
+		):
 			frappe.throw(
 				_("Delivery Note {0} does not belong to this Vehicle Allocation's Delivery Loads.").format(
 					stop.delivery_note
@@ -259,11 +261,22 @@ def validate_delivery_trip(doc, method=None):
 			)
 		stop.vuna_delivery_order = delivery_note.vuna_delivery_order
 		stop.vuna_delivery_load = delivery_note.vuna_delivery_load
+		if stop.vuna_delivery_load not in {selected_load.name for selected_load in loads}:
+			load_order = frappe.db.get_value(
+				"Delivery Note Item",
+				{"parent": stop.delivery_note, "vuna_delivery_load_order": ["is", "set"]},
+				"vuna_delivery_load_order",
+			)
+			if load_order:
+				stop.vuna_delivery_load = frappe.db.get_value("Delivery Load Order", load_order, "parent")
+				stop.vuna_delivery_order = frappe.db.get_value(
+					"Delivery Load Order", load_order, "delivery_order"
+				)
 		load_rows = frappe.get_all(
 			"Delivery Load Order",
 			filters={
-				"parent": delivery_note.vuna_delivery_load,
-				"delivery_order": delivery_note.vuna_delivery_order,
+				"parent": stop.vuna_delivery_load,
+				"delivery_order": stop.vuna_delivery_order,
 			},
 			pluck="name",
 		)
@@ -277,16 +290,15 @@ def get_delivery_trip_load_names(doc):
 		for row in (getattr(doc, "delivery_stops", None) or [])
 		if getattr(row, "vuna_delivery_load", None)
 	]
-	if stop_names:
-		return list(dict.fromkeys(stop_names))
-
-	stop_names = frappe.get_all(
+	stop_names.extend(
+		frappe.get_all(
 		"Delivery Stop",
 		filters={"parent": doc.name, "parenttype": "Delivery Trip", "vuna_delivery_load": ["is", "set"]},
 		pluck="vuna_delivery_load",
-	) if getattr(doc, "name", None) else []
-	if stop_names:
-		return list(dict.fromkeys(stop_names))
+		)
+		if getattr(doc, "name", None)
+		else []
+	)
 
 	allocation_name = getattr(doc, "vuna_vehicle_allocation", None) or getattr(
 		doc, "vuna_current_vehicle_allocation", None
@@ -295,8 +307,33 @@ def get_delivery_trip_load_names(doc):
 		allocation = frappe.get_doc("Vehicle Allocation", allocation_name)
 		names = get_allocation_load_names(allocation)
 		if names:
-			return names
-	return []
+			stop_names.extend(names)
+	return list(dict.fromkeys(stop_names))
+
+
+def get_delivery_notes_for_loads(load_names, *, docstatus=None):
+	"""Return Delivery Notes linked through parent or item-level load lineage."""
+	if not load_names:
+		return []
+	status_condition = ""
+	values = {"load_names": tuple(load_names)}
+	if docstatus is not None:
+		status_condition = "and dn.docstatus = %(docstatus)s"
+		values["docstatus"] = docstatus
+	return frappe.db.sql(
+		f"""
+		select distinct dn.name
+		from `tabDelivery Note` dn
+		left join `tabDelivery Note Item` dni on dni.parent = dn.name
+		left join `tabDelivery Load Order` dlo on dlo.name = dni.vuna_delivery_load_order
+		where (dn.vuna_delivery_load in %(load_names)s or dlo.parent in %(load_names)s)
+		{status_condition}
+		and dn.docstatus != 2
+		order by dn.creation asc
+		""",
+		values,
+		pluck="name",
+	)
 
 
 def get_delivery_trip_loads(doc, *, lock=False):
@@ -352,12 +389,14 @@ def validate_delivery_note_quantities_for_loads(loads):
 	}
 	actual_rows = frappe.db.sql(
 		"""
-			select dn.vuna_delivery_load as load_name, dni.so_detail, coalesce(sum(dni.qty), 0) as quantity
+			select coalesce(dlo.parent, dn.vuna_delivery_load) as load_name,
+				dni.so_detail, coalesce(sum(dni.qty), 0) as quantity
 			from `tabDelivery Note` dn
 			join `tabDelivery Note Item` dni on dni.parent = dn.name
-			where dn.vuna_delivery_load in %(load_names)s
+			left join `tabDelivery Load Order` dlo on dlo.name = dni.vuna_delivery_load_order
+			where (dn.vuna_delivery_load in %(load_names)s or dlo.parent in %(load_names)s)
 			and dn.docstatus = 1
-			group by dn.vuna_delivery_load, dni.so_detail
+			group by coalesce(dlo.parent, dn.vuna_delivery_load), dni.so_detail
 		""",
 		{"load_names": tuple(load_names)},
 		as_dict=True,

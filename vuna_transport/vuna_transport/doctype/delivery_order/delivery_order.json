@@ -521,7 +521,7 @@
    "fieldtype": "Select",
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nOpen\nPartially Allocated\nAllocated\nDispatched\nPartially Delivered\nDelivered\nCancelled",
+   "options": "Draft\nOpen\nPartially Allocated\nAllocated\nDispatched\nPartially Delivered\nDelivered\nClosed\nCancelled",
    "read_only": 1
   },
   {

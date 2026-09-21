@@ -551,16 +551,37 @@ def _validate_initial_allocation_sequence(load, allocation=None):
 
 def get_delivery_note_submission_status(load):
 	"""Return whether a load's active Delivery Notes are submitted and complete."""
+	from vuna_transport.services.execution.lineage_service import get_delivery_notes_for_loads
+
 	expected_orders = {row.delivery_order for row in load.delivery_orders if row.delivery_order}
+	note_names = get_delivery_notes_for_loads([load.name])
 	notes = frappe.get_all(
 		"Delivery Note",
-		filters={"vuna_delivery_load": load.name},
+		filters={"name": ["in", note_names]},
 		fields=["name", "docstatus", "vuna_delivery_order"],
 	)
 	active_notes = [note for note in notes if note.docstatus != 2]
 	submitted_notes = [note for note in active_notes if note.docstatus == 1]
 	draft_notes = [note for note in active_notes if note.docstatus == 0]
 	submitted_orders = {note.vuna_delivery_order for note in submitted_notes if note.vuna_delivery_order}
+	submitted_orders.update(
+		frappe.get_all(
+			"Delivery Load Order",
+			filters={
+				"name": [
+					"in",
+					frappe.get_all(
+						"Delivery Note Item",
+						filters={"parent": ["in", [note.name for note in submitted_notes]]},
+						pluck="vuna_delivery_load_order",
+					),
+				]
+			},
+			fields=["delivery_order"],
+			pluck="delivery_order",
+		)
+	)
+	submitted_orders.discard(None)
 	return {
 		"expected_delivery_orders": sorted(expected_orders),
 		"submitted_delivery_orders": sorted(expected_orders & submitted_orders),

@@ -77,9 +77,21 @@ def sync_delivery_orders_for_sales_order(sales_order):
 	for delivery_order_name in delivery_order_names:
 		delivery_order = frappe.get_doc("Delivery Order", delivery_order_name)
 		sync_delivery_order_quantities(delivery_order, persist=True)
+		sync_delivery_order_status_from_sales_order(delivery_order, doc)
 
 	# The existing generator remains responsible for newly-added Sales Order Items.
 	return create_delivery_orders_for_sales_order(doc)
+
+
+def sync_delivery_order_status_from_sales_order(delivery_order, sales_order=None):
+	"""Reflect a closed source Sales Order on its still-open Delivery Order."""
+	sales_order = sales_order or _get_sales_order(delivery_order.sales_order)
+	if delivery_order.docstatus == 2:
+		return
+	if sales_order.docstatus == 2 or sales_order.status in ("Closed", "Cancelled"):
+		if delivery_order.status not in ("Delivered", "Cancelled"):
+			frappe.db.set_value("Delivery Order", delivery_order.name, "status", "Closed", update_modified=False)
+			delivery_order.status = "Closed"
 
 
 @frappe.whitelist()

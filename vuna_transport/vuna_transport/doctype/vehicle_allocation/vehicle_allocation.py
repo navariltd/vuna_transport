@@ -59,12 +59,11 @@ class VehicleAllocation(Document):
 		if self.docstatus != 1:
 			frappe.throw("Submit the Vehicle Allocation before creating Delivery Notes.")
 
-		from vuna_transport.services.integrations.erpnext_integration import create_delivery_notes_for_load
+		from vuna_transport.services.integrations.erpnext_integration import (
+			create_delivery_notes_for_allocation,
+		)
 
-		created = []
-		for load_name in get_allocation_load_names(self):
-			created.extend(create_delivery_notes_for_load(load_name))
-		return created
+		return create_delivery_notes_for_allocation(self)
 
 	@frappe.whitelist()
 	def create_delivery_trip(self):
