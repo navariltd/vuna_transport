@@ -1,0 +1,3 @@
+.page-container:has(.dispatch-scan) .layout-main-section {
+	background: var(--subtle-fg);
+}

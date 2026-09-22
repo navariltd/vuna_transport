@@ -1,0 +1,124 @@
+{
+ "actions": [],
+ "creation": "2026-09-22 10:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "delivery_note",
+  "company",
+  "previous_status",
+  "new_status",
+  "column_break_xsxb",
+  "action",
+  "scanned_by",
+  "scanned_at",
+  "section_break_cegl",
+  "remarks",
+  "device_reference"
+ ],
+ "fields": [
+  {
+   "fieldname": "delivery_note",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Delivery Note",
+   "options": "Delivery Note",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "action",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Action",
+   "options": "Loaded\nDispatched",
+   "reqd": 1
+  },
+  {
+   "fieldname": "previous_status",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Previous Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "new_status",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "New Status",
+   "read_only": 1
+  },
+  {
+   "default": "__user",
+   "fieldname": "scanned_by",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Scanned By",
+   "options": "User",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "scanned_at",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Scanned At",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "device_reference",
+   "fieldtype": "Data",
+   "label": "Device Reference"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "column_break_xsxb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_cegl",
+   "fieldtype": "Section Break"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-22 15:29:14.149070",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Delivery Note Dispatch Event",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Transport Dispatcher"
+  },
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Transport Manager",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Transport Planner"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

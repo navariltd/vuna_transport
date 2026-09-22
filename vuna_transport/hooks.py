@@ -80,10 +80,11 @@ add_to_apps_screen = [
 # ----------
 
 # add methods and filters to jinja environment
-# jinja = {
-# 	"methods": "vuna_transport.utils.jinja_methods",
-# 	"filters": "vuna_transport.utils.jinja_filters"
-# }
+jinja = {
+	"methods": [
+		"vuna_transport.services.execution.delivery_note_scan_service.get_delivery_note_qr_html",
+	]
+}
 
 # Installation
 # ------------
@@ -261,6 +262,7 @@ fixtures = [
 after_migrate = [
 	"vuna_transport.install.ensure_transport_uoms",
 	"vuna_transport.install.normalize_transport_cost_natures",
+	"vuna_transport.install.ensure_dispatch_scan_roles",
 	"vuna_transport.services.routing.location_service.backfill_address_coordinates",
 	"vuna_transport.services.fleet.fleet_service.sync_vehicle_operational_snapshots",
 ]

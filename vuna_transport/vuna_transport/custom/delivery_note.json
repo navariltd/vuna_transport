@@ -137,11 +137,41 @@
    "translatable": 0,
    "unique": 0,
    "width": null
+  },
+  {
+   "doctype": "Custom Field",
+   "dt": "Delivery Note",
+   "fieldname": "vuna_dispatch_status",
+   "fieldtype": "Select",
+   "insert_after": "vuna_delivery_order",
+   "label": "Dispatch Status",
+   "module": "Vuna Transport",
+   "name": "Delivery Note-vuna_dispatch_status",
+   "options": "Ready for Loading\nLoaded\nDispatched",
+   "read_only": 1,
+   "default": "Ready for Loading",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "owner": "Administrator"
+  },
+  {
+   "doctype": "Custom Field",
+   "dt": "Delivery Note",
+   "fieldname": "vuna_dispatch_scan_count",
+   "fieldtype": "Int",
+   "insert_after": "vuna_dispatch_status",
+   "label": "Dispatch Scan Count",
+   "module": "Vuna Transport",
+   "name": "Delivery Note-vuna_dispatch_scan_count",
+   "read_only": 1,
+   "default": "0",
+   "hidden": 1,
+   "owner": "Administrator"
   }
  ],
  "custom_perms": [],
  "doctype": "Delivery Note",
  "links": [],
  "property_setters": [],
- "sync_on_migrate": 0
+ "sync_on_migrate": 1
 }

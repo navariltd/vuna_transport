@@ -9,10 +9,21 @@ DEFAULT_TRANSPORT_UOMS = {
 	"default_distance_uom": "Kilometer",
 }
 
+DEFAULT_DISPATCH_SCAN_ROLES = {
+	"allowed_loaded_scan_roles": ("Transport Manager",),
+	"allowed_dispatched_scan_roles": ("Transport Dispatcher",),
+}
+
+LEGACY_DEFAULT_DISPATCH_SCAN_ROLES = {
+	"allowed_loaded_scan_roles": {"Transport Dispatcher", "Transport Manager"},
+	"allowed_dispatched_scan_roles": {"Transport Dispatcher", "Transport Manager"},
+}
+
 
 def after_install():
 	ensure_transport_uoms()
 	normalize_transport_cost_natures()
+	ensure_dispatch_scan_roles()
 
 
 def ensure_transport_uoms():
@@ -51,6 +62,33 @@ def normalize_transport_cost_natures():
 			)
 
 	frappe.db.commit()
+
+
+def ensure_dispatch_scan_roles():
+	"""Seed configurable dispatch-scan permissions without overwriting user changes."""
+	if not frappe.db.exists("DocType", "Transport Settings") or not frappe.db.exists(
+		"DocType", "Transport Scan Role"
+	):
+		return
+
+	settings = frappe.get_single("Transport Settings")
+	changed = False
+	for fieldname, roles in DEFAULT_DISPATCH_SCAN_ROLES.items():
+		configured_roles = {
+			row.role for row in (getattr(settings, fieldname, None) or []) if row.role
+		}
+		if configured_roles and configured_roles != LEGACY_DEFAULT_DISPATCH_SCAN_ROLES[fieldname]:
+			continue
+		if configured_roles == LEGACY_DEFAULT_DISPATCH_SCAN_ROLES[fieldname]:
+			settings.set(fieldname, [])
+		for role in roles:
+			if frappe.db.exists("Role", role):
+				settings.append(fieldname, {"role": role})
+				changed = True
+
+	if changed:
+		settings.save(ignore_permissions=True)
+		frappe.db.commit()
 
 
 def migrate_province_to_territory():

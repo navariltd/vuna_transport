@@ -32,7 +32,10 @@
   "enable_transport_costing",
   "column_break_zhxz",
   "enable_gps_tracking",
-  "enable_route_optimization"
+  "enable_route_optimization",
+  "scan_permissions_section",
+  "allowed_loaded_scan_roles",
+  "allowed_dispatched_scan_roles"
  ],
  "fields": [
   {"fieldname":"general_tab","fieldtype":"Tab Break","label":"General"},
@@ -169,6 +172,25 @@
    "fieldname": "enable_route_optimization",
    "fieldtype": "Check",
    "label": "Enable Route Optimization"
+  },
+  {
+   "fieldname": "scan_permissions_section",
+   "fieldtype": "Section Break",
+   "label": "Dispatch Scan Permissions"
+  },
+  {
+   "description": "Roles allowed to scan Delivery Notes from Ready for Loading to Loaded.",
+   "fieldname": "allowed_loaded_scan_roles",
+   "fieldtype": "Table MultiSelect",
+   "label": "Roles Allowed to Mark Loaded",
+   "options": "Transport Scan Role"
+  },
+  {
+   "description": "Roles allowed to scan Delivery Notes from Loaded to Dispatched.",
+   "fieldname": "allowed_dispatched_scan_roles",
+   "fieldtype": "Table MultiSelect",
+   "label": "Roles Allowed to Mark Dispatched",
+   "options": "Transport Scan Role"
   }
  ],
  "grid_page_length": 50,
