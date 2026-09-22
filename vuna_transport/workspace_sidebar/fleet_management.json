@@ -172,6 +172,30 @@
   {
    "child": 1,
    "collapsible": 1,
+   "icon": "clipboard",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Vehicle Onboarding",
+   "link_to": "Vehicle Onboarding",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "refresh-cw",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Ownership Transfers",
+   "link_to": "Vehicle Ownership Transfer",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
    "icon": "file-text",
    "indent": 0,
    "keep_closed": 0,

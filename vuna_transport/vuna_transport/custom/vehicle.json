@@ -1310,6 +1310,21 @@
    "translatable": 0,
    "unique": 0,
    "width": null
+  },
+  {
+   "creation": "2026-09-22 13:30:00",
+   "default": null,
+   "description": "Transport Onboarding record that admitted this Vehicle into the Vuna fleet.",
+   "dt": "Vehicle",
+   "fieldname": "vuna_onboarding",
+   "fieldtype": "Link",
+   "insert_after": "vuna_vehicle_owner",
+   "label": "Vehicle Onboarding",
+   "module": "Vuna Transport",
+   "name": "Vehicle-vuna_onboarding",
+   "options": "Vehicle Onboarding",
+   "owner": "Administrator",
+   "read_only": 1
   }
  ],
  "custom_perms": [],
@@ -1409,5 +1424,5 @@
    "value": "0"
   }
  ],
- "sync_on_migrate": 0
+ "sync_on_migrate": 1
 }
