@@ -24,5 +24,7 @@
    "precision": "6",
    "owner": "Administrator"
   }
- ]
+ ],
+ "doctype": "Territory",
+ "sync_on_migrate": 1
 }

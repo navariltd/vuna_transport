@@ -20,7 +20,7 @@
    "description": "How the customer order will be fulfilled. Owned or subcontracted transport is selected later during Vehicle Allocation.",
    "docstatus": 0,
    "dt": "Sales Order",
-   "fetch_from": null,
+   "fetch_from": "customer.custom_delivery_method",
    "fetch_if_empty": 0,
    "fieldname": "vuna_delivery_method",
    "fieldtype": "Link",
@@ -72,7 +72,28 @@
  ],
  "custom_perms": [],
  "doctype": "Sales Order",
- "links": [],
+ "links": [
+  {
+   "creation": "2026-09-14 14:49:27.340613",
+   "custom": 1,
+   "docstatus": 0,
+   "group": "Payment",
+   "hidden": 0,
+   "idx": 0,
+   "is_child_table": 0,
+   "link_doctype": "Sales Order Commitment",
+   "link_fieldname": "sales_order",
+   "modified": "2026-09-15 13:05:55.505066",
+   "modified_by": "mungai@navari.co.ke",
+   "name": "ae69th63bl",
+   "owner": "kiprotich@navari.co.ke",
+   "parent": "Sales Order",
+   "parent_doctype": null,
+   "parentfield": "links",
+   "parenttype": "Customize Form",
+   "table_fieldname": null
+  }
+ ],
  "property_setters": [],
  "sync_on_migrate": 0
 }
