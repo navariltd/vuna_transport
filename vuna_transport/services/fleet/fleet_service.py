@@ -16,6 +16,7 @@ def validate_vehicle(doc, method=None):
 	"""Populate standard Vehicle fields from the selected Vuna Vehicle Model."""
 	_validate_vehicle_operational_roles(doc)
 	_validate_vehicle_asset(doc)
+	_validate_vehicle_cost_structure(doc)
 	if not getattr(doc, "vuna_vehicle_model", None):
 		category_name = getattr(doc, "vuna_vehicle_category", None)
 		if category_name:
@@ -149,6 +150,40 @@ def _validate_vehicle_asset(doc):
 	)
 	if duplicate:
 		frappe.throw(_("Asset {0} is already linked to Vehicle {1}.").format(asset.name, duplicate))
+
+
+def _validate_vehicle_cost_structure(doc):
+	"""Ensure the selected submitted cost structure matches this Vehicle's owner."""
+	structure_name = getattr(doc, "vuna_transport_cost_structure", None)
+	if not structure_name:
+		return
+
+	structure = frappe.db.get_value(
+		"Transport Cost Structure",
+		structure_name,
+		["company", "vehicle_owner", "disabled", "docstatus"],
+		as_dict=True,
+	)
+	if not structure:
+		frappe.throw(_("Transport Cost Structure {0} was not found.").format(structure_name))
+	if structure.docstatus != 1:
+		frappe.throw(_("Transport Cost Structure {0} must be submitted.").format(structure_name))
+	if structure.disabled:
+		frappe.throw(_("Disabled Transport Cost Structure {0} cannot be assigned.").format(structure_name))
+	if structure.company and doc.company and structure.company != doc.company:
+		frappe.throw(
+			_("Transport Cost Structure {0} belongs to Company {1}.").format(
+				structure_name, structure.company
+			)
+		)
+	vehicle_owner = normalize_vehicle_owner(getattr(doc, "vuna_vehicle_owner", None))
+	structure_owner = normalize_vehicle_owner(structure.vehicle_owner)
+	if structure_owner and vehicle_owner and structure_owner != vehicle_owner:
+		frappe.throw(
+			_("Transport Cost Structure {0} is for {1}-owned Vehicles, but this Vehicle is {2}-owned.").format(
+				structure_name, structure_owner, vehicle_owner
+			)
+		)
 
 
 @frappe.whitelist()

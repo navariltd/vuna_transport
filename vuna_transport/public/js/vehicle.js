@@ -5,7 +5,8 @@ frappe.ui.form.on("Vehicle", {
 	setup(frm) {
 		frm.set_query("vuna_transport_cost_structure", () => ({
 			filters: {
-				company: frm.doc.company,
+				company: ["in", [frm.doc.company, "", null]],
+				vehicle_owner: frm.doc.vuna_vehicle_owner,
 				disabled: 0,
 				docstatus: 1,
 			},
