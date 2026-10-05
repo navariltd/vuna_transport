@@ -14,6 +14,7 @@ from vuna_transport.services.shared.security_service import require_document_per
 
 def validate_vehicle(doc, method=None):
 	"""Populate standard Vehicle fields from the selected Vuna Vehicle Model."""
+	_normalize_vehicle_owner_fields(doc)
 	_validate_vehicle_operational_roles(doc)
 	_validate_vehicle_asset(doc)
 	_validate_vehicle_cost_structure(doc)
@@ -39,6 +40,12 @@ def validate_vehicle(doc, method=None):
 		"Electric",
 	):
 		doc.fuel_type = vehicle_model.fuel_type
+
+
+def _normalize_vehicle_owner_fields(doc):
+	"""Remove owner-specific values that no longer apply after an owner change."""
+	if normalize_vehicle_owner(getattr(doc, "vuna_vehicle_owner", None)) == "Company":
+		doc.vuna_supplier = None
 
 
 def _validate_vehicle_operational_roles(doc):

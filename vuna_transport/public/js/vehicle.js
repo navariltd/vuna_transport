@@ -88,6 +88,12 @@ frappe.ui.form.on("Vehicle", {
 				if (message?.vehicle_model) frm.set_value("vuna_vehicle_model", message.vehicle_model);
 			});
 	},
+
+	vuna_vehicle_owner(frm) {
+		if (frm.doc.vuna_vehicle_owner === "Company" && frm.doc.vuna_supplier) {
+			frm.set_value("vuna_supplier", null);
+		}
+	},
 });
 
 function render_operational_status(frm) {
