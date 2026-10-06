@@ -90,6 +90,48 @@ def get_current_driver_profile(installation_id, device_identifier=None):
 	return {"linked": True, "driver": driver}
 
 
+def get_assigned_delivery_trips(installation_id, device_identifier=None):
+	"""Return submitted Delivery Trips assigned to the authenticated Driver."""
+	profile = get_current_driver_profile(installation_id, device_identifier)
+	if not profile.get("linked"):
+		return profile
+
+	driver_name = profile["driver"]["name"]
+	trip_filters = {"docstatus": 1}
+	trip_or_filters = [{"driver": driver_name}]
+	if frappe.get_meta("Delivery Trip").has_field("vuna_current_driver"):
+		trip_or_filters.append({"vuna_current_driver": driver_name})
+
+	trips = frappe.get_all(
+		"Delivery Trip",
+		filters=trip_filters,
+		or_filters=trip_or_filters,
+		fields=["name", "status", "company", "vehicle", "driver", "departure_time", "total_distance", "uom"],
+		order_by="departure_time asc, creation asc",
+		limit_page_length=100,
+		ignore_permissions=True,
+	)
+	if not trips:
+		return {"linked": True, "driver": profile["driver"], "trips": []}
+
+	stop_rows = frappe.get_all(
+		"Delivery Stop",
+		filters={"parent": ["in", [trip.name for trip in trips]], "parenttype": "Delivery Trip"},
+		fields=["name", "parent", "idx", "customer", "address", "delivery_note", "visited", "estimated_arrival"],
+		order_by="parent asc, idx asc",
+		limit_page_length=1000,
+		ignore_permissions=True,
+	)
+	stops_by_trip = {}
+	for stop in stop_rows:
+		stops_by_trip.setdefault(stop.parent, []).append(stop)
+	for trip in trips:
+		trip["stops"] = stops_by_trip.get(trip.name, [])
+		trip["stop_count"] = len(trip["stops"])
+
+	return {"linked": True, "driver": profile["driver"], "trips": trips}
+
+
 def _find_device(installation_id, device_identifier=None):
 	filters = []
 	if device_identifier:

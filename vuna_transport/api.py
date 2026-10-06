@@ -1,5 +1,9 @@
 import frappe
-from vuna_transport.services.mobile.mobile_device_service import bootstrap_device, get_current_driver_profile
+from vuna_transport.services.mobile.mobile_device_service import (
+	bootstrap_device,
+	get_assigned_delivery_trips,
+	get_current_driver_profile,
+)
 
 
 @frappe.whitelist()
@@ -19,6 +23,11 @@ def bootstrap_mobile_device(installation_id, device_identifier=None, platform=No
 @frappe.whitelist()
 def get_mobile_driver_profile(installation_id, device_identifier=None):
 	return get_current_driver_profile(installation_id, device_identifier)
+
+
+@frappe.whitelist()
+def get_mobile_assigned_delivery_trips(installation_id, device_identifier=None):
+	return get_assigned_delivery_trips(installation_id, device_identifier)
 from frappe.utils import add_to_date, now_datetime
 
 from vuna_transport.services.fleet.driver_availability_service import (
