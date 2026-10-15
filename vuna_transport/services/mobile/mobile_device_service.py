@@ -409,25 +409,30 @@ def _delivery_stop_fields(*, include_parent):
 def _enrich_stops(stops):
 	address_names = {stop.address for stop in stops if stop.address}
 	contact_names = {stop.contact for stop in stops if stop.contact}
+	address_fields = [
+		"name",
+		"address_title",
+		"address_line1",
+		"address_line2",
+		"city",
+		"county",
+		"state",
+		"country",
+		"pincode",
+		"phone",
+		"email_id",
+	]
+	address_meta = frappe.get_meta("Address")
+	for fieldname in ("vuna_latitude", "vuna_longitude"):
+		if address_meta.has_field(fieldname):
+			address_fields.append(fieldname)
 	addresses = (
 		{
 			row.name: row
 			for row in frappe.get_all(
 				"Address",
 				filters={"name": ["in", list(address_names)]},
-				fields=[
-					"name",
-					"address_title",
-					"address_line1",
-					"address_line2",
-					"city",
-					"county",
-					"state",
-					"country",
-					"pincode",
-					"phone",
-					"email_id",
-				],
+				fields=address_fields,
 				ignore_permissions=True,
 			)
 		}
@@ -466,12 +471,27 @@ def _enrich_stops(stops):
 		else {}
 	)
 	for stop in stops:
-		stop["address_details"] = addresses.get(stop.address)
+		address = addresses.get(stop.address)
+		stop["address_details"] = address
 		stop["contact_details"] = contacts.get(stop.contact)
 		stop["proof_of_delivery"] = pods.get(getattr(stop, "vuna_proof_of_delivery", None))
 		stop["delivery_status"] = getattr(stop, "vuna_delivery_status", None) or (
 			"Completed" if stop.visited else "Pending"
 		)
+		if not _has_map_coordinates(stop.lat, stop.lng) and address and _has_map_coordinates(
+			address.get("vuna_latitude"), address.get("vuna_longitude")
+		):
+			stop["lat"] = flt(address.vuna_latitude)
+			stop["lng"] = flt(address.vuna_longitude)
+			stop["coordinate_source"] = "Address"
+
+
+def _has_map_coordinates(latitude, longitude):
+	if latitude in (None, "") or longitude in (None, ""):
+		return False
+	latitude = flt(latitude)
+	longitude = flt(longitude)
+	return -90 <= latitude <= 90 and -180 <= longitude <= 180 and (latitude, longitude) != (0, 0)
 
 
 def _serialize_pod(pod):
