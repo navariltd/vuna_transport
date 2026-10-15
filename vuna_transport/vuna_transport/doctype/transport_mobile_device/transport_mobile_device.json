@@ -1,25 +1,30 @@
 {
  "actions": [],
- "allow_rename": 0,
+ "allow_copy": 1,
  "autoname": "field:installation_id",
  "creation": "2026-10-04 20:00:00",
  "doctype": "DocType",
+ "engine": "InnoDB",
  "field_order": [
   "installation_id",
-  "latest_installation_id",
-  "device_identifier",
-  "platform",
   "user",
+  "latest_installation_id",
+  "column_break_sqdl",
   "status",
+  "device_identifier",
   "section_break_device",
   "manufacturer",
   "model_name",
-  "os_name",
   "os_version",
+  "column_break_dkzt",
+  "platform",
+  "os_name",
   "app_version",
   "section_break_activity",
   "first_registered_at",
+  "column_break_wmea",
   "last_seen_at",
+  "section_break_jchu",
   "notes"
  ],
  "fields": [
@@ -126,13 +131,31 @@
    "fieldname": "notes",
    "fieldtype": "Small Text",
    "label": "Notes"
+  },
+  {
+   "fieldname": "column_break_sqdl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_dkzt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_wmea",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_jchu",
+   "fieldtype": "Section Break"
   }
  ],
+ "in_create": 1,
  "links": [],
- "modified": "2026-10-04 20:00:00",
+ "modified": "2026-10-06 15:43:59.578227",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Mobile Device",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
