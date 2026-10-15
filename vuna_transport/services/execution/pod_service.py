@@ -49,7 +49,7 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 	pod.delivery_datetime = pod.delivery_datetime or now_datetime()
 
 	rebuild = not pod.items or any(
-		not row.delivery_note_item or flt(row.ordered_qty) <= 0 for row in pod.items
+		not row.delivery_note_item or flt(row.ordered_qty) <= 0 or not row.uom for row in pod.items
 	)
 	if rebuild:
 		pod.set("items", [])
@@ -61,7 +61,7 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 					"sales_order_item": delivery_item.so_detail,
 				},
 			)
-			ordered_qty = flt(delivery_item.stock_qty or delivery_item.qty)
+			ordered_qty = flt(delivery_item.qty)
 			pod.append(
 				"items",
 				{
@@ -72,6 +72,9 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 					"ordered_qty": ordered_qty,
 					"delivered_qty": ordered_qty,
 					"rejected_qty": 0,
+					"uom": delivery_item.uom,
+					"stock_uom": delivery_item.stock_uom,
+					"conversion_factor": flt(delivery_item.conversion_factor) or 1,
 					"batch_no": getattr(delivery_item, "batch_no", None),
 				},
 			)
@@ -120,7 +123,11 @@ def validate_pod_items(items, rejection_reasons=None):
 		# Preserve compatibility with older in-memory/test documents while existing
 		# records transition away from the unsupported nested Table MultiSelect.
 		item_reasons.extend(getattr(item, "rejection_reasons", None) or [])
-		if flt(item.rejected_qty) and not item_reasons and not getattr(item, "rejection_reason_remarks", None):
+		if (
+			flt(item.rejected_qty)
+			and not item_reasons
+			and not getattr(item, "rejection_reason_remarks", None)
+		):
 			frappe.throw(_("A rejection reason is required for item {0}.").format(item.item_code))
 
 
@@ -322,7 +329,11 @@ def recompute_delivery_load_completion(delivery_load, delivery_trip=None):
 		return
 	from vuna_transport.services.execution.dispatch_guard_service import set_delivery_load_status
 
-	target = "Completed" if pod_statuses and all(status == "Accepted" for status in pod_statuses) else "Completed with Exceptions"
+	target = (
+		"Completed"
+		if pod_statuses and all(status == "Accepted" for status in pod_statuses)
+		else "Completed with Exceptions"
+	)
 	set_delivery_load_status(
 		delivery_load,
 		target,

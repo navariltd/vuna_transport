@@ -478,8 +478,10 @@ def _enrich_stops(stops):
 		stop["delivery_status"] = getattr(stop, "vuna_delivery_status", None) or (
 			"Completed" if stop.visited else "Pending"
 		)
-		if not _has_map_coordinates(stop.lat, stop.lng) and address and _has_map_coordinates(
-			address.get("vuna_latitude"), address.get("vuna_longitude")
+		if (
+			not _has_map_coordinates(stop.lat, stop.lng)
+			and address
+			and _has_map_coordinates(address.get("vuna_latitude"), address.get("vuna_longitude"))
 		):
 			stop["lat"] = flt(address.vuna_latitude)
 			stop["lng"] = flt(address.vuna_longitude)
@@ -541,6 +543,7 @@ def _serialize_pod(pod):
 				"ordered_qty": row.ordered_qty,
 				"delivered_qty": row.delivered_qty,
 				"rejected_qty": row.rejected_qty,
+				"uom": row.uom,
 				"rejection_reason": row.rejection_reason,
 				"rejection_reason_remarks": row.rejection_reason_remarks,
 				"batch_no": row.batch_no,
