@@ -1,13 +1,46 @@
 import frappe
+from frappe.utils import add_to_date, now_datetime
+
+from vuna_transport.services.fleet.driver_availability_service import (
+	get_driver_availability_map,
+)
+from vuna_transport.services.fleet.vehicle_allocation_service import (
+	get_allocation_resource_window,
+	get_load_resource_window,
+	validate_allocation_load_set,
+)
+from vuna_transport.services.fleet.vehicle_availability_service import (
+	get_vehicle_availability_map,
+)
 from vuna_transport.services.mobile.mobile_device_service import (
 	bootstrap_device,
 	get_assigned_delivery_trips,
 	get_current_driver_profile,
+	get_delivery_note_details,
+	get_delivery_trip_details,
+	prepare_mobile_proof_of_delivery,
+	submit_mobile_proof_of_delivery,
+	upload_mobile_pod_attachment,
+)
+from vuna_transport.services.planning.delivery_load_service import get_compatible_vehicle_category_names
+from vuna_transport.services.shared.security_service import require_document_permission
+from vuna_transport.services.shared.workflow_policy_service import (
+	ALLOCATION_AFTER_DELIVERY_NOTES,
+	get_vehicle_allocation_timing,
 )
 
 
 @frappe.whitelist()
-def bootstrap_mobile_device(installation_id, device_identifier=None, platform=None, manufacturer=None, model_name=None, os_name=None, os_version=None, app_version=None):
+def bootstrap_mobile_device(
+	installation_id,
+	device_identifier=None,
+	platform=None,
+	manufacturer=None,
+	model_name=None,
+	os_name=None,
+	os_version=None,
+	app_version=None,
+):
 	return bootstrap_device(
 		installation_id=installation_id,
 		device_identifier=device_identifier,
@@ -28,25 +61,78 @@ def get_mobile_driver_profile(installation_id, device_identifier=None):
 @frappe.whitelist()
 def get_mobile_assigned_delivery_trips(installation_id, device_identifier=None):
 	return get_assigned_delivery_trips(installation_id, device_identifier)
-from frappe.utils import add_to_date, now_datetime
 
-from vuna_transport.services.fleet.driver_availability_service import (
-	get_driver_availability_map,
-)
-from vuna_transport.services.fleet.vehicle_allocation_service import (
-	get_allocation_resource_window,
-	get_load_resource_window,
-	validate_allocation_load_set,
-)
-from vuna_transport.services.fleet.vehicle_availability_service import (
-	get_vehicle_availability_map,
-)
-from vuna_transport.services.planning.delivery_load_service import get_compatible_vehicle_category_names
-from vuna_transport.services.shared.security_service import require_document_permission
-from vuna_transport.services.shared.workflow_policy_service import (
-	ALLOCATION_AFTER_DELIVERY_NOTES,
-	get_vehicle_allocation_timing,
-)
+
+@frappe.whitelist()
+def get_mobile_delivery_trip_details(installation_id, trip_name, device_identifier=None):
+	return get_delivery_trip_details(installation_id, trip_name, device_identifier)
+
+
+@frappe.whitelist()
+def get_mobile_delivery_note_details(
+	installation_id,
+	trip_name,
+	stop_name,
+	device_identifier=None,
+):
+	return get_delivery_note_details(
+		installation_id,
+		trip_name,
+		stop_name,
+		device_identifier,
+	)
+
+
+@frappe.whitelist()
+def prepare_mobile_pod(installation_id, trip_name, stop_name, device_identifier=None):
+	return prepare_mobile_proof_of_delivery(
+		installation_id,
+		trip_name,
+		stop_name,
+		device_identifier,
+	)
+
+
+@frappe.whitelist()
+def submit_mobile_pod(
+	installation_id,
+	trip_name,
+	stop_name,
+	payload,
+	device_identifier=None,
+):
+	return submit_mobile_proof_of_delivery(
+		installation_id,
+		trip_name,
+		stop_name,
+		payload,
+		device_identifier,
+	)
+
+
+@frappe.whitelist()
+def upload_mobile_pod_file(
+	installation_id,
+	trip_name,
+	stop_name,
+	pod_name,
+	attachment_type,
+	content,
+	filename,
+	device_identifier=None,
+	content_encoding="base64",
+):
+	return upload_mobile_pod_attachment(
+		installation_id,
+		trip_name,
+		stop_name,
+		pod_name,
+		attachment_type,
+		content,
+		filename,
+		device_identifier,
+		content_encoding,
+	)
 
 
 @frappe.whitelist()
@@ -144,7 +230,9 @@ def get_drivers_for_load(doctype, txt, searchfield, start, page_len, filters):
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def get_delivery_loads_for_allocation(doctype, txt, searchfield, start, page_len, filters, as_dict=False, **kwargs):
+def get_delivery_loads_for_allocation(
+	doctype, txt, searchfield, start, page_len, filters, as_dict=False, **kwargs
+):
 	"""Offer only operational loads compatible with the current allocation composition."""
 	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
 	selected = filters.get("selected_delivery_loads") or []
@@ -155,10 +243,15 @@ def get_delivery_loads_for_allocation(doctype, txt, searchfield, start, page_len
 	vehicle_category = filters.get("required_vehicle_category")
 	vehicle_name = filters.get("vehicle")
 	if vehicle_name:
-		vehicle_category = frappe.db.get_value("Vehicle", vehicle_name, "vuna_vehicle_category") or vehicle_category
+		vehicle_category = (
+			frappe.db.get_value("Vehicle", vehicle_name, "vuna_vehicle_category") or vehicle_category
+		)
 	if not vehicle_category:
 		return []
-	load_filters = {"docstatus": 1, "status": ["not in", ["Completed", "Completed with Exceptions", "Cancelled"]]}
+	load_filters = {
+		"docstatus": 1,
+		"status": ["not in", ["Completed", "Completed with Exceptions", "Cancelled"]],
+	}
 	if company:
 		load_filters["company"] = company
 	if vehicle_category:
@@ -217,10 +310,7 @@ def _loads_at_vehicle_allocation_step(candidates):
 			fields=["name", "requires_vehicle_allocation"],
 		)
 	}
-	method_required = {
-		row.name: methods.get(row.delivery_method, True)
-		for row in candidates
-	}
+	method_required = {row.name: methods.get(row.delivery_method, True) for row in candidates}
 	eligible = [row for row in candidates if method_required[row.name]]
 	if not eligible:
 		return []
@@ -336,7 +426,9 @@ def get_drivers_for_allocation(doctype, txt, searchfield, start, page_len, filte
 	for load in loads:
 		require_document_permission(load, "read")
 	from_time, to_time = get_allocation_resource_window(loads)
-	driver_names = frappe.get_list("Driver", filters={"status": "Active"}, pluck="name", limit_page_length=1000)
+	driver_names = frappe.get_list(
+		"Driver", filters={"status": "Active"}, pluck="name", limit_page_length=1000
+	)
 	availability = get_driver_availability_map(
 		driver_names=driver_names,
 		from_time=from_time,
