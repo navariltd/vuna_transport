@@ -3,7 +3,7 @@ import base64
 import frappe
 from frappe import _
 from frappe.utils import cint, flt, now_datetime
-from frappe.utils.file_manager import save_file
+from frappe.utils.file_manager import get_content_hash, save_file
 
 from vuna_transport.services.execution.pod_service import create_proof_of_delivery
 
@@ -28,6 +28,7 @@ def bootstrap_device(
 		frappe.throw(_("Installation ID is required."))
 
 	user = frappe.session.user
+	_lock_mobile_user(user)
 	device = _find_device(installation_id, device_identifier)
 	device_name = device.name if device else None
 	if device_name:
@@ -42,7 +43,21 @@ def bootstrap_device(
 			return _device_response(
 				device,
 				allowed=False,
-				message=_("This device is {0}. Contact your administrator.").format(device.status.lower()),
+				message=_device_status_message(device.status),
+			)
+		other_active_device = frappe.db.get_value(
+			"Transport Mobile Device",
+			{"user": user, "status": "Active", "name": ["!=", device.name]},
+			"name",
+		)
+		if other_active_device:
+			return _device_response(
+				device,
+				allowed=False,
+				message=_(
+					"More than one active mobile device is linked to your account. "
+					"Contact your administrator to keep only one active device."
+				),
 			)
 
 		device.last_seen_at = now_datetime()
@@ -53,6 +68,12 @@ def bootstrap_device(
 		device.save(ignore_permissions=True)
 		return _device_response(device, allowed=True)
 
+	active_device = frappe.db.get_value(
+		"Transport Mobile Device",
+		{"user": user, "status": "Active"},
+		"name",
+	)
+	status = "Pending Approval" if active_device else "Active"
 	device = frappe.get_doc(
 		{
 			"doctype": "Transport Mobile Device",
@@ -61,7 +82,7 @@ def bootstrap_device(
 			"device_identifier": device_identifier,
 			"platform": platform,
 			"user": user,
-			"status": "Active",
+			"status": status,
 			"manufacturer": manufacturer,
 			"model_name": model_name,
 			"os_name": os_name,
@@ -72,6 +93,14 @@ def bootstrap_device(
 		}
 	)
 	device.insert(ignore_permissions=True)
+	if status != "Active":
+		return _device_response(
+			device,
+			allowed=False,
+			message=_(
+				"Your account is already linked to another device. This device is awaiting administrator approval."
+			),
+		)
 	return _device_response(device, allowed=True)
 
 
@@ -138,7 +167,18 @@ def get_assigned_delivery_trips(installation_id, device_identifier=None):
 		"Delivery Trip",
 		filters=trip_filters,
 		or_filters=trip_or_filters,
-		fields=["name", "status", "company", "vehicle", "driver", "departure_time", "total_distance", "uom"],
+		fields=[
+			"name",
+			"status",
+			"company",
+			"vehicle",
+			"driver",
+			"departure_time",
+			"total_distance",
+			"uom",
+			"vuna_actual_start",
+			"vuna_actual_completion",
+		],
 		order_by="departure_time asc, creation asc",
 		limit_page_length=100,
 		ignore_permissions=True,
@@ -161,6 +201,7 @@ def get_assigned_delivery_trips(installation_id, device_identifier=None):
 		trip["stops"] = stops_by_trip.get(trip.name, [])
 		trip["stop_count"] = len(trip["stops"])
 		trip["completed_stop_count"] = sum(cint(stop.visited) for stop in trip["stops"])
+		_enrich_trip_execution(trip, trip["stops"])
 
 	return {"linked": True, "driver": profile["driver"], "trips": trips}
 
@@ -183,7 +224,8 @@ def get_delivery_trip_details(installation_id, trip_name, device_identifier=None
 	return {
 		"trip": {
 			"name": trip.name,
-			"status": trip.status,
+			"status": _mobile_trip_status(trip, stops),
+			"erpnext_status": trip.status,
 			"company": trip.company,
 			"vehicle": trip.vehicle,
 			"driver": trip.driver,
@@ -193,6 +235,9 @@ def get_delivery_trip_details(installation_id, trip_name, device_identifier=None
 			"stop_count": len(stops),
 			"completed_stop_count": completed,
 			"next_stop": next_stop,
+			"actual_start": trip.vuna_actual_start,
+			"actual_completion": trip.vuna_actual_completion,
+			"actions": _mobile_trip_actions(trip, stops),
 			"stops": stops,
 		}
 	}
@@ -210,8 +255,21 @@ def get_delivery_note_details(installation_id, trip_name, stop_name, device_iden
 	if delivery_note.docstatus != 1:
 		frappe.throw(_("Delivery Note {0} is not submitted.").format(delivery_note.name))
 	_enrich_stops([stop])
+	stop["can_arrive"] = False
+	stop["can_complete_delivery"] = (
+		bool(trip.vuna_actual_start) and not bool(trip.vuna_actual_completion) and not cint(stop.visited)
+	)
+	stop["requires_trip_start"] = not bool(trip.vuna_actual_start)
 	return {
-		"trip": {"name": trip.name, "status": trip.status, "vehicle": trip.vehicle},
+		"trip": {
+			"name": trip.name,
+			"status": _mobile_trip_status(trip),
+			"erpnext_status": trip.status,
+			"vehicle": trip.vehicle,
+			"actual_start": trip.vuna_actual_start,
+			"actual_completion": trip.vuna_actual_completion,
+			"actions": _mobile_trip_actions(trip),
+		},
 		"stop": stop,
 		"delivery_note": {
 			"name": delivery_note.name,
@@ -244,7 +302,8 @@ def prepare_mobile_proof_of_delivery(installation_id, trip_name, stop_name, devi
 	"""Create or load the single active draft POD for an assigned stop."""
 	driver = _require_mobile_driver(installation_id, device_identifier)
 	trip = _get_assigned_trip(trip_name, driver.name)
-	_get_trip_stop(trip.name, stop_name)
+	stop = _get_trip_stop(trip.name, stop_name)
+	_record_mobile_stop_arrival(trip, stop)
 	pod_name = create_proof_of_delivery(trip.name, stop_name)
 	return _serialize_pod(frappe.get_doc("Proof of Delivery", pod_name))
 
@@ -259,7 +318,8 @@ def submit_mobile_proof_of_delivery(
 	"""Apply a mobile POD payload and submit it through the normal DocType workflow."""
 	driver = _require_mobile_driver(installation_id, device_identifier)
 	trip = _get_assigned_trip(trip_name, driver.name)
-	_get_trip_stop(trip.name, stop_name)
+	stop = _get_trip_stop(trip.name, stop_name)
+	_record_mobile_stop_arrival(trip, stop)
 	payload = frappe.parse_json(payload) if isinstance(payload, str) else (payload or {})
 	pod_name = payload.get("name") or create_proof_of_delivery(trip.name, stop_name)
 	pod = frappe.get_doc("Proof of Delivery", pod_name)
@@ -333,7 +393,35 @@ def upload_mobile_pod_attachment(
 		frappe.throw(_("The attachment data is invalid."))
 	if len(file_content) > 8 * 1024 * 1024:
 		frappe.throw(_("Proof of Delivery attachments cannot exceed 8 MB."))
-	file_doc = save_file(filename, file_content, "Proof of Delivery", pod.name, is_private=1)
+
+	# A mobile request can be retried when the upload response is interrupted. Reuse
+	# an identical field attachment instead of creating another File record.
+	existing_file = frappe.db.get_value(
+		"File",
+		{
+			"attached_to_doctype": "Proof of Delivery",
+			"attached_to_name": pod.name,
+			"attached_to_field": fieldname,
+			"content_hash": get_content_hash(file_content),
+			"is_private": 1,
+		},
+		["name", "file_url"],
+		as_dict=True,
+	)
+	if existing_file:
+		pod.db_set(fieldname, existing_file.file_url, update_modified=False)
+		return {"file_url": existing_file.file_url, "fieldname": fieldname}
+
+	# Attaching directly to the target field prevents Frappe's Attach-field hook
+	# from creating a second File row when the POD is subsequently saved.
+	file_doc = save_file(
+		filename,
+		file_content,
+		"Proof of Delivery",
+		pod.name,
+		is_private=1,
+		df=fieldname,
+	)
 	pod.db_set(fieldname, file_doc.file_url, update_modified=False)
 	return {"file_url": file_doc.file_url, "fieldname": fieldname}
 
@@ -475,8 +563,16 @@ def _enrich_stops(stops):
 		stop["address_details"] = address
 		stop["contact_details"] = contacts.get(stop.contact)
 		stop["proof_of_delivery"] = pods.get(getattr(stop, "vuna_proof_of_delivery", None))
-		stop["delivery_status"] = getattr(stop, "vuna_delivery_status", None) or (
-			"Completed" if stop.visited else "Pending"
+		stored_status = getattr(stop, "vuna_delivery_status", None)
+		stop["delivery_status"] = (
+			stored_status
+			if stored_status and stored_status != "Pending"
+			else ("Completed" if stop.visited else None)
+			or ("Arrived" if getattr(stop, "vuna_actual_arrival", None) else "Pending")
+		)
+		stop["can_arrive"] = not cint(stop.visited) and not getattr(stop, "vuna_actual_arrival", None)
+		stop["can_complete_delivery"] = not cint(stop.visited) and bool(
+			getattr(stop, "vuna_actual_arrival", None)
 		)
 		if (
 			not _has_map_coordinates(stop.lat, stop.lng)
@@ -587,7 +683,19 @@ def _get_active_device(installation_id, device_identifier=None):
 		return {
 			"linked": False,
 			"code": "DEVICE_NOT_ACTIVE",
-			"message": _("This device is {0}. Contact your administrator.").format(device.status.lower()),
+			"message": _device_status_message(device.status),
+		}
+	if frappe.db.exists(
+		"Transport Mobile Device",
+		{"user": frappe.session.user, "status": "Active", "name": ["!=", device.name]},
+	):
+		return {
+			"linked": False,
+			"code": "MULTIPLE_ACTIVE_DEVICES",
+			"message": _(
+				"More than one active mobile device is linked to your account. "
+				"Contact your administrator to keep only one active device."
+			),
 		}
 	frappe.db.set_value(
 		"Transport Mobile Device", device.name, "last_seen_at", now_datetime(), update_modified=False
@@ -609,3 +717,64 @@ def _device_response(device, *, allowed, message=None):
 		},
 		"message": message,
 	}
+
+
+def _lock_mobile_user(user):
+	"""Serialize registrations and administrator replacements for one user."""
+	frappe.db.sql("select name from `tabUser` where name = %s for update", user)
+
+
+def _device_status_message(status):
+	if status == "Pending Approval":
+		return _(
+			"This device is awaiting administrator approval because your account is linked to another device."
+		)
+	return _("This device is {0}. Contact your administrator.").format((status or "inactive").lower())
+
+
+def _mobile_trip_status(trip, stops=None):
+	from vuna_transport.services.mobile.mobile_trip_execution_service import (
+		get_mobile_execution_status,
+	)
+
+	return get_mobile_execution_status(trip, stops)
+
+
+def _mobile_trip_actions(trip, stops=None):
+	from vuna_transport.services.mobile.mobile_trip_execution_service import (
+		get_mobile_execution_actions,
+	)
+
+	return get_mobile_execution_actions(trip, stops)
+
+
+def _enrich_trip_execution(trip, stops):
+	trip["erpnext_status"] = trip.status
+	trip["status"] = _mobile_trip_status(trip, stops)
+	trip["actual_start"] = trip.vuna_actual_start
+	trip["actual_completion"] = trip.vuna_actual_completion
+	trip["actions"] = _mobile_trip_actions(trip, stops)
+
+
+def _validate_mobile_stop_execution(trip, stop):
+	if not trip.vuna_actual_start:
+		frappe.throw(_("Start Delivery Trip {0} before recording delivery.").format(trip.name))
+	if trip.vuna_actual_completion:
+		frappe.throw(_("Delivery Trip {0} is already completed.").format(trip.name))
+	if cint(stop.visited):
+		frappe.throw(_("Delivery Stop {0} is already completed.").format(stop.name))
+
+
+def _record_mobile_stop_arrival(trip, stop):
+	"""Record arrival when the driver begins POD instead of requiring another action."""
+	_validate_mobile_stop_execution(trip, stop)
+	if not stop.vuna_actual_arrival:
+		arrival_at = now_datetime()
+		frappe.db.set_value(
+			"Delivery Stop",
+			stop.name,
+			"vuna_actual_arrival",
+			arrival_at,
+			update_modified=False,
+		)
+		stop.vuna_actual_arrival = arrival_at

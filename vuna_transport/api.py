@@ -22,6 +22,20 @@ from vuna_transport.services.mobile.mobile_device_service import (
 	submit_mobile_proof_of_delivery,
 	upload_mobile_pod_attachment,
 )
+from vuna_transport.services.mobile.mobile_request_service import (
+	create_mobile_expense_claim,
+	create_mobile_material_request,
+	get_mobile_request_details,
+	get_mobile_request_setup,
+	get_mobile_requests,
+	search_mobile_material_request_items,
+)
+from vuna_transport.services.mobile.mobile_trip_execution_service import (
+	get_mobile_trip_incidents,
+	report_mobile_trip_incident,
+	resolve_mobile_trip_incident,
+	start_mobile_delivery_trip,
+)
 from vuna_transport.services.planning.delivery_load_service import get_compatible_vehicle_category_names
 from vuna_transport.services.shared.security_service import require_document_permission
 from vuna_transport.services.shared.workflow_policy_service import (
@@ -84,6 +98,48 @@ def get_mobile_delivery_note_details(
 
 
 @frappe.whitelist()
+def start_mobile_trip(installation_id, trip_name, device_identifier=None):
+	return start_mobile_delivery_trip(installation_id, trip_name, device_identifier)
+
+
+@frappe.whitelist()
+def get_mobile_incidents(installation_id, trip_name, device_identifier=None):
+	return get_mobile_trip_incidents(installation_id, trip_name, device_identifier)
+
+
+@frappe.whitelist()
+def report_mobile_incident(
+	installation_id,
+	trip_name,
+	payload,
+	device_identifier=None,
+):
+	return report_mobile_trip_incident(
+		installation_id,
+		trip_name,
+		payload,
+		device_identifier,
+	)
+
+
+@frappe.whitelist()
+def resolve_mobile_incident(
+	installation_id,
+	trip_name,
+	incident_name,
+	resolution,
+	device_identifier=None,
+):
+	return resolve_mobile_trip_incident(
+		installation_id,
+		trip_name,
+		incident_name,
+		resolution,
+		device_identifier,
+	)
+
+
+@frappe.whitelist()
 def prepare_mobile_pod(installation_id, trip_name, stop_name, device_identifier=None):
 	return prepare_mobile_proof_of_delivery(
 		installation_id,
@@ -132,6 +188,76 @@ def upload_mobile_pod_file(
 		filename,
 		device_identifier,
 		content_encoding,
+	)
+
+
+@frappe.whitelist()
+def get_mobile_trip_request_setup(installation_id, trip_name, device_identifier=None):
+	return get_mobile_request_setup(installation_id, trip_name, device_identifier)
+
+
+@frappe.whitelist()
+def get_mobile_request_history(installation_id, device_identifier=None, limit=50):
+	return get_mobile_requests(installation_id, device_identifier, limit)
+
+
+@frappe.whitelist()
+def get_mobile_request(
+	installation_id,
+	doctype,
+	name,
+	device_identifier=None,
+):
+	return get_mobile_request_details(
+		installation_id,
+		doctype,
+		name,
+		device_identifier,
+	)
+
+
+@frappe.whitelist()
+def search_mobile_material_items(
+	installation_id,
+	trip_name,
+	txt=None,
+	device_identifier=None,
+):
+	return search_mobile_material_request_items(
+		installation_id,
+		trip_name,
+		txt,
+		device_identifier,
+	)
+
+
+@frappe.whitelist()
+def create_mobile_trip_expense_claim(
+	installation_id,
+	trip_name,
+	payload,
+	device_identifier=None,
+):
+	return create_mobile_expense_claim(
+		installation_id,
+		trip_name,
+		payload,
+		device_identifier,
+	)
+
+
+@frappe.whitelist()
+def create_mobile_trip_material_request(
+	installation_id,
+	trip_name,
+	payload,
+	device_identifier=None,
+):
+	return create_mobile_material_request(
+		installation_id,
+		trip_name,
+		payload,
+		device_identifier,
 	)
 
 

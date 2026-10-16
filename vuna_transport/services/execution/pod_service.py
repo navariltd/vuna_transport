@@ -2,7 +2,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import flt, now_datetime
+from frappe.utils import cint, flt, now_datetime
 
 from vuna_transport.services.execution.dispatch_guard_service import set_delivery_load_status
 from vuna_transport.services.execution.lineage_service import get_delivery_trip_load_names
@@ -132,13 +132,14 @@ def validate_pod_items(items, rejection_reasons=None):
 
 
 def update_delivery_stop_from_pod(pod, status):
+	existing_arrival = frappe.db.get_value("Delivery Stop", pod.delivery_stop, "vuna_actual_arrival")
 	frappe.db.set_value(
 		"Delivery Stop",
 		pod.delivery_stop,
 		{
 			"visited": 1,
 			"vuna_delivery_status": status,
-			"vuna_actual_arrival": pod.delivery_datetime,
+			"vuna_actual_arrival": existing_arrival or pod.delivery_datetime,
 			"vuna_actual_departure": pod.delivery_datetime,
 			"vuna_proof_of_delivery": pod.name,
 		},
@@ -146,6 +147,16 @@ def update_delivery_stop_from_pod(pod, status):
 	)
 	trip = frappe.get_doc("Delivery Trip", pod.delivery_trip)
 	trip.update_status()
+	if trip.vuna_actual_start and _all_delivery_trip_stops_visited(trip.name):
+		trip.db_set(
+			{
+				"vuna_actual_completion": pod.delivery_datetime,
+				"status": "Completed",
+			},
+			update_modified=False,
+		)
+	elif trip.vuna_actual_start and trip.status == "Scheduled":
+		trip.db_set("status", "In Transit", update_modified=False)
 	recompute_delivery_load_completion(pod.delivery_load, pod.delivery_trip)
 	if pod.delivery_order:
 		recompute_delivery_order_status(pod.delivery_order)
@@ -158,13 +169,17 @@ def reset_delivery_stop_from_pod(pod):
 		{
 			"visited": 0,
 			"vuna_delivery_status": "Pending",
-			"vuna_actual_arrival": None,
 			"vuna_actual_departure": None,
 			"vuna_proof_of_delivery": None,
 		},
 		update_modified=False,
 	)
-	frappe.get_doc("Delivery Trip", pod.delivery_trip).update_status()
+	trip = frappe.get_doc("Delivery Trip", pod.delivery_trip)
+	if trip.vuna_actual_completion:
+		trip.db_set("vuna_actual_completion", None, update_modified=False)
+	trip.update_status()
+	if trip.vuna_actual_start and trip.status == "Scheduled":
+		trip.db_set("status", "In Transit", update_modified=False)
 	set_delivery_load_status(
 		pod.delivery_load,
 		"Dispatched",
@@ -339,3 +354,12 @@ def recompute_delivery_load_completion(delivery_load, delivery_trip=None):
 		target,
 		_("Every delivery stop has a submitted Proof of Delivery."),
 	)
+
+
+def _all_delivery_trip_stops_visited(delivery_trip):
+	stops = frappe.get_all(
+		"Delivery Stop",
+		filters={"parent": delivery_trip, "parenttype": "Delivery Trip"},
+		pluck="visited",
+	)
+	return bool(stops) and all(cint(visited) for visited in stops)

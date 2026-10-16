@@ -181,6 +181,7 @@ doc_events = {
 			"vuna_transport.services.execution.lineage_service.submit_delivery_trip",
 			"vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 		],
+		"on_update_after_submit": "vuna_transport.services.mobile.mobile_trip_execution_service.synchronize_mobile_trip_execution_status",
 		"on_cancel": [
 			"vuna_transport.services.execution.lineage_service.cancel_delivery_trip",
 			"vuna_transport.services.execution.lineage_service.unlink_delivery_trip",
