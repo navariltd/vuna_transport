@@ -78,7 +78,11 @@ class TestReturnRequest(UnitTestCase):
 		self, require_doctype_permission, get_doc, require_document_permission
 	):
 		item = SimpleNamespace(
-			item_code="MILK", received_qty=10, quality_inspection=None, batch_no=None, delivery_note_item="DNI-1"
+			item_code="MILK",
+			received_qty=10,
+			quality_inspection=None,
+			batch_no=None,
+			delivery_note_item="DNI-1",
 		)
 		request = SimpleNamespace(
 			status="Received",

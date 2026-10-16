@@ -46,9 +46,7 @@ def validate_load_allocations(load, lock=True, for_execution=False):
 			delivery_orders[row.delivery_order] = delivery_order
 		if first_order is None:
 			first_order = delivery_order
-		_validate_delivery_order_for_load(
-			load, delivery_order, first_order, for_execution=for_execution
-		)
+		_validate_delivery_order_for_load(load, delivery_order, first_order, for_execution=for_execution)
 
 		delivery_order_item = delivery_order_items.get(row.delivery_order_item)
 		if not delivery_order_item:
@@ -285,10 +283,7 @@ def get_available_quantities(delivery_order_item_names, exclude_load=None):
 		filters={"name": ["in", item_names]},
 		fields=["name", "transport_qty", "sales_order_item"],
 	)
-	requested = {
-		row.name: flt(row.transport_qty)
-		for row in item_rows
-	}
+	requested = {row.name: flt(row.transport_qty) for row in item_rows}
 	sales_order_item_names = [row.sales_order_item for row in item_rows if row.sales_order_item]
 	if sales_order_item_names:
 		sales_order_quantities = {

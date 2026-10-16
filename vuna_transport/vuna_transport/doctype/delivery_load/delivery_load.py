@@ -23,10 +23,10 @@ from vuna_transport.services.planning.delivery_load_service import (
 	validate_capacity,
 	validate_load_allocations,
 )
-from vuna_transport.services.routing.route_service import apply_route_defaults
 from vuna_transport.services.routing.distance_estimation_service import (
 	apply_delivery_load_distance_estimate,
 )
+from vuna_transport.services.routing.route_service import apply_route_defaults
 
 
 class DeliveryLoad(Document):

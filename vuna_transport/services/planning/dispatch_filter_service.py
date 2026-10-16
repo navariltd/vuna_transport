@@ -7,7 +7,6 @@ from vuna_transport.vuna_transport.doctype.dispatch_planning_filter.dispatch_pla
 	ALLOWED_FILTER_KEYS,
 )
 
-
 FILTER_DEFINITIONS = {
 	"delivery_group": {"label": _("Delivery Group"), "fieldtype": "Link", "options": "Delivery Group"},
 	"transport_compatibility_group": {
@@ -96,7 +95,9 @@ def validate_configured_filters(company, planning_filters):
 	configured = {row["field_key"] for row in get_filter_definitions(company)}
 	unknown = set(planning_filters) - configured
 	if unknown:
-		frappe.throw(_("These Dispatch Planning filters are not configured: {0}.").format(", ".join(sorted(unknown))))
+		frappe.throw(
+			_("These Dispatch Planning filters are not configured: {0}.").format(", ".join(sorted(unknown)))
+		)
 	return {key: value for key, value in planning_filters.items() if value not in (None, "")}
 
 
@@ -117,7 +118,9 @@ def validate_additional_filters(additional_filters):
 		if doctype != "Delivery Order":
 			frappe.throw(_("Dispatch Planning filters must target Delivery Order."))
 		if fieldname in PROTECTED_FILTER_FIELDS:
-			frappe.throw(_("The {0} filter is controlled by Dispatch Planning security rules.").format(fieldname))
+			frappe.throw(
+				_("The {0} filter is controlled by Dispatch Planning security rules.").format(fieldname)
+			)
 		if not meta.get_field(fieldname):
 			frappe.throw(_("Delivery Order field {0} does not exist or is not permitted.").format(fieldname))
 		if operator not in ALLOWED_FILTER_OPERATORS:

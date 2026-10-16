@@ -90,7 +90,9 @@ def sync_delivery_order_status_from_sales_order(delivery_order, sales_order=None
 		return
 	if sales_order.docstatus == 2 or sales_order.status in ("Closed", "Cancelled"):
 		if delivery_order.status not in ("Delivered", "Cancelled"):
-			frappe.db.set_value("Delivery Order", delivery_order.name, "status", "Closed", update_modified=False)
+			frappe.db.set_value(
+				"Delivery Order", delivery_order.name, "status", "Closed", update_modified=False
+			)
 			delivery_order.status = "Closed"
 
 
@@ -190,7 +192,9 @@ def sync_delivery_orders_after_direct_delivery_note(doc, method=None):
 	for sales_order in sales_orders:
 		delivery_orders = frappe.get_all("Delivery Order", filters={"sales_order": sales_order}, pluck="name")
 		for delivery_order_name in delivery_orders:
-			sync_delivery_order_quantities(frappe.get_doc("Delivery Order", delivery_order_name), persist=True)
+			sync_delivery_order_quantities(
+				frappe.get_doc("Delivery Order", delivery_order_name), persist=True
+			)
 
 
 def get_sales_order_item_quantities(sales_order_item):

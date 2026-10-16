@@ -24,10 +24,12 @@ def execute():
 			child_loads.setdefault(row.parent, []).append(row.delivery_load)
 
 	for trip in trips:
-		load_names = list(dict.fromkeys(
-			([trip.vuna_delivery_load] if trip.get("vuna_delivery_load") else [])
-			+ child_loads.get(trip.name, [])
-		))
+		load_names = list(
+			dict.fromkeys(
+				([trip.vuna_delivery_load] if trip.get("vuna_delivery_load") else [])
+				+ child_loads.get(trip.name, [])
+			)
+		)
 		if not load_names:
 			continue
 		for stop in frappe.db.get_all(
@@ -41,6 +43,8 @@ def execute():
 			if not load_name and len(load_names) == 1:
 				load_name = load_names[0]
 			if load_name in load_names and load_name != stop.vuna_delivery_load:
-				frappe.db.set_value("Delivery Stop", stop.name, "vuna_delivery_load", load_name, update_modified=False)
+				frappe.db.set_value(
+					"Delivery Stop", stop.name, "vuna_delivery_load", load_name, update_modified=False
+				)
 
 	delete_custom_fields({"Delivery Trip": ["vuna_delivery_load"]}, bypass_hooks=True)

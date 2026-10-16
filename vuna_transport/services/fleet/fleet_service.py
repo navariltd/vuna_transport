@@ -187,9 +187,9 @@ def _validate_vehicle_cost_structure(doc):
 	structure_owner = normalize_vehicle_owner(structure.vehicle_owner)
 	if structure_owner and vehicle_owner and structure_owner != vehicle_owner:
 		frappe.throw(
-			_("Transport Cost Structure {0} is for {1}-owned Vehicles, but this Vehicle is {2}-owned.").format(
-				structure_name, structure_owner, vehicle_owner
-			)
+			_(
+				"Transport Cost Structure {0} is for {1}-owned Vehicles, but this Vehicle is {2}-owned."
+			).format(structure_name, structure_owner, vehicle_owner)
 		)
 
 

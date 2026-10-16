@@ -19,8 +19,8 @@ from vuna_transport.services.demand.delivery_order_service import (
 	_requires_transport_planning,
 	get_delivery_order_generation_status,
 	get_sales_order_item_quantities,
-	sync_delivery_order_status_from_sales_order,
 	sync_delivery_order_quantities,
+	sync_delivery_order_status_from_sales_order,
 )
 from vuna_transport.services.routing.location_service import (
 	get_point_coordinates,
@@ -38,7 +38,14 @@ IGNORE_TEST_RECORD_DEPENDENCIES = []  # eg. ["User"]
 
 class TestDeliveryOrder(UnitTestCase):
 	def test_post_submit_sync_fields_are_allowed_to_update(self):
-		for fieldname in ("ordered_qty", "transport_qty", "uom", "conversion_factor", "stock_qty", "stock_uom"):
+		for fieldname in (
+			"ordered_qty",
+			"transport_qty",
+			"uom",
+			"conversion_factor",
+			"stock_qty",
+			"stock_uom",
+		):
 			self.assertEqual(
 				frappe.get_meta("Delivery Order Item").get_field(fieldname).allow_on_submit,
 				1,
@@ -144,9 +151,7 @@ class TestDeliveryOrder(UnitTestCase):
 
 	@patch("vuna_transport.services.demand.delivery_order_service.frappe.db.set_value")
 	def test_closed_sales_order_closes_open_delivery_order(self, set_value):
-		delivery_order = SimpleNamespace(
-		name="DO-TEST", sales_order="SO-TEST", docstatus=1, status="Open"
-		)
+		delivery_order = SimpleNamespace(name="DO-TEST", sales_order="SO-TEST", docstatus=1, status="Open")
 		sales_order = SimpleNamespace(docstatus=1, status="Closed")
 
 		sync_delivery_order_status_from_sales_order(delivery_order, sales_order)

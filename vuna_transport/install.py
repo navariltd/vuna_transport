@@ -2,7 +2,6 @@
 
 import frappe
 
-
 DEFAULT_TRANSPORT_UOMS = {
 	"default_weight_uom": "Kg",
 	"default_volume_uom": "Cubic Meter",
@@ -74,9 +73,7 @@ def ensure_dispatch_scan_roles():
 	settings = frappe.get_single("Transport Settings")
 	changed = False
 	for fieldname, roles in DEFAULT_DISPATCH_SCAN_ROLES.items():
-		configured_roles = {
-			row.role for row in (getattr(settings, fieldname, None) or []) if row.role
-		}
+		configured_roles = {row.role for row in (getattr(settings, fieldname, None) or []) if row.role}
 		if configured_roles and configured_roles != LEGACY_DEFAULT_DISPATCH_SCAN_ROLES[fieldname]:
 			continue
 		if configured_roles == LEGACY_DEFAULT_DISPATCH_SCAN_ROLES[fieldname]:
@@ -102,9 +99,7 @@ def migrate_province_to_territory():
 			""",
 			as_dict=True,
 		):
-			territory = frappe.db.get_value(
-				"Territory", {"name": row.vuna_province, "is_group": 0}, "name"
-			)
+			territory = frappe.db.get_value("Territory", {"name": row.vuna_province, "is_group": 0}, "name")
 			if territory:
 				frappe.db.set_value("Address", row.name, "vuna_territory", territory, update_modified=False)
 
@@ -117,9 +112,7 @@ def migrate_province_to_territory():
 			""",
 			as_dict=True,
 		):
-			territory = frappe.db.get_value(
-				"Territory", {"name": row.province, "is_group": 0}, "name"
-			)
+			territory = frappe.db.get_value("Territory", {"name": row.province, "is_group": 0}, "name")
 			if territory:
 				frappe.db.set_value("County", row.name, "territory", territory, update_modified=False)
 

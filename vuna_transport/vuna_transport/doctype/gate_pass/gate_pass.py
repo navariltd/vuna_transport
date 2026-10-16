@@ -5,8 +5,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
-from vuna_transport.services.fleet.vehicle_allocation_service import get_allocation_load_names
 from vuna_transport.services.execution.lineage_service import get_delivery_trip_load_names
+from vuna_transport.services.fleet.vehicle_allocation_service import get_allocation_load_names
 
 
 class GatePass(Document):
@@ -15,7 +15,11 @@ class GatePass(Document):
 		self._populate_execution_context()
 		if self.direction == "Outbound":
 			self._validate_outbound_documents()
-		if self.gate_in_datetime and self.gate_out_datetime and self.gate_in_datetime < self.gate_out_datetime:
+		if (
+			self.gate_in_datetime
+			and self.gate_out_datetime
+			and self.gate_in_datetime < self.gate_out_datetime
+		):
 			frappe.throw(_("Gate In cannot be earlier than Gate Out."))
 
 	def before_submit(self):
@@ -65,21 +69,27 @@ class GatePass(Document):
 		if self.delivery_load:
 			load = frappe.get_doc("Delivery Load", self.delivery_load)
 			if load.docstatus != 1:
-				frappe.throw(_("Delivery Load {0} must be submitted before issuing a Gate Pass.").format(load.name))
+				frappe.throw(
+					_("Delivery Load {0} must be submitted before issuing a Gate Pass.").format(load.name)
+				)
 			if self.company and load.company != self.company:
 				frappe.throw(_("Gate Pass and Delivery Load must belong to the same Company."))
 
 		if self.vehicle_allocation:
 			allocation = frappe.get_doc("Vehicle Allocation", self.vehicle_allocation)
 			if allocation.docstatus != 1 or allocation.status not in ("Allocated", "Accepted", "Replaced"):
-				frappe.throw(_("Vehicle Allocation {0} must be submitted and active.").format(allocation.name))
+				frappe.throw(
+					_("Vehicle Allocation {0} must be submitted and active.").format(allocation.name)
+				)
 			if self.company and allocation.company != self.company:
 				frappe.throw(_("Gate Pass and Vehicle Allocation must belong to the same Company."))
 
 		if self.delivery_trip:
 			trip = frappe.get_doc("Delivery Trip", self.delivery_trip)
 			if trip.docstatus == 2:
-				frappe.throw(_("Cancelled Delivery Trip {0} cannot be used for a Gate Pass.").format(trip.name))
+				frappe.throw(
+					_("Cancelled Delivery Trip {0} cannot be used for a Gate Pass.").format(trip.name)
+				)
 			if self.company and trip.company != self.company:
 				frappe.throw(_("Gate Pass and Delivery Trip must belong to the same Company."))
 			trip_load_names = get_delivery_trip_load_names(trip)
@@ -95,9 +105,9 @@ class GatePass(Document):
 				)
 				if trip_load_names and not trip_load_names.issubset(allocation_load_names):
 					frappe.throw(
-						_("Vehicle Allocation {0} does not contain every Delivery Load on Delivery Trip {1}.").format(
-							self.vehicle_allocation, trip.name
-						)
+						_(
+							"Vehicle Allocation {0} does not contain every Delivery Load on Delivery Trip {1}."
+						).format(self.vehicle_allocation, trip.name)
 					)
 
 	def _populate_execution_context(self):

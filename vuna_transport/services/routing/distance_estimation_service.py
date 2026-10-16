@@ -21,7 +21,9 @@ def resolve_location_point(location):
 	"""Resolve an object or mapping into an explainable planning point."""
 	resolved = resolve_planning_location(
 		latitude=_value(location, "latitude", "planning_latitude", "destination_latitude", "source_latitude"),
-		longitude=_value(location, "longitude", "planning_longitude", "destination_longitude", "source_longitude"),
+		longitude=_value(
+			location, "longitude", "planning_longitude", "destination_longitude", "source_longitude"
+		),
 		town=_value(location, "town", "destination_town"),
 		constituency=_value(location, "constituency", "destination_constituency"),
 		county=_value(location, "county", "destination_county"),
@@ -109,8 +111,7 @@ def estimate_delivery_load_distance(load):
 			{
 				"name": getattr(order, "delivery_order", None),
 				"delivery_address": getattr(order, "delivery_address", None),
-				"destination_latitude": getattr(order, "destination_latitude", None)
-				or address_data.latitude,
+				"destination_latitude": getattr(order, "destination_latitude", None) or address_data.latitude,
 				"destination_longitude": getattr(order, "destination_longitude", None)
 				or address_data.longitude,
 				"town": getattr(order, "town", None) or address_data.town,

@@ -28,15 +28,17 @@ from vuna_transport.services.planning.delivery_load_service import (
 	apply_capacity_buffer,
 	calculate_load_totals,
 )
-from vuna_transport.services.planning.load_validation_service import calculate_allocated_measurements
-from vuna_transport.services.planning.load_validation_service import get_available_quantities
-from vuna_transport.services.routing.geography_service import (
-	calculate_delivery_window_compatibility,
-	calculate_geographic_cohesion,
+from vuna_transport.services.planning.load_validation_service import (
+	calculate_allocated_measurements,
+	get_available_quantities,
 )
 from vuna_transport.services.routing.distance_estimation_service import (
 	estimate_origin_to_destinations,
 	resolve_location_point,
+)
+from vuna_transport.services.routing.geography_service import (
+	calculate_delivery_window_compatibility,
+	calculate_geographic_cohesion,
 )
 from vuna_transport.services.shared.workflow_policy_service import (
 	ALLOCATION_AFTER_DELIVERY_NOTES,

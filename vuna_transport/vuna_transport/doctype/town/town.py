@@ -22,4 +22,8 @@ class Town(Document):
 			if not self.county:
 				self.county = constituency.county
 			elif self.county != constituency.county:
-				frappe.throw(_("Constituency {0} does not belong to County {1}.").format(self.constituency, self.county))
+				frappe.throw(
+					_("Constituency {0} does not belong to County {1}.").format(
+						self.constituency, self.county
+					)
+				)

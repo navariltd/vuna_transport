@@ -57,7 +57,9 @@ def resolve_geography_reference(geography):
 	return frappe._dict()
 
 
-def resolve_planning_location(*, latitude=None, longitude=None, town=None, constituency=None, county=None, territory=None):
+def resolve_planning_location(
+	*, latitude=None, longitude=None, town=None, constituency=None, county=None, territory=None
+):
 	"""Resolve exact coordinates first, then the most precise configured geography point."""
 	if latitude not in (None, "") and longitude not in (None, ""):
 		return frappe._dict(
@@ -94,7 +96,12 @@ def resolve_planning_location(*, latitude=None, longitude=None, town=None, const
 				latitude=float(row[fields[0]]),
 				longitude=float(row[fields[1]]),
 				basis=doctype,
-				confidence={"Town": "Medium", "Constituency": "Low", "County": "Low", "Territory": "Very Low"}[doctype],
+				confidence={
+					"Town": "Medium",
+					"Constituency": "Low",
+					"County": "Low",
+					"Territory": "Very Low",
+				}[doctype],
 				reference=value,
 			)
 	return frappe._dict(
@@ -252,9 +259,7 @@ def _validate_address_geography(address):
 	if town and constituency:
 		town_constituency = frappe.db.get_value("Town", town, "constituency")
 		if town_constituency and town_constituency != constituency:
-			frappe.throw(
-				_("Town {0} does not belong to Constituency {1}.").format(town, constituency)
-			)
+			frappe.throw(_("Town {0} does not belong to Constituency {1}.").format(town, constituency))
 
 
 def backfill_address_coordinates():

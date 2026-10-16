@@ -1,11 +1,13 @@
 # Copyright (c) 2026, Yovuna Technologies Limited and Contributors
 # See license.txt
 
+from unittest.mock import patch
+
 from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
 from frappe.utils import getdate
-from unittest.mock import patch
 
+from vuna_transport.services.planning.dispatch_filter_service import validate_additional_filters
 from vuna_transport.services.planning.dispatch_planning_service import (
 	_delivery_date_filter,
 	_filter_allocation_state,
@@ -13,7 +15,6 @@ from vuna_transport.services.planning.dispatch_planning_service import (
 	_summarize_vehicle_categories,
 	_warehouse_summaries,
 )
-from vuna_transport.services.planning.dispatch_filter_service import validate_additional_filters
 from vuna_transport.services.planning.load_suggestion_service import _partition_orders
 
 

@@ -73,9 +73,7 @@ class TransportCostStructureAssignment(Document):
 				)
 			)
 		missing_required = {
-			name
-			for name, row in structure_components.items()
-			if row.required and name not in seen
+			name for name, row in structure_components.items() if row.required and name not in seen
 		}
 		if missing_required:
 			frappe.throw(
@@ -101,21 +99,19 @@ class TransportCostStructureAssignment(Document):
 				county_territory = frappe.db.get_value("County", row.county, "territory")
 				if county_territory and county_territory != row.territory:
 					frappe.throw(
-						_("County {0} does not belong to Territory {1}.").format(
-							row.county, row.territory
-						)
+						_("County {0} does not belong to Territory {1}.").format(row.county, row.territory)
 					)
 			if row.town and not row.county:
 				frappe.throw(_("County is required when a Town is selected."))
 			if row.town and row.county:
 				town_county = frappe.db.get_value("Town", row.town, "county")
 				if town_county and town_county != row.county:
-					frappe.throw(
-						_("Town {0} does not belong to County {1}.").format(row.town, row.county)
-					)
+					frappe.throw(_("Town {0} does not belong to County {1}.").format(row.town, row.county))
 			key = (row.source_warehouse or "", row.territory, row.county or "", row.town or "")
 			if key in destinations:
-				frappe.throw(_("Destination geography {0} is duplicated.").format(" / ".join(filter(None, key))))
+				frappe.throw(
+					_("Destination geography {0} is duplicated.").format(" / ".join(filter(None, key)))
+				)
 			destinations.add(key)
 		if self.vehicle:
 			vehicle = frappe.db.get_value(

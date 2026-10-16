@@ -7,8 +7,8 @@ from unittest.mock import patch
 from frappe.exceptions import ValidationError
 from frappe.tests import IntegrationTestCase, UnitTestCase
 
-from vuna_transport.vuna_transport.doctype.vehicle_category.vehicle_category import VehicleCategory
 from vuna_transport.services.fleet.vehicle_category_service import validate_minimum_load_requirements
+from vuna_transport.vuna_transport.doctype.vehicle_category.vehicle_category import VehicleCategory
 
 # On IntegrationTestCase, the doctype test records and all
 # link-field test record dependencies are recursively loaded

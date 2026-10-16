@@ -149,9 +149,7 @@ def get_driver_availability_map(
 	)
 	trips = [trip for trip in trips if (trip.vuna_current_driver or trip.driver) in driver_names]
 	_attach_trip_loads(trips)
-	load_names = {
-		load_name for row in allocations for load_name in row.delivery_loads if load_name
-	} | {
+	load_names = {load_name for row in allocations for load_name in row.delivery_loads if load_name} | {
 		load_name for row in trips for load_name in row.delivery_loads
 	}
 	loads = (

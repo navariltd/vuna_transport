@@ -4,7 +4,6 @@ import frappe
 
 from vuna_transport.install import migrate_province_to_territory
 
-
 LEGACY_FIELDS = (
 	("Address", "vuna_province", "Address-vuna_province"),
 	("County", "province", None),
@@ -21,6 +20,4 @@ def execute():
 			frappe.delete_doc("Custom Field", custom_field_name, ignore_missing=True)
 		if frappe.db.has_column(doctype, fieldname):
 			safe_doctype = ("tab" + doctype).replace("`", "``")
-			frappe.db.sql_ddl(
-				f"alter table `{safe_doctype}` drop column `{fieldname}`"
-			)
+			frappe.db.sql_ddl(f"alter table `{safe_doctype}` drop column `{fieldname}`")

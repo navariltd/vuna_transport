@@ -130,7 +130,9 @@ def get_allocation_names_for_load(delivery_load, *, docstatus=None):
 	parents = list(dict.fromkeys(parents))
 	if docstatus is None or not parents:
 		return parents
-	return frappe.get_all("Vehicle Allocation", filters={"name": ["in", parents], "docstatus": docstatus}, pluck="name")
+	return frappe.get_all(
+		"Vehicle Allocation", filters={"name": ["in", parents], "docstatus": docstatus}, pluck="name"
+	)
 
 
 @frappe.whitelist()
@@ -196,7 +198,9 @@ def make_replacement_allocation(delivery_load):
 
 def _make_replacement_allocation(delivery_load):
 	require_doctype_permission("Vehicle Allocation", "create")
-	load_names = list(dict.fromkeys(delivery_load if isinstance(delivery_load, (list, tuple, set)) else [delivery_load]))
+	load_names = list(
+		dict.fromkeys(delivery_load if isinstance(delivery_load, (list, tuple, set)) else [delivery_load])
+	)
 	if not load_names:
 		frappe.throw(_("Select at least one Delivery Load to reallocate."))
 	for load_name in load_names:
@@ -262,14 +266,16 @@ def validate_allocation(allocation):
 	if load.required_vehicle_category:
 		if selected_category and selected_category != load.required_vehicle_category:
 			frappe.throw(
-				_("Selected Vehicle Category {0} does not match Delivery Load {1}'s required category {2}.").format(
-					selected_category, load.name, load.required_vehicle_category
-				)
+				_(
+					"Selected Vehicle Category {0} does not match Delivery Load {1}'s required category {2}."
+				).format(selected_category, load.name, load.required_vehicle_category)
 			)
 		allocation.required_vehicle_category = load.required_vehicle_category
 	allocation.allocated_by = allocation.allocated_by or frappe.session.user
 	allocation.allocated_on = allocation.allocated_on or now_datetime()
-	allocation.planned_reporting_time = allocation.planned_reporting_time or _earliest_planned_departure(loads)
+	allocation.planned_reporting_time = allocation.planned_reporting_time or _earliest_planned_departure(
+		loads
+	)
 	_set_assignment_context(allocation, loads)
 	_derive_vehicle_source(allocation)
 
@@ -317,7 +323,9 @@ def _validate_replacement_change(allocation):
 	selected_load_names = set(get_allocation_load_names(allocation))
 	previous_load_names = set(get_allocation_load_names(previous))
 	if not selected_load_names.issubset(previous_load_names):
-		frappe.throw(_("A replacement Vehicle Allocation can only contain loads from the original allocation."))
+		frappe.throw(
+			_("A replacement Vehicle Allocation can only contain loads from the original allocation.")
+		)
 	if selected_load_names != previous_load_names:
 		loads = get_allocation_loads(allocation)
 		if loads and _get_active_trip(loads[0]):
@@ -444,7 +452,11 @@ def _prepare_allocation_load_rows(allocation, loads):
 		row.volume_uom = load.volume_uom
 		row.total_stops = load.total_stops
 		groups = sorted(
-			{item.transport_compatibility_group for item in load.delivery_orders if item.transport_compatibility_group}
+			{
+				item.transport_compatibility_group
+				for item in load.delivery_orders
+				if item.transport_compatibility_group
+			}
 		)
 		row.transport_compatibility_groups = ", ".join(groups)
 
@@ -459,7 +471,9 @@ def _validate_selected_load_compatibility(loads):
 	methods = {load.delivery_method for load in loads if load.delivery_method}
 	if len(methods) > 1:
 		frappe.throw(_("Selected Delivery Loads must use compatible Delivery Methods."))
-	from vuna_transport.services.planning.load_validation_service import validate_transport_compatibility_groups
+	from vuna_transport.services.planning.load_validation_service import (
+		validate_transport_compatibility_groups,
+	)
 
 	validate_transport_compatibility_groups(
 		[row for load in loads for row in load.delivery_orders if row.delivery_order]
@@ -543,9 +557,9 @@ def _validate_initial_allocation_sequence(load, allocation=None):
 		)
 	if status["draft_delivery_notes"]:
 		frappe.throw(
-			_("Submit all Delivery Notes for Delivery Load {0} before allocating a vehicle. Draft: {1}.").format(
-				load.name, ", ".join(status["draft_delivery_notes"])
-			)
+			_(
+				"Submit all Delivery Notes for Delivery Load {0} before allocating a vehicle. Draft: {1}."
+			).format(load.name, ", ".join(status["draft_delivery_notes"]))
 		)
 
 
@@ -603,8 +617,8 @@ def _validate_vehicle_category_for_loads(loads, vehicle_category):
 					vehicle_category, load.name, load.required_vehicle_category
 				)
 			)
-	from vuna_transport.services.planning.delivery_load_service import validate_capacity
 	from vuna_transport.services.fleet.vehicle_category_service import validate_minimum_load_requirements
+	from vuna_transport.services.planning.delivery_load_service import validate_capacity
 
 	combined = _build_combined_capacity_load(loads)
 	category = frappe.get_doc("Vehicle Category", vehicle_category)
@@ -659,9 +673,7 @@ def activate_allocation(allocation):
 				)
 			)
 		previous_doc = frappe.get_doc("Vehicle Allocation", previous)
-		full_replacement = set(get_allocation_load_names(previous_doc)) == {
-			load.name for load in loads
-		}
+		full_replacement = set(get_allocation_load_names(previous_doc)) == {load.name for load in loads}
 		if full_replacement:
 			effective_from = allocation.effective_from or now_datetime()
 			frappe.db.set_value(
@@ -677,9 +689,9 @@ def activate_allocation(allocation):
 		else:
 			previous_doc.add_comment(
 				"Info",
-				_("Delivery Loads {0} were reallocated to {1}; the original allocation remains active for its other loads.").format(
-					", ".join(sorted(load.name for load in loads)), allocation.name
-				),
+				_(
+					"Delivery Loads {0} were reallocated to {1}; the original allocation remains active for its other loads."
+				).format(", ".join(sorted(load.name for load in loads)), allocation.name),
 			)
 	for load in loads:
 		if previous:

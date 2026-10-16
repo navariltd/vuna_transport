@@ -34,13 +34,13 @@ from vuna_transport.services.planning.delivery_load_service import (
 from vuna_transport.services.planning.delivery_load_service import (
 	create_delivery_load_from_plan as _create_delivery_load_from_plan,
 )
-from vuna_transport.services.planning.load_validation_service import validate_load_allocations
 from vuna_transport.services.planning.dispatch_filter_service import (
 	as_filter_conditions,
 	get_filter_definitions,
 	validate_additional_filters,
 	validate_configured_filters,
 )
+from vuna_transport.services.planning.load_validation_service import validate_load_allocations
 from vuna_transport.services.shared.security_service import (
 	require_company_access,
 	require_doctype_permission,
@@ -395,7 +395,11 @@ def get_cost_structure_estimates(allocations, vehicle_category=None):
 		"distance_uom": getattr(load, "distance_uom", None),
 		"cost_structures": sorted(
 			results,
-			key=lambda row: (not bool(row["cost_structure_assignment"]), row["estimated_full_cost"], row["cost_structure"]),
+			key=lambda row: (
+				not bool(row["cost_structure_assignment"]),
+				row["estimated_full_cost"],
+				row["cost_structure"],
+			),
 		),
 	}
 
@@ -564,17 +568,21 @@ def _get_order_metrics(order_names, include_items=False):
 			"Delivery Order", filters={"name": ["in", order_names]}, fields=["name", "source_warehouse"]
 		)
 	}
-	bins = {
-		(row.item_code, row.warehouse): flt(row.actual_qty)
-		for row in frappe.get_all(
-			"Bin",
-			filters={
-				"item_code": ["in", sorted({item.item_code for item in items if item.item_code})],
-				"warehouse": ["in", sorted(set(warehouses_by_order.values()) - {None, ""})],
-			},
-			fields=["item_code", "warehouse", "actual_qty"],
-		)
-	} if items and any(warehouses_by_order.values()) else {}
+	bins = (
+		{
+			(row.item_code, row.warehouse): flt(row.actual_qty)
+			for row in frappe.get_all(
+				"Bin",
+				filters={
+					"item_code": ["in", sorted({item.item_code for item in items if item.item_code})],
+					"warehouse": ["in", sorted(set(warehouses_by_order.values()) - {None, ""})],
+				},
+				fields=["item_code", "warehouse", "actual_qty"],
+			)
+		}
+		if items and any(warehouses_by_order.values())
+		else {}
+	)
 	allocation_rows = frappe.db.sql(
 		"""
 			select

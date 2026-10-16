@@ -11,7 +11,6 @@ from frappe.utils import now_datetime
 
 from vuna_transport.services.shared.security_service import require_document_permission
 
-
 READY_FOR_LOADING = "Ready for Loading"
 LOADED = "Loaded"
 DISPATCHED = "Dispatched"
@@ -40,10 +39,7 @@ def _configured_scan_roles(action):
 def get_available_scan_actions():
 	"""Return scan actions permitted for the current user and settings."""
 	user_roles = set(frappe.get_roles(frappe.session.user))
-	return {
-		action: bool(user_roles.intersection(_configured_scan_roles(action)))
-		for action in SCAN_ACTIONS
-	}
+	return {action: bool(user_roles.intersection(_configured_scan_roles(action))) for action in SCAN_ACTIONS}
 
 
 def _secret():

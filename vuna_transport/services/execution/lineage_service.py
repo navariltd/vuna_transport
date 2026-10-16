@@ -193,7 +193,9 @@ def validate_delivery_trip(doc, method=None):
 			frappe.db.get_value("Delivery Method", load.delivery_method, "requires_vehicle_allocation")
 		)
 	allocation = get_active_allocation(load, required=requires_allocation)
-	if allocation and set(get_allocation_load_names(allocation)) != {selected_load.name for selected_load in loads}:
+	if allocation and set(get_allocation_load_names(allocation)) != {
+		selected_load.name for selected_load in loads
+	}:
 		frappe.throw(_("Delivery Trip loads must match the active Vehicle Allocation."))
 	if allocation:
 		if not allocation.vehicle:
@@ -227,7 +229,9 @@ def validate_delivery_trip(doc, method=None):
 	execution_vehicle = doc.vuna_current_vehicle or doc.vehicle
 	if execution_vehicle and load.required_vehicle_category:
 		vehicle_category = frappe.db.get_value("Vehicle", execution_vehicle, "vuna_vehicle_category")
-		from vuna_transport.services.fleet.vehicle_allocation_service import _validate_vehicle_category_for_loads
+		from vuna_transport.services.fleet.vehicle_allocation_service import (
+			_validate_vehicle_category_for_loads,
+		)
 
 		_validate_vehicle_category_for_loads(loads, vehicle_category)
 
@@ -292,9 +296,9 @@ def get_delivery_trip_load_names(doc):
 	]
 	stop_names.extend(
 		frappe.get_all(
-		"Delivery Stop",
-		filters={"parent": doc.name, "parenttype": "Delivery Trip", "vuna_delivery_load": ["is", "set"]},
-		pluck="vuna_delivery_load",
+			"Delivery Stop",
+			filters={"parent": doc.name, "parenttype": "Delivery Trip", "vuna_delivery_load": ["is", "set"]},
+			pluck="vuna_delivery_load",
 		)
 		if getattr(doc, "name", None)
 		else []
@@ -412,15 +416,15 @@ def validate_delivery_note_quantities_for_loads(loads):
 		delivered = actual.get((row.parent, sales_order_item), 0)
 		if delivered > allocated:
 			frappe.throw(
-				_("Submitted Delivery Note quantity for item {0} exceeds Delivery Load {1} allocation.").format(
-					row.delivery_order_item, row.parent
-				)
+				_(
+					"Submitted Delivery Note quantity for item {0} exceeds Delivery Load {1} allocation."
+				).format(row.delivery_order_item, row.parent)
 			)
 		if delivered < allocated:
 			frappe.throw(
-				_("Submitted Delivery Notes are missing {0} of item {1} allocated on Delivery Load {2}.").format(
-					allocated - delivered, row.delivery_order_item, row.parent
-				)
+				_(
+					"Submitted Delivery Notes are missing {0} of item {1} allocated on Delivery Load {2}."
+				).format(allocated - delivered, row.delivery_order_item, row.parent)
 			)
 
 
@@ -447,14 +451,18 @@ def link_delivery_trip(doc, method=None):
 def submit_delivery_trip(doc, method=None):
 	if get_delivery_trip_load_names(doc):
 		for load_name in get_delivery_trip_load_names(doc):
-			set_delivery_load_status(load_name, "Dispatched", _("Delivery Trip {0} submitted").format(doc.name))
+			set_delivery_load_status(
+				load_name, "Dispatched", _("Delivery Trip {0} submitted").format(doc.name)
+			)
 			_recompute_delivery_order_statuses(load_name)
 
 
 def cancel_delivery_trip(doc, method=None):
 	if get_delivery_trip_load_names(doc):
 		for load_name in get_delivery_trip_load_names(doc):
-			set_delivery_load_status(load_name, "Ready for Dispatch", _("Delivery Trip {0} cancelled").format(doc.name))
+			set_delivery_load_status(
+				load_name, "Ready for Dispatch", _("Delivery Trip {0} cancelled").format(doc.name)
+			)
 			_recompute_delivery_order_statuses(load_name)
 
 

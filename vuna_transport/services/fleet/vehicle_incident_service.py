@@ -3,12 +3,12 @@
 import frappe
 from frappe import _
 
+from vuna_transport.services.execution.lineage_service import get_delivery_trip_load_names
 from vuna_transport.services.fleet.vehicle_allocation_service import (
 	allocation_includes_load,
 	get_allocation_load_names,
 	make_replacement_allocation,
 )
-from vuna_transport.services.execution.lineage_service import get_delivery_trip_load_names
 from vuna_transport.services.shared.security_service import (
 	require_doctype_permission,
 	require_document_permission,
@@ -61,7 +61,9 @@ def _load_context_from_references(incident, allocation=None, trip=None):
 		if not allocation and incident.vehicle_allocation:
 			allocation = frappe.get_doc("Vehicle Allocation", incident.vehicle_allocation)
 	if allocation:
-		incident.delivery_load = incident.delivery_load or next(iter(get_allocation_load_names(allocation)), None)
+		incident.delivery_load = incident.delivery_load or next(
+			iter(get_allocation_load_names(allocation)), None
+		)
 		incident.driver = incident.driver or allocation.driver
 	return allocation
 

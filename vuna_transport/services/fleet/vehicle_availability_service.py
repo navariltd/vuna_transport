@@ -304,9 +304,7 @@ def get_vehicle_availability_map(
 	)
 	trips = [trip for trip in trips if (trip.vuna_current_vehicle or trip.vehicle) in vehicle_names]
 	_attach_trip_loads(trips)
-	load_names = {
-		load_name for row in allocations for load_name in row.delivery_loads if load_name
-	} | {
+	load_names = {load_name for row in allocations for load_name in row.delivery_loads if load_name} | {
 		load_name for row in trips for load_name in row.delivery_loads
 	}
 	loads = (
@@ -568,8 +566,10 @@ def _evaluate_vehicle(
 			continue
 		current_allocation = current_allocation or allocation.name
 		if state == "Available":
-			state = "Loading" if any(load.status == "Loading" for load in allocation_loads) else _allocation_state(
-				allocation_loads[0] if allocation_loads else None
+			state = (
+				"Loading"
+				if any(load.status == "Loading" for load in allocation_loads)
+				else _allocation_state(allocation_loads[0] if allocation_loads else None)
 			)
 		reasons.append(
 			_reason(

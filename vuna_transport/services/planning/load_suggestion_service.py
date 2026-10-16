@@ -22,12 +22,12 @@ from vuna_transport.services.planning.delivery_load_service import (
 	build_delivery_load_from_allocations,
 	get_capacity_buffer_percentage,
 )
-from vuna_transport.services.planning.load_validation_service import PLANNABLE_DELIVERY_ORDER_STATUSES
 from vuna_transport.services.planning.dispatch_filter_service import (
 	as_filter_conditions,
 	validate_additional_filters,
 	validate_configured_filters,
 )
+from vuna_transport.services.planning.load_validation_service import PLANNABLE_DELIVERY_ORDER_STATUSES
 from vuna_transport.services.routing.geography_service import (
 	calculate_delivery_window_compatibility,
 	calculate_geographic_cohesion,
@@ -93,8 +93,8 @@ def suggest_delivery_loads(
 		delivery_date_from=delivery_date_from or delivery_date,
 		delivery_date_to=delivery_date_to or delivery_date,
 		delivery_order_names=delivery_order_names,
-			planning_filters=configured_filters,
-			additional_filters=additional_filter_conditions,
+		planning_filters=configured_filters,
+		additional_filters=additional_filter_conditions,
 	)
 	logger.debug(
 		"Load suggestion candidate pool: company=%s orders=%s selected=%s",

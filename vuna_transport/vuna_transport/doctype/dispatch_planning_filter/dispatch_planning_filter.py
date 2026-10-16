@@ -5,7 +5,6 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-
 ALLOWED_FILTER_KEYS = {
 	"delivery_group",
 	"transport_compatibility_group",

@@ -66,13 +66,17 @@ class TestGatePass(UnitTestCase):
 			}
 		)
 
-		with patch.object(gate_pass, "_validate_references"), patch.object(
-			gate_pass, "_populate_execution_context"
+		with (
+			patch.object(gate_pass, "_validate_references"),
+			patch.object(gate_pass, "_populate_execution_context"),
 		):
 			with self.assertRaises(ValidationError):
 				gate_pass.validate()
 
-	@patch("vuna_transport.vuna_transport.doctype.gate_pass.gate_pass.now_datetime", return_value="2026-09-17 13:00:00")
+	@patch(
+		"vuna_transport.vuna_transport.doctype.gate_pass.gate_pass.now_datetime",
+		return_value="2026-09-17 13:00:00",
+	)
 	def test_gate_out_and_gate_in_are_controlled_transitions(self, _now):
 		gate_pass = GatePass(
 			{

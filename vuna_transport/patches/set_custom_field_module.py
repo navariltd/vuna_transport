@@ -2,7 +2,6 @@
 
 import frappe
 
-
 CUSTOM_FIELD_DOCTYPES = {
 	"Address",
 	"Delivery Note",

@@ -37,10 +37,7 @@ class VehicleOwnershipTransfer(Document):
 			frappe.throw(_("New Supplier is required for a supplier-owned vehicle."))
 		if normalize_vehicle_owner(self.new_owner) == "Company" and self.new_supplier:
 			frappe.throw(_("New Supplier must be empty for a company-owned vehicle."))
-		if (
-			normalize_vehicle_owner(self.new_owner) == "Supplier"
-			and getattr(vehicle, "vuna_asset", None)
-		):
+		if normalize_vehicle_owner(self.new_owner) == "Supplier" and getattr(vehicle, "vuna_asset", None):
 			frappe.throw(
 				_("Handle the linked ERPNext Asset before transferring this Vehicle to supplier ownership.")
 			)
@@ -56,5 +53,7 @@ class VehicleOwnershipTransfer(Document):
 			frappe.throw(_("Vehicle {0} no longer exists.").format(self.vehicle))
 		if current.vuna_vehicle_owner != self.current_owner or current.vuna_supplier != self.current_supplier:
 			frappe.throw(
-				_("The Vehicle owner changed after this transfer was prepared. Refresh and create a new transfer.")
+				_(
+					"The Vehicle owner changed after this transfer was prepared. Refresh and create a new transfer."
+				)
 			)

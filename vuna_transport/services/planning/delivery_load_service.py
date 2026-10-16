@@ -497,7 +497,9 @@ def get_delivery_order_item_allocation_preview(
 			_("Allocated quantity exceeds the available quantity of {0}.").format(available_quantity)
 		)
 	planning_warehouse = source_warehouse or delivery_order.source_warehouse
-	stock_available_quantity = flt(_get_on_hand_stock([item.item_code], planning_warehouse).get(item.item_code))
+	stock_available_quantity = flt(
+		_get_on_hand_stock([item.item_code], planning_warehouse).get(item.item_code)
+	)
 	stock_required_quantity = quantity * flt(item.conversion_factor or 1)
 	return {
 		"delivery_order": delivery_order.name,

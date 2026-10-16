@@ -6,13 +6,13 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate, nowdate
 
+from vuna_transport.services.routing.distance_estimation_service import estimate_delivery_load_distance
+from vuna_transport.services.routing.location_service import get_address_planning_data
 from vuna_transport.services.shared.measurement_service import convert_measurement, get_transport_uoms
 from vuna_transport.services.shared.security_service import (
 	require_company_access,
 	require_document_permission,
 )
-from vuna_transport.services.routing.location_service import get_address_planning_data
-from vuna_transport.services.routing.distance_estimation_service import estimate_delivery_load_distance
 
 
 @dataclass
@@ -239,21 +239,17 @@ def estimate_transport_cost_for_loads(delivery_loads, vehicle):
 	combines the results and explicitly warns that the distance is not a
 	route-optimized total.
 	"""
-	load_documents = [
-		_resolve_document("Delivery Load", load) for load in (delivery_loads or [])
-	]
+	load_documents = [_resolve_document("Delivery Load", load) for load in (delivery_loads or [])]
 	if not load_documents:
 		frappe.throw(_("At least one Delivery Load is required for a combined estimate."))
 	vehicle_doc = _resolve_document("Vehicle", vehicle)
 	results = [estimate_transport_cost(load, vehicle_doc) for load in load_documents]
-	assignments = {row.get("cost_structure_assignment") for row in results if row.get("cost_structure_assignment")}
+	assignments = {
+		row.get("cost_structure_assignment") for row in results if row.get("cost_structure_assignment")
+	}
 	structures = {row.get("cost_structure") for row in results if row.get("cost_structure")}
 	currencies = {row.get("currency") for row in results if row.get("currency")}
-	warnings = _unique(
-		warning
-		for result in results
-		for warning in result.get("warnings", [])
-	)
+	warnings = _unique(warning for result in results for warning in result.get("warnings", []))
 	if len(load_documents) > 1:
 		warnings.append(
 			_("Combined distance sums the individual load estimates; it is not a route-optimized distance.")
@@ -437,12 +433,8 @@ def _destination_rate(component, context, profile):
 
 def _legacy_destination_rate(context, profile):
 	for row in getattr(profile, "destination_rates", []) or []:
-		if (
-			getattr(row, "destination_key", None) == context.destination
-			and (
-				not getattr(row, "source_warehouse", None)
-				or row.source_warehouse == context.source_warehouse
-			)
+		if getattr(row, "destination_key", None) == context.destination and (
+			not getattr(row, "source_warehouse", None) or row.source_warehouse == context.source_warehouse
 		):
 			return flt(row.rate)
 	return 0

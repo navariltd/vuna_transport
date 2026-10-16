@@ -3,11 +3,11 @@
 import frappe
 from frappe import _
 
-from vuna_transport.services.shared.security_service import require_document_permission
 from vuna_transport.services.fleet.vehicle_allocation_service import (
 	get_allocation_names_for_load,
 	get_delivery_note_submission_status,
 )
+from vuna_transport.services.shared.security_service import require_document_permission
 from vuna_transport.services.shared.workflow_policy_service import (
 	ALLOCATION_AFTER_DELIVERY_NOTES,
 	get_vehicle_allocation_timing,
@@ -79,12 +79,16 @@ def get_load_execution_summary(load):
 		order_by="creation asc",
 	)
 	submitted_pods = [pod for pod in pods if pod.docstatus == 1]
-	return_requests = frappe.get_all(
-		"Return Request",
-		filters={"delivery_trip": delivery_trip.name} if delivery_trip else {"name": ""},
-		fields=["name", "status", "proof_of_delivery"],
-		order_by="creation asc",
-	) if delivery_trip else []
+	return_requests = (
+		frappe.get_all(
+			"Return Request",
+			filters={"delivery_trip": delivery_trip.name} if delivery_trip else {"name": ""},
+			fields=["name", "status", "proof_of_delivery"],
+			order_by="creation asc",
+		)
+		if delivery_trip
+		else []
+	)
 	vehicle_allocation_timing = get_vehicle_allocation_timing()
 
 	next_action = _get_next_action(
@@ -227,13 +231,9 @@ def _get_next_action(
 ):
 	if delivery_notes_ready is None:
 		submitted_orders = {
-			note.vuna_delivery_order
-			for note in submitted_notes
-			if getattr(note, "vuna_delivery_order", None)
+			note.vuna_delivery_order for note in submitted_notes if getattr(note, "vuna_delivery_order", None)
 		}
-		delivery_notes_ready = (
-			not draft_notes and delivery_orders.issubset(submitted_orders)
-		)
+		delivery_notes_ready = not draft_notes and delivery_orders.issubset(submitted_orders)
 	if load.docstatus == 0:
 		return _action("submit_load", _("Submit Delivery Load"), _("Review capacity and submit this load."))
 	if load.docstatus == 2:

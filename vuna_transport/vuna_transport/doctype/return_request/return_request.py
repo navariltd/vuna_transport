@@ -14,7 +14,9 @@ class ReturnRequest(Document):
 		if not self.activities:
 			self.append_activity("Created", _("Return Request created."))
 		if self.custody:
-			self.append_custody_event(None, self.custody, self.responsible_party, _("Initial custody recorded."))
+			self.append_custody_event(
+				None, self.custody, self.responsible_party, _("Initial custody recorded.")
+			)
 
 	def validate(self):
 		validate_return_request(self)
