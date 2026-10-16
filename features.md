@@ -423,7 +423,8 @@ The first usable app should include:
 - [x] ~~Compressed delivery-photo capture and attachment upload~~
 - [x] ~~POD submission through the authoritative server workflow~~
 - [x] ~~Automatic Return Request creation for partial, rejected or failed POD outcomes~~
-- [ ] Offline draft storage and retry synchronization
+- [x] ~~Offline trip manifest cache and retry-safe POD synchronization~~
+- [ ] Offline Material Request, Expense Claim and incident drafts
 
 ### Driver App phase 2
 
@@ -572,7 +573,10 @@ Every operation must:
 - [x] ~~Implement Material Request and Expense Claim request flows.~~
 - [x] ~~Implement request history and itemized request details.~~
 - [x] ~~Add Android device testing and development APK builds.~~
-- [ ] Implement offline drafts and synchronization.
+- [x] ~~Implement SQLite work caching and a durable POD synchronization outbox.~~
+- [x] ~~Add a detailed Sync Center with queue status, errors, retries, POD review and completed-history cleanup.~~
+- [x] ~~Cache the Driver Profile, request history and previously viewed request details for offline viewing.~~
+- [ ] Extend offline drafts and synchronization to requests and incidents.
 - [x] ~~Implement explicit trip and stop execution actions.~~
 - [ ] Implement controlled location tracking.
 - [ ] Add expense receipt attachments.
@@ -584,7 +588,7 @@ Every operation must:
 
 The remaining mobile work should be implemented in this order:
 
-1. **Add offline drafts and safe synchronization.** PODs, signatures, photos and requests should survive connectivity loss, show their synchronization state and retry without creating duplicates.
+1. **Complete offline requests.** PODs, signatures and photos now survive connectivity loss and retry without duplicates, and the Sync Center exposes failures that need attention. Extend the same outbox to requests and incidents.
 2. **Add active-trip location tracking.** Tracking must require consent, operate only during an assigned active trip, queue locations while offline and stop when the trip ends.
 3. **Complete request and return evidence.** Add Expense Claim receipt attachments, Return Request visibility, custody instructions and the selected return destination where relevant.
 4. **Expose assigned load context.** Show the Delivery Loads and a concise cargo summary associated with the driver's trip without allowing the mobile app to mutate planning records.
