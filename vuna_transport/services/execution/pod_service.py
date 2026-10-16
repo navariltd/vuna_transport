@@ -2,7 +2,7 @@
 
 import frappe
 from frappe import _
-from frappe.utils import flt, now_datetime
+from frappe.utils import cint, flt, now_datetime
 
 from vuna_transport.services.execution.dispatch_guard_service import set_delivery_load_status
 from vuna_transport.services.execution.lineage_service import get_delivery_trip_load_names
@@ -49,7 +49,7 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 	pod.delivery_datetime = pod.delivery_datetime or now_datetime()
 
 	rebuild = not pod.items or any(
-		not row.delivery_note_item or flt(row.ordered_qty) <= 0 for row in pod.items
+		not row.delivery_note_item or flt(row.ordered_qty) <= 0 or not row.uom for row in pod.items
 	)
 	if rebuild:
 		pod.set("items", [])
@@ -61,7 +61,7 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 					"sales_order_item": delivery_item.so_detail,
 				},
 			)
-			ordered_qty = flt(delivery_item.stock_qty or delivery_item.qty)
+			ordered_qty = flt(delivery_item.qty)
 			pod.append(
 				"items",
 				{
@@ -72,6 +72,9 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 					"ordered_qty": ordered_qty,
 					"delivered_qty": ordered_qty,
 					"rejected_qty": 0,
+					"uom": delivery_item.uom,
+					"stock_uom": delivery_item.stock_uom,
+					"conversion_factor": flt(delivery_item.conversion_factor) or 1,
 					"batch_no": getattr(delivery_item, "batch_no", None),
 				},
 			)
@@ -120,18 +123,23 @@ def validate_pod_items(items, rejection_reasons=None):
 		# Preserve compatibility with older in-memory/test documents while existing
 		# records transition away from the unsupported nested Table MultiSelect.
 		item_reasons.extend(getattr(item, "rejection_reasons", None) or [])
-		if flt(item.rejected_qty) and not item_reasons and not getattr(item, "rejection_reason_remarks", None):
+		if (
+			flt(item.rejected_qty)
+			and not item_reasons
+			and not getattr(item, "rejection_reason_remarks", None)
+		):
 			frappe.throw(_("A rejection reason is required for item {0}.").format(item.item_code))
 
 
 def update_delivery_stop_from_pod(pod, status):
+	existing_arrival = frappe.db.get_value("Delivery Stop", pod.delivery_stop, "vuna_actual_arrival")
 	frappe.db.set_value(
 		"Delivery Stop",
 		pod.delivery_stop,
 		{
 			"visited": 1,
 			"vuna_delivery_status": status,
-			"vuna_actual_arrival": pod.delivery_datetime,
+			"vuna_actual_arrival": existing_arrival or pod.delivery_datetime,
 			"vuna_actual_departure": pod.delivery_datetime,
 			"vuna_proof_of_delivery": pod.name,
 		},
@@ -139,6 +147,16 @@ def update_delivery_stop_from_pod(pod, status):
 	)
 	trip = frappe.get_doc("Delivery Trip", pod.delivery_trip)
 	trip.update_status()
+	if trip.vuna_actual_start and _all_delivery_trip_stops_visited(trip.name):
+		trip.db_set(
+			{
+				"vuna_actual_completion": pod.delivery_datetime,
+				"status": "Completed",
+			},
+			update_modified=False,
+		)
+	elif trip.vuna_actual_start and trip.status == "Scheduled":
+		trip.db_set("status", "In Transit", update_modified=False)
 	recompute_delivery_load_completion(pod.delivery_load, pod.delivery_trip)
 	if pod.delivery_order:
 		recompute_delivery_order_status(pod.delivery_order)
@@ -151,13 +169,17 @@ def reset_delivery_stop_from_pod(pod):
 		{
 			"visited": 0,
 			"vuna_delivery_status": "Pending",
-			"vuna_actual_arrival": None,
 			"vuna_actual_departure": None,
 			"vuna_proof_of_delivery": None,
 		},
 		update_modified=False,
 	)
-	frappe.get_doc("Delivery Trip", pod.delivery_trip).update_status()
+	trip = frappe.get_doc("Delivery Trip", pod.delivery_trip)
+	if trip.vuna_actual_completion:
+		trip.db_set("vuna_actual_completion", None, update_modified=False)
+	trip.update_status()
+	if trip.vuna_actual_start and trip.status == "Scheduled":
+		trip.db_set("status", "In Transit", update_modified=False)
 	set_delivery_load_status(
 		pod.delivery_load,
 		"Dispatched",
@@ -322,9 +344,22 @@ def recompute_delivery_load_completion(delivery_load, delivery_trip=None):
 		return
 	from vuna_transport.services.execution.dispatch_guard_service import set_delivery_load_status
 
-	target = "Completed" if pod_statuses and all(status == "Accepted" for status in pod_statuses) else "Completed with Exceptions"
+	target = (
+		"Completed"
+		if pod_statuses and all(status == "Accepted" for status in pod_statuses)
+		else "Completed with Exceptions"
+	)
 	set_delivery_load_status(
 		delivery_load,
 		target,
 		_("Every delivery stop has a submitted Proof of Delivery."),
 	)
+
+
+def _all_delivery_trip_stops_visited(delivery_trip):
+	stops = frappe.get_all(
+		"Delivery Stop",
+		filters={"parent": delivery_trip, "parenttype": "Delivery Trip"},
+		pluck="visited",
+	)
+	return bool(stops) and all(cint(visited) for visited in stops)

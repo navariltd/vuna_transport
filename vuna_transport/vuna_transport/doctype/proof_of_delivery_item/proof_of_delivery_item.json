@@ -14,13 +14,16 @@
   "delivery_note_item",
   "section_break_yahs",
   "ordered_qty",
+  "uom",
   "delivered_qty",
   "rejected_qty",
   "column_break_viav",
   "rejection_reason",
   "rejection_reason_remarks",
   "remarks",
-  "batch_no"
+  "batch_no",
+  "stock_uom",
+  "conversion_factor"
  ],
  "fields": [
   {
@@ -68,6 +71,14 @@
    "reqd": 1
   },
   {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
    "fieldname": "rejected_qty",
    "fieldtype": "Float",
    "label": "Rejected Quantity",
@@ -104,13 +115,28 @@
   {
    "fieldname": "column_break_viav",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Stock UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "conversion_factor",
+   "fieldtype": "Float",
+   "hidden": 1,
+   "label": "Conversion Factor",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-08-11 12:45:02.929431",
+ "modified": "2026-10-15 14:49:56.968174",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Proof of Delivery Item",

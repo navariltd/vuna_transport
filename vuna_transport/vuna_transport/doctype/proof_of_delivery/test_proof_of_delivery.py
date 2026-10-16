@@ -13,6 +13,7 @@ from vuna_transport.services.execution.pod_service import (
 	prepare_pod_cancellation,
 	validate_pod_items,
 )
+from vuna_transport.services.execution.return_service import get_pod_quantity_in_stock_uom
 
 # On IntegrationTestCase, the doctype test records and all
 # link-field test record dependencies are recursively loaded
@@ -94,6 +95,24 @@ class TestProofOfDelivery(UnitTestCase):
 
 		with self.assertRaises(ValidationError):
 			validate_pod_items([item])
+
+	def test_pod_sales_uom_quantity_converts_to_stock_uom_for_return(self):
+		pod_item = SimpleNamespace(uom="Carton", rejected_qty=2)
+		delivery_note_item = SimpleNamespace(conversion_factor=12)
+
+		self.assertEqual(
+			get_pod_quantity_in_stock_uom(pod_item, delivery_note_item, "rejected_qty"),
+			24,
+		)
+
+	def test_legacy_pod_quantity_remains_in_stock_uom(self):
+		pod_item = SimpleNamespace(uom=None, rejected_qty=24)
+		delivery_note_item = SimpleNamespace(conversion_factor=12)
+
+		self.assertEqual(
+			get_pod_quantity_in_stock_uom(pod_item, delivery_note_item, "rejected_qty"),
+			24,
+		)
 
 	def test_item_rejection_reason_satisfies_validation(self):
 		item = SimpleNamespace(

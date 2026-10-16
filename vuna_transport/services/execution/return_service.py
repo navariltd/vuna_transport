@@ -321,7 +321,9 @@ def transition_return_request(return_request, action):
 	previous_status = request.status
 	request.flags.allow_status_change = True
 	request.status = target
-	request.append_activity(target, _("Return Request moved from {0} to {1}.").format(previous_status, target))
+	request.append_activity(
+		target, _("Return Request moved from {0} to {1}.").format(previous_status, target)
+	)
 	if action == "request":
 		request.save()
 		request.submit()
@@ -341,7 +343,9 @@ def record_custody_transfer(return_request, to_custody, responsible_party=None, 
 	require_document_permission(request, "write")
 	require_company_access(request.company)
 	if request.status in TERMINAL_STATUSES:
-		frappe.throw(_("Custody cannot change after Return Request {0} is {1}.").format(request.name, request.status))
+		frappe.throw(
+			_("Custody cannot change after Return Request {0} is {1}.").format(request.name, request.status)
+		)
 	if not to_custody or to_custody == "Unknown":
 		frappe.throw(_("Select the custody now responsible for the goods."))
 	if not responsible_party or responsible_party == "Unknown":
@@ -352,7 +356,8 @@ def record_custody_transfer(return_request, to_custody, responsible_party=None, 
 	request.append_custody_event(from_custody, to_custody, responsible_party, remarks)
 	request.append_activity(
 		"Custody Changed",
-		remarks or _("Custody changed from {0} to {1}.").format(from_custody or _("Not recorded"), to_custody),
+		remarks
+		or _("Custody changed from {0} to {1}.").format(from_custody or _("Not recorded"), to_custody),
 	)
 	if request.docstatus == 1:
 		request.flags.ignore_validate_update_after_submit = True
@@ -461,9 +466,17 @@ def create_return_request_from_pod(proof_of_delivery):
 	if existing:
 		return existing
 	delivery_note = frappe.get_doc("Delivery Note", pod.delivery_note)
+	delivery_note_items = {row.name: row for row in delivery_note.items}
 	request_rows = []
 	for row in pod.items:
-		quantity = flt(row.rejected_qty)
+		delivery_note_item = delivery_note_items.get(row.delivery_note_item)
+		if not delivery_note_item:
+			frappe.throw(
+				_("Delivery Note Item {0} could not be found in Delivery Note {1}.").format(
+					row.delivery_note_item, delivery_note.name
+				)
+			)
+		quantity = get_pod_quantity_in_stock_uom(row, delivery_note_item, "rejected_qty")
 		if quantity <= 0:
 			continue
 		request_rows.append(
@@ -472,7 +485,7 @@ def create_return_request_from_pod(proof_of_delivery):
 				"item_name": row.item_name,
 				"delivery_note_item": row.delivery_note_item,
 				"delivery_order_item": row.delivery_order_item,
-				"delivered_qty": row.delivered_qty,
+				"delivered_qty": get_pod_quantity_in_stock_uom(row, delivery_note_item, "delivered_qty"),
 				"requested_return_qty": quantity,
 				"return_reason": pod.exception_reason,
 			}
@@ -485,7 +498,9 @@ def create_return_request_from_pod(proof_of_delivery):
 		{
 			"company": pod.company,
 			"customer": pod.customer,
-			"sales_order": next((row.against_sales_order for row in delivery_note.items if row.against_sales_order), None),
+			"sales_order": next(
+				(row.against_sales_order for row in delivery_note.items if row.against_sales_order), None
+			),
 			"delivery_order": pod.delivery_order,
 			"delivery_note": pod.delivery_note,
 			"delivery_trip": pod.delivery_trip,
@@ -505,6 +520,21 @@ def create_return_request_from_pod(proof_of_delivery):
 	request.insert()
 	pod.db_set("return_request", request.name, update_modified=True)
 	return request.name
+
+
+def get_pod_quantity_in_stock_uom(pod_item, delivery_note_item, fieldname):
+	"""Convert new POD quantities to stock UOM while preserving legacy POD semantics.
+
+	POD items created before the sales-UOM snapshot was introduced stored stock
+	quantities and therefore have no UOM. New POD items store Delivery Note `qty`
+	in its transaction UOM and require the Delivery Note conversion factor here.
+	"""
+	quantity = flt(pod_item.get(fieldname) if hasattr(pod_item, "get") else getattr(pod_item, fieldname, 0))
+	item_uom = pod_item.get("uom") if hasattr(pod_item, "get") else getattr(pod_item, "uom", None)
+	if not item_uom:
+		return quantity
+	conversion_factor = flt(delivery_note_item.conversion_factor) or 1
+	return quantity * conversion_factor
 
 
 def _default_return_warehouse(delivery_note_name):

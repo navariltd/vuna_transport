@@ -1,0 +1,185 @@
+{
+ "actions": [],
+ "allow_copy": 1,
+ "autoname": "field:installation_id",
+ "creation": "2026-10-04 20:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "installation_id",
+  "user",
+  "latest_installation_id",
+  "column_break_sqdl",
+  "status",
+  "device_identifier",
+  "section_break_device",
+  "manufacturer",
+  "model_name",
+  "os_version",
+  "column_break_dkzt",
+  "platform",
+  "os_name",
+  "app_version",
+  "section_break_activity",
+  "first_registered_at",
+  "column_break_wmea",
+  "last_seen_at",
+  "section_break_jchu",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "installation_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Installation ID",
+   "read_only": 1,
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "latest_installation_id",
+   "fieldtype": "Data",
+   "label": "Latest Installation ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "device_identifier",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Device Identifier",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "platform",
+   "fieldtype": "Data",
+   "label": "Platform",
+   "read_only": 1
+  },
+  {
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Active",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Active\nPending Approval\nBlocked\nRevoked",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_device",
+   "fieldtype": "Section Break",
+   "label": "Device"
+  },
+  {
+   "fieldname": "manufacturer",
+   "fieldtype": "Data",
+   "label": "Manufacturer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "model_name",
+   "fieldtype": "Data",
+   "label": "Model",
+   "read_only": 1
+  },
+  {
+   "fieldname": "os_name",
+   "fieldtype": "Data",
+   "label": "Operating System",
+   "read_only": 1
+  },
+  {
+   "fieldname": "os_version",
+   "fieldtype": "Data",
+   "label": "OS Version",
+   "read_only": 1
+  },
+  {
+   "fieldname": "app_version",
+   "fieldtype": "Data",
+   "label": "App Version",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_activity",
+   "fieldtype": "Section Break",
+   "label": "Activity"
+  },
+  {
+   "fieldname": "first_registered_at",
+   "fieldtype": "Datetime",
+   "label": "First Registered At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_seen_at",
+   "fieldtype": "Datetime",
+   "label": "Last Seen At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "column_break_sqdl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_dkzt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_wmea",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_jchu",
+   "fieldtype": "Section Break"
+  }
+ ],
+ "in_create": 1,
+ "links": [],
+ "modified": "2026-10-06 15:43:59.578227",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Transport Mobile Device",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Manager",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "last_seen_at",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

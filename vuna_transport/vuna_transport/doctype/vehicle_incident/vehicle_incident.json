@@ -37,6 +37,7 @@
   "asset_repair",
   "police_reference",
   "insurance_reference",
+  "mobile_request_id",
   "location_tab",
   "location_section",
   "latitude",
@@ -45,7 +46,8 @@
   "use_device_location",
   "section_break_sdnu",
   "location",
-  "connections_tab"
+  "connections_tab",
+  "amended_from"
  ],
  "fields": [
   {
@@ -102,7 +104,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Incident Type",
-   "options": "Breakdown\nAccident\nMechanical Failure\nTyre Failure\nCargo Incident\nSecurity Incident\nDriver Incident\nOther",
+   "options": "Accident\nBreakdown\nCargo Incident\nDelay / Disruption\nDriver Incident\nMechanical Failure\nSecurity Incident\nTheft\nTyre Failure\nOther",
    "reqd": 1
   },
   {
@@ -277,6 +279,15 @@
    "label": "Insurance Reference"
   },
   {
+   "fieldname": "mobile_request_id",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Mobile Request ID",
+   "no_copy": 1,
+   "read_only": 1,
+   "unique": 1
+  },
+  {
    "collapsible": 1,
    "fieldname": "resolution_section",
    "fieldtype": "Section Break",
@@ -302,6 +313,16 @@
   {
    "fieldname": "section_break_sdnu",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Vehicle Incident",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
   }
  ],
  "grid_page_length": 50,
@@ -313,7 +334,7 @@
    "link_fieldname": "vehicle_incident"
   }
  ],
- "modified": "2026-09-02 14:24:57.559263",
+ "modified": "2026-10-08 14:49:55.618126",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Incident",
@@ -321,6 +342,7 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -329,7 +351,6 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
-   "cancel": 1,
    "share": 1,
    "submit": 1,
    "write": 1
