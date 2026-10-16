@@ -18,6 +18,7 @@ from vuna_transport.services.mobile.mobile_device_service import (
 	get_current_driver_profile,
 	get_delivery_note_details,
 	get_delivery_trip_details,
+	get_mobile_offline_manifest,
 	prepare_mobile_proof_of_delivery,
 	submit_mobile_proof_of_delivery,
 	upload_mobile_pod_attachment,
@@ -75,6 +76,11 @@ def get_mobile_driver_profile(installation_id, device_identifier=None):
 @frappe.whitelist()
 def get_mobile_assigned_delivery_trips(installation_id, device_identifier=None):
 	return get_assigned_delivery_trips(installation_id, device_identifier)
+
+
+@frappe.whitelist()
+def get_mobile_offline_work(installation_id, device_identifier=None):
+	return get_mobile_offline_manifest(installation_id, device_identifier)
 
 
 @frappe.whitelist()

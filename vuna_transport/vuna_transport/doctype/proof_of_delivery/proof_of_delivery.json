@@ -37,6 +37,7 @@
   "exception_reason",
   "remarks",
   "notes",
+  "mobile_request_id",
   "section_break_kaie",
   "amended_from"
  ],
@@ -186,6 +187,15 @@
    "fieldname": "notes",
    "fieldtype": "Small Text",
    "label": "Notes"
+  },
+  {
+   "fieldname": "mobile_request_id",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Mobile Request ID",
+   "no_copy": 1,
+   "read_only": 1,
+   "unique": 1
   },
   {
    "fieldname": "signature",

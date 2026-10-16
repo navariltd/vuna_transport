@@ -1,4 +1,5 @@
 import base64
+import re
 
 import frappe
 from frappe import _
@@ -6,6 +7,21 @@ from frappe.utils import cint, flt, now_datetime
 from frappe.utils.file_manager import get_content_hash, save_file
 
 from vuna_transport.services.execution.pod_service import create_proof_of_delivery
+
+POD_EXCEPTION_REASONS = (
+	"Customer Closed",
+	"Customer Unavailable",
+	"Wrong Address",
+	"Product Rejected",
+	"Product Damaged",
+	"Quantity Shortage",
+	"Temperature Breach",
+	"Payment Unavailable",
+	"Vehicle Breakdown",
+	"Road or Weather Disruption",
+	"Other",
+)
+MOBILE_REQUEST_ID_PATTERN = re.compile(r"^[a-f0-9-]{16,64}$", re.IGNORECASE)
 
 
 def bootstrap_device(
@@ -194,6 +210,7 @@ def get_assigned_delivery_trips(installation_id, device_identifier=None):
 		limit_page_length=1000,
 		ignore_permissions=True,
 	)
+	_enrich_stops(stop_rows)
 	stops_by_trip = {}
 	for stop in stop_rows:
 		stops_by_trip.setdefault(stop.parent, []).append(stop)
@@ -201,9 +218,108 @@ def get_assigned_delivery_trips(installation_id, device_identifier=None):
 		trip["stops"] = stops_by_trip.get(trip.name, [])
 		trip["stop_count"] = len(trip["stops"])
 		trip["completed_stop_count"] = sum(cint(stop.visited) for stop in trip["stops"])
+		trip["next_stop"] = next((stop.name for stop in trip["stops"] if not cint(stop.visited)), None)
 		_enrich_trip_execution(trip, trip["stops"])
 
 	return {"linked": True, "driver": profile["driver"], "trips": trips}
+
+
+def get_mobile_offline_manifest(installation_id, device_identifier=None):
+	"""Return bounded assigned work for one durable mobile cache refresh."""
+	assigned = get_assigned_delivery_trips(installation_id, device_identifier)
+	if not assigned.get("linked"):
+		return _offline_manifest_response(assigned)
+
+	active_trips = [
+		trip for trip in assigned.get("trips", []) if trip.get("status") not in ("Completed", "Cancelled")
+	]
+	note_names = list(
+		dict.fromkeys(
+			stop.delivery_note
+			for trip in active_trips
+			for stop in trip.get("stops", [])
+			if stop.delivery_note
+		)
+	)[:1000]
+	if not note_names:
+		return _offline_manifest_response(assigned)
+
+	notes = {
+		row.name: row
+		for row in frappe.get_all(
+			"Delivery Note",
+			filters={"name": ["in", note_names], "docstatus": 1},
+			fields=[
+				"name",
+				"customer",
+				"customer_name",
+				"posting_date",
+				"posting_time",
+				"status",
+				"currency",
+				"grand_total",
+			],
+			limit_page_length=1000,
+			ignore_permissions=True,
+		)
+	}
+	items_by_note = {}
+	for row in frappe.get_all(
+		"Delivery Note Item",
+		filters={"parent": ["in", list(notes)]},
+		fields=[
+			"name",
+			"parent",
+			"idx",
+			"item_code",
+			"item_name",
+			"description",
+			"qty",
+			"uom",
+			"stock_qty",
+			"stock_uom",
+			"batch_no",
+		],
+		order_by="parent asc, idx asc",
+		limit_page_length=10000,
+		ignore_permissions=True,
+	):
+		items_by_note.setdefault(row.parent, []).append(row)
+
+	delivery_notes = []
+	for trip in active_trips:
+		for stop in trip.get("stops", []):
+			note = notes.get(stop.delivery_note)
+			if not note:
+				continue
+			note["items"] = items_by_note.get(note.name, [])
+			delivery_notes.append(
+				{
+					"trip": {
+						"name": trip.name,
+						"status": trip.status,
+						"erpnext_status": trip.erpnext_status,
+						"vehicle": trip.vehicle,
+						"actual_start": trip.actual_start,
+						"actual_completion": trip.actual_completion,
+						"actions": trip.actions,
+					},
+					"stop": stop,
+					"delivery_note": note,
+				}
+			)
+
+	return _offline_manifest_response(assigned, delivery_notes)
+
+
+def _offline_manifest_response(assigned, delivery_notes=None):
+	return {
+		"assigned": assigned,
+		"delivery_notes": delivery_notes or [],
+		"rejection_reasons": _get_rejection_reasons(),
+		"exception_reasons": POD_EXCEPTION_REASONS,
+		"synced_at": now_datetime(),
+	}
 
 
 def get_delivery_trip_details(installation_id, trip_name, device_identifier=None):
@@ -219,6 +335,7 @@ def get_delivery_trip_details(installation_id, trip_name, device_identifier=None
 		ignore_permissions=True,
 	)
 	_enrich_stops(stops)
+	_set_mobile_stop_actions(trip, stops)
 	completed = sum(cint(stop.visited) for stop in stops)
 	next_stop = next((stop.name for stop in stops if not cint(stop.visited)), None)
 	return {
@@ -255,11 +372,7 @@ def get_delivery_note_details(installation_id, trip_name, stop_name, device_iden
 	if delivery_note.docstatus != 1:
 		frappe.throw(_("Delivery Note {0} is not submitted.").format(delivery_note.name))
 	_enrich_stops([stop])
-	stop["can_arrive"] = False
-	stop["can_complete_delivery"] = (
-		bool(trip.vuna_actual_start) and not bool(trip.vuna_actual_completion) and not cint(stop.visited)
-	)
-	stop["requires_trip_start"] = not bool(trip.vuna_actual_start)
+	_set_mobile_stop_actions(trip, [stop])
 	return {
 		"trip": {
 			"name": trip.name,
@@ -319,9 +432,34 @@ def submit_mobile_proof_of_delivery(
 	driver = _require_mobile_driver(installation_id, device_identifier)
 	trip = _get_assigned_trip(trip_name, driver.name)
 	stop = _get_trip_stop(trip.name, stop_name)
-	_record_mobile_stop_arrival(trip, stop)
 	payload = frappe.parse_json(payload) if isinstance(payload, str) else (payload or {})
-	pod_name = payload.get("name") or create_proof_of_delivery(trip.name, stop_name)
+	request_id = (payload.get("request_id") or "").strip()
+	if not MOBILE_REQUEST_ID_PATTERN.fullmatch(request_id):
+		frappe.throw(_("A valid mobile request ID is required."))
+	existing_name = frappe.db.get_value(
+		"Proof of Delivery",
+		{"mobile_request_id": request_id, "docstatus": ["!=", 2]},
+		"name",
+	)
+	if existing_name:
+		existing = frappe.get_doc("Proof of Delivery", existing_name)
+		if existing.delivery_trip != trip.name or existing.delivery_stop != stop_name:
+			frappe.throw(_("This mobile request ID belongs to another delivery."))
+		if existing.docstatus == 1:
+			return _mobile_pod_submission_response(
+				existing,
+				installation_id,
+				trip.name,
+				device_identifier,
+			)
+	_record_mobile_stop_arrival(trip, stop)
+
+	payload_name = payload.get("name")
+	pod_name = (
+		payload_name
+		if payload_name and frappe.db.exists("Proof of Delivery", payload_name)
+		else existing_name or create_proof_of_delivery(trip.name, stop_name)
+	)
 	pod = frappe.get_doc("Proof of Delivery", pod_name)
 	if pod.delivery_trip != trip.name or pod.delivery_stop != stop_name:
 		frappe.throw(_("Proof of Delivery {0} does not belong to this stop.").format(pod.name))
@@ -336,9 +474,15 @@ def submit_mobile_proof_of_delivery(
 	pod.notes = payload.get("notes")
 	pod.signature = payload.get("signature")
 	pod.delivery_photo = payload.get("delivery_photo")
+	pod.mobile_request_id = request_id
 	item_values = {row.get("name"): row for row in payload.get("items", []) if row.get("name")}
+	item_values_by_delivery_note = {
+		row.get("delivery_note_item"): row
+		for row in payload.get("items", [])
+		if row.get("delivery_note_item")
+	}
 	for item in pod.items:
-		values = item_values.get(item.name)
+		values = item_values.get(item.name) or item_values_by_delivery_note.get(item.delivery_note_item)
 		if not values:
 			frappe.throw(
 				_("Proof of Delivery item {0} is missing from the submission.").format(item.item_code)
@@ -349,12 +493,21 @@ def submit_mobile_proof_of_delivery(
 
 	pod.save()
 	pod.submit()
+	return _mobile_pod_submission_response(
+		pod,
+		installation_id,
+		trip.name,
+		device_identifier,
+	)
+
+
+def _mobile_pod_submission_response(pod, installation_id, trip_name, device_identifier):
 	return {
 		"proof_of_delivery": pod.name,
 		"status": pod.status,
 		"trip": get_delivery_trip_details(
 			installation_id,
-			trip.name,
+			trip_name,
 			device_identifier,
 		)["trip"],
 	}
@@ -593,13 +746,6 @@ def _has_map_coordinates(latitude, longitude):
 
 
 def _serialize_pod(pod):
-	reasons = frappe.get_all(
-		"Rejection Reason",
-		filters={"disabled": 0} if frappe.get_meta("Rejection Reason").has_field("disabled") else None,
-		pluck="name",
-		order_by="name asc",
-		ignore_permissions=True,
-	)
 	return {
 		"name": pod.name,
 		"docstatus": pod.docstatus,
@@ -617,23 +763,12 @@ def _serialize_pod(pod):
 		"notes": pod.notes,
 		"signature": pod.signature,
 		"delivery_photo": pod.delivery_photo,
-		"rejection_reasons": reasons,
-		"exception_reasons": [
-			"Customer Closed",
-			"Customer Unavailable",
-			"Wrong Address",
-			"Product Rejected",
-			"Product Damaged",
-			"Quantity Shortage",
-			"Temperature Breach",
-			"Payment Unavailable",
-			"Vehicle Breakdown",
-			"Road or Weather Disruption",
-			"Other",
-		],
+		"rejection_reasons": _get_rejection_reasons(),
+		"exception_reasons": POD_EXCEPTION_REASONS,
 		"items": [
 			{
 				"name": row.name,
+				"delivery_note_item": row.delivery_note_item,
 				"item_code": row.item_code,
 				"item_name": row.item_name,
 				"ordered_qty": row.ordered_qty,
@@ -647,6 +782,16 @@ def _serialize_pod(pod):
 			for row in pod.items
 		],
 	}
+
+
+def _get_rejection_reasons():
+	return frappe.get_all(
+		"Rejection Reason",
+		filters={"disabled": 0} if frappe.get_meta("Rejection Reason").has_field("disabled") else None,
+		pluck="name",
+		order_by="name asc",
+		ignore_permissions=True,
+	)
 
 
 def _find_device(installation_id, device_identifier=None):
@@ -754,6 +899,16 @@ def _enrich_trip_execution(trip, stops):
 	trip["actual_start"] = trip.vuna_actual_start
 	trip["actual_completion"] = trip.vuna_actual_completion
 	trip["actions"] = _mobile_trip_actions(trip, stops)
+	_set_mobile_stop_actions(trip, stops)
+
+
+def _set_mobile_stop_actions(trip, stops):
+	trip_started = bool(getattr(trip, "vuna_actual_start", None) or trip.get("actual_start"))
+	trip_completed = bool(getattr(trip, "vuna_actual_completion", None) or trip.get("actual_completion"))
+	for stop in stops:
+		stop["can_arrive"] = False
+		stop["can_complete_delivery"] = trip_started and not trip_completed and not cint(stop.visited)
+		stop["requires_trip_start"] = not trip_started
 
 
 def _validate_mobile_stop_execution(trip, stop):
