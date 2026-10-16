@@ -15,8 +15,8 @@ from vuna_transport.services.execution.dispatch_guard_service import (
 )
 from vuna_transport.services.fleet.vehicle_allocation_service import (
 	get_active_allocation,
-	get_allocation_loads,
 	get_allocation_load_names,
+	get_allocation_loads,
 )
 from vuna_transport.services.shared.security_service import (
 	require_doctype_permission,
@@ -97,9 +97,7 @@ def create_delivery_notes_for_load(load):
 	created = []
 	for delivery_order_name, load_rows in _group_load_rows(load).items():
 		if _delivery_order_has_existing_note(load.name, delivery_order_name):
-			created.extend(
-				name for name in _get_delivery_notes_for_loads([load.name]) if name not in created
-			)
+			created.extend(name for name in _get_delivery_notes_for_loads([load.name]) if name not in created)
 			continue
 
 		if pick_list:
@@ -186,9 +184,7 @@ def create_delivery_notes_for_allocation(allocation):
 		for delivery_order_name, load_rows in _group_load_rows(load).items():
 			if _delivery_order_has_existing_note(load.name, delivery_order_name):
 				continue
-			delivery_note = _make_delivery_note_direct(
-				delivery_order_name, load_rows, load.source_warehouse
-			)
+			delivery_note = _make_delivery_note_direct(delivery_order_name, load_rows, load.source_warehouse)
 			if not delivery_note or not delivery_note.items:
 				frappe.throw(_("No deliverable items were found for {0}.").format(delivery_order_name))
 			_set_delivery_note_source_warehouse(delivery_note, load.source_warehouse)
@@ -226,7 +222,9 @@ def create_delivery_notes_for_allocation(allocation):
 	for load in loads:
 		requires_allocation = _delivery_method_requires_vehicle_allocation(load)
 		has_allocation = bool(get_active_allocation(load, required=False))
-		target_status = "Awaiting Vehicle" if requires_allocation and not has_allocation else "Ready for Dispatch"
+		target_status = (
+			"Awaiting Vehicle" if requires_allocation and not has_allocation else "Ready for Dispatch"
+		)
 		set_delivery_load_status(load, target_status, _("Delivery Notes created or confirmed for this load"))
 	return created
 
@@ -418,7 +416,9 @@ def create_delivery_trip_for_load(load):
 		)
 	if allocation and not allocation.driver:
 		frappe.throw(
-			_("The active Vehicle Allocation must reference an ERPNext Driver before creating a Delivery Trip.")
+			_(
+				"The active Vehicle Allocation must reference an ERPNext Driver before creating a Delivery Trip."
+			)
 		)
 
 	loads = get_allocation_loads(allocation) if allocation else [load]
@@ -446,7 +446,10 @@ def create_delivery_trip_for_load(load):
 	if not delivery_notes:
 		frappe.throw(_("Create and submit the Delivery Notes for this load first."))
 	expected_delivery_orders = {
-		row.delivery_order for selected_load in loads for row in selected_load.delivery_orders if row.delivery_order
+		row.delivery_order
+		for selected_load in loads
+		for row in selected_load.delivery_orders
+		if row.delivery_order
 	}
 	note_delivery_orders = set(
 		frappe.get_all(
@@ -514,7 +517,11 @@ def create_delivery_trip_for_load(load):
 	if allocation:
 		delivery_trip.vehicle = allocation.vehicle
 		delivery_trip.driver = allocation.driver
-	departures = [get_datetime(selected_load.planned_departure) for selected_load in loads if selected_load.planned_departure]
+	departures = [
+		get_datetime(selected_load.planned_departure)
+		for selected_load in loads
+		if selected_load.planned_departure
+	]
 	delivery_trip.departure_time = min(departures) if departures else now_datetime()
 	delivery_trip.vuna_vehicle_allocation = allocation.name if allocation else None
 	delivery_trip.vuna_current_vehicle_allocation = allocation.name if allocation else None
@@ -540,11 +547,15 @@ def _populate_delivery_stop_links(delivery_trip, loads):
 				{"parent": stop.delivery_note, "vuna_delivery_load_order": ["is", "set"]},
 				"vuna_delivery_load_order",
 			)
-			load_name = frappe.db.get_value("Delivery Load Order", load_order, "parent") if load_order else None
+			load_name = (
+				frappe.db.get_value("Delivery Load Order", load_order, "parent") if load_order else None
+			)
 			load = next((row for row in loads if row.name == load_name), None)
 			if load and load_order:
 				delivery_order = frappe.db.get_value("Delivery Load Order", load_order, "delivery_order")
-		load_rows = [row for row in (load.delivery_orders if load else []) if row.delivery_order == delivery_order]
+		load_rows = [
+			row for row in (load.delivery_orders if load else []) if row.delivery_order == delivery_order
+		]
 		stop.vuna_delivery_order = delivery_order
 		stop.vuna_delivery_load = delivery_note.vuna_delivery_load
 		if len(load_rows) == 1:
@@ -559,10 +570,7 @@ def _validate_delivery_orders_for_execution(load):
 			["docstatus", "status", "company", "source_warehouse", "sales_order"],
 			as_dict=True,
 		)
-		if (
-			not delivery_order
-			or delivery_order.docstatus != 1
-		):
+		if not delivery_order or delivery_order.docstatus != 1:
 			frappe.throw(
 				_("Delivery Order {0} is no longer eligible for execution.").format(delivery_order_name)
 			)
