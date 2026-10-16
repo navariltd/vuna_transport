@@ -534,7 +534,9 @@ function recalculate_load_totals(frm) {
 
 function show_item_selection_dialog(frm, result) {
 	const existing = new Set(
-		(frm.doc.delivery_orders || []).map((row) => `${row.delivery_order}::${row.delivery_order_item}`)
+		(frm.doc.delivery_orders || []).map(
+			(row) => `${row.delivery_order}::${row.delivery_order_item}`
+		)
 	);
 	const items = (result.items || []).filter(
 		(row) => !existing.has(`${row.delivery_order}::${row.delivery_order_item}`)
@@ -550,29 +552,74 @@ function show_item_selection_dialog(frm, result) {
 		primary_action_label: __("Add Selected Items"),
 		primary_action() {
 			const selected = new Set(
-				dialog.$wrapper.find(".vuna-load-item:checked").map((_, input) => $(input).data("item")).get()
+				dialog.$wrapper
+					.find(".vuna-load-item:checked")
+					.map((_, input) => $(input).data("item"))
+					.get()
 			);
 			if (!selected.size) {
 				frappe.msgprint(__("Select at least one item."));
 				return;
 			}
-			["company", "source_warehouse", "delivery_method", "transport_zone", "transport_route", "dispatch_date", "weight_uom", "volume_uom"].forEach((field) => {
+			[
+				"company",
+				"source_warehouse",
+				"delivery_method",
+				"transport_zone",
+				"transport_route",
+				"dispatch_date",
+				"weight_uom",
+				"volume_uom",
+			].forEach((field) => {
 				if (!frm.doc[field] && result[field]) frm.doc[field] = result[field];
 			});
-			items.filter((row) => selected.has(row.delivery_order_item)).forEach((row) => frm.add_child("delivery_orders", row));
+			items
+				.filter((row) => selected.has(row.delivery_order_item))
+				.forEach((row) => frm.add_child("delivery_orders", row));
 			recalculate_load_totals(frm);
 			frm.refresh_fields();
 			frm.dirty();
 			dialog.hide();
-			frappe.show_alert({ message: __("Selected items added to the Delivery Load"), indicator: "green" });
+			frappe.show_alert({
+				message: __("Selected items added to the Delivery Load"),
+				indicator: "green",
+			});
 		},
 	});
 	const number = (value) => frappe.format(value || 0, { fieldtype: "Float" });
-	const rows = items.map((row) => {
-		const sufficient = row.stock_availability_status === "Available";
-		return `<tr><td><input class="vuna-load-item" type="checkbox" checked data-item="${frappe.utils.escape_html(row.delivery_order_item)}"></td><td>${frappe.utils.escape_html(row.delivery_order)}</td><td><strong>${frappe.utils.escape_html(row.item_code)}</strong><br><span class="text-muted small">${frappe.utils.escape_html(row.item_name || "")}</span></td><td>${number(row.available_quantity)} ${frappe.utils.escape_html(row.uom || "")}</td><td><span class="indicator-pill ${sufficient ? "green" : "orange"}">${number(row.stock_available_quantity)} ${frappe.utils.escape_html(row.stock_uom || "")}</span><br><span class="text-muted small">${sufficient ? __("On hand") : __("Insufficient on hand")}</span></td></tr>`;
-	}).join("");
-	dialog.get_field("items").$wrapper.html(`<p class="text-muted small">${__("On-hand stock is a planning warning. Pick List and Delivery Note remain the stock authority.")}</p><table class="table table-bordered"><thead><tr><th></th><th>${__("Delivery Order")}</th><th>${__("Item")}</th><th>${__("Transport Available")}</th><th>${__("On Hand")}</th></tr></thead><tbody>${rows}</tbody></table>`);
+	const rows = items
+		.map((row) => {
+			const sufficient = row.stock_availability_status === "Available";
+			return `<tr><td><input class="vuna-load-item" type="checkbox" checked data-item="${frappe.utils.escape_html(
+				row.delivery_order_item
+			)}"></td><td>${frappe.utils.escape_html(
+				row.delivery_order
+			)}</td><td><strong>${frappe.utils.escape_html(
+				row.item_code
+			)}</strong><br><span class="text-muted small">${frappe.utils.escape_html(
+				row.item_name || ""
+			)}</span></td><td>${number(row.available_quantity)} ${frappe.utils.escape_html(
+				row.uom || ""
+			)}</td><td><span class="indicator-pill ${sufficient ? "green" : "orange"}">${number(
+				row.stock_available_quantity
+			)} ${frappe.utils.escape_html(
+				row.stock_uom || ""
+			)}</span><br><span class="text-muted small">${
+				sufficient ? __("On hand") : __("Insufficient on hand")
+			}</span></td></tr>`;
+		})
+		.join("");
+	dialog
+		.get_field("items")
+		.$wrapper.html(
+			`<p class="text-muted small">${__(
+				"On-hand stock is a planning warning. Pick List and Delivery Note remain the stock authority."
+			)}</p><table class="table table-bordered"><thead><tr><th></th><th>${__(
+				"Delivery Order"
+			)}</th><th>${__("Item")}</th><th>${__("Transport Available")}</th><th>${__(
+				"On Hand"
+			)}</th></tr></thead><tbody>${rows}</tbody></table>`
+		);
 	dialog.show();
 }
 

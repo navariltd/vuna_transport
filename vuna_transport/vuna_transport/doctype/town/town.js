@@ -4,9 +4,7 @@
 frappe.ui.form.on("Town", {
 	setup(frm) {
 		frm.set_query("constituency", () => ({
-			filters: frm.doc.county
-				? { county: frm.doc.county, disabled: 0 }
-				: { disabled: 0 },
+			filters: frm.doc.county ? { county: frm.doc.county, disabled: 0 } : { disabled: 0 },
 		}));
 	},
 	constituency(frm) {

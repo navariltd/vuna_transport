@@ -85,7 +85,8 @@ frappe.ui.form.on("Vehicle", {
 		frappe.db
 			.get_value("Vehicle Category", frm.doc.vuna_vehicle_category, "vehicle_model")
 			.then(({ message }) => {
-				if (message?.vehicle_model) frm.set_value("vuna_vehicle_model", message.vehicle_model);
+				if (message?.vehicle_model)
+					frm.set_value("vuna_vehicle_model", message.vehicle_model);
 			});
 	},
 

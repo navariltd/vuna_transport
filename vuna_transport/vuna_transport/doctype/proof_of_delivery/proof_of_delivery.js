@@ -8,9 +8,16 @@ frappe.ui.form.on("Proof of Delivery", {
 		// offer to cancel the submitted trip; the server-side on_cancel handler
 		// resets only this POD's Delivery Stop outcome.
 		frm.ignore_doctypes_on_cancel_all = ["Delivery Trip"];
-		if (frm.doc.docstatus === 1 && ["Partially Delivered", "Rejected", "Failed"].includes(frm.doc.status)) {
+		if (
+			frm.doc.docstatus === 1 &&
+			["Partially Delivered", "Rejected", "Failed"].includes(frm.doc.status)
+		) {
 			frappe.db
-				.get_value("Return Request", { proof_of_delivery: frm.doc.name, docstatus: ["!=", 2] }, ["name", "docstatus"])
+				.get_value(
+					"Return Request",
+					{ proof_of_delivery: frm.doc.name, docstatus: ["!=", 2] },
+					["name", "docstatus"]
+				)
 				.then(({ message }) => {
 					if (message?.name) return;
 					frm.add_custom_button(
@@ -56,7 +63,6 @@ frappe.ui.form.on("Proof of Delivery Item", {
 	},
 });
 
-
 function set_rejected_quantity(frm, cdt, cdn) {
 	const row = frappe.get_doc(cdt, cdn);
 	const rejected = Math.max((row.ordered_qty || 0) - (row.delivered_qty || 0), 0);
@@ -66,6 +72,12 @@ function set_rejected_quantity(frm, cdt, cdn) {
 
 function update_pod_totals(frm) {
 	const items = frm.doc.items || [];
-	frm.set_value("total_accepted_qty", items.reduce((total, row) => total + (row.delivered_qty || 0), 0));
-	frm.set_value("total_rejected_qty", items.reduce((total, row) => total + (row.rejected_qty || 0), 0));
+	frm.set_value(
+		"total_accepted_qty",
+		items.reduce((total, row) => total + (row.delivered_qty || 0), 0)
+	);
+	frm.set_value(
+		"total_rejected_qty",
+		items.reduce((total, row) => total + (row.rejected_qty || 0), 0)
+	);
 }

@@ -32,22 +32,29 @@ frappe.ui.form.on("Transport Cost Structure Assignment", {
 		}
 
 		const populate = () => {
-			frappe.db.get_doc("Transport Cost Structure", frm.doc.cost_structure).then((structure) => {
-				frm.clear_table("components");
-				(structure.components || []).forEach((component) => {
-					const row = frm.add_child("components");
-					row.cost_component = component.cost_component;
-					row.calculation_basis = component.calculation_basis;
-					row.cost_nature = component.cost_nature;
+			frappe.db
+				.get_doc("Transport Cost Structure", frm.doc.cost_structure)
+				.then((structure) => {
+					frm.clear_table("components");
+					(structure.components || []).forEach((component) => {
+						const row = frm.add_child("components");
+						row.cost_component = component.cost_component;
+						row.calculation_basis = component.calculation_basis;
+						row.cost_nature = component.cost_nature;
+					});
+					frm.refresh_field("components");
+					frm.__last_cost_structure = frm.doc.cost_structure;
 				});
-				frm.refresh_field("components");
-				frm.__last_cost_structure = frm.doc.cost_structure;
-			});
 		};
 
-		if ((frm.doc.components || []).length && frm.__last_cost_structure !== frm.doc.cost_structure) {
+		if (
+			(frm.doc.components || []).length &&
+			frm.__last_cost_structure !== frm.doc.cost_structure
+		) {
 			frappe.confirm(
-				__("Replace the current assignment components with those from the selected Cost Structure?"),
+				__(
+					"Replace the current assignment components with those from the selected Cost Structure?"
+				),
 				populate,
 				() => frm.set_value("cost_structure", frm.__last_cost_structure || "")
 			);

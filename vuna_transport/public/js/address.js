@@ -17,7 +17,7 @@ frappe.ui.form.on("Address", {
 			filters: frm.doc.vuna_constituency
 				? { constituency: frm.doc.vuna_constituency, disabled: 0 }
 				: frm.doc.vuna_county
-					? { county: frm.doc.vuna_county, disabled: 0 }
+				? { county: frm.doc.vuna_county, disabled: 0 }
 				: { disabled: 0 },
 		}));
 	},

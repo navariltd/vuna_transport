@@ -86,7 +86,11 @@ frappe.ui.form.on("Return Request", {
 				() => prepare_return_stock_document(frm),
 				__("Actions")
 			);
-			if ((frm.doc.items || []).some((row) => flt(row.received_qty) && !row.quality_inspection)) {
+			if (
+				(frm.doc.items || []).some(
+					(row) => flt(row.received_qty) && !row.quality_inspection
+				)
+			) {
 				frm.add_custom_button(
 					__("Prepare Quality Inspections"),
 					() => prepare_quality_inspections(frm),
@@ -104,8 +108,12 @@ frappe.ui.form.on("Return Request", {
 		if (frm.doc.status === "Resolved") {
 			frm.add_custom_button(__("Close"), () => transition(frm, "close"), __("Actions"));
 		}
-		if (!['Resolved', 'Closed', 'Cancelled'].includes(frm.doc.status)) {
-			frm.add_custom_button(__("Record Custody Change"), () => record_custody_change(frm), __("Actions"));
+		if (!["Resolved", "Closed", "Cancelled"].includes(frm.doc.status)) {
+			frm.add_custom_button(
+				__("Record Custody Change"),
+				() => record_custody_change(frm),
+				__("Actions")
+			);
 		}
 		add_resolution_actions(frm);
 	},
@@ -219,7 +227,8 @@ function record_custody_change(frm) {
 				fieldname: "to_custody",
 				fieldtype: "Select",
 				label: __("Custody Now With"),
-				options: "Still With Vehicle\nLeft With Customer\nHeld By Transporter\nReturned To Depot\nTransferred To Another Vehicle",
+				options:
+					"Still With Vehicle\nLeft With Customer\nHeld By Transporter\nReturned To Depot\nTransferred To Another Vehicle",
 				reqd: 1,
 			},
 			{
@@ -248,7 +257,11 @@ function add_resolution_actions(frm) {
 	if (frm.doc.commercial_resolution === "Credit Note" && !frm.doc.credit_note) {
 		frm.add_custom_button(
 			__("Find Credit Note"),
-			() => frappe.set_route("List", "Sales Invoice", { customer: frm.doc.customer, is_return: 1 }),
+			() =>
+				frappe.set_route("List", "Sales Invoice", {
+					customer: frm.doc.customer,
+					is_return: 1,
+				}),
 			__("Resolve")
 		);
 	}

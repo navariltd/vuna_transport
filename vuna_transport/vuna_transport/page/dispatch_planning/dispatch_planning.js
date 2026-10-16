@@ -2,7 +2,11 @@ frappe.provide("vuna_transport.DispatchPlanning");
 
 frappe.pages["dispatch-planning"].on_page_load = function (wrapper) {
 	$(wrapper).addClass("dispatch-planning-page");
-	$(wrapper).closest(".page-container").addClass("dispatch-planning-page").find("footer").remove();
+	$(wrapper)
+		.closest(".page-container")
+		.addClass("dispatch-planning-page")
+		.find("footer")
+		.remove();
 	frappe.ui.make_app_page({
 		parent: wrapper,
 		title: __("Dispatch Planning"),
@@ -85,11 +89,15 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			`<div class="dispatch-planning">
 				<div class="dp-toolbar">
 					<div class="dp-toolbar-header dp-collapsible-header" role="button" tabindex="0" aria-expanded="false">
-						<div class="dp-filter-title">${__("Planning Filters")} <span class="text-muted dp-filter-toggle-icon">▸</span></div>
+						<div class="dp-filter-title">${__(
+							"Planning Filters"
+						)} <span class="text-muted dp-filter-toggle-icon">▸</span></div>
 						<div class="dp-toolbar-actions">
 							<button class="btn btn-default btn-sm btn-toggle-filters">${__("Show Filters")}</button>
 							<button class="btn btn-default btn-sm btn-native-filter">${__("Add Filter")}</button>
-							<button class="btn btn-default btn-sm btn-clear-native-filter" title="${__("Clear added filters")}">×</button>
+							<button class="btn btn-default btn-sm btn-clear-native-filter" title="${__(
+								"Clear added filters"
+							)}">×</button>
 						<button class="btn btn-default btn-refresh">${__("Refresh")}</button>
 						<button class="btn btn-default btn-suggest">${__("Suggest Loads")}</button>
 						</div>
@@ -210,8 +218,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			this.configured_filter_keys.clear();
 			this.configured_filter_company = "global";
 			const response = await frappe.call({
-				method:
-					"vuna_transport.services.planning.dispatch_planning_service.get_dispatch_planning_filter_definitions",
+				method: "vuna_transport.services.planning.dispatch_planning_service.get_dispatch_planning_filter_definitions",
 				args: {},
 			});
 			for (const definition of response.message || []) {
@@ -242,7 +249,8 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	configure_location_filter_queries() {
-		if (this.filters.territory) this.filters.territory.get_query = () => ({ filters: { is_group: 0 } });
+		if (this.filters.territory)
+			this.filters.territory.get_query = () => ({ filters: { is_group: 0 } });
 		if (this.filters.county)
 			this.filters.county.get_query = () => ({
 				filters: this.filters.territory?.get_value()
@@ -254,7 +262,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				filters: this.filters.constituency?.get_value()
 					? { constituency: this.filters.constituency.get_value(), disabled: 0 }
 					: this.filters.county?.get_value()
-						? { county: this.filters.county.get_value(), disabled: 0 }
+					? { county: this.filters.county.get_value(), disabled: 0 }
 					: { disabled: 0 },
 			});
 		if (this.filters.constituency)
@@ -330,7 +338,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.schedule_plan_evaluation();
 	}
 
-		toggle_filters() {
+	toggle_filters() {
 		const $filters = this.$root.find(".dp-filter-grid");
 		const collapsed = $filters
 			.toggleClass("dp-filter-grid-collapsed")
@@ -338,7 +346,9 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.$root
 			.find(".btn-toggle-filters")
 			.text(collapsed ? __("Show Filters") : __("Hide Filters"));
-		this.$root.find(".dp-collapsible-header").attr("aria-expanded", collapsed ? "false" : "true");
+		this.$root
+			.find(".dp-collapsible-header")
+			.attr("aria-expanded", collapsed ? "false" : "true");
 		this.$root.find(".dp-filter-toggle-icon").text(collapsed ? "▸" : "▾");
 	}
 
@@ -642,7 +652,9 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		$target.addClass("dp-details-loading").html(this.loading()).show();
 		try {
 			await this.ensure_details([name]);
-			$target.removeClass("dp-details-loading").html(this.render_item_table(this.details[name]));
+			$target
+				.removeClass("dp-details-loading")
+				.html(this.render_item_table(this.details[name]));
 		} catch (error) {
 			$target.removeClass("dp-details-loading").html(this.error_message(error));
 		}
@@ -694,7 +706,13 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					"allocated"
 				)}</small></span><span>${this.number(item.available_quantity)} ${__(
 					"remaining"
-				)}<small class="${stock_sufficient ? "text-success" : "text-warning"}">${this.number(item.stock_available_quantity)} ${this.escape(item.stock_uom || "")} ${stock_sufficient ? __("on hand") : __("on hand — insufficient")}</small></span><span>${this.number(item.weight)} / ${this.number(
+				)}<small class="${
+					stock_sufficient ? "text-success" : "text-warning"
+				}">${this.number(item.stock_available_quantity)} ${this.escape(
+					item.stock_uom || ""
+				)} ${
+					stock_sufficient ? __("on hand") : __("on hand — insufficient")
+				}</small></span><span>${this.number(item.weight)} / ${this.number(
 					item.volume
 				)}<small>${this.escape(
 					item.handling_requirements || __("No handling profile")
@@ -702,11 +720,13 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					"Load Qty"
 				)}</label><input type="number" class="form-control dp-allocation-qty" placeholder="${__(
 					"Enter quantity"
-				)}" title="${__("Enter the quantity to include in this Delivery Load")}" data-order="${this.escape(
-					order.name
-				)}" data-item="${this.escape(item.name)}" min="0" max="${
-					item.available_quantity
-				}" step="any" value="${allocation?.allocated_quantity || 0}"></span></div>`;
+				)}" title="${__(
+					"Enter the quantity to include in this Delivery Load"
+				)}" data-order="${this.escape(order.name)}" data-item="${this.escape(
+					item.name
+				)}" min="0" max="${item.available_quantity}" step="any" value="${
+					allocation?.allocated_quantity || 0
+				}"></span></div>`;
 			})
 			.join("")}</div>`;
 	}
@@ -801,7 +821,9 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		const rows = [...this.allocations.values()];
 		const $target = this.$root.find(".dp-costed-vehicles");
 		if (!rows.length || !this.plan) return $target.empty();
-		$target.html(`<div class="text-muted small">${__("Loading cost structure estimates...")}</div>`);
+		$target.html(
+			`<div class="text-muted small">${__("Loading cost structure estimates...")}</div>`
+		);
 		try {
 			const response = await this.call("get_cost_structure_estimates", {
 				allocations: rows,
@@ -819,15 +841,30 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 								(row, index) =>
 									`<div class="dp-costed-vehicle"><strong>${
 										index + 1
-									}. ${this.escape(row.cost_structure_label || row.cost_structure)}</strong><span>${
-										row.cost_structure_assignment || __("No applicable assignment")
+									}. ${this.escape(
+										row.cost_structure_label || row.cost_structure
+									)}</strong><span>${
+										row.cost_structure_assignment ||
+										__("No applicable assignment")
 									}</span><b>${
 										row.currency
-											? `${this.number(row.estimated_full_cost)} ${this.escape(row.currency)}`
+											? `${this.number(
+													row.estimated_full_cost
+											  )} ${this.escape(row.currency)}`
 											: __("Not estimated")
 									}</b>${
-										row.recommended ? `<small class="text-success">${__("Recommended")}</small>` : ""
-									}${row.warnings?.length ? `<small class="text-warning">${this.escape(row.warnings[0])}</small>` : ""}</div>`
+										row.recommended
+											? `<small class="text-success">${__(
+													"Recommended"
+											  )}</small>`
+											: ""
+									}${
+										row.warnings?.length
+											? `<small class="text-warning">${this.escape(
+													row.warnings[0]
+											  )}</small>`
+											: ""
+									}</div>`
 							)
 							.join("")}`
 					: `<div class="text-muted small">${__(
@@ -852,14 +889,14 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		};
 		const capacity_rows = Object.entries(capacity)
 			.filter(([dimension]) => ["weight", "volume"].includes(dimension))
-			.filter(([, values]) => values.capacity)
+			.filter(([, values]) => values.capacity);
 		const has_full_dimension = capacity_rows.some(([, values]) => values.remaining <= 0);
 		const has_healthy_dimension = capacity_rows.some(([, values]) => values.utilization >= 70);
 		const overall_status = has_full_dimension
 			? "full"
 			: has_healthy_dimension
-				? "healthy"
-				: "available";
+			? "healthy"
+			: "available";
 		const overall_label = {
 			available: __("Capacity Available"),
 			healthy: __("Capacity Available"),
@@ -867,23 +904,24 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			unknown: __("Capacity Not Configured"),
 		}[overall_status];
 		const rows = capacity_rows
-			.map(
-				([dimension, values]) => {
-					const row_status = values.remaining <= 0
+			.map(([dimension, values]) => {
+				const row_status =
+					values.remaining <= 0
 						? "full"
 						: values.utilization >= 70
-							? "healthy"
-							: "available";
-					const progress = Math.min(100, Math.max(0, Number(values.utilization) || 0));
-					return `<div class="dp-capacity-row"><span>${labels[dimension]}</span><strong>${this.number(
-						values.used
-					)} / ${this.number(values.capacity)}</strong><small class="dp-capacity-value ${
-						row_status
-					}">${this.number(
-						values.remaining
-					)} ${__("available")} · ${this.number(values.utilization)}%</small><div class="dp-capacity-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"><span class="${row_status}" style="width: ${progress}%"></span></div></div>`;
-				}
-			)
+						? "healthy"
+						: "available";
+				const progress = Math.min(100, Math.max(0, Number(values.utilization) || 0));
+				return `<div class="dp-capacity-row"><span>${
+					labels[dimension]
+				}</span><strong>${this.number(values.used)} / ${this.number(
+					values.capacity
+				)}</strong><small class="dp-capacity-value ${row_status}">${this.number(
+					values.remaining
+				)} ${__("available")} · ${this.number(
+					values.utilization
+				)}%</small><div class="dp-capacity-progress" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100"><span class="${row_status}" style="width: ${progress}%"></span></div></div>`;
+			})
 			.join("");
 		return rows
 			? `<div class="dp-capacity-breakdown"><div class="dp-capacity-status dp-capacity-${overall_status}"><strong>${overall_label}</strong></div>${rows}</div>`

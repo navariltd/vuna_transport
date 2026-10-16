@@ -9,8 +9,13 @@ frappe.ui.form.on("Transport Cost Structure Component", {
 			return;
 		}
 
-		frappe.db.get_value("Transport Cost Component", row.cost_component, "default_cost_nature").then((result) => {
-			frm.set_value(`${cdt}.${cdn}.cost_nature`, result.message.default_cost_nature || "");
-		});
+		frappe.db
+			.get_value("Transport Cost Component", row.cost_component, "default_cost_nature")
+			.then((result) => {
+				frm.set_value(
+					`${cdt}.${cdn}.cost_nature`,
+					result.message.default_cost_nature || ""
+				);
+			});
 	},
 });
