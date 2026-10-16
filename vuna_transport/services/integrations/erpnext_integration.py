@@ -207,8 +207,8 @@ def create_delivery_notes_for_allocation(allocation):
 
 	created = []
 	for entries in grouped.values():
-		base_load, base_order, base_note, base_rows = entries[0]
-		for source_load, source_order, source_note, source_rows in entries[1:]:
+		base_load, base_order, base_note, _base_rows = entries[0]
+		for _source_load, _source_order, source_note, _source_rows in entries[1:]:
 			for item in source_note.items:
 				values = item.as_dict()
 				for field in ("name", "parent", "parentfield", "parenttype", "idx", "doctype"):
