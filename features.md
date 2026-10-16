@@ -405,41 +405,48 @@ The app will be a driver execution interface over server-side Vuna Transport and
 
 The first usable app should include:
 
-- Secure driver login
-- Driver-specific dashboard
-- Assigned Delivery Trips
-- Assigned Vehicle and Loads
-- Delivery Stop list
-- Delivery Note and item details
-- Stop arrival/action state
-- Item-level delivered quantities
-- Accepted and rejected quantities
-- Rejection reason and remarks
-- Customer signature
-- Delivery photos/attachments
-- POD submission
-- Delivery Exception creation when necessary
-- Offline draft storage and retry synchronization
+- [x] ~~Manual or QR-based site onboarding~~
+- [x] ~~Secure driver login and persisted session~~
+- [x] ~~Registered-device validation and administrative revocation~~
+- [x] ~~Driver-specific dashboard and profile~~
+- [x] ~~Assigned Delivery Trips~~
+- [x] ~~Assigned Vehicle visibility~~
+- [ ] Assigned Delivery Load and cargo summary
+- [x] ~~Delivery Stop list and trip progress~~
+- [x] ~~Delivery Note and item details~~
+- [x] ~~Destination map, current-location display and external navigation~~
+- [x] ~~Explicit Start Trip and Report Delay or Incident actions, with arrival and trip completion derived from POD execution~~
+- [x] ~~Item-level delivered quantities~~
+- [x] ~~Accepted and rejected quantities~~
+- [x] ~~Rejection reason and remarks~~
+- [x] ~~Customer signature~~
+- [x] ~~Compressed delivery-photo capture and attachment upload~~
+- [x] ~~POD submission through the authoritative server workflow~~
+- [x] ~~Automatic Return Request creation for partial, rejected or failed POD outcomes~~
+- [ ] Offline draft storage and retry synchronization
 
 ### Driver App phase 2
 
-- Return Request initiation from a Delivery Exception
-- Custody and physical-resolution capture
-- Return status visibility
-- Driver expense request entry
-- Receipt photos
-- Trip and Delivery Load linkage
-- HRMS Expense Claim submission integration
+- [x] ~~Return Request initiation from a non-accepted POD~~
+- [ ] Return Request instructions, custody and physical-resolution visibility
+- [ ] Return status visibility in the mobile app
+- [x] ~~Multi-line driver Expense Claim request entry~~
+- [x] ~~Material Request entry with item search~~
+- [x] ~~Request history, approval status and item drill-down~~
+- [ ] Expense receipt photos and supporting attachments
+- [x] ~~Trip linkage on Material Requests and Expense Claims~~
+- [ ] Delivery Load and cargo linkage in the mobile UI
+- [x] ~~HRMS Expense Claim submission integration~~
 
 ### Driver App phase 3
 
-- Location tracking consent
-- Active-trip location pings
-- Background location updates
-- Offline location queue
-- Server-side Driver Location Log
-- Dispatcher visibility of last known location
-- Tracking start/stop based on trip state
+- [ ] Location tracking consent
+- [ ] Active-trip location pings
+- [ ] Background location updates
+- [ ] Offline location queue
+- [ ] Server-side Driver Location Log
+- [ ] Dispatcher visibility of last known location
+- [ ] Tracking start/stop based on trip state
 
 Location tracking should initially be limited to active assigned trips. It should not include live optimization, geofencing, telemetry, or route adherence until the basic execution workflow is proven.
 
@@ -503,12 +510,11 @@ get_assigned_delivery_trips
 get_trip_details
 get_stop_details
 start_delivery_trip
-arrive_at_stop
-submit_delivery_result
-create_delivery_exception
+prepare_proof_of_delivery (records arrival)
+submit_delivery_result (completes the trip after its final stop)
+report_vehicle_incident
 submit_expense_claim
 record_driver_location
-complete_delivery_trip
 ```
 
 Every operation must:
@@ -536,32 +542,53 @@ Every operation must:
 
 ### Driver identity and access
 
-- Confirm the Driver → Employee → User relationship used by the customer.
-- Decide whether each driver receives a Frappe user account or whether an external identity layer is required.
-- Define driver role permissions and mobile-specific permissions.
-- Add device/session revocation support.
+- [x] ~~Use the standard ERPNext Driver linked to the authenticated Frappe User and Employee where applicable.~~
+- [x] ~~Use individual Frappe user accounts for mobile drivers.~~
+- [x] ~~Validate the authenticated user, linked Driver, assigned trip and registered device on dedicated mobile APIs.~~
+- [x] ~~Add administrative device revocation support.~~
+- [x] ~~Enforce one active device per user, including after reinstall or installation-ID changes.~~
+- [ ] Define and document the final production driver roles and mobile-specific permissions.
 
 ### React Native backend
 
-- Inspect existing ERPNext/HRMS Expense Claim workflow and API requirements.
-- Design and implement dedicated driver APIs.
-- Add server-side request schemas and idempotency keys.
-- Define mobile payload versions and backward compatibility rules.
-- Add API rate limits and upload limits.
-- Add mobile-specific audit logging.
+- [x] ~~Inspect and reuse the ERPNext/HRMS Expense Claim workflow.~~
+- [x] ~~Implement dedicated driver profile, trip, stop, POD and request APIs.~~
+- [x] ~~Validate device ownership and trip assignment on mobile APIs.~~
+- [x] ~~Add bounded request payloads and idempotency identifiers for Material Requests and Expense Claims.~~
+- [x] ~~Add POD attachment size limits and duplicate-file protection.~~
+- [ ] Add idempotency identifiers for POD submission and every state-changing trip action.
+- [ ] Define mobile payload versions and backward compatibility rules.
+- [ ] Add API rate limits and configurable upload limits.
+- [ ] Add mobile-specific execution and synchronization audit logging.
 
 ### React Native app
 
-- Create the React Native project shell at `vuna_transport/vuna_transport_mobile` using Expo SDK 57, TypeScript, and Expo Router.
-- Implement authentication and session persistence.
-- Implement trip and stop screens.
-- Implement item-level POD.
-- Implement signature/photo capture.
-- Implement offline drafts and synchronization.
-- Implement Delivery Exception capture.
-- Implement Expense Claim request flow.
-- Implement location tracking.
-- Add Android device testing and release signing.
+- [x] ~~Create the React Native project shell at `vuna_transport_mobile` using Expo SDK 57, TypeScript, and Expo Router.~~
+- [x] ~~Implement site onboarding, authentication and session persistence.~~
+- [x] ~~Implement the Home, Profile and Requests tabs.~~
+- [x] ~~Implement trip, stop and Delivery Note screens.~~
+- [x] ~~Implement item-level POD.~~
+- [x] ~~Implement signature and optimized photo capture.~~
+- [x] ~~Implement Material Request and Expense Claim request flows.~~
+- [x] ~~Implement request history and itemized request details.~~
+- [x] ~~Add Android device testing and development APK builds.~~
+- [ ] Implement offline drafts and synchronization.
+- [x] ~~Implement explicit trip and stop execution actions.~~
+- [ ] Implement controlled location tracking.
+- [ ] Add expense receipt attachments.
+- [ ] Add Return Request visibility and driver instructions.
+- [ ] Configure production Android release signing, versioning and distribution.
+- [ ] Test and package the iOS application.
+
+### Driver App implementation priorities
+
+The remaining mobile work should be implemented in this order:
+
+1. **Add offline drafts and safe synchronization.** PODs, signatures, photos and requests should survive connectivity loss, show their synchronization state and retry without creating duplicates.
+2. **Add active-trip location tracking.** Tracking must require consent, operate only during an assigned active trip, queue locations while offline and stop when the trip ends.
+3. **Complete request and return evidence.** Add Expense Claim receipt attachments, Return Request visibility, custody instructions and the selected return destination where relevant.
+4. **Expose assigned load context.** Show the Delivery Loads and a concise cargo summary associated with the driver's trip without allowing the mobile app to mutate planning records.
+5. **Harden and release the application.** Add mobile API tests, retry/idempotency tests, reassignment and cancellation tests, upload/rate limits, production signing, versioning and iOS validation.
 
 ### Mobile test coverage
 
