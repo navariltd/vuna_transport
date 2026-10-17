@@ -14,10 +14,13 @@
   "delivered_qty",
   "requested_return_qty",
   "remaining_qty",
+  "uom",
   "column_break_quantities",
   "received_qty",
   "accepted_return_qty",
   "rejected_return_qty",
+  "stock_uom",
+  "conversion_factor",
   "batch_no",
   "serial_no",
   "reason_section",
@@ -91,6 +94,15 @@
    "read_only": 1
   },
   {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "UOM",
+   "options": "UOM",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
    "fieldname": "column_break_quantities",
    "fieldtype": "Column Break"
   },
@@ -99,22 +111,42 @@
    "fieldname": "received_qty",
    "fieldtype": "Float",
    "in_list_view": 1,
-   "label": "Received Quantity",
-   "non_negative": 1
+   "label": "Returned Quantity",
+   "non_negative": 1,
+   "read_only": 1
   },
   {
    "default": "0",
    "fieldname": "accepted_return_qty",
    "fieldtype": "Float",
-   "label": "Accepted Return Quantity",
-   "non_negative": 1
+   "label": "Inspection Accepted Quantity",
+   "non_negative": 1,
+   "read_only": 1
   },
   {
    "default": "0",
    "fieldname": "rejected_return_qty",
    "fieldtype": "Float",
-   "label": "Rejected Return Quantity",
-   "non_negative": 1
+   "label": "Inspection Rejected Quantity",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "label": "Stock UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "conversion_factor",
+   "fieldtype": "Float",
+   "hidden": 1,
+   "label": "Conversion Factor",
+   "positive": 1,
+   "read_only": 1,
+   "reqd": 1
   },
   {
    "fieldname": "batch_no",
@@ -147,6 +179,7 @@
   {
    "fieldname": "resolution_type",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Resolution Type",
    "options": "Return Resolution Type"
   },
@@ -154,6 +187,7 @@
    "default": "0",
    "fieldname": "resolution_qty",
    "fieldtype": "Float",
+   "hidden": 1,
    "label": "Resolution Quantity",
    "non_negative": 1
   }
@@ -161,7 +195,7 @@
  "grid_page_length": 50,
  "istable": 1,
  "links": [],
- "modified": "2026-09-15 21:50:34.737287",
+ "modified": "2026-10-17 00:41:18.449536",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Return Request Item",

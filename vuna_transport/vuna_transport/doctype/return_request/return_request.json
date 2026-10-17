@@ -14,12 +14,15 @@
   "customer",
   "column_break_identity",
   "status",
+  "return_source",
+  "process_summary",
   "initiated_by",
   "initiation_date",
   "return_reasons",
   "return_remarks",
   "source_section",
   "sales_order",
+  "sales_invoice",
   "delivery_note",
   "column_break_source",
   "delivery_order",
@@ -29,19 +32,29 @@
   "return_section",
   "return_method",
   "return_warehouse",
+  "inspection_required",
   "custody",
   "custody_events",
   "responsible_party",
   "physical_resolution",
   "commercial_resolution",
   "items",
+  "quantity_summary_section",
+  "expected_return_qty",
+  "returned_qty",
+  "column_break_quantity_summary",
+  "return_difference_qty",
   "resolution_section",
   "return_stock_document",
   "credit_note",
+  "replacement_sales_order",
+  "refund_payment_entry",
   "replacement_delivery_reference",
-  "notes",
-  "activity_section",
-  "activities"
+  "no_further_action",
+  "no_further_action_remarks",
+  "resolved_by",
+  "resolved_on",
+  "notes"
  ],
  "fields": [
   {
@@ -91,9 +104,22 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nRequested\nApproved\nAwaiting Return\nIn Transit\nReceived\nUnder Inspection\nAwaiting Resolution\nResolved\nClosed\nCancelled",
+   "options": "Draft\nAwaiting Sales Return\nAwaiting Inspection\nAwaiting Return Submission\nAwaiting Commercial Resolution\nResolved\nClosed\nCancelled",
    "read_only": 1,
    "reqd": 1
+  },
+  {
+   "default": "Manual",
+   "fieldname": "return_source",
+   "fieldtype": "Select",
+   "label": "Return Source",
+   "options": "Delivery Rejection\nFailed Delivery\nCustomer Return\nManual",
+   "reqd": 1
+  },
+  {
+   "fieldname": "process_summary",
+   "fieldtype": "HTML",
+   "label": "Return Progress"
   },
   {
    "fieldname": "initiated_by",
@@ -131,6 +157,13 @@
    "fieldtype": "Link",
    "label": "Sales Order",
    "options": "Sales Order",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
    "read_only": 1
   },
   {
@@ -179,10 +212,11 @@
   {
    "fieldname": "return_method",
    "fieldtype": "Select",
+   "hidden": 1,
    "in_list_view": 1,
    "label": "Return Method",
    "options": "Company Pickup\nCustomer Drop-off\nDriver Return\nThird-party Return",
-   "reqd": 1
+   "reqd": 0
   },
   {
    "fieldname": "return_warehouse",
@@ -190,38 +224,50 @@
    "in_list_view": 1,
    "label": "Return Warehouse",
    "options": "Warehouse",
-   "reqd": 1
+   "reqd": 0
+  },
+  {
+   "default": "0",
+   "description": "When enabled, the draft Sales Return cannot be submitted until every return item has a submitted Quality Inspection and a complete quantity outcome.",
+   "fieldname": "inspection_required",
+   "fieldtype": "Check",
+   "label": "Quality Inspection Required"
   },
   {
    "fieldname": "custody",
-  "fieldtype": "Select",
-  "label": "Custody",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Custody",
    "options": "\nStill With Vehicle\nLeft With Customer\nHeld By Transporter\nReturned To Depot\nTransferred To Another Vehicle\nUnknown"
   },
   {
    "fieldname": "custody_events",
    "fieldtype": "Table",
+   "hidden": 1,
    "label": "Custody History",
    "options": "Return Custody Event",
    "read_only": 1
   },
   {
-  "fieldname": "responsible_party",
-  "fieldtype": "Select",
-  "label": "Responsible Party",
+   "fieldname": "responsible_party",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Responsible Party",
   "options": "\nCompany\nCustomer\nTransporter\nDriver\nThird Party\nUnknown"
   },
   {
-  "fieldname": "physical_resolution",
-  "fieldtype": "Select",
-  "label": "Physical Resolution",
+   "fieldname": "physical_resolution",
+   "fieldtype": "Select",
+   "hidden": 1,
+   "label": "Physical Resolution",
   "options": "\nReturn to Original Depot\nReturn to Nearest Depot\nCustomer Return to Depot\nLeave With Customer\nRe-deliver\nDispose / Write Off\nPending Decision"
   },
   {
-  "fieldname": "commercial_resolution",
-  "fieldtype": "Select",
-  "label": "Commercial Resolution",
-  "options": "\nReplacement\nCredit Note\nRe-delivery\nNo Charge\nNo Further Action\nPending"
+   "allow_on_submit": 1,
+   "fieldname": "commercial_resolution",
+   "fieldtype": "Select",
+   "label": "Commercial Resolution",
+   "options": "\nCredit Customer\nReplacement\nRefund\nNo Further Action\nPending"
   },
   {
    "fieldname": "items",
@@ -231,6 +277,36 @@
    "reqd": 1
   },
   {
+   "fieldname": "quantity_summary_section",
+   "fieldtype": "Section Break",
+   "label": "Return Progress"
+  },
+  {
+   "fieldname": "expected_return_qty",
+   "fieldtype": "Float",
+   "label": "Expected Return Quantity",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "returned_qty",
+   "fieldtype": "Float",
+   "label": "Returned Quantity",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_quantity_summary",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "return_difference_qty",
+   "fieldtype": "Float",
+   "label": "Difference Quantity",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
    "fieldname": "resolution_section",
    "fieldtype": "Section Break",
    "label": "ERPNext Stock & Follow-up"
@@ -238,44 +314,74 @@
   {
    "fieldname": "return_stock_document",
    "fieldtype": "Link",
-   "label": "Return Stock Document",
+   "label": "Sales Return",
    "options": "Delivery Note",
    "read_only": 1
+  },
+  {
+   "fieldname": "replacement_sales_order",
+   "fieldtype": "Link",
+   "label": "Replacement Sales Order",
+   "options": "Sales Order",
+   "read_only": 1
+  },
+  {
+   "fieldname": "refund_payment_entry",
+   "fieldtype": "Link",
+   "label": "Refund Payment Entry",
+   "options": "Payment Entry",
+   "allow_on_submit": 1
   },
   {
    "fieldname": "credit_note",
    "fieldtype": "Link",
    "label": "Credit Note",
-   "options": "Sales Invoice"
+   "options": "Sales Invoice",
+   "read_only": 1
   },
   {
    "fieldname": "replacement_delivery_reference",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Replacement / Follow-up Delivery Order",
    "options": "Delivery Order"
+  },
+  {
+   "default": "0",
+   "fieldname": "no_further_action",
+   "fieldtype": "Check",
+   "label": "No Further Action",
+   "read_only": 1
+  },
+  {
+   "fieldname": "no_further_action_remarks",
+   "fieldtype": "Small Text",
+   "label": "No Further Action Remarks",
+   "read_only": 1
+  },
+  {
+   "fieldname": "resolved_by",
+   "fieldtype": "Link",
+   "label": "Resolved By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "resolved_on",
+   "fieldtype": "Datetime",
+   "label": "Resolved On",
+   "read_only": 1
   },
   {
    "fieldname": "notes",
    "fieldtype": "Long Text",
    "label": "Notes"
-  },
-  {
-   "fieldname": "activity_section",
-   "fieldtype": "Section Break",
-   "label": "Return Activity"
-  },
-  {
-   "fieldname": "activities",
-   "fieldtype": "Table",
-   "label": "Activity History",
-   "options": "Return Request Activity",
-   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-15 22:07:48.597473",
+ "modified": "2026-10-16 23:44:38.045782",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Return Request",

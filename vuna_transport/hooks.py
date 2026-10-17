@@ -159,16 +159,46 @@ doc_events = {
 		"validate": "vuna_transport.services.routing.location_service.synchronize_address_location",
 	},
 	"Sales Order": {
-		"on_submit": "vuna_transport.services.demand.delivery_order_service.create_delivery_orders_for_sales_order",
+		"before_submit": "vuna_transport.services.execution.return_service.validate_linked_replacement_sales_order",
+		"on_submit": [
+			"vuna_transport.services.demand.delivery_order_service.create_delivery_orders_for_sales_order",
+			"vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
+		],
 		"on_update_after_submit": "vuna_transport.services.demand.delivery_order_service.sync_delivery_orders_for_sales_order",
+		"on_cancel": "vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
 	},
 	"Delivery Note": {
-		"validate": "vuna_transport.services.execution.lineage_service.populate_delivery_note_delivery_links",
+		"validate": [
+			"vuna_transport.services.execution.lineage_service.populate_delivery_note_delivery_links",
+			"vuna_transport.services.execution.return_service.validate_sales_return_request_link",
+		],
+		"on_update": "vuna_transport.services.execution.return_service.sync_sales_return_request_link",
+		"before_submit": "vuna_transport.services.execution.return_service.validate_linked_sales_return_submission",
+		"before_cancel": "vuna_transport.services.execution.return_service.prepare_sales_return_cancellation",
 		"on_submit": [
 			"vuna_transport.services.demand.delivery_order_service.sync_delivery_orders_after_direct_delivery_note",
 			"vuna_transport.services.execution.lineage_service.complete_load_without_trip",
+			"vuna_transport.services.execution.return_service.sync_return_request_from_sales_return",
 		],
-		"on_cancel": "vuna_transport.services.execution.lineage_service.reconcile_load_after_delivery_note_cancel",
+		"on_cancel": [
+			"vuna_transport.services.execution.lineage_service.reconcile_load_after_delivery_note_cancel",
+			"vuna_transport.services.execution.return_service.sync_return_request_from_sales_return",
+		],
+		"on_trash": "vuna_transport.services.execution.return_service.prepare_sales_return_cancellation",
+	},
+	"Quality Inspection": {
+		"before_cancel": "vuna_transport.services.execution.return_service.prepare_quality_inspection_removal",
+		"on_submit": "vuna_transport.services.execution.return_service.sync_return_request_from_quality_inspection",
+		"on_cancel": "vuna_transport.services.execution.return_service.sync_return_request_from_quality_inspection",
+		"on_trash": "vuna_transport.services.execution.return_service.prepare_quality_inspection_removal",
+	},
+	"Sales Invoice": {
+		"on_submit": "vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
+		"on_cancel": "vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
+	},
+	"Payment Entry": {
+		"on_submit": "vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
+		"on_cancel": "vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
 	},
 	"Delivery Trip": {
 		"before_cancel": "vuna_transport.services.execution.lineage_service.prepare_delivery_trip_cancellation",
@@ -238,7 +268,9 @@ doc_events = {
 
 doctype_js = {
 	"Address": "public/js/address.js",
+	"Delivery Note": "public/js/delivery_note.js",
 	"Delivery Trip": "public/js/delivery_trip.js",
+	"Quality Inspection": "public/js/quality_inspection.js",
 	"Sales Order": "public/js/sales_order.js",
 	"Vehicle": "public/js/vehicle.js",
 	"Vehicle Incident": "public/js/vehicle_incident_location.js",
@@ -309,6 +341,9 @@ before_tests = "vuna_transport.setup.utils.before_tests"
 # extend_doctype_class = {
 # 	"Task": "vuna_transport.custom.task.CustomTaskMixin"
 # }
+extend_doctype_class = {
+	"Quality Inspection": ["vuna_transport.overrides.quality_inspection.ReturnQualityInspectionMixin"],
+}
 
 # Overriding Methods
 # ------------------------------
@@ -316,6 +351,10 @@ before_tests = "vuna_transport.setup.utils.before_tests"
 # override_whitelisted_methods = {
 # 	"frappe.desk.doctype.event.event.get_events": "vuna_transport.event.get_events"
 # }
+override_whitelisted_methods = {
+	"erpnext.controllers.stock_controller.check_item_quality_inspection": "vuna_transport.overrides.quality_inspection.check_item_quality_inspection",
+	"erpnext.controllers.stock_controller.make_quality_inspections": "vuna_transport.overrides.quality_inspection.make_quality_inspections",
+}
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,

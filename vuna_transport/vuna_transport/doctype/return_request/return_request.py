@@ -6,13 +6,14 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
-from vuna_transport.services.execution.return_service import validate_return_request
+from vuna_transport.services.execution.return_service import (
+	recalculate_return_request,
+	validate_return_request,
+)
 
 
 class ReturnRequest(Document):
 	def before_insert(self):
-		if not self.activities:
-			self.append_activity("Created", _("Return Request created."))
 		if self.custody:
 			self.append_custody_event(
 				None, self.custody, self.responsible_party, _("Initial custody recorded.")
@@ -22,23 +23,52 @@ class ReturnRequest(Document):
 		validate_return_request(self)
 
 	def before_submit(self):
-		if self.status != "Requested":
-			frappe.throw(_("A Return Request must be submitted from Requested status."))
+		for row in self.items:
+			if not row.return_reason:
+				frappe.throw(_("Item Return Reason is required for {0}.").format(row.item_code))
 
-	def append_activity(self, action, remarks=None, reference=None):
-		"""Keep a concise operational timeline without duplicating ERPNext ledgers."""
-		self.append(
-			"activities",
-			{
-				"status": self.status,
-				"action": action,
-				"activity_on": now_datetime(),
-				"user": frappe.session.user,
-				"remarks": remarks,
-				"reference_doctype": getattr(reference, "doctype", None),
-				"reference_name": getattr(reference, "name", None),
-			},
-		)
+	def on_submit(self):
+		recalculate_return_request(self.name)
+
+	def before_cancel(self):
+		self.ignore_linked_doctypes = ["Proof of Delivery"]
+		for doctype, fieldname, label in (
+			("Delivery Note", "return_stock_document", _("Sales Return")),
+			("Sales Invoice", "credit_note", _("Credit Note")),
+			("Sales Order", "replacement_sales_order", _("Replacement Sales Order")),
+			("Payment Entry", "refund_payment_entry", _("Refund Payment Entry")),
+		):
+			name = self.get(fieldname)
+			if not name:
+				continue
+			docstatus = frappe.db.get_value(doctype, name, "docstatus")
+			if docstatus == 0:
+				frappe.throw(
+					_("Delete draft {0} {1} before cancelling this Return Request.").format(label, name)
+				)
+			if docstatus == 1:
+				frappe.throw(_("Cancel {0} {1} before cancelling this Return Request.").format(label, name))
+
+	def on_cancel(self):
+		self.unlink_proof_of_delivery()
+		self.db_set("status", "Cancelled", update_modified=False)
+
+	def on_trash(self):
+		self.unlink_proof_of_delivery()
+
+	def unlink_proof_of_delivery(self):
+		"""Clear the convenience backlink without weakening return lineage checks."""
+		if not self.proof_of_delivery:
+			return
+		linked_request = frappe.db.get_value("Proof of Delivery", self.proof_of_delivery, "return_request")
+		if linked_request == self.name:
+			frappe.db.set_value(
+				"Proof of Delivery",
+				self.proof_of_delivery,
+				"return_request",
+				None,
+				update_modified=False,
+			)
 
 	def append_custody_event(self, from_custody, to_custody, responsible_party=None, remarks=None):
 		self.append(
