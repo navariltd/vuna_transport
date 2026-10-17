@@ -44,7 +44,6 @@ Delivery Exception / Return Request where required
 * **Delivery Load Planning** - Bundle multiple Delivery Orders or Item lines, support partial quantities, and validate capacity and transport compatibility.
 * **Dispatch Planning** - Plan demand using warehouse, customer, date, and geography filters while viewing fleet and driver availability.
 * **Vehicle Allocation** - Assign vehicles and drivers to one or more Delivery Loads with server-side availability and capacity validation.
-* **Delivery Execution** - Create and track ERPNext Delivery Notes and Delivery Trips without replacing the standard ERPNext workflow.
 * **Proof of Delivery** - Capture accepted, rejected, partial, and failed delivery outcomes with item-level quantities and rejection reasons.
 * **Exceptions and Returns** - Track unresolved delivery outcomes, custody, return requests, inspections, stock returns, and commercial follow-up.
 * **Transport Costing Estimates** - Estimate transport costs using Cost Components, Cost Structures, Cost Structure Assignments, destinations, distance, and vehicle context.
