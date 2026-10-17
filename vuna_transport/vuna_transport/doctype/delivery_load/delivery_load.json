@@ -10,6 +10,7 @@
   "load_tab",
   "load_identity_section",
   "company",
+  "required_vehicle_category",
   "naming_series",
   "column_break_npju",
   "dispatch_date",
@@ -22,23 +23,6 @@
   "transport_zone",
   "transport_route",
   "delivery_trip",
-  "section_break_sgfs",
-  "required_vehicle_category",
-  "active_vehicle_allocation",
-  "planned_departure",
-  "planned_arrival",
-  "column_break_fpwz",
-  "estimated_distance",
-  "estimated_duration",
-  "distance_estimate_method",
-  "distance_estimate_basis",
-  "distance_estimate_confidence",
-  "distance_estimate_warning",
-  "column_break_fsyc",
-  "refrigeration_required",
-  "tail_lift_required",
-  "required_body_type",
-  "special_equipment_required",
   "capacity_section",
   "total_weight",
   "weight_uom",
@@ -49,6 +33,24 @@
   "column_break_fymq",
   "minimum_payload",
   "minimum_volume",
+  "section_break_sgfs",
+  "active_vehicle_allocation",
+  "planned_departure",
+  "planned_arrival",
+  "column_break_fpwz",
+  "estimated_distance",
+  "estimated_duration",
+  "column_break_fsyc",
+  "refrigeration_required",
+  "tail_lift_required",
+  "required_body_type",
+  "special_equipment_required",
+  "estimates_section",
+  "distance_estimate_method",
+  "distance_estimate_basis",
+  "distance_estimate_confidence",
+  "column_break_uqgt",
+  "distance_estimate_warning",
   "section_break_mvxd",
   "capacity_summary",
   "pallets_section",
@@ -134,6 +136,7 @@
    "reqd": 1
   },
   {
+   "collapsible": 1,
    "fieldname": "section_break_dfkk",
    "fieldtype": "Section Break",
    "label": "Dispatch Context"
@@ -420,6 +423,16 @@
   {
    "fieldname": "section_break_mvxd",
    "fieldtype": "Section Break"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "estimates_section",
+   "fieldtype": "Section Break",
+   "label": "Estimates"
+  },
+  {
+   "fieldname": "column_break_uqgt",
+   "fieldtype": "Column Break"
   }
  ],
  "grid_page_length": 50,
@@ -441,8 +454,8 @@
    "link_doctype": "Delivery Trip",
    "link_fieldname": "vuna_delivery_load"
   }
-],
- "modified": "2026-09-15 21:27:15.257718",
+ ],
+ "modified": "2026-10-17 09:53:42.020286",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Delivery Load",

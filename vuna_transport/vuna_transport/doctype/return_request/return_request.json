@@ -13,48 +13,60 @@
   "company",
   "customer",
   "column_break_identity",
-  "status",
-  "return_source",
-  "process_summary",
-  "initiated_by",
   "initiation_date",
-  "return_reasons",
-  "return_remarks",
+  "initiated_by",
+  "column_break_oboa",
+  "return_source",
+  "status",
   "source_section",
+  "delivery_note",
   "sales_order",
   "sales_invoice",
-  "delivery_note",
   "column_break_source",
   "delivery_order",
   "delivery_trip",
   "proof_of_delivery",
   "delivery_address",
-  "return_section",
-  "return_method",
+  "section_break_zzrn",
   "return_warehouse",
+  "return_reasons",
+  "column_break_sxsa",
   "inspection_required",
-  "custody",
-  "custody_events",
-  "responsible_party",
-  "physical_resolution",
-  "commercial_resolution",
+  "section_break_lscq",
   "items",
+  "section_break_xbot",
+  "return_remarks",
   "quantity_summary_section",
   "expected_return_qty",
   "returned_qty",
   "column_break_quantity_summary",
   "return_difference_qty",
+  "resolution_tab",
+  "process_summary",
   "resolution_section",
   "return_stock_document",
   "credit_note",
   "replacement_sales_order",
   "refund_payment_entry",
   "replacement_delivery_reference",
-  "no_further_action",
-  "no_further_action_remarks",
+  "amended_from",
+  "column_break_dvom",
   "resolved_by",
   "resolved_on",
-  "notes"
+  "section_break_qxqq",
+  "no_further_action",
+  "no_further_action_remarks",
+  "section_break_mgma",
+  "notes",
+  "custody_tab",
+  "return_section",
+  "return_method",
+  "custody",
+  "custody_events",
+  "responsible_party",
+  "physical_resolution",
+  "commercial_resolution",
+  "connections_tab"
  ],
  "fields": [
   {
@@ -144,10 +156,11 @@
   },
   {
    "fieldname": "return_remarks",
-   "fieldtype": "Small Text",
+   "fieldtype": "Text Editor",
    "label": "Remarks"
   },
   {
+   "collapsible": 1,
    "fieldname": "source_section",
    "fieldtype": "Section Break",
    "label": "Original Delivery"
@@ -163,8 +176,7 @@
    "fieldname": "sales_invoice",
    "fieldtype": "Link",
    "label": "Sales Invoice",
-   "options": "Sales Invoice",
-   "read_only": 1
+   "options": "Sales Invoice"
   },
   {
    "fieldname": "delivery_note",
@@ -195,7 +207,8 @@
    "fieldname": "proof_of_delivery",
    "fieldtype": "Link",
    "label": "Proof of Delivery",
-   "options": "Proof of Delivery"
+   "options": "Proof of Delivery",
+   "search_index": 1
   },
   {
    "fieldname": "delivery_address",
@@ -215,16 +228,14 @@
    "hidden": 1,
    "in_list_view": 1,
    "label": "Return Method",
-   "options": "Company Pickup\nCustomer Drop-off\nDriver Return\nThird-party Return",
-   "reqd": 0
+   "options": "Company Pickup\nCustomer Drop-off\nDriver Return\nThird-party Return"
   },
   {
    "fieldname": "return_warehouse",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Return Warehouse",
-   "options": "Warehouse",
-   "reqd": 0
+   "options": "Warehouse"
   },
   {
    "default": "0",
@@ -253,14 +264,14 @@
    "fieldtype": "Select",
    "hidden": 1,
    "label": "Responsible Party",
-  "options": "\nCompany\nCustomer\nTransporter\nDriver\nThird Party\nUnknown"
+   "options": "\nCompany\nCustomer\nTransporter\nDriver\nThird Party\nUnknown"
   },
   {
    "fieldname": "physical_resolution",
    "fieldtype": "Select",
    "hidden": 1,
    "label": "Physical Resolution",
-  "options": "\nReturn to Original Depot\nReturn to Nearest Depot\nCustomer Return to Depot\nLeave With Customer\nRe-deliver\nDispose / Write Off\nPending Decision"
+   "options": "\nReturn to Original Depot\nReturn to Nearest Depot\nCustomer Return to Depot\nLeave With Customer\nRe-deliver\nDispose / Write Off\nPending Decision"
   },
   {
    "allow_on_submit": 1,
@@ -326,11 +337,11 @@
    "read_only": 1
   },
   {
+   "allow_on_submit": 1,
    "fieldname": "refund_payment_entry",
    "fieldtype": "Link",
    "label": "Refund Payment Entry",
-   "options": "Payment Entry",
-   "allow_on_submit": 1
+   "options": "Payment Entry"
   },
   {
    "fieldname": "credit_note",
@@ -376,12 +387,73 @@
    "fieldname": "notes",
    "fieldtype": "Long Text",
    "label": "Notes"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Return Request",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "section_break_zzrn",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_sxsa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_lscq",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "resolution_tab",
+   "fieldtype": "Tab Break",
+   "label": "Resolution"
+  },
+  {
+   "fieldname": "custody_tab",
+   "fieldtype": "Tab Break",
+   "hidden": 1,
+   "label": "Custody"
+  },
+  {
+   "fieldname": "connections_tab",
+   "fieldtype": "Tab Break",
+   "label": "Connections",
+   "show_dashboard": 1
+  },
+  {
+   "fieldname": "column_break_oboa",
+   "fieldtype": "Column Break"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_xbot",
+   "fieldtype": "Section Break",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "column_break_dvom",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_qxqq",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "section_break_mgma",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-16 23:44:38.045782",
+ "modified": "2026-10-17 10:19:33.624971",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Return Request",
