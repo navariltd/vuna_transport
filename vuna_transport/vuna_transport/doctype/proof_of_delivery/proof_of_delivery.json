@@ -34,7 +34,6 @@
   "total_rejected_qty",
   "rejection_reasons",
   "exception_details",
-  "exception_reason",
   "remarks",
   "notes",
   "mobile_request_id",
@@ -172,13 +171,6 @@
   },
   {
    "depends_on": "eval:doc.total_rejected_qty > 0",
-   "fieldname": "exception_reason",
-   "fieldtype": "Select",
-   "label": "Exception Reason",
-   "options": "Customer Closed\nCustomer Unavailable\nWrong Address\nProduct Rejected\nProduct Damaged\nQuantity Shortage\nTemperature Breach\nPayment Unavailable\nVehicle Breakdown\nRoad or Weather Disruption\nOther"
-  },
-  {
-   "depends_on": "eval:doc.total_rejected_qty > 0",
    "fieldname": "remarks",
    "fieldtype": "Small Text",
    "label": "Remarks"
@@ -264,7 +256,7 @@
    "link_fieldname": "proof_of_delivery"
   }
  ],
- "modified": "2026-09-03 07:39:52.433813",
+ "modified": "2026-10-17 00:18:01.223808",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Proof of Delivery",

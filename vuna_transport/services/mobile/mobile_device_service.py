@@ -8,19 +8,6 @@ from frappe.utils.file_manager import get_content_hash, save_file
 
 from vuna_transport.services.execution.pod_service import create_proof_of_delivery
 
-POD_EXCEPTION_REASONS = (
-	"Customer Closed",
-	"Customer Unavailable",
-	"Wrong Address",
-	"Product Rejected",
-	"Product Damaged",
-	"Quantity Shortage",
-	"Temperature Breach",
-	"Payment Unavailable",
-	"Vehicle Breakdown",
-	"Road or Weather Disruption",
-	"Other",
-)
 MOBILE_REQUEST_ID_PATTERN = re.compile(r"^[a-f0-9-]{16,64}$", re.IGNORECASE)
 
 
@@ -317,7 +304,6 @@ def _offline_manifest_response(assigned, delivery_notes=None):
 		"assigned": assigned,
 		"delivery_notes": delivery_notes or [],
 		"rejection_reasons": _get_rejection_reasons(),
-		"exception_reasons": POD_EXCEPTION_REASONS,
 		"synced_at": now_datetime(),
 	}
 
@@ -469,7 +455,6 @@ def submit_mobile_proof_of_delivery(
 	pod.received_by = payload.get("received_by")
 	pod.receiver_phone = payload.get("receiver_phone")
 	pod.delivery_datetime = now_datetime()
-	pod.exception_reason = payload.get("exception_reason")
 	pod.remarks = payload.get("remarks")
 	pod.notes = payload.get("notes")
 	pod.signature = payload.get("signature")
@@ -758,13 +743,11 @@ def _serialize_pod(pod):
 		"delivery_datetime": pod.delivery_datetime,
 		"received_by": pod.received_by,
 		"receiver_phone": pod.receiver_phone,
-		"exception_reason": pod.exception_reason,
 		"remarks": pod.remarks,
 		"notes": pod.notes,
 		"signature": pod.signature,
 		"delivery_photo": pod.delivery_photo,
 		"rejection_reasons": _get_rejection_reasons(),
-		"exception_reasons": POD_EXCEPTION_REASONS,
 		"items": [
 			{
 				"name": row.name,

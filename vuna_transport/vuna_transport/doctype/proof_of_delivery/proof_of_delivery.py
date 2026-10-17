@@ -24,7 +24,6 @@ class ProofofDelivery(Document):
 		self.total_accepted_qty = sum(flt(item.delivered_qty) for item in self.items)
 		self.total_rejected_qty = sum(flt(item.rejected_qty) for item in self.items)
 		self.status = derive_pod_status(self.items)
-		self.validate_exception_reason()
 
 	def populate_stop_details(self):
 		stop = frappe.db.get_value(
@@ -123,10 +122,6 @@ class ProofofDelivery(Document):
 				frappe.throw(
 					_("Delivery Order Item {0} could not be found.").format(item.delivery_order_item)
 				)
-
-	def validate_exception_reason(self):
-		if self.status in ("Partially Delivered", "Rejected", "Failed") and not self.exception_reason:
-			frappe.throw(_("An exception reason is required for {0} deliveries.").format(self.status.lower()))
 
 	def on_submit(self):
 		update_delivery_stop_from_pod(self, self.status)

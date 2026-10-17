@@ -19,7 +19,14 @@ frappe.ui.form.on("Proof of Delivery", {
 					["name", "docstatus"]
 				)
 				.then(({ message }) => {
-					if (message?.name) return;
+					if (message?.name) {
+						frm.add_custom_button(
+							__("Open Return Request"),
+							() => frappe.set_route("Form", "Return Request", message.name),
+							__("Resolve")
+						);
+						return;
+					}
 					frm.add_custom_button(
 						__("Create Return Request"),
 						() =>
