@@ -16,6 +16,10 @@ from vuna_transport.services.fleet.vehicle_allocation_service import (
 
 
 def populate_delivery_note_delivery_links(doc, method=None):
+	# ERPNext copies the original transport links onto Sales Returns. They retain
+	# lineage for audit purposes but must not re-enter forward dispatch planning.
+	if getattr(doc, "is_return", 0):
+		return
 	if not doc.meta.has_field("vuna_delivery_load"):
 		return
 	if not doc.vuna_delivery_load:
@@ -495,6 +499,8 @@ def unlink_delivery_trip(doc, method=None):
 
 
 def complete_load_without_trip(doc, method=None):
+	if getattr(doc, "is_return", 0):
+		return
 	load_name = getattr(doc, "vuna_delivery_load", None)
 	if not load_name or doc.docstatus != 1:
 		return
@@ -517,6 +523,8 @@ def complete_load_without_trip(doc, method=None):
 
 
 def reconcile_load_after_delivery_note_cancel(doc, method=None):
+	if getattr(doc, "is_return", 0):
+		return
 	load_name = getattr(doc, "vuna_delivery_load", None)
 	if not load_name:
 		return

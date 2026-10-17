@@ -89,6 +89,11 @@ def scan_delivery_note_qr(token, action, device_reference=None, remarks=None):
 	_require_scan_action_permission(action)
 	doc = _resolve_qr_token(token)
 	require_document_permission(doc, "read")
+	if doc.is_return:
+		frappe.throw(
+			_("Sales Return {0} cannot use the outbound Dispatch Scan workflow.").format(doc.name),
+			frappe.ValidationError,
+		)
 	if not frappe.has_permission("Delivery Note Dispatch Event", "create"):
 		frappe.throw(_("You do not have permission to record Delivery Note scans."), frappe.PermissionError)
 

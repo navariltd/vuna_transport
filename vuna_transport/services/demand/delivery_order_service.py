@@ -186,6 +186,8 @@ def sync_delivery_order_quantities(delivery_order, persist=False):
 
 def sync_delivery_orders_after_direct_delivery_note(doc, method=None):
 	"""Refresh Vuna demand after a Delivery Note created directly from a Sales Order."""
+	if getattr(doc, "is_return", False):
+		return
 	if getattr(doc, "vuna_delivery_load", None):
 		return
 	sales_orders = {row.against_sales_order for row in doc.items if getattr(row, "against_sales_order", None)}

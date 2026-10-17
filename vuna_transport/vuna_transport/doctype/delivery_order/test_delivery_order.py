@@ -21,6 +21,7 @@ from vuna_transport.services.demand.delivery_order_service import (
 	get_sales_order_item_quantities,
 	sync_delivery_order_quantities,
 	sync_delivery_order_status_from_sales_order,
+	sync_delivery_orders_after_direct_delivery_note,
 )
 from vuna_transport.services.routing.location_service import (
 	get_point_coordinates,
@@ -148,6 +149,18 @@ class TestDeliveryOrder(UnitTestCase):
 	def test_sales_order_quantities_are_authoritative(self):
 		item = SimpleNamespace(qty=100, delivered_qty=30)
 		self.assertEqual(get_sales_order_item_quantities(item), (100, 70))
+
+	@patch("vuna_transport.services.demand.delivery_order_service.frappe.get_all")
+	def test_sales_return_does_not_resynchronize_outbound_delivery_orders(self, get_all):
+		sync_delivery_orders_after_direct_delivery_note(
+			SimpleNamespace(
+				is_return=1,
+				vuna_delivery_load=None,
+				items=[SimpleNamespace(against_sales_order="SO-TEST")],
+			)
+		)
+
+		get_all.assert_not_called()
 
 	@patch("vuna_transport.services.demand.delivery_order_service.frappe.db.set_value")
 	def test_closed_sales_order_closes_open_delivery_order(self, set_value):
