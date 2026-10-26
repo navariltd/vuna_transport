@@ -12,6 +12,7 @@ from vuna_transport.services.fleet.vehicle_allocation_service import (
 	_validate_initial_allocation_sequence,
 	_validate_planning_window,
 	_validate_subcontractor,
+	get_allocation_delivery_note_status,
 	get_allocation_load_names,
 	get_load_resource_window,
 	prepare_allocation_cancellation,
@@ -24,6 +25,61 @@ from vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation
 
 
 class TestVehicleAllocation(UnitTestCase):
+	@patch("vuna_transport.services.fleet.vehicle_allocation_service.get_delivery_note_submission_status")
+	@patch("vuna_transport.services.fleet.vehicle_allocation_service.get_allocation_loads")
+	@patch("vuna_transport.services.fleet.vehicle_allocation_service.require_document_permission")
+	@patch("vuna_transport.services.fleet.vehicle_allocation_service.frappe.get_doc")
+	@patch("vuna_transport.services.fleet.vehicle_allocation_service.frappe.db.get_value")
+	def test_delivery_trip_action_requires_all_allocation_notes_to_be_submitted(
+		self, get_value, get_doc, require_permission, get_loads, get_note_status
+	):
+		get_value.return_value = None
+		allocation = SimpleNamespace(name="VA-1")
+		get_doc.return_value = allocation
+		get_loads.return_value = [SimpleNamespace(name="DL-1"), SimpleNamespace(name="DL-2")]
+		get_note_status.side_effect = [
+			{
+				"ready": True,
+				"draft_delivery_notes": [],
+				"submitted_delivery_notes": ["DN-1"],
+			},
+			{
+				"ready": False,
+				"draft_delivery_notes": ["DN-2"],
+				"submitted_delivery_notes": [],
+			},
+		]
+
+		status = get_allocation_delivery_note_status("VA-1")
+
+		self.assertFalse(status["ready_for_delivery_trip"])
+		self.assertEqual(status["draft_delivery_notes"], ["DN-2"])
+		self.assertEqual(status["submitted_delivery_notes"], ["DN-1"])
+		require_permission.assert_called_once_with(allocation, "read")
+
+	@patch("vuna_transport.services.fleet.vehicle_allocation_service.get_delivery_note_submission_status")
+	@patch("vuna_transport.services.fleet.vehicle_allocation_service.get_allocation_loads")
+	@patch("vuna_transport.services.fleet.vehicle_allocation_service.require_document_permission")
+	@patch("vuna_transport.services.fleet.vehicle_allocation_service.frappe.get_doc")
+	@patch("vuna_transport.services.fleet.vehicle_allocation_service.frappe.db.get_value")
+	def test_delivery_trip_action_is_not_offered_when_trip_already_exists(
+		self, get_value, get_doc, require_permission, get_loads, get_note_status
+	):
+		allocation = SimpleNamespace(name="VA-1")
+		get_doc.return_value = allocation
+		get_value.return_value = "DT-1"
+		get_loads.return_value = [SimpleNamespace(name="DL-1")]
+		get_note_status.return_value = {
+			"ready": True,
+			"draft_delivery_notes": [],
+			"submitted_delivery_notes": ["DN-1"],
+		}
+
+		status = get_allocation_delivery_note_status("VA-1")
+
+		self.assertEqual(status["active_delivery_trip"], "DT-1")
+		self.assertFalse(status["ready_for_delivery_trip"])
+
 	def test_child_table_is_the_canonical_delivery_load_set(self):
 		allocation = SimpleNamespace(
 			delivery_loads=[

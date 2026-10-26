@@ -607,6 +607,36 @@ def get_delivery_note_submission_status(load):
 	}
 
 
+@frappe.whitelist()
+def get_allocation_delivery_note_status(allocation_name):
+	"""Return the one execution action currently valid for a Vehicle Allocation."""
+	allocation = frappe.get_doc("Vehicle Allocation", allocation_name)
+	require_document_permission(allocation, "read")
+	active_delivery_trip = frappe.db.get_value(
+		"Delivery Trip",
+		{"vuna_current_vehicle_allocation": allocation.name, "docstatus": ["!=", 2]},
+		"name",
+	) or frappe.db.get_value(
+		"Delivery Trip",
+		{"vuna_vehicle_allocation": allocation.name, "docstatus": ["!=", 2]},
+		"name",
+	)
+	loads = get_allocation_loads(allocation)
+	statuses = [get_delivery_note_submission_status(load) for load in loads]
+	return {
+		"active_delivery_trip": active_delivery_trip,
+		"ready_for_delivery_trip": not active_delivery_trip
+		and bool(statuses)
+		and all(status["ready"] for status in statuses),
+		"draft_delivery_notes": sorted(
+			{note for status in statuses for note in status["draft_delivery_notes"]}
+		),
+		"submitted_delivery_notes": sorted(
+			{note for status in statuses for note in status["submitted_delivery_notes"]}
+		),
+	}
+
+
 def _validate_vehicle_category_for_loads(loads, vehicle_category):
 	if not vehicle_category:
 		frappe.throw(_("Select a Vehicle Category for the allocated vehicle."))

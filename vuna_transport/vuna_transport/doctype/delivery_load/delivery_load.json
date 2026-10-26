@@ -453,6 +453,11 @@
    "group": "Dispatch Execution",
    "link_doctype": "Delivery Trip",
    "link_fieldname": "vuna_delivery_load"
+  },
+  {
+   "group": "Dispatch Execution",
+   "link_doctype": "Vehicle Allocation",
+   "link_fieldname": "delivery_load"
   }
  ],
  "modified": "2026-10-17 09:53:42.020286",

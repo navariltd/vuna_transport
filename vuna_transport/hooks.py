@@ -276,7 +276,13 @@ doctype_js = {
 	"Vehicle Incident": "public/js/vehicle_incident_location.js",
 }
 
+doctype_list_js = {
+	"Delivery Note": "public/js/delivery_note_list.js",
+}
+
 override_doctype_dashboards = {
+	"Delivery Note": "vuna_transport.overrides.delivery_note_dashboard.get_data",
+	"Sales Order": "vuna_transport.overrides.sales_order_dashboard.get_data",
 	"Vehicle": "vuna_transport.overrides.vehicle_dashboard.get_data",
 }
 

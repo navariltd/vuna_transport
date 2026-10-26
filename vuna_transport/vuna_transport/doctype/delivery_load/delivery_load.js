@@ -170,15 +170,6 @@ function add_execution_actions(frm, summary) {
 		button.addClass("btn-primary");
 	}
 
-	if (summary.pick_list?.name) {
-		frm.add_custom_button(
-			__("Pick List"),
-			() => {
-				frappe.set_route("Form", "Pick List", summary.pick_list.name);
-			},
-			__("View")
-		);
-	}
 	if (frm.doc.docstatus === 1 && !summary.pick_list && !summary.delivery_notes.total) {
 		frm.add_custom_button(
 			__("Create Pick List (Optional)"),
@@ -188,22 +179,6 @@ function add_execution_actions(frm, summary) {
 				});
 			},
 			__("Warehouse")
-		);
-	}
-	if (summary.vehicle_allocation?.name) {
-		frm.add_custom_button(
-			__("Vehicle Allocation"),
-			() => {
-				frappe.set_route("Form", "Vehicle Allocation", summary.vehicle_allocation.name);
-			},
-			__("View")
-		);
-		frm.add_custom_button(
-			__("Allocation History"),
-			() => {
-				frappe.set_route("List", "Vehicle Allocation", { delivery_load: frm.doc.name });
-			},
-			__("View")
 		);
 	}
 	if (
@@ -221,22 +196,6 @@ function add_execution_actions(frm, summary) {
 				});
 			},
 			__("Dispatch")
-		);
-	}
-	if (summary.delivery_notes.names.length) {
-		frm.add_custom_button(
-			__("Delivery Notes"),
-			() => open_delivery_notes(summary.delivery_notes.names),
-			__("View")
-		);
-	}
-	if (summary.delivery_trip?.name) {
-		frm.add_custom_button(
-			__("Delivery Trip"),
-			() => {
-				frappe.set_route("Form", "Delivery Trip", summary.delivery_trip.name);
-			},
-			__("View")
 		);
 	}
 }

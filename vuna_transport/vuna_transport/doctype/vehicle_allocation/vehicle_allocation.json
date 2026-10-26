@@ -425,12 +425,17 @@
  "is_submittable": 1,
  "links": [
   {
-   "link_doctype": "Delivery Trip",
-   "link_fieldname": "vuna_vehicle_allocation"
-  },
-  {
+   "group": "Dispatch Execution",
    "link_doctype": "Delivery Trip",
    "link_fieldname": "vuna_current_vehicle_allocation"
+  },
+  {
+   "group": "Load Assignment",
+   "is_child_table": 1,
+   "link_doctype": "Vehicle Allocation Load",
+   "link_fieldname": "delivery_load",
+   "parent_doctype": "Delivery Load",
+   "table_fieldname": "delivery_loads"
   }
  ],
  "modified": "2026-09-18 09:22:03.495208",

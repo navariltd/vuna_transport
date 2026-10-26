@@ -41,35 +41,13 @@ frappe.ui.form.on("Vehicle Allocation", {
 
 	refresh(frm) {
 		update_load_selection_button(frm);
-		frm.remove_custom_button(__("Create Delivery Notes"), __("Execution"));
-		frm.remove_custom_button(__("Create Delivery Trip"), __("Execution"));
+		frm.remove_custom_button(__("Delivery Notes"), __("Create"));
+		frm.remove_custom_button(__("Delivery Trip"), __("Create"));
 		const loads = (frm.doc.delivery_loads || [])
 			.map((row) => row.delivery_load)
 			.filter(Boolean);
 		if (frm.doc.docstatus === 1 && loads.length) {
-			frm.add_custom_button(
-				__("Create Delivery Notes"),
-				() =>
-					frm.call("create_delivery_notes").then(({ message }) => {
-						if (!message) return;
-						if (message.length === 1) {
-							frappe.set_route("Form", "Delivery Note", message[0]);
-						} else {
-							frappe.set_route("List", "Delivery Note", { name: ["in", message] });
-						}
-					}),
-				__("Execution")
-			);
-			frm.add_custom_button(
-				__("Create Delivery Trip"),
-				() =>
-					frappe.model.open_mapped_doc({
-						method: "vuna_transport.services.fleet.vehicle_allocation_service.make_delivery_trip_from_allocation",
-						frm,
-						freeze_message: __("Preparing Delivery Trip..."),
-					}),
-				__("Execution")
-			);
+			add_next_execution_action(frm);
 		}
 		if (loads.length) {
 			frappe
@@ -78,11 +56,6 @@ frappe.ui.form.on("Vehicle Allocation", {
 					args: { delivery_loads: loads },
 				})
 				.then(({ message }) => render_capacity_summary(frm, message));
-			frm.add_custom_button(
-				__("Open Delivery Loads"),
-				() => frappe.set_route("List", "Delivery Load", { name: ["in", loads] }),
-				__("View")
-			);
 		}
 	},
 
@@ -156,6 +129,49 @@ frappe.ui.form.on("Vehicle Allocation", {
 			});
 	},
 });
+
+function add_next_execution_action(frm) {
+	frappe
+		.call({
+			method: "vuna_transport.services.fleet.vehicle_allocation_service.get_allocation_delivery_note_status",
+			args: { allocation_name: frm.doc.name },
+		})
+		.then(({ message }) => {
+			if (frm.doc.docstatus !== 1 || !message) return;
+			if (message.active_delivery_trip) return;
+			if (message.ready_for_delivery_trip) {
+				frm.add_custom_button(
+					__("Delivery Trip"),
+					() =>
+						frappe.model.open_mapped_doc({
+							method: "vuna_transport.services.fleet.vehicle_allocation_service.make_delivery_trip_from_allocation",
+							frm,
+							freeze_message: __("Preparing Delivery Trip..."),
+						}),
+					__("Create")
+				);
+				frm.page.set_inner_btn_group_as_primary(__("Create"));
+				return;
+			}
+
+			frm.add_custom_button(
+				__("Delivery Notes"),
+				() =>
+					frm.call("create_delivery_notes").then(({ message: delivery_notes }) => {
+						if (!delivery_notes) return;
+						if (delivery_notes.length === 1) {
+							frappe.set_route("Form", "Delivery Note", delivery_notes[0]);
+						} else {
+							frappe.set_route("List", "Delivery Note", {
+								name: ["in", delivery_notes],
+							});
+						}
+					}),
+				__("Create")
+			);
+			frm.page.set_inner_btn_group_as_primary(__("Create"));
+		});
+}
 
 function select_delivery_loads(frm) {
 	if (!frm.doc.company) {
