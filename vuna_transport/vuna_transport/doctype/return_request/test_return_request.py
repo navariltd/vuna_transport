@@ -17,6 +17,7 @@ from vuna_transport.services.execution.return_service import (
 	get_remaining_returnable_quantity,
 	get_return_request_state,
 	prepare_sales_return_cancellation,
+	sync_return_request_from_commercial_document,
 	sync_return_request_from_sales_return,
 	sync_sales_return_request_link,
 	validate_linked_sales_return_submission,
@@ -366,9 +367,16 @@ class TestReturnRequest(UnitTestCase):
 
 	@patch(
 		"vuna_transport.services.execution.return_service.frappe.db.get_value",
-		return_value=frappe._dict(against_sales_order="SO-1", so_detail="SOI-1"),
+		return_value=frappe._dict(
+			against_sales_order="SO-1",
+			so_detail="SOI-1",
+			price_list_rate=565,
+			discount_percentage=3,
+			discount_amount=16.95,
+			rate=548.05,
+		),
 	)
-	def test_duplicated_sales_return_row_recovers_original_item_lineage(self, _get_value):
+	def test_split_sales_return_row_recovers_source_lineage_and_commercial_terms(self, _get_value):
 		request = make_request(items=[SimpleNamespace(delivery_note_item="DNI-1", item_code="ITEM-1")])
 		row = SimpleNamespace(
 			idx=2,
@@ -383,6 +391,10 @@ class TestReturnRequest(UnitTestCase):
 		self.assertEqual(row.dn_detail, "DNI-1")
 		self.assertEqual(row.against_sales_order, "SO-1")
 		self.assertEqual(row.so_detail, "SOI-1")
+		self.assertEqual(row.price_list_rate, 565)
+		self.assertEqual(row.discount_percentage, 3)
+		self.assertEqual(row.discount_amount, 16.95)
+		self.assertEqual(row.rate, 548.05)
 
 	@patch(
 		"vuna_transport.services.execution.return_service.frappe.db.get_value",
@@ -492,5 +504,41 @@ class TestReturnRequest(UnitTestCase):
 			"return_stock_document",
 			None,
 			update_modified=False,
+		)
+		recalculate.assert_called_once_with("RR-0001")
+
+	@patch("vuna_transport.services.execution.return_service.recalculate_return_request")
+	@patch("vuna_transport.services.execution.return_service.frappe.db.set_value")
+	@patch("vuna_transport.services.execution.return_service.frappe.get_all", return_value=["RR-0001"])
+	def test_standard_credit_note_from_sales_return_links_return_request(
+		self, get_all, set_value, recalculate
+	):
+		credit_note = SimpleNamespace(
+			doctype="Sales Invoice",
+			name="SINV-RET-1",
+			docstatus=1,
+			is_return=1,
+			company="Test Company",
+			customer="Test Customer",
+			items=[SimpleNamespace(delivery_note="DN-RET-1")],
+		)
+
+		sync_return_request_from_commercial_document(credit_note)
+
+		get_all.assert_called_once_with(
+			"Return Request",
+			filters={
+				"return_stock_document": ["in", ["DN-RET-1"]],
+				"docstatus": ["!=", 2],
+				"company": "Test Company",
+				"customer": "Test Customer",
+			},
+			pluck="name",
+		)
+		set_value.assert_called_once_with(
+			"Return Request",
+			"RR-0001",
+			{"credit_note": "SINV-RET-1", "commercial_resolution": "Credit Customer"},
+			update_modified=True,
 		)
 		recalculate.assert_called_once_with("RR-0001")

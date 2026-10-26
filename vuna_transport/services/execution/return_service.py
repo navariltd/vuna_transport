@@ -28,6 +28,23 @@ ACTIVE_STATUSES = {
 TERMINAL_STATUSES = {"Resolved", "Closed", "Cancelled"}
 VALID_STATUSES = ACTIVE_STATUSES | TERMINAL_STATUSES
 
+# A Sales Return reverses the commercial terms that were executed on its source
+# Delivery Note. These fields are deliberately limited to ERPNext's standard
+# selling fields: transport does not own or recalculate pricing rules.
+RETURN_SALES_ITEM_COMMERCIAL_FIELDS = (
+	"price_list_rate",
+	"base_price_list_rate",
+	"margin_type",
+	"margin_rate_or_amount",
+	"rate_with_margin",
+	"base_rate_with_margin",
+	"discount_percentage",
+	"discount_amount",
+	"rate",
+	"base_rate",
+	"pricing_rules",
+)
+
 
 def validate_return_request(request):
 	"""Validate the return against the submitted delivery and live return balance."""
@@ -405,17 +422,26 @@ def get_remaining_returnable_quantity(delivery_note_item, exclude_request=None):
 
 
 @frappe.whitelist()
-def get_returnable_items(delivery_note):
+def get_returnable_items(delivery_note, exclude_request=None):
 	"""Return submitted Delivery Note items with remaining returnable quantities."""
 	require_doctype_permission("Delivery Note", "read")
 	source = frappe.get_doc("Delivery Note", delivery_note)
 	require_document_permission(source, "read")
 	if source.docstatus != 1 or source.is_return:
 		frappe.throw(_("Return Requests must reference a submitted non-return Delivery Note."))
+	if exclude_request:
+		request = frappe.get_doc("Return Request", exclude_request)
+		require_document_permission(request, "read")
+		if request.delivery_note != source.name:
+			frappe.throw(
+				_("Return Request {0} does not reference Delivery Note {1}.").format(
+					request.name, source.name
+				)
+			)
 
 	items = []
 	for row in source.items:
-		remaining = get_remaining_returnable_quantity(row.name)
+		remaining = get_remaining_returnable_quantity(row.name, exclude_request)
 		if remaining <= 0:
 			continue
 		delivery_order_item = row.get("delivery_order_item")
@@ -581,71 +607,6 @@ def record_no_further_action(return_request, remarks):
 
 
 @frappe.whitelist()
-def create_return_credit_note(return_request):
-	"""Prepare a draft ERPNext Credit Note for the quantity actually returned to stock."""
-	require_doctype_permission("Sales Invoice", "create")
-	frappe.db.sql("select name from `tabReturn Request` where name = %s for update", return_request)
-	request = frappe.get_doc("Return Request", return_request)
-	require_document_permission(request, "write")
-	require_company_access(request.company)
-	state = get_return_request_state(request)
-	if state["return_docstatus"] != 1:
-		frappe.throw(_("Submit the Sales Return before creating a Credit Note."))
-	if request.credit_note:
-		linked_status = frappe.db.get_value("Sales Invoice", request.credit_note, "docstatus")
-		if linked_status is not None and linked_status != 2:
-			return request.credit_note
-
-	sales_invoices = (
-		[request.sales_invoice]
-		if request.sales_invoice
-		else _get_source_sales_invoices(request.delivery_note)
-	)
-	if not sales_invoices:
-		frappe.throw(
-			_("No submitted Sales Invoice was found for Delivery Note {0}.").format(request.delivery_note)
-		)
-	if len(sales_invoices) > 1:
-		frappe.throw(
-			_(
-				"Delivery Note {0} is billed by multiple Sales Invoices. Select the source Sales Invoice first."
-			).format(request.delivery_note)
-		)
-
-	from erpnext.controllers.sales_and_purchase_return import make_return_doc
-
-	source_invoice = frappe.get_doc("Sales Invoice", sales_invoices[0])
-	require_document_permission(source_invoice, "read")
-	target = make_return_doc("Sales Invoice", source_invoice.name)
-	returned_stock_by_item = state["returned_stock_by_item"]
-	target_items = []
-	for row in target.items:
-		returned_stock_qty = returned_stock_by_item.get(row.dn_detail, 0)
-		if returned_stock_qty <= 0:
-			continue
-		conversion_factor = flt(row.conversion_factor) or 1
-		row.qty = -(returned_stock_qty / conversion_factor)
-		row.stock_qty = -returned_stock_qty
-		target_items.append(row)
-	target.set("items", target_items)
-	if not target.items:
-		frappe.throw(_("The source Sales Invoice has no rows matching the returned items."))
-	target.insert()
-	frappe.db.set_value(
-		"Return Request",
-		request.name,
-		{
-			"sales_invoice": sales_invoices[0],
-			"commercial_resolution": "Credit Customer",
-			"credit_note": target.name,
-		},
-		update_modified=True,
-	)
-	recalculate_return_request(request.name)
-	return target.name
-
-
-@frappe.whitelist()
 def create_replacement_sales_order(return_request):
 	"""Prepare a draft replacement Sales Order for stock that was actually returned."""
 	require_doctype_permission("Sales Order", "create")
@@ -753,39 +714,55 @@ def validate_linked_sales_return_submission(doc, method=None):
 
 
 def _map_split_sales_return_rows(request, sales_return):
-	"""Restore source-row lineage cleared when a standard return row is duplicated."""
+	"""Restore source lineage and commercial terms on linked Sales Return rows.
+
+	A user may split one returned item into separate rows for different return
+	warehouses or inspection outcomes. ERPNext treats a newly added row as a new
+	item selection and can therefore fetch today's Item Price. A tagged Return
+	Request must instead retain the price and discount executed on the original
+	Delivery Note, while still allowing the user to choose the physical outcome.
+	"""
 	request_items = {row.delivery_note_item: row for row in request.items}
 	request_items_by_code = defaultdict(list)
+	source_context_by_item = {}
 	for row in request.items:
 		request_items_by_code[row.item_code].append(row)
 
 	for row in sales_return.items:
-		if row.dn_detail in request_items:
-			continue
-		if row.dn_detail:
+		request_item = request_items.get(row.dn_detail)
+		if not request_item and row.dn_detail:
 			frappe.throw(
 				_("Row #{0}: Item {1} does not belong to Return Request {2}.").format(
 					row.idx, row.item_code, request.name
 				)
 			)
-		candidates = request_items_by_code.get(row.item_code, [])
-		if len(candidates) != 1:
-			frappe.throw(
-				_("Row #{0}: Item {1} cannot be matched uniquely to a Return Request item.").format(
-					row.idx, row.item_code
+		if not request_item:
+			candidates = request_items_by_code.get(row.item_code, [])
+			if len(candidates) != 1:
+				frappe.throw(
+					_("Row #{0}: Item {1} cannot be matched uniquely to a Return Request item.").format(
+						row.idx, row.item_code
+					)
 				)
+			request_item = candidates[0]
+			row.dn_detail = request_item.delivery_note_item
+
+		source = source_context_by_item.get(request_item.delivery_note_item)
+		if source is None:
+			source = frappe.db.get_value(
+				"Delivery Note Item",
+				request_item.delivery_note_item,
+				["against_sales_order", "so_detail", *RETURN_SALES_ITEM_COMMERCIAL_FIELDS],
+				as_dict=True,
 			)
-		request_item = candidates[0]
-		row.dn_detail = request_item.delivery_note_item
-		source = frappe.db.get_value(
-			"Delivery Note Item",
-			request_item.delivery_note_item,
-			["against_sales_order", "so_detail"],
-			as_dict=True,
-		)
-		if source:
-			row.against_sales_order = source.against_sales_order
-			row.so_detail = source.so_detail
+			source_context_by_item[request_item.delivery_note_item] = source
+		if not source or not hasattr(source, "get"):
+			continue
+
+		row.against_sales_order = source.against_sales_order
+		row.so_detail = source.so_detail
+		for fieldname in RETURN_SALES_ITEM_COMMERCIAL_FIELDS:
+			setattr(row, fieldname, source.get(fieldname))
 
 
 def validate_sales_return_request_link(doc, method=None):
@@ -827,6 +804,7 @@ def validate_sales_return_request_link(doc, method=None):
 					request.name, request.return_stock_document
 				)
 			)
+	_map_split_sales_return_rows(request, doc)
 
 
 def sync_sales_return_request_link(doc, method=None):
@@ -1036,6 +1014,21 @@ def _get_return_request_item_for_quality_inspection(doc):
 
 
 def sync_return_request_from_commercial_document(doc, method=None):
+	if doc.doctype == "Sales Invoice" and getattr(doc, "is_return", False):
+		return_request = _get_return_request_from_sales_return_credit_note(doc)
+		if return_request:
+			values = {"credit_note": doc.name if doc.docstatus == 1 else None}
+			if doc.docstatus == 1:
+				values["commercial_resolution"] = "Credit Customer"
+			elif (
+				frappe.db.get_value("Return Request", return_request, "commercial_resolution")
+				== "Credit Customer"
+			):
+				values["commercial_resolution"] = "Pending"
+			frappe.db.set_value("Return Request", return_request, values, update_modified=True)
+			recalculate_return_request(return_request)
+			return
+
 	field_by_doctype = {
 		"Sales Invoice": "credit_note",
 		"Sales Order": "replacement_sales_order",
@@ -1049,6 +1042,24 @@ def sync_return_request_from_commercial_document(doc, method=None):
 	)
 	if return_request:
 		recalculate_return_request(return_request)
+
+
+def _get_return_request_from_sales_return_credit_note(credit_note):
+	"""Find the one Return Request represented by an ERPNext Credit Note's Sales Return rows."""
+	sales_returns = {row.delivery_note for row in credit_note.items if getattr(row, "delivery_note", None)}
+	if not sales_returns:
+		return None
+
+	filters = {
+		"return_stock_document": ["in", list(sales_returns)],
+		"docstatus": ["!=", 2],
+	}
+	if getattr(credit_note, "company", None):
+		filters["company"] = credit_note.company
+	if getattr(credit_note, "customer", None):
+		filters["customer"] = credit_note.customer
+	return_requests = frappe.get_all("Return Request", filters=filters, pluck="name")
+	return return_requests[0] if len(return_requests) == 1 else None
 
 
 @frappe.whitelist()

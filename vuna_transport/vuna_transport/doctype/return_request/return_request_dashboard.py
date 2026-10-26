@@ -6,6 +6,9 @@ from frappe import _
 
 def get_data():
 	return {
+		# Enables Frappe's Connections client to fetch badge counts and resolved
+		# document names. Sales Returns carry this reverse link on Delivery Note.
+		"fieldname": "vuna_return_request",
 		"internal_links": {
 			"Proof of Delivery": "proof_of_delivery",
 			"Delivery Trip": "delivery_trip",

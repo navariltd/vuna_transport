@@ -10,6 +10,7 @@ class TestReturnRequestDashboard(UnitTestCase):
 	def test_generated_return_documents_are_available_as_connections(self):
 		data = get_data()
 
+		self.assertEqual(data["fieldname"], "vuna_return_request")
 		self.assertEqual(data["internal_links"]["Delivery Note"], "return_stock_document")
 		self.assertEqual(data["internal_links"]["Quality Inspection"], ["items", "quality_inspection"])
 		self.assertEqual(data["internal_links"]["Sales Invoice"], "credit_note")
