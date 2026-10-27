@@ -7,11 +7,13 @@ from frappe.model.document import Document
 from frappe.utils import getdate
 
 from vuna_transport.services.fleet.vehicle_owner_service import normalize_vehicle_owner
+from vuna_transport.services.shared.security_service import require_doctype_permission
 
 
 class VehicleOnboarding(Document):
 	def validate(self):
 		self.status = self.status or "Draft"
+		self._validate_license_plate()
 		self._set_category_model()
 		self._validate_owner()
 		self._validate_dates()
@@ -31,6 +33,26 @@ class VehicleOnboarding(Document):
 			frappe.throw(_("Supplier is required for a supplier-owned vehicle."))
 		if owner == "Company" and self.supplier:
 			frappe.throw(_("Supplier must be empty for a company-owned vehicle."))
+
+	def _validate_license_plate(self):
+		existing_vehicle = frappe.db.get_value("Vehicle", {"license_plate": self.license_plate}, "name")
+		if existing_vehicle and existing_vehicle != self.vehicle:
+			frappe.throw(
+				_("Vehicle {0} already exists for License Plate {1}.").format(
+					existing_vehicle, self.license_plate
+				)
+			)
+		existing_onboarding = frappe.db.get_value(
+			"Vehicle Onboarding",
+			{"license_plate": self.license_plate, "name": ["!=", self.name or ""]},
+			"name",
+		)
+		if existing_onboarding:
+			frappe.throw(
+				_("Vehicle Onboarding {0} already uses License Plate {1}.").format(
+					existing_onboarding, self.license_plate
+				)
+			)
 
 	def _set_category_model(self):
 		if not self.vehicle_category or self.vehicle_model:
@@ -68,12 +90,31 @@ class VehicleOnboarding(Document):
 					frappe.throw(_("Mandatory Vehicle insurance details are required before approval."))
 			elif requirement.name not in rows:
 				frappe.throw(_("Mandatory Vehicle Document {0} is missing.").format(requirement.name))
+		self._validate_template_documents(rows)
+
+	def _validate_template_documents(self, document_types):
+		if not self.transport_cost_structure:
+			return
+		template = frappe.db.get_value(
+			"Vehicle Onboarding Template",
+			{"transport_cost_structure": self.transport_cost_structure},
+			"name",
+		)
+		if not template:
+			return
+		required_documents = frappe.get_all(
+			"Vehicle Onboarding Template Document",
+			filters={"parent": template, "mandatory": 1},
+			pluck="vehicle_document_type",
+		)
+		missing = sorted(set(required_documents) - document_types)
+		if missing:
+			frappe.throw(_("Onboarding Template requires: {0}.").format(", ".join(missing)))
 
 	def _create_vehicle(self):
 		if self.vehicle:
 			return frappe.get_doc("Vehicle", self.vehicle)
-		if frappe.db.exists("Vehicle", self.license_plate):
-			frappe.throw(_("Vehicle {0} already exists.").format(self.license_plate))
+		self._validate_license_plate()
 
 		model = frappe.get_cached_doc("Vehicle Model", self.vehicle_model)
 		vehicle = frappe.get_doc(
@@ -117,3 +158,24 @@ class VehicleOnboarding(Document):
 					}
 				).insert()
 		return vehicle
+
+
+@frappe.whitelist()
+def get_onboarding_template_documents(transport_cost_structure):
+	"""Return the configured checklist for a submitted cost structure."""
+	require_doctype_permission("Vehicle Onboarding Template", "read")
+	if not transport_cost_structure:
+		return []
+	template = frappe.db.get_value(
+		"Vehicle Onboarding Template",
+		{"transport_cost_structure": transport_cost_structure},
+		"name",
+	)
+	if not template:
+		return []
+	return frappe.get_all(
+		"Vehicle Onboarding Template Document",
+		filters={"parent": template},
+		fields=["vehicle_document_type", "mandatory"],
+		order_by="idx",
+	)

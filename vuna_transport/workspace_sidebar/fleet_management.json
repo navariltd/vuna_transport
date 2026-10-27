@@ -175,6 +175,18 @@
    "icon": "clipboard",
    "indent": 0,
    "keep_closed": 0,
+   "label": "Vehicle Onboarding Template",
+   "link_to": "Vehicle Onboarding Template",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
+   "icon": "clipboard",
+   "indent": 0,
+   "keep_closed": 0,
    "label": "Vehicle Onboarding",
    "link_to": "Vehicle Onboarding",
    "link_type": "DocType",
@@ -392,7 +404,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-21 08:52:29.023529",
+ "modified": "2026-10-27 08:00:00.000000",
  "modified_by": "Administrator",
  "name": "Fleet Management",
  "owner": "Administrator",

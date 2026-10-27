@@ -121,6 +121,16 @@
   {
    "hidden": 0,
    "is_query_report": 0,
+   "label": "Vehicle Onboarding Template",
+   "link_count": 0,
+   "link_to": "Vehicle Onboarding Template",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
    "label": "Vehicle Documents",
    "link_count": 0,
    "link_to": "Vehicle Document",
@@ -331,7 +341,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-21 08:52:29.023529",
+ "modified": "2026-10-27 08:00:00.000000",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Fleet Management",
