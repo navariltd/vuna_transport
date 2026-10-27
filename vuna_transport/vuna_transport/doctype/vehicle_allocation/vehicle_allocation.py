@@ -12,6 +12,7 @@ from vuna_transport.services.fleet.vehicle_allocation_service import (
 	activate_allocation,
 	get_allocation_load_names,
 	restore_previous_allocation,
+	sync_allocation_execution_status,
 	validate_allocation,
 	validate_allocation_cancellation,
 )
@@ -40,6 +41,7 @@ class VehicleAllocation(Document):
 
 	def on_submit(self):
 		activate_allocation(self)
+		sync_allocation_execution_status(self)
 
 	def before_cancel(self):
 		validate_allocation_cancellation(self)

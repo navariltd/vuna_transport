@@ -27,7 +27,15 @@ from vuna_transport.services.shared.workflow_policy_service import (
 	allocation_is_required_before_delivery_notes,
 )
 
-ACTIVE_STATUSES = ("Allocated", "Accepted")
+ACTIVE_STATUSES = (
+	"Allocated",
+	"Accepted",
+	"Awaiting Delivery Notes",
+	"Ready for Delivery Trip",
+	"Delivery Trip Draft",
+	"Delivery Trip Scheduled",
+	"In Transit",
+)
 
 
 @frappe.whitelist()
@@ -612,6 +620,11 @@ def get_allocation_delivery_note_status(allocation_name):
 	"""Return the one execution action currently valid for a Vehicle Allocation."""
 	allocation = frappe.get_doc("Vehicle Allocation", allocation_name)
 	require_document_permission(allocation, "read")
+	return _get_allocation_execution_state(allocation)
+
+
+def _get_allocation_execution_state(allocation):
+	"""Return authoritative execution details for one allocation without permission checks."""
 	active_delivery_trip = frappe.db.get_value(
 		"Delivery Trip",
 		{"vuna_current_vehicle_allocation": allocation.name, "docstatus": ["!=", 2]},
@@ -623,6 +636,11 @@ def get_allocation_delivery_note_status(allocation_name):
 	)
 	loads = get_allocation_loads(allocation)
 	statuses = [get_delivery_note_submission_status(load) for load in loads]
+	trip = (
+		frappe.db.get_value("Delivery Trip", active_delivery_trip, ["name", "docstatus", "status"], as_dict=True)
+		if active_delivery_trip
+		else None
+	)
 	return {
 		"active_delivery_trip": active_delivery_trip,
 		"ready_for_delivery_trip": not active_delivery_trip
@@ -634,7 +652,76 @@ def get_allocation_delivery_note_status(allocation_name):
 		"submitted_delivery_notes": sorted(
 			{note for status in statuses for note in status["submitted_delivery_notes"]}
 		),
+		"execution_status": _get_allocation_execution_status(allocation, statuses, trip),
 	}
+
+
+def sync_allocation_execution_status(allocation):
+	"""Persist the allocation lifecycle state so the standard list filter remains useful."""
+	if isinstance(allocation, str):
+		allocation = frappe.get_doc("Vehicle Allocation", allocation)
+	if allocation.docstatus != 1 or allocation.status in ("Replaced", "Cancelled"):
+		return
+	status = _get_allocation_execution_state(allocation)["execution_status"]
+	if status != allocation.status:
+		allocation.db_set("status", status, update_modified=False)
+		allocation.status = status
+
+
+def sync_allocation_execution_status_for_delivery_note(doc, method=None):
+	"""Refresh allocations affected by a Delivery Note submission or cancellation."""
+	load_names = {getattr(doc, "vuna_delivery_load", None)}
+	load_names.update(
+		frappe.get_all(
+			"Delivery Note Item",
+			filters={"parent": doc.name},
+			pluck="vuna_delivery_load",
+		)
+	)
+	load_names.discard(None)
+	if not load_names:
+		return
+	allocation_names = frappe.get_all(
+		"Delivery Load",
+		filters={"name": ["in", list(load_names)], "active_vehicle_allocation": ["is", "set"]},
+		pluck="active_vehicle_allocation",
+	)
+	for allocation_name in set(allocation_names):
+		sync_allocation_execution_status(allocation_name)
+
+
+def sync_allocation_execution_status_for_delivery_trip(doc, method=None):
+	"""Refresh the allocation lifecycle after a Delivery Trip changes state."""
+	allocation_name = getattr(doc, "vuna_current_vehicle_allocation", None) or getattr(
+		doc, "vuna_vehicle_allocation", None
+	)
+	if allocation_name:
+		sync_allocation_execution_status(allocation_name)
+
+
+def _get_allocation_execution_status(allocation, note_statuses, trip=None):
+	"""Describe allocation progress from its authoritative execution documents."""
+	docstatus = getattr(allocation, "docstatus", 1)
+	allocation_status = getattr(allocation, "status", None) or "Allocated"
+	if docstatus == 0:
+		return "Draft"
+	if docstatus == 2 or allocation_status == "Cancelled":
+		return "Cancelled"
+	if allocation_status == "Replaced":
+		return "Replaced"
+	if trip:
+		if getattr(trip, "docstatus", None) == 0:
+			return "Delivery Trip Draft"
+		if getattr(trip, "status", None) == "In Transit":
+			return "In Transit"
+		if getattr(trip, "status", None) == "Completed":
+			return "Completed"
+		return "Delivery Trip Scheduled"
+	if note_statuses and all(status["ready"] for status in note_statuses):
+		return "Ready for Delivery Trip"
+	if any(status.get("active_delivery_notes") for status in note_statuses):
+		return "Awaiting Delivery Notes"
+	return allocation_status
 
 
 def _validate_vehicle_category_for_loads(loads, vehicle_category):

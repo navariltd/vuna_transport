@@ -40,6 +40,7 @@ frappe.ui.form.on("Vehicle Allocation", {
 	},
 
 	refresh(frm) {
+		set_allocation_execution_indicator(frm, frm.doc.status || "Draft");
 		update_load_selection_button(frm);
 		frm.remove_custom_button(__("Delivery Notes"), __("Create"));
 		frm.remove_custom_button(__("Delivery Trip"), __("Create"));
@@ -138,6 +139,7 @@ function add_next_execution_action(frm) {
 		})
 		.then(({ message }) => {
 			if (frm.doc.docstatus !== 1 || !message) return;
+			set_allocation_execution_indicator(frm, message.execution_status);
 			if (message.active_delivery_trip) return;
 			if (message.ready_for_delivery_trip) {
 				frm.add_custom_button(
@@ -171,6 +173,24 @@ function add_next_execution_action(frm) {
 			);
 			frm.page.set_inner_btn_group_as_primary(__("Create"));
 		});
+}
+
+function set_allocation_execution_indicator(frm, status) {
+	const indicators = {
+		Draft: "gray",
+		Allocated: "green",
+		Accepted: "green",
+		Rejected: "red",
+		"Awaiting Delivery Notes": "orange",
+		"Ready for Delivery Trip": "blue",
+		"Delivery Trip Draft": "orange",
+		"Delivery Trip Scheduled": "blue",
+		"In Transit": "blue",
+		Completed: "green",
+		Replaced: "gray",
+		Cancelled: "red",
+	};
+	frm.page.set_indicator(__(status), indicators[status] || "gray");
 }
 
 function select_delivery_loads(frm) {

@@ -14,8 +14,10 @@ from vuna_transport.services.fleet.vehicle_allocation_service import (
 	_validate_subcontractor,
 	get_allocation_delivery_note_status,
 	get_allocation_load_names,
+	_get_allocation_execution_status,
 	get_load_resource_window,
 	prepare_allocation_cancellation,
+	sync_allocation_execution_status,
 	time_windows_overlap,
 )
 from vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation import (
@@ -25,6 +27,47 @@ from vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation
 
 
 class TestVehicleAllocation(UnitTestCase):
+	@patch("vuna_transport.services.fleet.vehicle_allocation_service._get_allocation_execution_state")
+	def test_execution_status_is_saved_for_standard_list_filter(self, get_execution_state):
+		allocation = SimpleNamespace(docstatus=1, status="Allocated", db_set=MagicMock())
+		get_execution_state.return_value = {"execution_status": "Ready for Delivery Trip"}
+
+		sync_allocation_execution_status(allocation)
+
+		allocation.db_set.assert_called_once_with(
+			"status", "Ready for Delivery Trip", update_modified=False
+		)
+		self.assertEqual(allocation.status, "Ready for Delivery Trip")
+
+	def test_execution_status_is_derived_from_delivery_note_progress(self):
+		allocation = SimpleNamespace(docstatus=1, status="Allocated")
+
+		self.assertEqual(
+			_get_allocation_execution_status(
+				allocation,
+				[
+					{
+						"ready": False,
+						"active_delivery_notes": ["DN-001"],
+					}
+				],
+			),
+			"Awaiting Delivery Notes",
+		)
+		self.assertEqual(
+			_get_allocation_execution_status(
+				allocation,
+				[{"ready": True, "active_delivery_notes": ["DN-001"]}],
+			),
+			"Ready for Delivery Trip",
+		)
+
+	def test_execution_status_uses_delivery_trip_progress(self):
+		allocation = SimpleNamespace(docstatus=1, status="Allocated")
+		trip = SimpleNamespace(docstatus=1, status="In Transit")
+
+		self.assertEqual(_get_allocation_execution_status(allocation, [], trip), "In Transit")
+
 	@patch("vuna_transport.services.fleet.vehicle_allocation_service.get_delivery_note_submission_status")
 	@patch("vuna_transport.services.fleet.vehicle_allocation_service.get_allocation_loads")
 	@patch("vuna_transport.services.fleet.vehicle_allocation_service.require_document_permission")

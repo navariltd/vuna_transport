@@ -178,10 +178,12 @@ doc_events = {
 		"on_submit": [
 			"vuna_transport.services.demand.delivery_order_service.sync_delivery_orders_after_direct_delivery_note",
 			"vuna_transport.services.execution.lineage_service.complete_load_without_trip",
+			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_note",
 			"vuna_transport.services.execution.return_service.sync_return_request_from_sales_return",
 		],
 		"on_cancel": [
 			"vuna_transport.services.execution.lineage_service.reconcile_load_after_delivery_note_cancel",
+			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_note",
 			"vuna_transport.services.execution.return_service.sync_return_request_from_sales_return",
 		],
 		"on_trash": "vuna_transport.services.execution.return_service.prepare_sales_return_cancellation",
@@ -206,16 +208,22 @@ doc_events = {
 		"validate": "vuna_transport.services.execution.lineage_service.validate_delivery_trip",
 		"on_update": [
 			"vuna_transport.services.execution.lineage_service.link_delivery_trip",
+			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_trip",
 			"vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 		],
 		"on_submit": [
 			"vuna_transport.services.execution.lineage_service.submit_delivery_trip",
+			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_trip",
 			"vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 		],
-		"on_update_after_submit": "vuna_transport.services.mobile.mobile_trip_execution_service.synchronize_mobile_trip_execution_status",
+		"on_update_after_submit": [
+			"vuna_transport.services.mobile.mobile_trip_execution_service.synchronize_mobile_trip_execution_status",
+			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_trip",
+		],
 		"on_cancel": [
 			"vuna_transport.services.execution.lineage_service.cancel_delivery_trip",
 			"vuna_transport.services.execution.lineage_service.unlink_delivery_trip",
+			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_trip",
 			"vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 		],
 		"on_trash": [
