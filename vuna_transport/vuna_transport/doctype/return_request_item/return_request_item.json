@@ -9,6 +9,7 @@
   "item_name",
   "column_break_links",
   "delivery_note_item",
+  "sales_invoice_item",
   "delivery_order_item",
   "quantity_section",
   "delivered_qty",
@@ -54,8 +55,14 @@
    "fieldtype": "Link",
    "label": "Delivery Note Item",
    "options": "Delivery Note Item",
-   "read_only": 1,
-   "reqd": 1
+   "read_only": 1
+  },
+  {
+   "fieldname": "sales_invoice_item",
+   "fieldtype": "Link",
+   "label": "Sales Invoice Item",
+   "options": "Sales Invoice Item",
+   "read_only": 1
   },
   {
    "fieldname": "delivery_order_item",
@@ -195,7 +202,7 @@
  "grid_page_length": 50,
  "istable": 1,
  "links": [],
- "modified": "2026-10-17 00:41:18.449536",
+ "modified": "2026-10-27 07:26:01.000000",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Return Request Item",

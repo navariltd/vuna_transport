@@ -52,12 +52,12 @@ def validate_return_request(request):
 		request.initiation_date = nowdate()
 	if request.status not in VALID_STATUSES:
 		frappe.throw(_("Invalid Return Request status: {0}").format(request.status))
-	delivery_note = _get_source_delivery_note(request)
-	_populate_request_context(request, delivery_note)
+	source_type, source = _get_return_source(request)
+	_populate_request_context(request, source, source_type)
 	_set_return_source(request)
 	_validate_return_warehouse(request)
-	_validate_items(request, delivery_note)
-	_validate_follow_up_documents(request, delivery_note)
+	_validate_items(request, source, source_type)
+	_validate_follow_up_documents(request, source, source_type)
 	_apply_return_state(request, get_return_request_state(request))
 
 
@@ -69,44 +69,64 @@ def _set_return_source(request):
 		request.return_source = "Manual"
 
 
-def _get_source_delivery_note(request):
-	if not request.delivery_note:
-		frappe.throw(_("Delivery Note is required."))
-	delivery_note = frappe.get_doc("Delivery Note", request.delivery_note)
-	require_document_permission(delivery_note, "read")
-	if delivery_note.docstatus != 1 or delivery_note.is_return:
-		frappe.throw(_("Return Requests must reference a submitted non-return Delivery Note."))
-	return delivery_note
+def _get_return_source(request):
+	"""Resolve one authoritative return source without guessing across deliveries."""
+	if request.delivery_note:
+		delivery_note = frappe.get_doc("Delivery Note", request.delivery_note)
+		require_document_permission(delivery_note, "read")
+		if delivery_note.docstatus != 1 or delivery_note.is_return:
+			frappe.throw(_("Return Requests must reference a submitted non-return Delivery Note."))
+		return "Delivery Note", delivery_note
+	if not request.sales_invoice:
+		frappe.throw(_("Select a Delivery Note or Sales Invoice."))
+	sales_invoice = frappe.get_doc("Sales Invoice", request.sales_invoice)
+	require_document_permission(sales_invoice, "read")
+	if sales_invoice.docstatus != 1 or sales_invoice.is_return:
+		frappe.throw(_("Return Requests must reference a submitted non-return Sales Invoice."))
+	if sales_invoice.update_stock:
+		return "Sales Invoice", sales_invoice
+	delivery_notes = sorted({row.delivery_note for row in sales_invoice.items if row.delivery_note})
+	if len(delivery_notes) != 1:
+		frappe.throw(
+			_(
+				"Sales Invoice {0} is linked to multiple or no Delivery Notes. Select the Delivery Note to return."
+			).format(sales_invoice.name)
+		)
+	request.delivery_note = delivery_notes[0]
+	return _get_return_source(request)
 
 
-def _populate_request_context(request, delivery_note):
+def _populate_request_context(request, source, source_type):
 	for fieldname in ("company", "customer"):
-		if request.get(fieldname) and request.get(fieldname) != delivery_note.get(fieldname):
+		if request.get(fieldname) and request.get(fieldname) != source.get(fieldname):
 			frappe.throw(
 				_("{0} must match Delivery Note {1}.").format(
-					fieldname.replace("_", " ").title(), delivery_note.name
+					fieldname.replace("_", " ").title(), source.name
 				)
 			)
-		request.set(fieldname, delivery_note.get(fieldname))
+		request.set(fieldname, source.get(fieldname))
 	if not request.sales_order:
 		request.sales_order = next(
-			(row.against_sales_order for row in delivery_note.items if row.against_sales_order), None
+			(
+				row.against_sales_order if source_type == "Delivery Note" else row.sales_order
+				for row in source.items
+				if (row.against_sales_order if source_type == "Delivery Note" else row.sales_order)
+			),
+			None,
 		)
-	if not request.sales_invoice:
-		sales_invoices = _get_source_sales_invoices(delivery_note.name)
+	if source_type == "Delivery Note" and not request.sales_invoice:
+		sales_invoices = _get_source_sales_invoices(source.name)
 		if len(sales_invoices) == 1:
 			request.sales_invoice = sales_invoices[0]
-	if request.delivery_trip:
+	if source_type == "Delivery Note" and request.delivery_trip:
 		trip = frappe.get_doc("Delivery Trip", request.delivery_trip)
-		if not any(row.delivery_note == delivery_note.name for row in trip.delivery_stops):
+		if not any(row.delivery_note == source.name for row in trip.delivery_stops):
 			frappe.throw(
-				_("Delivery Trip {0} does not contain Delivery Note {1}.").format(
-					trip.name, delivery_note.name
-				)
+				_("Delivery Trip {0} does not contain Delivery Note {1}.").format(trip.name, source.name)
 			)
-	if request.proof_of_delivery:
+	if source_type == "Delivery Note" and request.proof_of_delivery:
 		pod = frappe.get_doc("Proof of Delivery", request.proof_of_delivery)
-		if pod.docstatus != 1 or pod.delivery_note != delivery_note.name:
+		if pod.docstatus != 1 or pod.delivery_note != source.name:
 			frappe.throw(_("Proof of Delivery must be submitted for the selected Delivery Note."))
 
 
@@ -120,39 +140,43 @@ def _validate_return_warehouse(request):
 		frappe.throw(_("Return Warehouse must belong to Company {0}.").format(request.company))
 
 
-def _validate_items(request, delivery_note):
+def _validate_items(request, source, source_type):
 	if not request.items:
 		frappe.throw(_("At least one Return Request Item is required."))
-	delivery_items = {row.name: row for row in delivery_note.items}
+	source_items = {row.name: row for row in source.items}
 	seen = set()
 	for row in request.items:
-		if row.delivery_note_item in seen:
-			frappe.throw(_("Delivery Note Item {0} appears more than once.").format(row.delivery_note_item))
-		seen.add(row.delivery_note_item)
-		delivery_item = delivery_items.get(row.delivery_note_item)
-		if not delivery_item:
+		reference_field = "delivery_note_item" if source_type == "Delivery Note" else "sales_invoice_item"
+		reference = row.get(reference_field)
+		if not reference or reference in seen:
+			frappe.throw(_("Each return item must reference one unique source item."))
+		seen.add(reference)
+		source_item = source_items.get(reference)
+		if not source_item:
 			frappe.throw(
-				_("Item {0} does not belong to Delivery Note {1}.").format(
-					row.delivery_note_item, delivery_note.name
-				)
+				_("Item {0} does not belong to {1} {2}.").format(reference, source_type, source.name)
 			)
-		row.item_code = delivery_item.item_code
-		row.item_name = delivery_item.item_name
-		row.uom = delivery_item.uom
-		row.stock_uom = delivery_item.stock_uom
-		row.conversion_factor = flt(delivery_item.conversion_factor) or 1
-		row.delivered_qty = abs(flt(delivery_item.qty))
-		if row.delivery_order_item and delivery_item.so_detail:
+		row.item_code = source_item.item_code
+		row.item_name = source_item.item_name
+		row.uom = source_item.uom
+		row.stock_uom = source_item.stock_uom
+		row.conversion_factor = flt(source_item.conversion_factor) or 1
+		row.delivered_qty = abs(flt(source_item.qty))
+		if source_type == "Delivery Note" and row.delivery_order_item and source_item.so_detail:
 			if (
 				frappe.db.get_value("Delivery Order Item", row.delivery_order_item, "sales_order_item")
-				!= delivery_item.so_detail
+				!= source_item.so_detail
 			):
 				frappe.throw(
 					_("Delivery Order Item does not match Delivery Note Item {0}.").format(
 						row.delivery_note_item
 					)
 				)
-		remaining = get_remaining_returnable_quantity(row.delivery_note_item, request.name)
+		remaining = (
+			get_remaining_returnable_quantity(reference, request.name)
+			if source_type == "Delivery Note"
+			else get_remaining_returnable_sales_invoice_quantity(reference, request.name)
+		)
 		requested = flt(row.requested_return_qty)
 		if requested <= 0 or requested > remaining:
 			frappe.throw(
@@ -178,27 +202,30 @@ def _validate_items(request, delivery_note):
 					row.item_code
 				)
 			)
-		_validate_quality_inspection(row, request, delivery_note)
+		_validate_quality_inspection(row, request, source)
 
 
-def _validate_quality_inspection(row, request, delivery_note):
+def _validate_quality_inspection(row, request, source):
 	if not row.quality_inspection:
 		return
 	inspection = frappe.get_doc("Quality Inspection", row.quality_inspection)
-	expected_reference = getattr(request, "return_stock_document", None)
+	expected_reference = getattr(request, "return_stock_document", None) or getattr(
+		request, "credit_note", None
+	)
 	if not expected_reference:
 		frappe.throw(_("Create the draft Sales Return before linking Quality Inspections."))
-	if inspection.reference_type != "Delivery Note" or inspection.reference_name != expected_reference:
+	expected_type = "Delivery Note" if request.delivery_note else "Sales Invoice"
+	if inspection.reference_type != expected_type or inspection.reference_name != expected_reference:
 		frappe.throw(
-			_("Quality Inspection {0} must reference Delivery Note {1}.").format(
-				row.quality_inspection, expected_reference
+			_("Quality Inspection {0} must reference {1} {2}.").format(
+				row.quality_inspection, expected_type, expected_reference
 			)
 		)
 	if inspection.item_code != row.item_code:
 		frappe.throw(_("Quality Inspection {0} is for a different item.").format(row.quality_inspection))
 
 
-def _validate_follow_up_documents(request, delivery_note):
+def _validate_follow_up_documents(request, source, source_type):
 	if request.sales_invoice:
 		sales_invoice = frappe.get_doc("Sales Invoice", request.sales_invoice)
 		if (
@@ -236,7 +263,7 @@ def _validate_follow_up_documents(request, delivery_note):
 			or follow_up.customer != request.customer
 		):
 			frappe.throw(_("Replacement Delivery Order must belong to the same Company and Customer."))
-		if follow_up.name == request.delivery_note:
+		if request.delivery_note and follow_up.name == request.delivery_note:
 			frappe.throw(_("The original Delivery Note cannot be its own replacement reference."))
 
 
@@ -251,10 +278,19 @@ def _get_source_sales_invoices(delivery_note):
 
 def get_return_request_state(request):
 	"""Derive return progress from ERPNext documents instead of browser-maintained status."""
-	expected_by_item = {row.delivery_note_item: flt(row.requested_return_qty) for row in request.items}
+	has_delivery_note = bool(request.get("delivery_note"))
+	reference_field = "delivery_note_item" if has_delivery_note else "sales_invoice_item"
+	if not has_delivery_note and any(getattr(row, "delivery_note_item", None) for row in request.items):
+		# Keeps state calculation compatible with legacy requests created before
+		# Sales Invoice items were introduced as an alternate source.
+		has_delivery_note = True
+		reference_field = "delivery_note_item"
+	expected_by_item = {
+		getattr(row, reference_field, None): flt(row.requested_return_qty) for row in request.items
+	}
 	returned_by_item = dict.fromkeys(expected_by_item, 0.0)
 	returned_stock_by_item = dict.fromkeys(expected_by_item, 0.0)
-	request_items = {row.delivery_note_item: row for row in request.items}
+	request_items = {getattr(row, reference_field, None): row for row in request.items}
 	return_docstatus = None
 
 	if request.return_stock_document and frappe.db.exists("Delivery Note", request.return_stock_document):
@@ -270,6 +306,20 @@ def get_return_request_state(request):
 					returned_stock_by_item[row.dn_detail] += stock_qty
 					returned_by_item[row.dn_detail] += _from_stock_qty(
 						stock_qty, request_items[row.dn_detail]
+					)
+	elif not has_delivery_note and request.credit_note:
+		return_docstatus = frappe.db.get_value("Sales Invoice", request.credit_note, "docstatus")
+		if return_docstatus == 1:
+			for row in frappe.get_all(
+				"Sales Invoice Item",
+				filters={"parent": request.credit_note},
+				fields=["sales_invoice_item", "stock_qty", "qty"],
+			):
+				if row.sales_invoice_item in returned_by_item:
+					stock_qty = abs(flt(row.stock_qty or row.qty))
+					returned_stock_by_item[row.sales_invoice_item] += stock_qty
+					returned_by_item[row.sales_invoice_item] += _from_stock_qty(
+						stock_qty, request_items[row.sales_invoice_item]
 					)
 
 	inspection_complete = True
@@ -296,7 +346,11 @@ def get_return_request_state(request):
 		status = "Draft"
 	elif request.docstatus == 2:
 		status = "Cancelled"
-	elif not request.return_stock_document or return_docstatus in (None, 2):
+	elif (
+		(has_delivery_note and not request.return_stock_document)
+		or (not has_delivery_note and not request.credit_note)
+		or return_docstatus in (None, 2)
+	):
 		status = "Awaiting Sales Return"
 	elif return_docstatus == 0:
 		status = (
@@ -345,7 +399,7 @@ def _apply_return_state(request, state):
 	request.returned_qty = state["returned_qty"]
 	request.return_difference_qty = state["return_difference_qty"]
 	for row in request.items:
-		row.received_qty = state["returned_by_item"].get(row.delivery_note_item, 0)
+		row.received_qty = state["returned_by_item"].get(row.delivery_note_item or row.sales_invoice_item, 0)
 		row.remaining_qty = max(flt(row.requested_return_qty) - flt(row.received_qty), 0)
 
 
@@ -421,6 +475,38 @@ def get_remaining_returnable_quantity(delivery_note_item, exclude_request=None):
 	return max(delivered - flt(returned) - flt(requested), 0)
 
 
+def get_remaining_returnable_sales_invoice_quantity(sales_invoice_item, exclude_request=None):
+	"""Return remaining quantity in a stock-updating Sales Invoice item's UOM."""
+	row = frappe.db.get_value(
+		"Sales Invoice Item", sales_invoice_item, ["qty", "conversion_factor"], as_dict=True
+	)
+	if not row:
+		frappe.throw(_("Sales Invoice Item {0} was not found.").format(sales_invoice_item))
+	conversion_factor = flt(row.conversion_factor) or 1
+	delivered = abs(flt(row.qty))
+	returned_stock = frappe.db.sql(
+		"""
+		select coalesce(sum(abs(sii.stock_qty)), 0)
+		from `tabSales Invoice Item` sii
+		inner join `tabSales Invoice` si on si.name = sii.parent
+		where sii.sales_invoice_item = %s and si.is_return = 1 and si.docstatus = 1
+		""",
+		sales_invoice_item,
+	)[0][0]
+	returned = flt(returned_stock) / conversion_factor
+	requested = frappe.db.sql(
+		"""
+		select coalesce(sum(rri.requested_return_qty), 0)
+		from `tabReturn Request Item` rri
+		inner join `tabReturn Request` rr on rr.name = rri.parent
+		where rri.sales_invoice_item = %s and rr.docstatus != 2
+		and (%s is null or rr.name != %s)
+		""",
+		(sales_invoice_item, exclude_request, exclude_request),
+	)[0][0]
+	return max(delivered - returned - flt(requested), 0)
+
+
 @frappe.whitelist()
 def get_returnable_items(delivery_note, exclude_request=None):
 	"""Return submitted Delivery Note items with remaining returnable quantities."""
@@ -465,6 +551,48 @@ def get_returnable_items(delivery_note, exclude_request=None):
 			}
 		)
 	return items
+
+
+@frappe.whitelist()
+def get_sales_invoice_return_context(sales_invoice, exclude_request=None):
+	"""Resolve a Sales Invoice into its Delivery Note or stock-return item context."""
+	require_doctype_permission("Sales Invoice", "read")
+	source = frappe.get_doc("Sales Invoice", sales_invoice)
+	require_document_permission(source, "read")
+	require_company_access(source.company)
+	if source.docstatus != 1 or source.is_return:
+		frappe.throw(_("Select a submitted non-return Sales Invoice."))
+	if not source.update_stock:
+		delivery_notes = sorted({row.delivery_note for row in source.items if row.delivery_note})
+		if not delivery_notes:
+			frappe.throw(
+				_("This Sales Invoice is not linked to a Delivery Note. Select the Delivery Note instead.")
+			)
+		return {
+			"source_type": "Delivery Note",
+			"delivery_note": delivery_notes[0] if len(delivery_notes) == 1 else None,
+			"delivery_notes": delivery_notes,
+			"items": [],
+		}
+
+	items = []
+	for row in source.items:
+		remaining = get_remaining_returnable_sales_invoice_quantity(row.name, exclude_request)
+		if remaining <= 0:
+			continue
+		items.append(
+			{
+				"sales_invoice_item": row.name,
+				"item_code": row.item_code,
+				"item_name": row.item_name,
+				"delivered_qty": abs(flt(row.qty)),
+				"requested_return_qty": remaining,
+				"uom": row.uom,
+				"stock_uom": row.stock_uom,
+				"conversion_factor": flt(row.conversion_factor) or 1,
+			}
+		)
+	return {"source_type": "Sales Invoice", "delivery_note": None, "items": items}
 
 
 @frappe.whitelist()
@@ -543,18 +671,50 @@ def record_custody_transfer(return_request, to_custody, responsible_party=None, 
 
 @frappe.whitelist()
 def create_return_stock_document(return_request):
-	"""Prepare one idempotent draft ERPNext return Delivery Note."""
-	require_doctype_permission("Delivery Note", "create")
+	"""Prepare the appropriate ERPNext stock return for the request source."""
 	frappe.db.sql("select name from `tabReturn Request` where name = %s for update", return_request)
 	request = frappe.get_doc("Return Request", return_request)
 	require_document_permission(request, "read")
 	require_company_access(request.company)
 	if request.docstatus != 1:
 		frappe.throw(_("Submit the Return Request before creating its Sales Return."))
+	if not request.delivery_note:
+		require_doctype_permission("Sales Invoice", "create")
+		if request.credit_note:
+			linked_status = frappe.db.get_value("Sales Invoice", request.credit_note, "docstatus")
+			if linked_status is not None and linked_status != 2:
+				return {"doctype": "Sales Invoice", "name": request.credit_note}
+		from erpnext.controllers.sales_and_purchase_return import make_return_doc
+
+		source = frappe.get_doc("Sales Invoice", request.sales_invoice)
+		require_document_permission(source, "read")
+		target = make_return_doc("Sales Invoice", source.name)
+		requested_by_item = {row.sales_invoice_item: row for row in request.items}
+		target_items = []
+		for row in target.items:
+			request_item = requested_by_item.get(row.sales_invoice_item)
+			if not request_item:
+				continue
+			quantity = flt(request_item.requested_return_qty)
+			if quantity <= 0:
+				continue
+			row.qty = -quantity
+			row.stock_qty = -(quantity * (flt(row.conversion_factor) or 1))
+			row.warehouse = request.return_warehouse
+			target_items.append(row)
+		target.set("items", target_items)
+		if not target.items:
+			frappe.throw(_("No return items could be mapped to the original Sales Invoice."))
+		target.insert()
+		request.db_set("credit_note", target.name, update_modified=True)
+		recalculate_return_request(request.name)
+		return {"doctype": "Sales Invoice", "name": target.name}
+
+	require_doctype_permission("Delivery Note", "create")
 	if request.return_stock_document:
 		linked_status = frappe.db.get_value("Delivery Note", request.return_stock_document, "docstatus")
 		if linked_status is not None and linked_status != 2:
-			return request.return_stock_document
+			return {"doctype": "Delivery Note", "name": request.return_stock_document}
 	from erpnext.controllers.sales_and_purchase_return import make_return_doc
 
 	source = frappe.get_doc("Delivery Note", request.delivery_note)
@@ -581,7 +741,7 @@ def create_return_stock_document(return_request):
 	target.insert()
 	request.db_set("return_stock_document", target.name, update_modified=True)
 	recalculate_return_request(request.name)
-	return target.name
+	return {"doctype": "Delivery Note", "name": target.name}
 
 
 @frappe.whitelist()
@@ -617,6 +777,10 @@ def create_replacement_sales_order(return_request):
 	state = get_return_request_state(request)
 	if state["return_docstatus"] != 1:
 		frappe.throw(_("Submit the Sales Return before creating a replacement."))
+	if not request.delivery_note:
+		frappe.throw(
+			_("Replacement Sales Orders are available only for returns originating from a Delivery Note.")
+		)
 	if request.replacement_sales_order:
 		linked_status = frappe.db.get_value("Sales Order", request.replacement_sales_order, "docstatus")
 		if linked_status is not None and linked_status != 2:
@@ -713,6 +877,38 @@ def validate_linked_sales_return_submission(doc, method=None):
 			)
 
 
+def validate_linked_sales_invoice_credit_note_submission(doc, method=None):
+	"""Keep a direct stock-invoice credit note within its Return Request quantity."""
+	if not doc.is_return:
+		return
+	return_request = frappe.db.get_value("Return Request", {"credit_note": doc.name, "docstatus": 1}, "name")
+	if not return_request:
+		return
+	request = frappe.get_doc("Return Request", return_request)
+	if request.delivery_note:
+		return
+	require_company_access(request.company)
+	_map_split_credit_note_rows(request, doc)
+	request_items = {row.sales_invoice_item: row for row in request.items}
+	returned_by_item = defaultdict(float)
+	for row in doc.items:
+		if row.sales_invoice_item not in request_items:
+			frappe.throw(
+				_("Row #{0}: Item {1} does not belong to Return Request {2}.").format(
+					row.idx, row.item_code, request.name
+				)
+			)
+		returned_by_item[row.sales_invoice_item] += abs(flt(row.qty))
+	for sales_invoice_item, returned_qty in returned_by_item.items():
+		requested = flt(request_items[sales_invoice_item].requested_return_qty)
+		if returned_qty > requested:
+			frappe.throw(
+				_("Credit Note quantity for {0} cannot exceed the requested return quantity {1}.").format(
+					request_items[sales_invoice_item].item_code, requested
+				)
+			)
+
+
 def _map_split_sales_return_rows(request, sales_return):
 	"""Restore source lineage and commercial terms on linked Sales Return rows.
 
@@ -763,6 +959,43 @@ def _map_split_sales_return_rows(request, sales_return):
 		row.so_detail = source.so_detail
 		for fieldname in RETURN_SALES_ITEM_COMMERCIAL_FIELDS:
 			setattr(row, fieldname, source.get(fieldname))
+
+
+def _map_split_credit_note_rows(request, credit_note):
+	"""Keep direct Sales Invoice lineage and commercial terms when users split rows."""
+	request_items = {row.sales_invoice_item: row for row in request.items}
+	request_items_by_code = defaultdict(list)
+	for row in request.items:
+		request_items_by_code[row.item_code].append(row)
+
+	for row in credit_note.items:
+		request_item = request_items.get(row.sales_invoice_item)
+		if not request_item and row.sales_invoice_item:
+			frappe.throw(
+				_("Row #{0}: Item {1} does not belong to Return Request {2}.").format(
+					row.idx, row.item_code, request.name
+				)
+			)
+		if not request_item:
+			candidates = request_items_by_code.get(row.item_code, [])
+			if len(candidates) != 1:
+				frappe.throw(
+					_("Row #{0}: Item {1} cannot be matched uniquely to a Return Request item.").format(
+						row.idx, row.item_code
+					)
+				)
+			request_item = candidates[0]
+			row.sales_invoice_item = request_item.sales_invoice_item
+
+		source = frappe.db.get_value(
+			"Sales Invoice Item",
+			request_item.sales_invoice_item,
+			RETURN_SALES_ITEM_COMMERCIAL_FIELDS,
+			as_dict=True,
+		)
+		if source:
+			for fieldname in RETURN_SALES_ITEM_COMMERCIAL_FIELDS:
+				setattr(row, fieldname, source.get(fieldname))
 
 
 def validate_sales_return_request_link(doc, method=None):
@@ -958,6 +1191,59 @@ def sync_return_request_from_sales_return(doc, method=None):
 		recalculate_return_request(return_request)
 
 
+def _sync_direct_credit_note_outcomes(request, credit_note):
+	"""Persist physical return outcomes for a credit note made from a stock invoice."""
+	if credit_note.docstatus == 2:
+		for row in request.items:
+			frappe.db.set_value(
+				"Return Request Item",
+				row.name,
+				{
+					"received_qty": 0,
+					"accepted_return_qty": 0,
+					"rejected_return_qty": 0,
+					"remaining_qty": flt(row.requested_return_qty),
+				},
+				update_modified=False,
+			)
+		return
+	if credit_note.docstatus != 1:
+		return
+	request_items = {row.sales_invoice_item: row for row in request.items}
+	warehouses = {row.warehouse for row in credit_note.items if row.warehouse}
+	rejected_warehouses = set()
+	if warehouses:
+		rejected_warehouses = set(
+			frappe.get_all(
+				"Warehouse",
+				filters={"name": ["in", list(warehouses)], "is_rejected_warehouse": 1},
+				pluck="name",
+			)
+		)
+	outcomes = defaultdict(lambda: {"returned": 0.0, "accepted": 0.0, "rejected": 0.0})
+	for row in credit_note.items:
+		request_item = request_items.get(row.sales_invoice_item)
+		if not request_item:
+			continue
+		quantity = abs(flt(row.qty))
+		outcomes[row.sales_invoice_item]["returned"] += quantity
+		classification = "rejected" if row.warehouse in rejected_warehouses else "accepted"
+		outcomes[row.sales_invoice_item][classification] += quantity
+	for row in request.items:
+		outcome = outcomes[row.sales_invoice_item]
+		frappe.db.set_value(
+			"Return Request Item",
+			row.name,
+			{
+				"received_qty": outcome["returned"],
+				"accepted_return_qty": outcome["accepted"],
+				"rejected_return_qty": outcome["rejected"],
+				"remaining_qty": max(flt(row.requested_return_qty) - outcome["returned"], 0),
+			},
+			update_modified=False,
+		)
+
+
 def sync_return_request_from_quality_inspection(doc, method=None):
 	request_item = _get_return_request_item_for_quality_inspection(doc)
 	return_request = request_item.parent if request_item else None
@@ -992,22 +1278,26 @@ def _get_return_request_item_for_quality_inspection(doc):
 	request_item = frappe.db.get_value(
 		"Return Request Item", {"quality_inspection": doc.name}, ["name", "parent"], as_dict=True
 	)
-	if request_item or doc.reference_type != "Delivery Note" or not doc.reference_name:
+	if request_item or doc.reference_type not in {"Delivery Note", "Sales Invoice"} or not doc.reference_name:
 		return request_item
 
+	link_field = "return_stock_document" if doc.reference_type == "Delivery Note" else "credit_note"
 	return_request = frappe.db.get_value(
-		"Return Request",
-		{"return_stock_document": doc.reference_name, "docstatus": ["!=", 2]},
-		"name",
+		"Return Request", {link_field: doc.reference_name, "docstatus": ["!=", 2]}, "name"
 	)
 	if not return_request or not doc.child_row_reference:
 		return None
-	delivery_note_item = frappe.db.get_value("Delivery Note Item", doc.child_row_reference, "dn_detail")
-	if not delivery_note_item:
+	if doc.reference_type == "Delivery Note":
+		source_item = frappe.db.get_value("Delivery Note Item", doc.child_row_reference, "dn_detail")
+		source_field = "delivery_note_item"
+	else:
+		source_item = frappe.db.get_value("Sales Invoice Item", doc.child_row_reference, "sales_invoice_item")
+		source_field = "sales_invoice_item"
+	if not source_item:
 		return None
 	return frappe.db.get_value(
 		"Return Request Item",
-		{"parent": return_request, "delivery_note_item": delivery_note_item},
+		{"parent": return_request, source_field: source_item},
 		["name", "parent"],
 		as_dict=True,
 	)
@@ -1017,6 +1307,9 @@ def sync_return_request_from_commercial_document(doc, method=None):
 	if doc.doctype == "Sales Invoice" and getattr(doc, "is_return", False):
 		return_request = _get_return_request_from_sales_return_credit_note(doc)
 		if return_request:
+			if not any(getattr(row, "delivery_note", None) for row in doc.items):
+				request = frappe.get_doc("Return Request", return_request)
+				_sync_direct_credit_note_outcomes(request, doc)
 			values = {"credit_note": doc.name if doc.docstatus == 1 else None}
 			if doc.docstatus == 1:
 				values["commercial_resolution"] = "Credit Customer"
@@ -1046,6 +1339,11 @@ def sync_return_request_from_commercial_document(doc, method=None):
 
 def _get_return_request_from_sales_return_credit_note(credit_note):
 	"""Find the one Return Request represented by an ERPNext Credit Note's Sales Return rows."""
+	direct_request = frappe.db.get_value(
+		"Return Request", {"credit_note": credit_note.name, "docstatus": ["!=", 2]}, "name"
+	)
+	if direct_request:
+		return direct_request
 	sales_returns = {row.delivery_note for row in credit_note.items if getattr(row, "delivery_note", None)}
 	if not sales_returns:
 		return None

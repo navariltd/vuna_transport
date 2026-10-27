@@ -193,6 +193,7 @@ doc_events = {
 		"on_trash": "vuna_transport.services.execution.return_service.prepare_quality_inspection_removal",
 	},
 	"Sales Invoice": {
+		"before_submit": "vuna_transport.services.execution.return_service.validate_linked_sales_invoice_credit_note_submission",
 		"on_submit": "vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
 		"on_cancel": "vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
 	},

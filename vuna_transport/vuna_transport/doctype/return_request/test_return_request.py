@@ -11,11 +11,13 @@ from frappe.tests import UnitTestCase
 from vuna_transport.services.execution.return_service import (
 	_get_pod_item_return_reason,
 	_get_sales_return_outcomes,
+	_map_split_credit_note_rows,
 	_map_split_sales_return_rows,
 	create_return_request_from_pod,
 	get_pod_quantity_in_sales_uom,
 	get_remaining_returnable_quantity,
 	get_return_request_state,
+	get_sales_invoice_return_context,
 	prepare_sales_return_cancellation,
 	sync_return_request_from_commercial_document,
 	sync_return_request_from_sales_return,
@@ -90,6 +92,27 @@ class TestReturnRequest(UnitTestCase):
 		)
 
 		self.assertEqual(_get_pod_item_return_reason(pod, item), "Damaged")
+
+	@patch("vuna_transport.services.execution.return_service.require_company_access")
+	@patch("vuna_transport.services.execution.return_service.require_document_permission")
+	@patch("vuna_transport.services.execution.return_service.require_doctype_permission")
+	@patch("vuna_transport.services.execution.return_service.frappe.get_doc")
+	def test_invoice_with_multiple_delivery_notes_returns_a_selection_context(
+		self, get_doc, _require_doctype_permission, _require_document_permission, _require_company_access
+	):
+		get_doc.return_value = SimpleNamespace(
+			name="SINV-1",
+			company="Test Company",
+			docstatus=1,
+			is_return=0,
+			update_stock=0,
+			items=[SimpleNamespace(delivery_note="DN-2"), SimpleNamespace(delivery_note="DN-1")],
+		)
+
+		context = get_sales_invoice_return_context("SINV-1")
+
+		self.assertIsNone(context["delivery_note"])
+		self.assertEqual(context["delivery_notes"], ["DN-1", "DN-2"])
 
 	def test_pod_form_rejection_reasons_are_return_reason_fallback(self):
 		pod = SimpleNamespace(
@@ -263,6 +286,31 @@ class TestReturnRequest(UnitTestCase):
 		)
 		self.assertEqual(get_return_request_state(request)["status"], "Resolved")
 
+	@patch("vuna_transport.services.execution.return_service.frappe.get_all")
+	@patch("vuna_transport.services.execution.return_service.frappe.db.get_value", return_value=1)
+	def test_direct_stock_invoice_credit_note_resolves_return(self, _get_value, get_all):
+		get_all.return_value = [frappe._dict(sales_invoice_item="SII-1", stock_qty=-24, qty=-2)]
+		request = make_request(
+			delivery_note=None,
+			credit_note="SINV-RET-1",
+			items=[
+				SimpleNamespace(
+					sales_invoice_item="SII-1",
+					requested_return_qty=2,
+					conversion_factor=12,
+					quality_inspection=None,
+					accepted_return_qty=0,
+					rejected_return_qty=0,
+				)
+			],
+		)
+
+		state = get_return_request_state(request)
+
+		self.assertEqual(state["status"], "Resolved")
+		self.assertEqual(state["returned_qty"], 2)
+		self.assertEqual(state["returned_stock_by_item"]["SII-1"], 24)
+
 	@patch("vuna_transport.services.execution.return_service.require_company_access")
 	@patch("vuna_transport.services.execution.return_service.frappe.db.get_value")
 	@patch("vuna_transport.services.execution.return_service.frappe.get_doc")
@@ -394,6 +442,21 @@ class TestReturnRequest(UnitTestCase):
 		self.assertEqual(row.price_list_rate, 565)
 		self.assertEqual(row.discount_percentage, 3)
 		self.assertEqual(row.discount_amount, 16.95)
+		self.assertEqual(row.rate, 548.05)
+
+	@patch(
+		"vuna_transport.services.execution.return_service.frappe.db.get_value",
+		return_value=frappe._dict(price_list_rate=565, discount_percentage=3, rate=548.05),
+	)
+	def test_split_credit_note_row_recovers_invoice_lineage_and_commercial_terms(self, _get_value):
+		request = make_request(items=[SimpleNamespace(sales_invoice_item="SII-1", item_code="ITEM-1")])
+		row = SimpleNamespace(idx=2, item_code="ITEM-1", sales_invoice_item=None)
+
+		_map_split_credit_note_rows(request, SimpleNamespace(items=[row]))
+
+		self.assertEqual(row.sales_invoice_item, "SII-1")
+		self.assertEqual(row.price_list_rate, 565)
+		self.assertEqual(row.discount_percentage, 3)
 		self.assertEqual(row.rate, 548.05)
 
 	@patch(

@@ -134,6 +134,7 @@
    "label": "Return Progress"
   },
   {
+   "default": "Salesperson",
    "fieldname": "initiated_by",
    "fieldtype": "Select",
    "label": "Initiated By",
@@ -160,7 +161,6 @@
    "label": "Remarks"
   },
   {
-   "collapsible": 1,
    "fieldname": "source_section",
    "fieldtype": "Section Break",
    "label": "Original Delivery"
@@ -183,8 +183,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Delivery Note",
-   "options": "Delivery Note",
-   "reqd": 1
+   "options": "Delivery Note"
   },
   {
    "fieldname": "column_break_source",
@@ -201,13 +200,15 @@
    "fieldname": "delivery_trip",
    "fieldtype": "Link",
    "label": "Delivery Trip",
-   "options": "Delivery Trip"
+   "options": "Delivery Trip",
+   "read_only": 1
   },
   {
    "fieldname": "proof_of_delivery",
    "fieldtype": "Link",
    "label": "Proof of Delivery",
    "options": "Proof of Delivery",
+   "read_only": 1,
    "search_index": 1
   },
   {
@@ -453,7 +454,7 @@
  "grid_page_length": 50,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-17 10:19:33.624971",
+ "modified": "2026-10-27 07:34:43.951479",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Return Request",
