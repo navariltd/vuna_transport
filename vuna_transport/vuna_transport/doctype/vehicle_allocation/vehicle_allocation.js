@@ -40,6 +40,9 @@ frappe.ui.form.on("Vehicle Allocation", {
 	},
 
 	refresh(frm) {
+		// Delivery Loads are retained as the demand record. The server-side
+		// cancellation flow detaches this allocation before Frappe checks links.
+		frm.ignore_doctypes_on_cancel_all = ["Delivery Load"];
 		set_allocation_execution_indicator(frm, frm.doc.status || "Draft");
 		update_load_selection_button(frm);
 		frm.remove_custom_button(__("Delivery Notes"), __("Create"));
