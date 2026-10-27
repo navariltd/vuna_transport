@@ -388,6 +388,12 @@ def get_delivery_note_details(installation_id, trip_name, stop_name, device_iden
 		frappe.throw(_("Delivery Note {0} is not submitted.").format(delivery_note.name))
 	_enrich_stops([stop])
 	_set_mobile_stop_actions(trip, [stop])
+	submitted_pod = None
+	pod_name = getattr(stop, "vuna_proof_of_delivery", None)
+	if pod_name:
+		pod = frappe.get_doc("Proof of Delivery", pod_name)
+		if pod.docstatus == 1:
+			submitted_pod = _serialize_pod(pod)
 	return {
 		"trip": {
 			"name": trip.name,
@@ -399,6 +405,7 @@ def get_delivery_note_details(installation_id, trip_name, stop_name, device_iden
 			"actions": _mobile_trip_actions(trip),
 		},
 		"stop": stop,
+		"proof_of_delivery": submitted_pod,
 		"delivery_note": {
 			"name": delivery_note.name,
 			"customer": delivery_note.customer,

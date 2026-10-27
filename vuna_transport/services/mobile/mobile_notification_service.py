@@ -8,6 +8,7 @@ from frappe import _
 
 
 EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
+REMOTE_PUSH_NOTIFICATIONS_ENABLED = False
 
 
 def notify_delivery_trip(doc, method=None):
@@ -73,6 +74,8 @@ def _context_value(value, label):
 
 
 def _queue_push(users, title, body, route):
+	if not REMOTE_PUSH_NOTIFICATIONS_ENABLED:
+		return
 	for user in set(users):
 		frappe.enqueue(
 			"vuna_transport.services.mobile.mobile_notification_service.send_push_notification",
