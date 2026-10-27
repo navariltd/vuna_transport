@@ -552,12 +552,11 @@ def get_drivers_for_allocation(doctype, txt, searchfield, start, page_len, filte
 	if isinstance(load_names, str):
 		load_names = frappe.parse_json(load_names) or []
 	load_names = [name for name in load_names if name]
-	if not load_names:
-		return []
-	loads = validate_allocation_load_set(load_names)
+	loads = validate_allocation_load_set(load_names) if load_names else []
 	for load in loads:
 		require_document_permission(load, "read")
 	from_time, to_time = get_allocation_resource_window(loads)
+	company = filters.get("company") or (loads[0].company if loads else None)
 	driver_names = frappe.get_list(
 		"Driver", filters={"status": "Active"}, pluck="name", limit_page_length=1000
 	)
@@ -565,7 +564,7 @@ def get_drivers_for_allocation(doctype, txt, searchfield, start, page_len, filte
 		driver_names=driver_names,
 		from_time=from_time,
 		to_time=to_time,
-		company=loads[0].company,
+		company=company,
 	)
 	available = [row.driver for row in availability.values() if row.dispatch_eligible]
 	if not available:
