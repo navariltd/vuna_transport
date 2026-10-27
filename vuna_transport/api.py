@@ -14,6 +14,7 @@ from vuna_transport.services.fleet.vehicle_availability_service import (
 )
 from vuna_transport.services.mobile.mobile_device_service import (
 	bootstrap_device,
+	register_mobile_push_token,
 	get_assigned_delivery_trips,
 	get_current_driver_profile,
 	get_delivery_note_details,
@@ -71,6 +72,21 @@ def bootstrap_mobile_device(
 @frappe.whitelist()
 def get_mobile_driver_profile(installation_id, device_identifier=None):
 	return get_current_driver_profile(installation_id, device_identifier)
+
+
+@frappe.whitelist()
+def register_mobile_device_push_token(
+	installation_id,
+	push_token,
+	device_identifier=None,
+	provider="expo",
+):
+	return register_mobile_push_token(
+		installation_id,
+		push_token,
+		device_identifier,
+		provider,
+	)
 
 
 @frappe.whitelist()

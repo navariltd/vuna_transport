@@ -215,10 +215,12 @@ doc_events = {
 			"vuna_transport.services.execution.lineage_service.submit_delivery_trip",
 			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_trip",
 			"vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+			"vuna_transport.services.mobile.mobile_notification_service.notify_delivery_trip",
 		],
 		"on_update_after_submit": [
 			"vuna_transport.services.mobile.mobile_trip_execution_service.synchronize_mobile_trip_execution_status",
 			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_trip",
+			"vuna_transport.services.mobile.mobile_notification_service.notify_delivery_trip",
 		],
 		"on_cancel": [
 			"vuna_transport.services.execution.lineage_service.cancel_delivery_trip",
@@ -230,6 +232,12 @@ doc_events = {
 			"vuna_transport.services.execution.lineage_service.unlink_delivery_trip",
 		],
 		"after_delete": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+	},
+	"Expense Claim": {
+		"on_update": "vuna_transport.services.mobile.mobile_notification_service.notify_expense_claim",
+	},
+	"Material Request": {
+		"on_update": "vuna_transport.services.mobile.mobile_notification_service.notify_material_request",
 	},
 	"Vehicle": {
 		"validate": "vuna_transport.services.fleet.fleet_service.validate_vehicle",
