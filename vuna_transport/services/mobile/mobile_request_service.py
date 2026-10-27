@@ -27,7 +27,9 @@ def get_mobile_requests(installation_id, device_identifier=None, limit=50, trip_
 	limit = min(max(cint(limit) or 50, 1), MAX_REQUEST_HISTORY_ROWS)
 	requests = []
 
-	if driver.employee and frappe.has_permission("Expense Claim", "read"):
+	# Mobile drivers can view only their own mobile-originated claims. This is
+	# intentionally scoped here instead of requiring the full HRMS desk role.
+	if driver.employee:
 		expense_fields = [
 			"name",
 			"status",
@@ -47,7 +49,7 @@ def get_mobile_requests(installation_id, device_identifier=None, limit=50, trip_
 		}
 		if trip:
 			expense_filters["delivery_trip"] = trip.name
-		for row in frappe.get_list(
+		for row in frappe.get_all(
 			"Expense Claim",
 			filters=expense_filters,
 			fields=expense_fields,
@@ -126,7 +128,6 @@ def get_mobile_request_details(
 	if doctype not in {"Expense Claim", "Material Request"} or not name:
 		frappe.throw(_("Select a valid mobile request."))
 	doc = frappe.get_doc(doctype, name)
-	doc.check_permission("read")
 
 	if doctype == "Expense Claim":
 		if (
@@ -161,6 +162,7 @@ def get_mobile_request_details(
 			],
 		}
 
+	doc.check_permission("read")
 	if doc.owner != frappe.session.user or "Mobile Request ID:" not in (doc.terms or ""):
 		frappe.throw(
 			_("This Material Request does not belong to your mobile requests."), frappe.PermissionError
@@ -201,7 +203,7 @@ def get_mobile_request_setup(installation_id, trip_name, device_identifier=None)
 		)
 
 	expense_types = []
-	if frappe.has_permission("Expense Claim Type", "read"):
+	if driver.employee:
 		configured_types = frappe.get_all(
 			"Expense Claim Account",
 			filters={"company": trip.company},
@@ -209,7 +211,7 @@ def get_mobile_request_setup(installation_id, trip_name, device_identifier=None)
 			limit_page_length=200,
 		)
 		if configured_types:
-			expense_types = frappe.get_list(
+			expense_types = frappe.get_all(
 				"Expense Claim Type",
 				filters={"name": ["in", list(dict.fromkeys(configured_types))]},
 				pluck="name",
@@ -234,7 +236,7 @@ def get_mobile_request_setup(installation_id, trip_name, device_identifier=None)
 		"expense_types": expense_types,
 		"warehouses": warehouses,
 		"permissions": {
-			"expense_claim": bool(driver.employee and frappe.has_permission("Expense Claim", "create")),
+			"expense_claim": bool(driver.employee),
 			"material_request": bool(frappe.has_permission("Material Request", "create")),
 		},
 	}
@@ -279,7 +281,6 @@ def create_mobile_expense_claim(
 	"""Create one HRMS Expense Claim draft linked to the assigned Delivery Trip."""
 	driver, trip = _get_mobile_request_context(installation_id, trip_name, device_identifier)
 	_ensure_trip_accepts_requests(trip)
-	require_doctype_permission("Expense Claim", "create")
 	if not driver.employee:
 		frappe.throw(_("Your Driver profile must be linked to an Employee before claiming expenses."))
 	payload = _parse_payload(payload)
@@ -345,7 +346,10 @@ def create_mobile_expense_claim(
 	claim.remark = _request_context(request_id, trip.name, driver.name, payload.get("remarks"))
 	for expense in validated_expenses:
 		claim.append("expenses", expense)
-	claim.insert()
+	# The API has authenticated the device, driver, Employee link, and assigned
+	# trip. Keep this mobile path available without requiring the HRMS desk
+	# Expense Claim role, while preserving normal document validation.
+	claim.insert(ignore_permissions=True)
 	return {"doctype": claim.doctype, "name": claim.name, "status": claim.status, "created": True}
 
 
