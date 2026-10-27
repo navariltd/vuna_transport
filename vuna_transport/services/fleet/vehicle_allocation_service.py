@@ -620,6 +620,8 @@ def get_allocation_delivery_note_status(allocation_name):
 	"""Return the one execution action currently valid for a Vehicle Allocation."""
 	allocation = frappe.get_doc("Vehicle Allocation", allocation_name)
 	require_document_permission(allocation, "read")
+	sync_allocation_execution_status(allocation)
+	allocation.reload()
 	return _get_allocation_execution_state(allocation)
 
 
@@ -729,7 +731,7 @@ def _get_allocation_execution_status(allocation, note_statuses, trip=None):
 		return "Delivery Trip Scheduled"
 	if note_statuses and all(status["ready"] for status in note_statuses):
 		return "Ready for Delivery Trip"
-	if any(status.get("active_delivery_notes") for status in note_statuses):
+	if note_statuses:
 		return "Awaiting Delivery Notes"
 	return allocation_status
 

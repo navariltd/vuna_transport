@@ -74,6 +74,13 @@ class TestVehicleAllocation(UnitTestCase):
 			),
 			"Ready for Delivery Trip",
 		)
+		self.assertEqual(
+			_get_allocation_execution_status(
+				allocation,
+				[{"ready": False, "active_delivery_notes": []}],
+			),
+			"Awaiting Delivery Notes",
+		)
 
 	def test_execution_status_uses_delivery_trip_progress(self):
 		allocation = SimpleNamespace(docstatus=1, status="Allocated")

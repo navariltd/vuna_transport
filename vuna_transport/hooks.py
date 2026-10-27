@@ -172,7 +172,10 @@ doc_events = {
 			"vuna_transport.services.execution.lineage_service.populate_delivery_note_delivery_links",
 			"vuna_transport.services.execution.return_service.validate_sales_return_request_link",
 		],
-		"on_update": "vuna_transport.services.execution.return_service.sync_sales_return_request_link",
+		"on_update": [
+			"vuna_transport.services.execution.return_service.sync_sales_return_request_link",
+			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_note",
+		],
 		"before_submit": "vuna_transport.services.execution.return_service.validate_linked_sales_return_submission",
 		"before_cancel": "vuna_transport.services.execution.return_service.prepare_sales_return_cancellation",
 		"on_submit": [
