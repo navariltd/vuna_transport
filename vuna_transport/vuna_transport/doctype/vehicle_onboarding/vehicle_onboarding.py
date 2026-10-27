@@ -6,6 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import getdate
 
+from vuna_transport.services.fleet.license_plate_service import normalize_and_validate_license_plate
 from vuna_transport.services.fleet.vehicle_owner_service import normalize_vehicle_owner
 from vuna_transport.services.shared.security_service import require_doctype_permission
 
@@ -35,6 +36,7 @@ class VehicleOnboarding(Document):
 			frappe.throw(_("Supplier must be empty for a company-owned vehicle."))
 
 	def _validate_license_plate(self):
+		self.license_plate = normalize_and_validate_license_plate(self.license_plate, self.vehicle_category)
 		existing_vehicle = frappe.db.get_value("Vehicle", {"license_plate": self.license_plate}, "name")
 		if existing_vehicle and existing_vehicle != self.vehicle:
 			frappe.throw(

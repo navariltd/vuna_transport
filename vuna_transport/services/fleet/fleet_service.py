@@ -8,12 +8,14 @@ from vuna_transport.services.fleet.vehicle_availability_service import (
 	get_vehicle_availability_map,
 	get_vehicle_status,
 )
+from vuna_transport.services.fleet.license_plate_service import normalize_and_validate_license_plate
 from vuna_transport.services.fleet.vehicle_owner_service import normalize_vehicle_owner
 from vuna_transport.services.shared.security_service import require_document_permission
 
 
 def validate_vehicle(doc, method=None):
 	"""Populate standard Vehicle fields from the selected Vuna Vehicle Model."""
+	_normalize_and_validate_vehicle_license_plate(doc)
 	_normalize_vehicle_owner_fields(doc)
 	_validate_vehicle_operational_roles(doc)
 	_validate_vehicle_asset(doc)
@@ -40,6 +42,15 @@ def validate_vehicle(doc, method=None):
 		"Electric",
 	):
 		doc.fuel_type = vehicle_model.fuel_type
+
+
+def _normalize_and_validate_vehicle_license_plate(doc):
+	"""Keep transport Vehicle registration marks in one searchable canonical form."""
+	if not getattr(doc, "vuna_transport_enabled", 0) or not getattr(doc, "license_plate", None):
+		return
+	doc.license_plate = normalize_and_validate_license_plate(
+		doc.license_plate, getattr(doc, "vuna_vehicle_category", None)
+	)
 
 
 def _normalize_vehicle_owner_fields(doc):

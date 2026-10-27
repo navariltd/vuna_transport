@@ -10,6 +10,7 @@
   "identity_section",
   "vehicle_category_name",
   "vehicle_model",
+  "license_plate_format",
   "body_type",
   "column_break_pxpq",
   "disabled",
@@ -58,6 +59,15 @@
    "fieldtype": "Link",
    "label": "Default Vehicle Model",
    "options": "Vehicle Model"
+  },
+  {
+   "default": "Motor Vehicle",
+   "description": "Motor Vehicle: KAA 123A. Motorcycle: KMCE 123A.",
+   "fieldname": "license_plate_format",
+   "fieldtype": "Select",
+   "label": "License Plate Format",
+   "options": "Motor Vehicle\nMotorcycle",
+   "reqd": 1
   },
   {
    "fieldname": "body_type",

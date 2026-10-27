@@ -14,15 +14,21 @@ frappe.ui.form.on("Vehicle Onboarding", {
 		if (!frm.doc.vehicle_category) return;
 
 		frappe.db
-			.get_value("Vehicle Category", frm.doc.vehicle_category, "vehicle_model")
+			.get_value("Vehicle Category", frm.doc.vehicle_category, [
+				"vehicle_model",
+				"license_plate_format",
+			])
 			.then(({ message }) => {
 				if (message?.vehicle_model) {
 					frm.set_value("vehicle_model", message.vehicle_model);
 				}
+				set_plate_format_hint(frm, message?.license_plate_format);
+				format_license_plate_field(frm, message?.license_plate_format);
 			});
 	},
 
 	license_plate(frm) {
+		format_license_plate_field(frm);
 		const licensePlate = frm.doc.license_plate?.trim();
 		if (!licensePlate) return;
 		Promise.all([
@@ -92,6 +98,26 @@ frappe.ui.form.on("Vehicle Onboarding", {
 		});
 	},
 });
+
+function set_plate_format_hint(frm, format) {
+	const example = format === "Motorcycle" ? "KMCE 123A" : "KAA 123A";
+	frm.set_df_property(
+		"license_plate",
+		"description",
+		__("Use the {0} format, for example {1}.", [format || "Motor Vehicle", example])
+	);
+}
+
+function format_license_plate_field(frm, format) {
+	const value = frm.doc.license_plate?.replace(/[\s-]+/g, "").toUpperCase();
+	if (!value) return;
+	const splitAt = format === "Motorcycle" ? 4 : 3;
+	const expectedLength = format === "Motorcycle" ? 8 : 7;
+	if (value.length === expectedLength) {
+		const formatted = `${value.slice(0, splitAt)} ${value.slice(splitAt)}`;
+		if (frm.doc.license_plate !== formatted) frm.set_value("license_plate", formatted);
+	}
+}
 
 function populate_template_documents(frm, documents) {
 	const replace = () => {
