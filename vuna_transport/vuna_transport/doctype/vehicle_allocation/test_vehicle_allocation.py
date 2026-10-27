@@ -18,6 +18,7 @@ from vuna_transport.services.fleet.vehicle_allocation_service import (
 	get_load_resource_window,
 	prepare_allocation_cancellation,
 	sync_allocation_execution_status,
+	sync_allocation_execution_status_for_delivery_note,
 	time_windows_overlap,
 )
 from vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation import (
@@ -27,6 +28,18 @@ from vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation
 
 
 class TestVehicleAllocation(UnitTestCase):
+	@patch("vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status")
+	@patch("vuna_transport.services.fleet.vehicle_allocation_service.frappe.get_all")
+	def test_delivery_note_status_sync_uses_delivery_load_order_lineage(self, get_all, sync_status):
+		get_all.side_effect = [["DLO-001"], ["DL-001"], ["VA-001"]]
+
+		sync_allocation_execution_status_for_delivery_note(
+			SimpleNamespace(name="DN-001", vuna_delivery_load=None)
+		)
+
+		self.assertEqual(get_all.call_args_list[0].kwargs["pluck"], "vuna_delivery_load_order")
+		sync_status.assert_called_once_with("VA-001")
+
 	@patch("vuna_transport.services.fleet.vehicle_allocation_service._get_allocation_execution_state")
 	def test_execution_status_is_saved_for_standard_list_filter(self, get_execution_state):
 		allocation = SimpleNamespace(docstatus=1, status="Allocated", db_set=MagicMock())

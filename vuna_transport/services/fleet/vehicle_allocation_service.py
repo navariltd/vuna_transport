@@ -671,13 +671,23 @@ def sync_allocation_execution_status(allocation):
 def sync_allocation_execution_status_for_delivery_note(doc, method=None):
 	"""Refresh allocations affected by a Delivery Note submission or cancellation."""
 	load_names = {getattr(doc, "vuna_delivery_load", None)}
-	load_names.update(
-		frappe.get_all(
+	load_order_names = {
+		name
+		for name in frappe.get_all(
 			"Delivery Note Item",
 			filters={"parent": doc.name},
-			pluck="vuna_delivery_load",
+			pluck="vuna_delivery_load_order",
 		)
-	)
+		if name
+	}
+	if load_order_names:
+		load_names.update(
+			frappe.get_all(
+				"Delivery Load Order",
+				filters={"name": ["in", list(load_order_names)]},
+				pluck="parent",
+			)
+		)
 	load_names.discard(None)
 	if not load_names:
 		return
