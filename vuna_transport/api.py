@@ -203,8 +203,8 @@ def get_mobile_trip_request_setup(installation_id, trip_name, device_identifier=
 
 
 @frappe.whitelist()
-def get_mobile_request_history(installation_id, device_identifier=None, limit=50):
-	return get_mobile_requests(installation_id, device_identifier, limit)
+def get_mobile_request_history(installation_id, device_identifier=None, limit=50, trip_name=None):
+	return get_mobile_requests(installation_id, device_identifier, limit, trip_name)
 
 
 @frappe.whitelist()

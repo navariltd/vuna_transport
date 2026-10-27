@@ -20,9 +20,10 @@ REQUEST_ID_PATTERN = re.compile(r"^[a-f0-9-]{16,64}$", re.IGNORECASE)
 MAX_REQUEST_HISTORY_ROWS = 100
 
 
-def get_mobile_requests(installation_id, device_identifier=None, limit=50):
+def get_mobile_requests(installation_id, device_identifier=None, limit=50, trip_name=None):
 	"""Return recent mobile-originated requests owned by the current driver user."""
 	driver = _require_mobile_driver(installation_id, device_identifier)
+	trip = _get_assigned_trip(trip_name, driver.name) if trip_name else None
 	limit = min(max(cint(limit) or 50, 1), MAX_REQUEST_HISTORY_ROWS)
 	requests = []
 
@@ -40,12 +41,15 @@ def get_mobile_requests(installation_id, device_identifier=None, limit=50):
 		]
 		if frappe.get_meta("Expense Claim").has_field("workflow_state"):
 			expense_fields.append("workflow_state")
+		expense_filters = {
+			"employee": driver.employee,
+			"remark": ["like", "%Mobile Request ID:%"],
+		}
+		if trip:
+			expense_filters["delivery_trip"] = trip.name
 		for row in frappe.get_list(
 			"Expense Claim",
-			filters={
-				"employee": driver.employee,
-				"remark": ["like", "%Mobile Request ID:%"],
-			},
+			filters=expense_filters,
 			fields=expense_fields,
 			order_by="modified desc",
 			limit_page_length=limit,
@@ -78,12 +82,15 @@ def get_mobile_requests(installation_id, device_identifier=None, limit=50):
 		]
 		if frappe.get_meta("Material Request").has_field("workflow_state"):
 			material_fields.append("workflow_state")
+		material_filters = {
+			"owner": frappe.session.user,
+			"terms": ["like", "%Mobile Request ID:%"],
+		}
+		if trip:
+			material_filters["terms"] = ["like", f"%Delivery Trip: {trip.name}%"]
 		material_requests = frappe.get_list(
 			"Material Request",
-			filters={
-				"owner": frappe.session.user,
-				"terms": ["like", "%Mobile Request ID:%"],
-			},
+			filters=material_filters,
 			fields=material_fields,
 			order_by="modified desc",
 			limit_page_length=limit,
@@ -183,6 +190,7 @@ def get_mobile_request_details(
 def get_mobile_request_setup(installation_id, trip_name, device_identifier=None):
 	"""Return bounded configuration needed by the mobile request forms."""
 	driver, trip = _get_mobile_request_context(installation_id, trip_name, device_identifier)
+	_ensure_trip_accepts_requests(trip)
 	employee = None
 	if driver.employee:
 		employee = frappe.db.get_value(
@@ -239,7 +247,8 @@ def search_mobile_material_request_items(
 	device_identifier=None,
 ):
 	"""Search a small set of enabled stock Items for an assigned driver's request."""
-	_get_mobile_request_context(installation_id, trip_name, device_identifier)
+	_, trip = _get_mobile_request_context(installation_id, trip_name, device_identifier)
+	_ensure_trip_accepts_requests(trip)
 	require_doctype_permission("Material Request", "create")
 	if not frappe.has_permission("Item", "read"):
 		frappe.throw(_("You do not have permission to view Items."), frappe.PermissionError)
@@ -269,6 +278,7 @@ def create_mobile_expense_claim(
 ):
 	"""Create one HRMS Expense Claim draft linked to the assigned Delivery Trip."""
 	driver, trip = _get_mobile_request_context(installation_id, trip_name, device_identifier)
+	_ensure_trip_accepts_requests(trip)
 	require_doctype_permission("Expense Claim", "create")
 	if not driver.employee:
 		frappe.throw(_("Your Driver profile must be linked to an Employee before claiming expenses."))
@@ -347,6 +357,7 @@ def create_mobile_material_request(
 ):
 	"""Create one ERPNext Material Request draft for review and normal processing."""
 	driver, trip = _get_mobile_request_context(installation_id, trip_name, device_identifier)
+	_ensure_trip_accepts_requests(trip)
 	require_doctype_permission("Material Request", "create")
 	payload = _parse_payload(payload)
 	request_id = _validate_request_id(payload.get("request_id"))
@@ -419,6 +430,11 @@ def _get_mobile_request_context(installation_id, trip_name, device_identifier=No
 	driver = _require_mobile_driver(installation_id, device_identifier)
 	trip = _get_assigned_trip(trip_name, driver.name)
 	return driver, trip
+
+
+def _ensure_trip_accepts_requests(trip):
+	if trip.status == "Completed" or getattr(trip, "vuna_actual_completion", None):
+		frappe.throw(_("Delivery Trip {0} is completed; no new requests can be created.").format(trip.name))
 
 
 def _parse_payload(payload):
