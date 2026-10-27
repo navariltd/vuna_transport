@@ -4,12 +4,14 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import getdate, today
 
 from vuna_transport.services.fleet.vehicle_owner_service import normalize_vehicle_owner
 
 
 class VehicleOwnershipTransfer(Document):
 	def validate(self):
+		self._validate_effective_date()
 		vehicle = frappe.get_cached_doc("Vehicle", self.vehicle)
 		self.company = vehicle.company
 		self.current_owner = vehicle.vuna_vehicle_owner
@@ -20,17 +22,25 @@ class VehicleOwnershipTransfer(Document):
 		self._validate_current_owner()
 
 	def on_submit(self):
-		vehicle = frappe.get_doc("Vehicle", self.vehicle)
-		vehicle.db_set("vuna_vehicle_owner", self.new_owner, update_modified=True)
-		vehicle.db_set(
-			"vuna_supplier",
-			self.new_supplier if normalize_vehicle_owner(self.new_owner) == "Supplier" else None,
-			update_modified=False,
+		new_owner = normalize_vehicle_owner(self.new_owner)
+		frappe.db.set_value(
+			"Vehicle",
+			self.vehicle,
+			{
+				"vuna_vehicle_owner": new_owner,
+				"vuna_supplier": self.new_supplier if new_owner == "Supplier" else None,
+			},
+			update_modified=True,
 		)
+		frappe.clear_document_cache("Vehicle", self.vehicle)
 		from vuna_transport.services.fleet.fleet_service import sync_vehicle_operational_snapshots
 
 		sync_vehicle_operational_snapshots([self.vehicle])
 		self.db_set("status", "Submitted", update_modified=False)
+
+	def _validate_effective_date(self):
+		if self.effective_date and getdate(self.effective_date) < getdate(today()):
+			frappe.throw(_("Effective Date cannot be before today."))
 
 	def _validate_new_owner(self, vehicle):
 		if normalize_vehicle_owner(self.new_owner) == "Supplier" and not self.new_supplier:
