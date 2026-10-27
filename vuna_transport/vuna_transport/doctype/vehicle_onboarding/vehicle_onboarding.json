@@ -1,63 +1,226 @@
 {
  "actions": [],
- "allow_rename": 0,
- "autoname": "naming_series:",
+ "allow_import": 1,
+ "autoname": "field:license_plate",
  "creation": "2026-09-22 13:30:00",
  "doctype": "DocType",
+ "engine": "InnoDB",
  "field_order": [
-  "naming_series",
   "license_plate",
-  "company",
   "vehicle_owner",
   "supplier",
+  "asset",
+  "column_break_hzdv",
+  "company",
+  "transport_cost_structure",
+  "section_break_dcie",
   "vehicle_category",
   "vehicle_model",
+  "column_break_ppqr",
   "fuel_type",
   "fuel_uom",
-  "asset",
   "insurance_section",
   "insurance_company",
-  "policy_no",
   "insurance_start_date",
+  "column_break_lluo",
+  "policy_no",
   "insurance_end_date",
   "documents_section",
   "documents",
   "notes",
   "vehicle",
-  "status"
+  "status",
+  "amended_from"
  ],
  "fields": [
-  {"fieldname":"naming_series","fieldtype":"Select","label":"Naming Series","options":"VO-.YYYY.-","default":"VO-.YYYY.-","reqd":1},
-  {"fieldname":"license_plate","fieldtype":"Data","label":"License Plate","in_list_view":1,"reqd":1,"unique":1},
-  {"fieldname":"company","fieldtype":"Link","label":"Company","options":"Company","reqd":1},
-  {"fieldname":"vehicle_owner","fieldtype":"Select","label":"Vehicle Owner","options":"\nCompany\nSupplier","reqd":1},
-  {"fieldname":"supplier","fieldtype":"Link","label":"Supplier","options":"Supplier","depends_on":"eval:doc.vehicle_owner == 'Supplier'","mandatory_depends_on":"eval:doc.vehicle_owner == 'Supplier'"},
-  {"fieldname":"vehicle_category","fieldtype":"Link","label":"Vehicle Category","options":"Vehicle Category","reqd":1},
-  {"fieldname":"vehicle_model","fieldtype":"Link","label":"Vehicle Model","options":"Vehicle Model","reqd":1},
-  {"fieldname":"fuel_type","fieldtype":"Select","label":"Fuel Type","options":"Petrol\nDiesel\nNatural Gas\nElectric","default":"Diesel","reqd":1},
-  {"fieldname":"fuel_uom","fieldtype":"Link","label":"Fuel UOM","options":"UOM","default":"Litre","reqd":1},
-  {"fieldname":"asset","fieldtype":"Link","label":"ERPNext Asset","options":"Asset","depends_on":"eval:doc.vehicle_owner == 'Company'","mandatory_depends_on":"eval:doc.vehicle_owner == 'Company'"},
-  {"fieldname":"insurance_section","fieldtype":"Section Break","label":"Standard Vehicle Insurance"},
-  {"fieldname":"insurance_company","fieldtype":"Data","label":"Insurance Company"},
-  {"fieldname":"policy_no","fieldtype":"Data","label":"Policy Number"},
-  {"fieldname":"insurance_start_date","fieldtype":"Date","label":"Insurance Start Date"},
-  {"fieldname":"insurance_end_date","fieldtype":"Date","label":"Insurance End Date"},
-  {"fieldname":"documents_section","fieldtype":"Section Break","label":"Required Vehicle Documents"},
-  {"fieldname":"documents","fieldtype":"Table","label":"Documents","options":"Vehicle Onboarding Document"},
-  {"fieldname":"notes","fieldtype":"Small Text","label":"Notes"},
-  {"fieldname":"vehicle","fieldtype":"Link","label":"Created Vehicle","options":"Vehicle","read_only":1,"in_list_view":1},
-  {"fieldname":"status","fieldtype":"Select","label":"Status","options":"Draft\nApproved\nRejected\nCancelled","default":"Draft","read_only":1,"in_list_view":1}
+  {
+   "fieldname": "license_plate",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "License Plate",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "default": "Supplier",
+   "fieldname": "vehicle_owner",
+   "fieldtype": "Select",
+   "label": "Vehicle Owner",
+   "options": "\nCompany\nSupplier",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.vehicle_owner == 'Supplier'",
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Supplier",
+   "mandatory_depends_on": "eval:doc.vehicle_owner == 'Supplier'",
+   "options": "Supplier"
+  },
+  {
+   "fieldname": "vehicle_category",
+   "fieldtype": "Link",
+   "label": "Vehicle Category",
+   "options": "Vehicle Category",
+   "reqd": 1
+  },
+  {
+   "fieldname": "vehicle_model",
+   "fieldtype": "Link",
+   "label": "Vehicle Model",
+   "options": "Vehicle Model",
+   "reqd": 1
+  },
+  {
+   "default": "Diesel",
+   "fieldname": "fuel_type",
+   "fieldtype": "Select",
+   "label": "Fuel Type",
+   "options": "Petrol\nDiesel\nNatural Gas\nElectric",
+   "reqd": 1
+  },
+  {
+   "default": "Litre",
+   "fieldname": "fuel_uom",
+   "fieldtype": "Link",
+   "label": "Fuel UOM",
+   "options": "UOM",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.vehicle_owner == 'Company'",
+   "fieldname": "asset",
+   "fieldtype": "Link",
+   "label": "Asset",
+   "mandatory_depends_on": "eval:doc.vehicle_owner == 'Company'",
+   "options": "Asset"
+  },
+  {
+   "fieldname": "insurance_section",
+   "fieldtype": "Section Break",
+   "label": "Standard Vehicle Insurance"
+  },
+  {
+   "fieldname": "insurance_company",
+   "fieldtype": "Data",
+   "label": "Insurance Company"
+  },
+  {
+   "fieldname": "policy_no",
+   "fieldtype": "Data",
+   "label": "Policy Number"
+  },
+  {
+   "fieldname": "insurance_start_date",
+   "fieldtype": "Date",
+   "label": "Insurance Start Date"
+  },
+  {
+   "fieldname": "insurance_end_date",
+   "fieldtype": "Date",
+   "label": "Insurance End Date"
+  },
+  {
+   "fieldname": "documents_section",
+   "fieldtype": "Section Break",
+   "label": "Required Vehicle Documents"
+  },
+  {
+   "fieldname": "documents",
+   "fieldtype": "Table",
+   "label": "Documents",
+   "options": "Vehicle Onboarding Document"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "vehicle",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Created Vehicle",
+   "options": "Vehicle",
+   "read_only": 1
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Draft\nApproved\nRejected\nCancelled",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_hzdv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_lluo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Vehicle Onboarding",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "section_break_dcie",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_ppqr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "transport_cost_structure",
+   "fieldtype": "Link",
+   "label": "Transport Cost Structure",
+   "options": "Transport Cost Structure",
+   "reqd": 1
+  }
  ],
  "is_submittable": 1,
- "modified": "2026-09-22 13:30:00",
+ "links": [],
+ "modified": "2026-10-27 07:32:38.726750",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Onboarding",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
-  {"create":1,"read":1,"write":1,"role":"Transport Manager"},
-  {"read":1,"role":"Transport Planner"},
-  {"read":1,"role":"Transport Dispatcher"}
+  {
+   "create": 1,
+   "read": 1,
+   "role": "Transport Manager",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Transport Planner"
+  },
+  {
+   "read": 1,
+   "role": "Transport Dispatcher"
+  }
  ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
  "track_changes": 1
 }
