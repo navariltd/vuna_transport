@@ -8,13 +8,13 @@ from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
 
 from vuna_transport.services.fleet.vehicle_allocation_service import (
+	_get_allocation_execution_status,
 	_get_replacement_stage,
 	_validate_initial_allocation_sequence,
 	_validate_planning_window,
 	_validate_subcontractor,
 	get_allocation_delivery_note_status,
 	get_allocation_load_names,
-	_get_allocation_execution_status,
 	get_load_resource_window,
 	prepare_allocation_cancellation,
 	sync_allocation_execution_status,
@@ -47,9 +47,7 @@ class TestVehicleAllocation(UnitTestCase):
 
 		sync_allocation_execution_status(allocation)
 
-		allocation.db_set.assert_called_once_with(
-			"status", "Ready for Delivery Trip", update_modified=False
-		)
+		allocation.db_set.assert_called_once_with("status", "Ready for Delivery Trip", update_modified=False)
 		self.assertEqual(allocation.status, "Ready for Delivery Trip")
 
 	def test_execution_status_is_derived_from_delivery_note_progress(self):
@@ -73,6 +71,13 @@ class TestVehicleAllocation(UnitTestCase):
 				[{"ready": True, "active_delivery_notes": ["DN-001"]}],
 			),
 			"Ready for Delivery Trip",
+		)
+		self.assertEqual(
+			_get_allocation_execution_status(
+				allocation,
+				[{"ready": False, "active_delivery_notes": []}],
+			),
+			"Awaiting Delivery Notes",
 		)
 
 	def test_execution_status_uses_delivery_trip_progress(self):

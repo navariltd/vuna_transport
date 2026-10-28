@@ -20,6 +20,11 @@
   "platform",
   "os_name",
   "app_version",
+  "section_break_notifications",
+  "push_token",
+  "push_provider",
+  "push_notifications_enabled",
+  "push_token_updated_at",
   "section_break_activity",
   "first_registered_at",
   "column_break_wmea",
@@ -108,6 +113,35 @@
    "fieldname": "app_version",
    "fieldtype": "Data",
    "label": "App Version",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_notifications",
+   "fieldtype": "Section Break",
+   "label": "Notifications"
+  },
+  {
+   "fieldname": "push_token",
+   "fieldtype": "Password",
+   "label": "Push Token",
+   "read_only": 1
+  },
+  {
+   "fieldname": "push_provider",
+   "fieldtype": "Data",
+   "label": "Push Provider",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "push_notifications_enabled",
+   "fieldtype": "Check",
+   "label": "Push Notifications Enabled"
+  },
+  {
+   "fieldname": "push_token_updated_at",
+   "fieldtype": "Datetime",
+   "label": "Push Token Updated At",
    "read_only": 1
   },
   {

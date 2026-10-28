@@ -308,6 +308,35 @@ def _offline_manifest_response(assigned, delivery_notes=None):
 	}
 
 
+def register_mobile_push_token(
+	installation_id,
+	push_token,
+	device_identifier=None,
+	provider="expo",
+):
+	"""Register the push token belonging to the authenticated active device."""
+	device_error = _get_active_device(installation_id, device_identifier)
+	if device_error:
+		frappe.throw(device_error["message"], frappe.PermissionError)
+	if not push_token or len(str(push_token)) > 512:
+		frappe.throw(_("A valid push notification token is required."))
+	device = _find_device(installation_id, device_identifier)
+	if not device or device.user != frappe.session.user:
+		frappe.throw(_("This device is not registered for the logged-in user."), frappe.PermissionError)
+	frappe.db.set_value(
+		"Transport Mobile Device",
+		device.name,
+		{
+			"push_token": str(push_token),
+			"push_provider": provider or "expo",
+			"push_notifications_enabled": 1,
+			"push_token_updated_at": now_datetime(),
+		},
+		update_modified=False,
+	)
+	return {"registered": True, "device": device.name}
+
+
 def get_delivery_trip_details(installation_id, trip_name, device_identifier=None):
 	"""Return one submitted trip and its ordered stops for the assigned mobile Driver."""
 	driver = _require_mobile_driver(installation_id, device_identifier)
@@ -359,6 +388,12 @@ def get_delivery_note_details(installation_id, trip_name, stop_name, device_iden
 		frappe.throw(_("Delivery Note {0} is not submitted.").format(delivery_note.name))
 	_enrich_stops([stop])
 	_set_mobile_stop_actions(trip, [stop])
+	submitted_pod = None
+	pod_name = getattr(stop, "vuna_proof_of_delivery", None)
+	if pod_name:
+		pod = frappe.get_doc("Proof of Delivery", pod_name)
+		if pod.docstatus == 1:
+			submitted_pod = _serialize_pod(pod)
 	return {
 		"trip": {
 			"name": trip.name,
@@ -370,6 +405,7 @@ def get_delivery_note_details(installation_id, trip_name, stop_name, device_iden
 			"actions": _mobile_trip_actions(trip),
 		},
 		"stop": stop,
+		"proof_of_delivery": submitted_pod,
 		"delivery_note": {
 			"name": delivery_note.name,
 			"customer": delivery_note.customer,

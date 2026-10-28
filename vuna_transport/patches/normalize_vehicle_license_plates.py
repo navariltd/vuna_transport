@@ -17,9 +17,7 @@ def execute():
 			if enabled_field and not row.get(enabled_field):
 				continue
 			try:
-				normalized = normalize_and_validate_license_plate(
-					row.license_plate, row.get(category_field)
-				)
+				normalized = normalize_and_validate_license_plate(row.license_plate, row.get(category_field))
 			except frappe.ValidationError:
 				# Do not prevent an upgrade because of legacy data. It will be corrected on its next edit.
 				continue

@@ -20,13 +20,16 @@ REQUEST_ID_PATTERN = re.compile(r"^[a-f0-9-]{16,64}$", re.IGNORECASE)
 MAX_REQUEST_HISTORY_ROWS = 100
 
 
-def get_mobile_requests(installation_id, device_identifier=None, limit=50):
+def get_mobile_requests(installation_id, device_identifier=None, limit=50, trip_name=None):
 	"""Return recent mobile-originated requests owned by the current driver user."""
 	driver = _require_mobile_driver(installation_id, device_identifier)
+	trip = _get_assigned_trip(trip_name, driver.name) if trip_name else None
 	limit = min(max(cint(limit) or 50, 1), MAX_REQUEST_HISTORY_ROWS)
 	requests = []
 
-	if driver.employee and frappe.has_permission("Expense Claim", "read"):
+	# Mobile drivers can view only their own mobile-originated claims. This is
+	# intentionally scoped here instead of requiring the full HRMS desk role.
+	if driver.employee:
 		expense_fields = [
 			"name",
 			"status",
@@ -40,12 +43,15 @@ def get_mobile_requests(installation_id, device_identifier=None, limit=50):
 		]
 		if frappe.get_meta("Expense Claim").has_field("workflow_state"):
 			expense_fields.append("workflow_state")
-		for row in frappe.get_list(
+		expense_filters = {
+			"employee": driver.employee,
+			"remark": ["like", "%Mobile Request ID:%"],
+		}
+		if trip:
+			expense_filters["delivery_trip"] = trip.name
+		for row in frappe.get_all(
 			"Expense Claim",
-			filters={
-				"employee": driver.employee,
-				"remark": ["like", "%Mobile Request ID:%"],
-			},
+			filters=expense_filters,
 			fields=expense_fields,
 			order_by="modified desc",
 			limit_page_length=limit,
@@ -78,12 +84,15 @@ def get_mobile_requests(installation_id, device_identifier=None, limit=50):
 		]
 		if frappe.get_meta("Material Request").has_field("workflow_state"):
 			material_fields.append("workflow_state")
+		material_filters = {
+			"owner": frappe.session.user,
+			"terms": ["like", "%Mobile Request ID:%"],
+		}
+		if trip:
+			material_filters["terms"] = ["like", f"%Delivery Trip: {trip.name}%"]
 		material_requests = frappe.get_list(
 			"Material Request",
-			filters={
-				"owner": frappe.session.user,
-				"terms": ["like", "%Mobile Request ID:%"],
-			},
+			filters=material_filters,
 			fields=material_fields,
 			order_by="modified desc",
 			limit_page_length=limit,
@@ -119,7 +128,6 @@ def get_mobile_request_details(
 	if doctype not in {"Expense Claim", "Material Request"} or not name:
 		frappe.throw(_("Select a valid mobile request."))
 	doc = frappe.get_doc(doctype, name)
-	doc.check_permission("read")
 
 	if doctype == "Expense Claim":
 		if (
@@ -154,6 +162,7 @@ def get_mobile_request_details(
 			],
 		}
 
+	doc.check_permission("read")
 	if doc.owner != frappe.session.user or "Mobile Request ID:" not in (doc.terms or ""):
 		frappe.throw(
 			_("This Material Request does not belong to your mobile requests."), frappe.PermissionError
@@ -183,6 +192,7 @@ def get_mobile_request_details(
 def get_mobile_request_setup(installation_id, trip_name, device_identifier=None):
 	"""Return bounded configuration needed by the mobile request forms."""
 	driver, trip = _get_mobile_request_context(installation_id, trip_name, device_identifier)
+	_ensure_trip_accepts_requests(trip)
 	employee = None
 	if driver.employee:
 		employee = frappe.db.get_value(
@@ -193,7 +203,7 @@ def get_mobile_request_setup(installation_id, trip_name, device_identifier=None)
 		)
 
 	expense_types = []
-	if frappe.has_permission("Expense Claim Type", "read"):
+	if driver.employee:
 		configured_types = frappe.get_all(
 			"Expense Claim Account",
 			filters={"company": trip.company},
@@ -201,7 +211,7 @@ def get_mobile_request_setup(installation_id, trip_name, device_identifier=None)
 			limit_page_length=200,
 		)
 		if configured_types:
-			expense_types = frappe.get_list(
+			expense_types = frappe.get_all(
 				"Expense Claim Type",
 				filters={"name": ["in", list(dict.fromkeys(configured_types))]},
 				pluck="name",
@@ -226,7 +236,7 @@ def get_mobile_request_setup(installation_id, trip_name, device_identifier=None)
 		"expense_types": expense_types,
 		"warehouses": warehouses,
 		"permissions": {
-			"expense_claim": bool(driver.employee and frappe.has_permission("Expense Claim", "create")),
+			"expense_claim": bool(driver.employee),
 			"material_request": bool(frappe.has_permission("Material Request", "create")),
 		},
 	}
@@ -239,7 +249,8 @@ def search_mobile_material_request_items(
 	device_identifier=None,
 ):
 	"""Search a small set of enabled stock Items for an assigned driver's request."""
-	_get_mobile_request_context(installation_id, trip_name, device_identifier)
+	_, trip = _get_mobile_request_context(installation_id, trip_name, device_identifier)
+	_ensure_trip_accepts_requests(trip)
 	require_doctype_permission("Material Request", "create")
 	if not frappe.has_permission("Item", "read"):
 		frappe.throw(_("You do not have permission to view Items."), frappe.PermissionError)
@@ -269,7 +280,7 @@ def create_mobile_expense_claim(
 ):
 	"""Create one HRMS Expense Claim draft linked to the assigned Delivery Trip."""
 	driver, trip = _get_mobile_request_context(installation_id, trip_name, device_identifier)
-	require_doctype_permission("Expense Claim", "create")
+	_ensure_trip_accepts_requests(trip)
 	if not driver.employee:
 		frappe.throw(_("Your Driver profile must be linked to an Employee before claiming expenses."))
 	payload = _parse_payload(payload)
@@ -335,7 +346,10 @@ def create_mobile_expense_claim(
 	claim.remark = _request_context(request_id, trip.name, driver.name, payload.get("remarks"))
 	for expense in validated_expenses:
 		claim.append("expenses", expense)
-	claim.insert()
+	# The API has authenticated the device, driver, Employee link, and assigned
+	# trip. Keep this mobile path available without requiring the HRMS desk
+	# Expense Claim role, while preserving normal document validation.
+	claim.insert(ignore_permissions=True)
 	return {"doctype": claim.doctype, "name": claim.name, "status": claim.status, "created": True}
 
 
@@ -347,6 +361,7 @@ def create_mobile_material_request(
 ):
 	"""Create one ERPNext Material Request draft for review and normal processing."""
 	driver, trip = _get_mobile_request_context(installation_id, trip_name, device_identifier)
+	_ensure_trip_accepts_requests(trip)
 	require_doctype_permission("Material Request", "create")
 	payload = _parse_payload(payload)
 	request_id = _validate_request_id(payload.get("request_id"))
@@ -419,6 +434,11 @@ def _get_mobile_request_context(installation_id, trip_name, device_identifier=No
 	driver = _require_mobile_driver(installation_id, device_identifier)
 	trip = _get_assigned_trip(trip_name, driver.name)
 	return driver, trip
+
+
+def _ensure_trip_accepts_requests(trip):
+	if trip.status == "Completed" or getattr(trip, "vuna_actual_completion", None):
+		frappe.throw(_("Delivery Trip {0} is completed; no new requests can be created.").format(trip.name))
 
 
 def _parse_payload(payload):
