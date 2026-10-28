@@ -4,8 +4,8 @@ from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
 
 from vuna_transport.services.fleet.license_plate_service import (
-	MOTORCYCLE,
 	MOTOR_VEHICLE,
+	MOTORCYCLE,
 	format_license_plate,
 	normalize_and_validate_license_plate,
 )

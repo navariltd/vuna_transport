@@ -6,7 +6,6 @@ import frappe
 import requests
 from frappe import _
 
-
 EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 REMOTE_PUSH_NOTIFICATIONS_ENABLED = False
 
@@ -36,7 +35,9 @@ def notify_expense_claim(doc, method=None):
 	before = doc.get_doc_before_save()
 	if not before or _document_status(before) == _document_status(doc):
 		return
-	users = frappe.get_all("Driver", filters={"employee": doc.employee}, pluck="user", ignore_permissions=True)
+	users = frappe.get_all(
+		"Driver", filters={"employee": doc.employee}, pluck="user", ignore_permissions=True
+	)
 	users = [user for user in users if user]
 	if users:
 		trip = doc.get("delivery_trip")

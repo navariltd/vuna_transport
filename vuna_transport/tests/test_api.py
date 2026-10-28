@@ -22,9 +22,7 @@ class TestVehicleAllocationDriverSearch(UnitTestCase):
 
 		get_list.side_effect = get_driver_rows
 		get_resource_window.return_value = ("2026-10-27 08:00:00", "2026-10-27 08:00:01")
-		get_availability_map.return_value = {
-			"DR-001": frappe._dict(driver="DR-001", dispatch_eligible=True)
-		}
+		get_availability_map.return_value = {"DR-001": frappe._dict(driver="DR-001", dispatch_eligible=True)}
 
 		result = get_drivers_for_allocation(
 			"Driver", "", "name", 0, 20, {"company": "Yovuna Tech", "delivery_loads": []}

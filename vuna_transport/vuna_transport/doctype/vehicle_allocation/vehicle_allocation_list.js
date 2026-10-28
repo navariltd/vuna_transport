@@ -13,12 +13,6 @@ frappe.listview_settings["Vehicle Allocation"] = {
 			Completed: [__("Completed"), "green"],
 			Accepted: [__("Accepted"), "green"],
 			Rejected: [__("Rejected"), "red"],
-			"Awaiting Delivery Notes": [__("Awaiting Delivery Notes"), "orange"],
-			"Ready for Delivery Trip": [__("Ready for Delivery Trip"), "blue"],
-			"Delivery Trip Draft": [__("Delivery Trip Draft"), "orange"],
-			"Delivery Trip Scheduled": [__("Delivery Trip Scheduled"), "blue"],
-			"In Transit": [__("In Transit"), "blue"],
-			Completed: [__("Completed"), "green"],
 			Replaced: [__("Replaced"), "gray"],
 			Cancelled: [__("Cancelled"), "red"],
 		};

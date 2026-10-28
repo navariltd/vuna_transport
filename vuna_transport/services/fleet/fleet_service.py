@@ -4,11 +4,11 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, cint, now_datetime
 
+from vuna_transport.services.fleet.license_plate_service import normalize_and_validate_license_plate
 from vuna_transport.services.fleet.vehicle_availability_service import (
 	get_vehicle_availability_map,
 	get_vehicle_status,
 )
-from vuna_transport.services.fleet.license_plate_service import normalize_and_validate_license_plate
 from vuna_transport.services.fleet.vehicle_owner_service import normalize_vehicle_owner
 from vuna_transport.services.shared.security_service import require_document_permission
 

@@ -14,13 +14,13 @@ from vuna_transport.services.fleet.vehicle_availability_service import (
 )
 from vuna_transport.services.mobile.mobile_device_service import (
 	bootstrap_device,
-	register_mobile_push_token,
 	get_assigned_delivery_trips,
 	get_current_driver_profile,
 	get_delivery_note_details,
 	get_delivery_trip_details,
 	get_mobile_offline_manifest,
 	prepare_mobile_proof_of_delivery,
+	register_mobile_push_token,
 	submit_mobile_proof_of_delivery,
 	upload_mobile_pod_attachment,
 )

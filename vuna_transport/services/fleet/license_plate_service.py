@@ -5,7 +5,6 @@ import re
 import frappe
 from frappe import _
 
-
 MOTOR_VEHICLE = "Motor Vehicle"
 MOTORCYCLE = "Motorcycle"
 
@@ -32,10 +31,7 @@ def get_license_plate_format(vehicle_category=None):
 	"""Get the format configured on a Vehicle Category, defaulting to motor vehicles."""
 	if not vehicle_category:
 		return MOTOR_VEHICLE
-	return (
-		frappe.db.get_value("Vehicle Category", vehicle_category, "license_plate_format")
-		or MOTOR_VEHICLE
-	)
+	return frappe.db.get_value("Vehicle Category", vehicle_category, "license_plate_format") or MOTOR_VEHICLE
 
 
 def format_license_plate(value, license_plate_format=MOTOR_VEHICLE):
@@ -50,7 +46,7 @@ def format_license_plate(value, license_plate_format=MOTOR_VEHICLE):
 				license_plate_format, format_definition["example"]
 			)
 		)
-	return f"{plate[:format_definition['split_at']]} {plate[format_definition['split_at'] :]}"
+	return f"{plate[: format_definition['split_at']]} {plate[format_definition['split_at'] :]}"
 
 
 def normalize_and_validate_license_plate(value, vehicle_category=None):
