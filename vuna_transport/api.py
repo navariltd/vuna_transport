@@ -76,10 +76,10 @@ def get_mobile_driver_profile(installation_id, device_identifier=None):
 
 @frappe.whitelist()
 def register_mobile_device_push_token(
-	installation_id,
-	push_token,
-	device_identifier=None,
-	provider="expo",
+	installation_id: str,
+	push_token: str,
+	device_identifier: str | None = None,
+	provider: str = "expo",
 ):
 	return register_mobile_push_token(
 		installation_id,
@@ -219,7 +219,12 @@ def get_mobile_trip_request_setup(installation_id, trip_name, device_identifier=
 
 
 @frappe.whitelist()
-def get_mobile_request_history(installation_id, device_identifier=None, limit=50, trip_name=None):
+def get_mobile_request_history(
+	installation_id: str,
+	device_identifier: str | None = None,
+	limit: int | str = 50,
+	trip_name: str | None = None,
+):
 	return get_mobile_requests(installation_id, device_identifier, limit, trip_name)
 
 
