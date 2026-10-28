@@ -621,7 +621,8 @@ def get_allocation_delivery_note_status(allocation_name):
 	allocation = frappe.get_doc("Vehicle Allocation", allocation_name)
 	require_document_permission(allocation, "read")
 	sync_allocation_execution_status(allocation)
-	allocation.reload()
+	if hasattr(allocation, "reload"):
+		allocation.reload()
 	return _get_allocation_execution_state(allocation)
 
 
@@ -639,7 +640,9 @@ def _get_allocation_execution_state(allocation):
 	loads = get_allocation_loads(allocation)
 	statuses = [get_delivery_note_submission_status(load) for load in loads]
 	trip = (
-		frappe.db.get_value("Delivery Trip", active_delivery_trip, ["name", "docstatus", "status"], as_dict=True)
+		frappe.db.get_value(
+			"Delivery Trip", active_delivery_trip, ["name", "docstatus", "status"], as_dict=True
+		)
 		if active_delivery_trip
 		else None
 	)
@@ -662,7 +665,10 @@ def sync_allocation_execution_status(allocation):
 	"""Persist the allocation lifecycle state so the standard list filter remains useful."""
 	if isinstance(allocation, str):
 		allocation = frappe.get_doc("Vehicle Allocation", allocation)
-	if allocation.docstatus != 1 or allocation.status in ("Replaced", "Cancelled"):
+	if getattr(allocation, "docstatus", None) != 1 or getattr(allocation, "status", None) in (
+		"Replaced",
+		"Cancelled",
+	):
 		return
 	status = _get_allocation_execution_state(allocation)["execution_status"]
 	if status != allocation.status:
