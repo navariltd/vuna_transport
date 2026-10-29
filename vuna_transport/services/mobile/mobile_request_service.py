@@ -414,6 +414,9 @@ def create_mobile_material_request(
 		quantity = flt(row.get("qty"))
 		if not item or quantity <= 0:
 			frappe.throw(_("Every requested Item must have a quantity greater than zero."))
+		item_schedule_date = getdate(row.get("schedule_date") or schedule_date)
+		if item_schedule_date < getdate(nowdate()):
+			frappe.throw(_("The Required By date for {0} cannot be before today.").format(item.name))
 		request.append(
 			"items",
 			{
@@ -422,10 +425,12 @@ def create_mobile_material_request(
 				"uom": item.stock_uom,
 				"stock_uom": item.stock_uom,
 				"conversion_factor": 1,
-				"schedule_date": schedule_date,
+				"schedule_date": item_schedule_date,
+				"description": row.get("description"),
 				"warehouse": warehouse,
 			},
 		)
+	request.schedule_date = min((row.schedule_date for row in request.items), default=schedule_date)
 	request.insert()
 	return {"doctype": request.doctype, "name": request.name, "status": request.status, "created": True}
 
