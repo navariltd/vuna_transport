@@ -7,6 +7,9 @@ from frappe.utils import cint, flt, now_datetime
 from frappe.utils.file_manager import get_content_hash, save_file
 
 from vuna_transport.services.execution.pod_service import create_proof_of_delivery
+from vuna_transport.services.execution.stock_identity_service import (
+	get_single_delivery_note_item_batch,
+)
 
 MOBILE_REQUEST_ID_PATTERN = re.compile(r"^[a-f0-9-]{16,64}$", re.IGNORECASE)
 
@@ -266,11 +269,13 @@ def get_mobile_offline_manifest(installation_id, device_identifier=None):
 			"stock_qty",
 			"stock_uom",
 			"batch_no",
+			"serial_and_batch_bundle",
 		],
 		order_by="parent asc, idx asc",
 		limit_page_length=10000,
 		ignore_permissions=True,
 	):
+		row.batch_no = get_single_delivery_note_item_batch(row)
 		items_by_note.setdefault(row.parent, []).append(row)
 
 	delivery_notes = []
@@ -425,7 +430,7 @@ def get_delivery_note_details(installation_id, trip_name, stop_name, device_iden
 					"uom": row.uom,
 					"stock_qty": row.stock_qty,
 					"stock_uom": row.stock_uom,
-					"batch_no": getattr(row, "batch_no", None),
+					"batch_no": get_single_delivery_note_item_batch(row),
 				}
 				for row in delivery_note.items
 			],

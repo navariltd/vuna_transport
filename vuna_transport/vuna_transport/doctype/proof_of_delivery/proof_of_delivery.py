@@ -13,6 +13,9 @@ from vuna_transport.services.execution.pod_service import (
 	validate_pod_items,
 )
 from vuna_transport.services.execution.return_service import create_return_request_from_pod
+from vuna_transport.services.execution.stock_identity_service import (
+	get_single_delivery_note_item_batch,
+)
 
 
 class ProofofDelivery(Document):
@@ -97,6 +100,8 @@ class ProofofDelivery(Document):
 						"uom",
 						"stock_uom",
 						"conversion_factor",
+						"batch_no",
+						"serial_and_batch_bundle",
 					],
 				)
 			}
@@ -113,6 +118,7 @@ class ProofofDelivery(Document):
 			item.uom = delivery_note_item.uom
 			item.stock_uom = delivery_note_item.stock_uom
 			item.conversion_factor = flt(delivery_note_item.conversion_factor) or 1
+			item.batch_no = item.batch_no or get_single_delivery_note_item_batch(delivery_note_item)
 			if not flt(item.ordered_qty):
 				item.ordered_qty = flt(delivery_note_item.qty)
 			if not item.delivery_order_item:

@@ -192,10 +192,20 @@ doc_events = {
 		"on_trash": "vuna_transport.services.execution.return_service.prepare_sales_return_cancellation",
 	},
 	"Quality Inspection": {
-		"before_cancel": "vuna_transport.services.execution.return_service.prepare_quality_inspection_removal",
-		"on_submit": "vuna_transport.services.execution.return_service.sync_return_request_from_quality_inspection",
+		"on_update": "vuna_transport.services.execution.return_v2_service.sync_return_quality_inspection",
+		"before_cancel": [
+			"vuna_transport.services.execution.return_service.prepare_quality_inspection_removal",
+			"vuna_transport.services.execution.return_v2_service.prepare_return_quality_inspection_removal",
+		],
+		"on_submit": [
+			"vuna_transport.services.execution.return_service.sync_return_request_from_quality_inspection",
+			"vuna_transport.services.execution.return_v2_service.sync_return_quality_inspection",
+		],
 		"on_cancel": "vuna_transport.services.execution.return_service.sync_return_request_from_quality_inspection",
-		"on_trash": "vuna_transport.services.execution.return_service.prepare_quality_inspection_removal",
+		"on_trash": [
+			"vuna_transport.services.execution.return_service.prepare_quality_inspection_removal",
+			"vuna_transport.services.execution.return_v2_service.prepare_return_quality_inspection_removal",
+		],
 	},
 	"Sales Invoice": {
 		"before_submit": "vuna_transport.services.execution.return_service.validate_linked_sales_invoice_credit_note_submission",
@@ -205,6 +215,13 @@ doc_events = {
 	"Payment Entry": {
 		"on_submit": "vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
 		"on_cancel": "vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
+	},
+	"Stock Entry": {
+		"before_submit": "vuna_transport.services.execution.return_v2_service.validate_return_stock_entry",
+		"before_cancel": "vuna_transport.services.execution.return_v2_service.prepare_return_stock_entry_removal",
+		"on_submit": "vuna_transport.services.execution.return_v2_service.sync_return_inspection_from_stock_entry",
+		"on_cancel": "vuna_transport.services.execution.return_v2_service.sync_return_inspection_from_stock_entry",
+		"on_trash": "vuna_transport.services.execution.return_v2_service.prepare_return_stock_entry_removal",
 	},
 	"Delivery Trip": {
 		"before_cancel": "vuna_transport.services.execution.lineage_service.prepare_delivery_trip_cancellation",
@@ -302,6 +319,7 @@ doctype_list_js = {
 
 override_doctype_dashboards = {
 	"Delivery Note": "vuna_transport.overrides.delivery_note_dashboard.get_data",
+	"Delivery Trip": "vuna_transport.overrides.delivery_trip_dashboard.get_data",
 	"Sales Order": "vuna_transport.overrides.sales_order_dashboard.get_data",
 	"Vehicle": "vuna_transport.overrides.vehicle_dashboard.get_data",
 }
