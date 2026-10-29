@@ -1,3 +1,5 @@
+/* global erpnext */
+
 frappe.ui.form.on("Delivery Trip", {
 	setup(frm) {
 		frm.set_query("vehicle", () => {
@@ -16,29 +18,34 @@ frappe.ui.form.on("Delivery Trip", {
 		const loads = (frm.doc.delivery_stops || [])
 			.map((row) => row.vuna_delivery_load)
 			.filter(Boolean);
-		if (loads.length) {
+
+		if (frm.doc.docstatus === 0) {
+			frm.remove_custom_button(__("Delivery Note"), __("Get stops from"));
 			frm.add_custom_button(
-				loads.length === 1 ? __("Open Delivery Load") : __("Open Delivery Loads"),
+				__("Delivery Note"),
 				() => {
-					frappe.set_route(
-						loads.length === 1 ? "Form" : "List",
-						"Delivery Load",
-						loads.length === 1 ? loads[0] : { name: ["in", loads] }
-					);
-				},
-				__("Vuna Transport")
-			);
-			frm.add_custom_button(
-				__("Allocation History"),
-				() => {
-					frappe.set_route("List", "Vehicle Allocation", {
-						delivery_load: ["in", loads],
+					const get_query_filters = {
+						company: frm.doc.company,
+						docstatus: 1,
+						status: ["!=", "Closed"],
+					};
+					if (loads.length) get_query_filters.vuna_delivery_load = ["in", loads];
+
+					erpnext.utils.map_current_doc({
+						method: "erpnext.stock.doctype.delivery_note.delivery_note.make_delivery_trip",
+						source_doctype: "Delivery Note",
+						target: frm,
+						date_field: "posting_date",
+						setters: {
+							company: frm.doc.company,
+							customer: null,
+						},
+						get_query_filters,
 					});
 				},
-				__("Vuna Transport")
+				__("Get stops from")
 			);
 		}
-
 		if (
 			loads.length &&
 			frm.doc.docstatus < 2 &&
@@ -54,7 +61,7 @@ frappe.ui.form.on("Delivery Trip", {
 						freeze_message: __("Preparing replacement allocation..."),
 					});
 				},
-				__("Vuna Transport")
+				__("Create")
 			);
 		}
 
@@ -69,7 +76,7 @@ frappe.ui.form.on("Delivery Trip", {
 					};
 					frappe.new_doc("Gate Pass");
 				},
-				__("Vuna Transport")
+				__("Create")
 			);
 			const pending_stops = (frm.doc.delivery_stops || []).filter(
 				(stop) => stop.delivery_note && !stop.vuna_proof_of_delivery
@@ -116,9 +123,10 @@ frappe.ui.form.on("Delivery Trip", {
 						});
 						dialog.show();
 					},
-					__("Vuna Transport")
+					__("Create")
 				);
 			}
 		}
+		frm.page.set_inner_btn_group_as_primary(__("Create"));
 	},
 });

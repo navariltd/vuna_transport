@@ -620,6 +620,17 @@
    "translatable": 0,
    "unique": 0,
    "width": null
+  },
+  {
+   "dt": "Delivery Trip",
+   "fieldname": "connections_tab",
+   "fieldtype": "Tab Break",
+   "insert_after": "vuna_vehicle_allocation",
+   "label": "Connections",
+   "module": "Vuna Transport",
+   "name": "Delivery Trip-connections_tab",
+   "owner": "Administrator",
+   "show_dashboard": 1
   }
  ],
  "custom_perms": [],
