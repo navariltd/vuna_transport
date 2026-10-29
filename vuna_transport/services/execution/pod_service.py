@@ -6,6 +6,9 @@ from frappe.utils import cint, flt, now_datetime
 
 from vuna_transport.services.execution.dispatch_guard_service import set_delivery_load_status
 from vuna_transport.services.execution.lineage_service import get_delivery_trip_load_names
+from vuna_transport.services.execution.stock_identity_service import (
+	get_single_delivery_note_item_batch,
+)
 from vuna_transport.services.shared.security_service import (
 	require_doctype_permission,
 	require_document_permission,
@@ -75,7 +78,7 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 					"uom": delivery_item.uom,
 					"stock_uom": delivery_item.stock_uom,
 					"conversion_factor": flt(delivery_item.conversion_factor) or 1,
-					"batch_no": getattr(delivery_item, "batch_no", None),
+					"batch_no": get_single_delivery_note_item_batch(delivery_item),
 				},
 			)
 

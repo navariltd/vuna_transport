@@ -6,6 +6,10 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, flt, now_datetime, nowdate
 
+from vuna_transport.services.execution.stock_identity_service import (
+	get_delivery_note_item_batches,
+	get_single_delivery_note_item_batch,
+)
 from vuna_transport.services.shared.security_service import (
 	require_company_access,
 	require_doctype_permission,
@@ -20,11 +24,23 @@ RETURN_PHYSICAL_RESOLUTIONS = {
 
 ACTIVE_STATUSES = {
 	"Draft",
+	"Awaiting Receipt",
 	"Awaiting Sales Return",
 	"Awaiting Inspection",
+	"Awaiting Disposition",
 	"Awaiting Return Submission",
 	"Awaiting Commercial Resolution",
 }
+
+
+def _return_request_qty_precision() -> int:
+	return frappe.get_precision("Return Request Item", "requested_return_qty") or 3
+
+
+def _round_return_request_qty(quantity) -> float:
+	return flt(quantity, _return_request_qty_precision())
+
+
 TERMINAL_STATUSES = {"Resolved", "Closed", "Cancelled"}
 VALID_STATUSES = ACTIVE_STATUSES | TERMINAL_STATUSES
 
@@ -161,6 +177,16 @@ def _validate_items(request, source, source_type):
 		row.uom = source_item.uom
 		row.stock_uom = source_item.stock_uom
 		row.conversion_factor = flt(source_item.conversion_factor) or 1
+		if source_type == "Delivery Note":
+			source_batches = get_delivery_note_item_batches(source_item)
+			if row.batch_no and row.batch_no not in source_batches:
+				frappe.throw(
+					_("Batch {0} was not delivered on Delivery Note Item {1}.").format(
+						row.batch_no, source_item.name
+					)
+				)
+			if len(source_batches) == 1:
+				row.batch_no = source_batches[0]
 		row.delivered_qty = abs(flt(source_item.qty))
 		if source_type == "Delivery Note" and row.delivery_order_item and source_item.so_detail:
 			if (
@@ -177,14 +203,16 @@ def _validate_items(request, source, source_type):
 			if source_type == "Delivery Note"
 			else get_remaining_returnable_sales_invoice_quantity(reference, request.name)
 		)
-		requested = flt(row.requested_return_qty)
+		remaining = _round_return_request_qty(remaining)
+		requested = flt(row.requested_return_qty, row.precision("requested_return_qty"))
+		row.requested_return_qty = requested
 		if requested <= 0 or requested > remaining:
 			frappe.throw(
 				_("Return quantity for {0} must be greater than zero and no more than {1}.").format(
 					row.item_code, remaining
 				)
 			)
-		row.remaining_qty = max(requested - flt(row.received_qty), 0)
+		row.remaining_qty = flt(max(requested - flt(row.received_qty), 0), row.precision("remaining_qty"))
 		received = flt(row.received_qty)
 		accepted = flt(row.accepted_return_qty)
 		rejected = flt(row.rejected_return_qty)
@@ -278,6 +306,8 @@ def _get_source_sales_invoices(delivery_note):
 
 def get_return_request_state(request):
 	"""Derive return progress from ERPNext documents instead of browser-maintained status."""
+	if request.get("process_version") == "Custody and Inspection":
+		return _get_v2_return_request_state(request)
 	has_delivery_note = bool(request.get("delivery_note"))
 	reference_field = "delivery_note_item" if has_delivery_note else "sales_invoice_item"
 	if not has_delivery_note and any(getattr(row, "delivery_note_item", None) for row in request.items):
@@ -375,6 +405,67 @@ def get_return_request_state(request):
 		"return_docstatus": return_docstatus,
 		"inspection_complete": inspection_complete,
 		"commercial_complete": commercial_complete,
+	}
+
+
+def _get_v2_return_request_state(request):
+	"""Derive V2 progress from the linked Sales Return and inspection."""
+	return _get_v2_sales_return_state(request)
+
+
+def _get_v2_sales_return_state(request):
+	request_items = {row.delivery_note_item: row for row in request.items}
+	returned_by_item = dict.fromkeys(request_items, 0.0)
+	returned_stock_by_item = dict.fromkeys(request_items, 0.0)
+	return_docstatus = frappe.db.get_value("Delivery Note", request.return_stock_document, "docstatus")
+	if return_docstatus == 1:
+		for row in frappe.get_all(
+			"Delivery Note Item",
+			filters={"parent": request.return_stock_document, "stock_qty": ["<", 0]},
+			fields=["dn_detail", "stock_qty"],
+		):
+			if row.dn_detail not in request_items:
+				continue
+			stock_qty = abs(flt(row.stock_qty))
+			returned_stock_by_item[row.dn_detail] += stock_qty
+			returned_by_item[row.dn_detail] += _from_stock_qty(stock_qty, request_items[row.dn_detail])
+	inspection = frappe.db.get_value(
+		"Return Inspection",
+		{"sales_return": request.return_stock_document, "docstatus": 1},
+		["name", "stock_entry"],
+		as_dict=True,
+	)
+	expected = sum(flt(row.requested_return_qty) for row in request.items)
+	returned = sum(returned_by_item.values())
+	if request.docstatus == 0:
+		status = "Draft"
+	elif request.docstatus == 2:
+		status = "Cancelled"
+	elif not request.return_stock_document or return_docstatus in (None, 2):
+		status = "Awaiting Sales Return"
+	elif return_docstatus == 0:
+		status = "Awaiting Return Submission"
+	elif not inspection:
+		status = "Awaiting Inspection"
+	elif (
+		not inspection.stock_entry
+		or frappe.db.get_value("Stock Entry", inspection.stock_entry, "docstatus") != 1
+	):
+		status = "Awaiting Disposition"
+	elif _has_completed_commercial_resolution(request):
+		status = "Closed" if request.status == "Closed" else "Resolved"
+	else:
+		status = "Awaiting Commercial Resolution"
+	return {
+		"status": status,
+		"expected_return_qty": expected,
+		"returned_qty": returned,
+		"return_difference_qty": max(expected - returned, 0),
+		"returned_by_item": returned_by_item,
+		"returned_stock_by_item": returned_stock_by_item,
+		"return_docstatus": return_docstatus,
+		"inspection_complete": bool(inspection),
+		"commercial_complete": _has_completed_commercial_resolution(request),
 	}
 
 
@@ -527,7 +618,7 @@ def get_returnable_items(delivery_note, exclude_request=None):
 
 	items = []
 	for row in source.items:
-		remaining = get_remaining_returnable_quantity(row.name, exclude_request)
+		remaining = _round_return_request_qty(get_remaining_returnable_quantity(row.name, exclude_request))
 		if remaining <= 0:
 			continue
 		delivery_order_item = row.get("delivery_order_item")
@@ -548,6 +639,7 @@ def get_returnable_items(delivery_note, exclude_request=None):
 				"uom": row.uom,
 				"stock_uom": row.stock_uom,
 				"conversion_factor": flt(row.conversion_factor) or 1,
+				"batch_no": get_single_delivery_note_item_batch(row),
 			}
 		)
 	return items
@@ -577,7 +669,9 @@ def get_sales_invoice_return_context(sales_invoice, exclude_request=None):
 
 	items = []
 	for row in source.items:
-		remaining = get_remaining_returnable_sales_invoice_quantity(row.name, exclude_request)
+		remaining = _round_return_request_qty(
+			get_remaining_returnable_sales_invoice_quantity(row.name, exclude_request)
+		)
 		if remaining <= 0:
 			continue
 		items.append(
@@ -695,11 +789,11 @@ def create_return_stock_document(return_request):
 			request_item = requested_by_item.get(row.sales_invoice_item)
 			if not request_item:
 				continue
-			quantity = flt(request_item.requested_return_qty)
+			quantity = _round_return_request_qty(request_item.requested_return_qty)
 			if quantity <= 0:
 				continue
 			row.qty = -quantity
-			row.stock_qty = -(quantity * (flt(row.conversion_factor) or 1))
+			row.stock_qty = -flt(quantity * (flt(row.conversion_factor) or 1), row.precision("stock_qty"))
 			row.warehouse = request.return_warehouse
 			target_items.append(row)
 		target.set("items", target_items)
@@ -727,11 +821,11 @@ def create_return_stock_document(return_request):
 		if not request_item:
 			continue
 		conversion_factor = flt(row.conversion_factor) or 1
-		expected_qty = flt(request_item.requested_return_qty)
+		expected_qty = _round_return_request_qty(request_item.requested_return_qty)
 		if expected_qty <= 0:
 			continue
 		row.qty = -expected_qty
-		row.stock_qty = -(expected_qty * conversion_factor)
+		row.stock_qty = -flt(expected_qty * conversion_factor, row.precision("stock_qty"))
 		row.warehouse = request.return_warehouse
 		target_items.append(row)
 	target.set("items", target_items)
@@ -1029,7 +1123,17 @@ def validate_sales_return_request_link(doc, method=None):
 				request.name, request.delivery_note, doc.return_against
 			)
 		)
-	if request.return_stock_document and request.return_stock_document != doc.name:
+	if request.get("process_version") == "Custody and Inspection":
+		from vuna_transport.services.execution.return_v2_service import (
+			validate_sales_return_lineage,
+		)
+
+		validate_sales_return_lineage(doc, request)
+	if (
+		request.get("process_version") != "Custody and Inspection"
+		and request.return_stock_document
+		and request.return_stock_document != doc.name
+	):
 		linked_status = frappe.db.get_value("Delivery Note", request.return_stock_document, "docstatus")
 		if linked_status != 2:
 			frappe.throw(
@@ -1059,6 +1163,11 @@ def sync_sales_return_request_link(doc, method=None):
 
 	if not doc.vuna_return_request:
 		return
+	if (
+		frappe.db.get_value("Return Request", doc.vuna_return_request, "process_version")
+		== "Custody and Inspection"
+	):
+		return
 	if frappe.db.get_value("Return Request", doc.vuna_return_request, "return_stock_document") != doc.name:
 		frappe.db.set_value(
 			"Return Request",
@@ -1077,6 +1186,15 @@ def prepare_sales_return_cancellation(doc, method=None):
 	return_request = _get_linked_return_request_name(doc)
 	if not return_request:
 		return
+	inspection = frappe.db.get_value(
+		"Return Inspection", {"sales_return": doc.name, "docstatus": ["!=", 2]}, "name"
+	)
+	if inspection:
+		frappe.throw(
+			_("Cancel and delete Return Inspection {0} before cancelling this Sales Return.").format(
+				inspection
+			)
+		)
 	if frappe.db.get_value("Return Request", return_request, "return_stock_document") == doc.name:
 		frappe.db.set_value(
 			"Return Request", return_request, "return_stock_document", None, update_modified=False
@@ -1157,6 +1275,9 @@ def sync_return_request_from_sales_return(doc, method=None):
 	return_request = _get_linked_return_request_name(doc)
 	if return_request:
 		request = frappe.get_doc("Return Request", return_request)
+		if request.get("process_version") == "Custody and Inspection":
+			recalculate_return_request(return_request)
+			return
 		if doc.docstatus == 2:
 			for row in request.items:
 				frappe.db.set_value(
@@ -1406,6 +1527,7 @@ def create_return_request_from_pod(proof_of_delivery):
 				"uom": delivery_note_item.uom,
 				"stock_uom": delivery_note_item.stock_uom,
 				"conversion_factor": flt(delivery_note_item.conversion_factor) or 1,
+				"batch_no": row.batch_no or get_single_delivery_note_item_batch(delivery_note_item),
 				"return_reason": _get_pod_item_return_reason(pod, row),
 			}
 		)

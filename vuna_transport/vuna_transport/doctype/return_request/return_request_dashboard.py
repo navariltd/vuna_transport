@@ -19,6 +19,9 @@ def get_data():
 			"Payment Entry": "refund_payment_entry",
 			"Delivery Order": "replacement_delivery_reference",
 		},
+		"non_standard_fieldnames": {
+			"Return Inspection": "return_request",
+		},
 		"transactions": [
 			{
 				"label": _("Delivery Context"),
@@ -26,7 +29,7 @@ def get_data():
 			},
 			{
 				"label": _("Physical Return"),
-				"items": ["Delivery Note", "Quality Inspection"],
+				"items": ["Delivery Note", "Return Inspection", "Quality Inspection"],
 			},
 			{
 				"label": _("Commercial Resolution"),

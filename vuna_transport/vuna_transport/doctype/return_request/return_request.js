@@ -52,9 +52,12 @@ frappe.ui.form.on("Return Request", {
 		frm.ignore_doctypes_on_cancel_all = [
 			...new Set([...(frm.ignore_doctypes_on_cancel_all || []), "Proof of Delivery"]),
 		];
-		render_process_summary(frm);
 		add_get_delivered_items_button(frm);
 		if (frm.is_new()) return;
+		if (frm.doc.process_version === "Custody and Inspection") {
+			add_v2_return_actions(frm);
+			return;
+		}
 
 		frm.remove_custom_button(__("Create Sales Return"), __("Next Action"));
 		frm.remove_custom_button(__("Sales Return"), __("Next Action"));
@@ -87,7 +90,6 @@ frappe.ui.form.on("Return Request", {
 				__("Actions")
 			);
 		}
-		add_resolution_actions(frm);
 	},
 
 	delivery_note(frm) {
@@ -135,6 +137,48 @@ frappe.ui.form.on("Return Request", {
 		clear_customer_dependent_context(frm);
 	},
 });
+
+function add_v2_return_actions(frm) {
+	if (frm.doc.docstatus !== 1) return;
+	if (["Awaiting Sales Return", "Awaiting Receipt"].includes(frm.doc.status)) {
+		frm.add_custom_button(
+			__("Sales Return"),
+			() => {
+				frappe.call({
+					method: "vuna_transport.services.execution.return_service.create_return_stock_document",
+					args: { return_request: frm.doc.name },
+					freeze: true,
+					callback: ({ message }) => {
+						if (message)
+							frappe.set_route(
+								"Form",
+								message.doctype || "Delivery Note",
+								message.name || message
+							);
+					},
+				});
+			},
+			__("Create")
+		);
+		frm.page.set_inner_btn_group_as_primary(__("Create"));
+	}
+	if (frm.doc.status === "Awaiting Inspection" && frm.doc.return_stock_document) {
+		frm.add_custom_button(
+			__("Return Inspection"),
+			() =>
+				frappe.call({
+					method: "vuna_transport.services.execution.return_v2_service.create_return_inspection_from_sales_return",
+					args: { sales_return: frm.doc.return_stock_document },
+					freeze: true,
+					callback: ({ message }) => {
+						if (message) frappe.set_route("Form", "Return Inspection", message);
+					},
+				}),
+			__("Create")
+		);
+		frm.page.set_inner_btn_group_as_primary(__("Create"));
+	}
+}
 
 function set_delivery_note_from_invoice(frm, delivery_note) {
 	frm.set_value("delivery_note", delivery_note);
@@ -211,32 +255,6 @@ function clear_customer_dependent_context(frm) {
 	frm.refresh_field("items");
 }
 
-function render_process_summary(frm) {
-	const field = frm.fields_dict.process_summary;
-	if (!field?.$wrapper) return;
-	const escape = frappe.utils.escape_html;
-	const expected = flt(frm.doc.expected_return_qty);
-	const returned = flt(frm.doc.returned_qty);
-	const difference = flt(frm.doc.return_difference_qty);
-	field.$wrapper.html(`
-		<div class="rounded border p-3 mb-3">
-			<div class="text-muted text-uppercase small">${__("Current Stage")}</div>
-			<div class="font-weight-bold mb-3">${escape(frm.doc.status || __("Draft"))}</div>
-			<div class="d-flex flex-wrap" style="gap: 2rem">
-				<div><div class="text-muted small">${__("Expected")}</div><strong>${format_number(
-		expected
-	)}</strong></div>
-				<div><div class="text-muted small">${__("Returned")}</div><strong>${format_number(
-		returned
-	)}</strong></div>
-				<div><div class="text-muted small">${__("Difference")}</div><strong>${format_number(
-		difference
-	)}</strong></div>
-			</div>
-		</div>
-	`);
-}
-
 frappe.ui.form.on("Return Request Item", {
 	requested_return_qty(frm, cdt, cdn) {
 		const row = frappe.get_doc(cdt, cdn);
@@ -290,6 +308,7 @@ function show_returnable_items_dialog(frm, items) {
 			delivery_order_item: item.delivery_order_item,
 			stock_uom: item.stock_uom,
 			conversion_factor: item.conversion_factor,
+			batch_no: item.batch_no,
 			item_code: item.item_code,
 			item_name: item.item_name,
 			delivered_qty: item.delivered_qty,
@@ -320,6 +339,14 @@ function show_returnable_items_dialog(frm, items) {
 					{ fieldtype: "Data", fieldname: "delivery_order_item", hidden: true },
 					{ fieldtype: "Data", fieldname: "stock_uom", hidden: true },
 					{ fieldtype: "Float", fieldname: "conversion_factor", hidden: true },
+					{
+						fieldtype: "Link",
+						fieldname: "batch_no",
+						label: __("Batch No"),
+						options: "Batch",
+						read_only: true,
+						in_list_view: true,
+					},
 					{
 						fieldtype: "Read Only",
 						fieldname: "item_code",
@@ -397,6 +424,7 @@ function show_returnable_items_dialog(frm, items) {
 					uom: item.uom,
 					stock_uom: item.stock_uom,
 					conversion_factor: item.conversion_factor,
+					batch_no: item.batch_no,
 				});
 			});
 			frm.refresh_field("items");
@@ -434,57 +462,6 @@ function prepare_return_stock_document(frm) {
 			if (target) {
 				frappe.set_route("Form", target.doctype || "Delivery Note", target.name || target);
 			}
-		},
-	});
-}
-
-function add_resolution_actions(frm) {
-	if (frm.doc.status !== "Awaiting Commercial Resolution") return;
-	if (!frm.doc.delivery_note) return;
-	if (!frm.doc.replacement_sales_order && frm.doc.sales_order) {
-		frm.add_custom_button(
-			__("Create Replacement"),
-			() => create_replacement_sales_order(frm),
-			__("Resolve")
-		);
-	}
-	frm.add_custom_button(
-		__("No Further Action"),
-		() => record_no_further_action(frm),
-		__("Resolve")
-	);
-}
-
-function record_no_further_action(frm) {
-	frappe.prompt(
-		[
-			{
-				fieldname: "remarks",
-				fieldtype: "Small Text",
-				label: __("Decision Remarks"),
-				reqd: 1,
-			},
-		],
-		({ remarks }) => {
-			frappe.call({
-				method: "vuna_transport.services.execution.return_service.record_no_further_action",
-				args: { return_request: frm.doc.name, remarks },
-				freeze: true,
-				callback: () => frm.reload_doc(),
-			});
-		},
-		__("No Further Action"),
-		__("Confirm")
-	);
-}
-
-function create_replacement_sales_order(frm) {
-	frappe.call({
-		method: "vuna_transport.services.execution.return_service.create_replacement_sales_order",
-		args: { return_request: frm.doc.name },
-		freeze: true,
-		callback: ({ message }) => {
-			if (message) frappe.set_route("Form", "Sales Order", message);
 		},
 	});
 }

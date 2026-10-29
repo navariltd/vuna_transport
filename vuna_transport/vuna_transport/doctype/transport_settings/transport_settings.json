@@ -33,6 +33,7 @@
   "column_break_zhxz",
   "enable_gps_tracking",
   "enable_route_optimization",
+  "require_quality_inspection_for_return_inspection",
   "scan_permissions_section",
   "allowed_loaded_scan_roles",
   "allowed_dispatched_scan_roles"
@@ -172,6 +173,13 @@
    "fieldname": "enable_route_optimization",
    "fieldtype": "Check",
    "label": "Enable Route Optimization"
+  },
+  {
+   "default": "0",
+   "description": "When enabled, every Return Inspection result group must have its own submitted ERPNext Quality Inspection.",
+   "fieldname": "require_quality_inspection_for_return_inspection",
+   "fieldtype": "Check",
+   "label": "Require Quality Inspection for Returns"
   },
   {
    "fieldname": "scan_permissions_section",

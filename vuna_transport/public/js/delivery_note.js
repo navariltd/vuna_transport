@@ -14,6 +14,7 @@ frappe.ui.form.on("Delivery Note", {
 		hide_standard_delivery_trip_action_for_allocated_load(frm);
 		if (frm.doc.is_return) {
 			configure_return_quality_inspection(frm);
+			add_return_inspection_action(frm);
 			return;
 		}
 		if (frm.doc.docstatus !== 1 || !frappe.model.can_create("Return Request")) {
@@ -35,6 +36,31 @@ frappe.ui.form.on("Delivery Note", {
 		);
 	},
 });
+
+function add_return_inspection_action(frm) {
+	if (
+		frm.is_new() ||
+		frm.doc.docstatus !== 1 ||
+		!frm.doc.vuna_return_request ||
+		!frappe.model.can_create("Return Inspection")
+	)
+		return;
+
+	frm.add_custom_button(
+		__("Return Inspection"),
+		() =>
+			frappe.call({
+				method: "vuna_transport.services.execution.return_v2_service.create_return_inspection_from_sales_return",
+				args: { sales_return: frm.doc.name },
+				freeze: true,
+				callback: ({ message }) => {
+					if (message) frappe.set_route("Form", "Return Inspection", message);
+				},
+			}),
+		__("Create")
+	);
+	frm.page.set_inner_btn_group_as_primary(__("Create"));
+}
 
 function hide_standard_delivery_trip_action_for_allocated_load(frm) {
 	if (frm.doc.docstatus !== 1 || !frm.doc.vuna_delivery_load) return;

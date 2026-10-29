@@ -14,6 +14,8 @@ from vuna_transport.services.execution.return_service import (
 
 class ReturnRequest(Document):
 	def before_insert(self):
+		if not self.process_version:
+			self.process_version = "Custody and Inspection"
 		if self.custody:
 			self.append_custody_event(
 				None, self.custody, self.responsible_party, _("Initial custody recorded.")
@@ -32,6 +34,8 @@ class ReturnRequest(Document):
 
 	def before_cancel(self):
 		self.ignore_linked_doctypes = ["Proof of Delivery"]
+		if self.process_version == "Custody and Inspection":
+			self.ignore_linked_doctypes.append("Return Inspection")
 		for doctype, fieldname, label in (
 			("Delivery Note", "return_stock_document", _("Sales Return")),
 			("Sales Invoice", "credit_note", _("Credit Note")),
