@@ -2,13 +2,40 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Delivery Order", {
-	refresh(frm) {
+	async refresh(frm) {
 		if (frm.doc.docstatus === 1 && ["Open", "Partially Allocated"].includes(frm.doc.status)) {
-			const button = frm.add_custom_button(__("Create"), () => {
-				open_delivery_load_item_dialog(frm);
-			});
+			const button = frm.add_custom_button(
+				__("Transport Load"),
+				() => {
+					open_delivery_load_item_dialog(frm);
+				},
+				__("Create")
+			);
 			button.addClass("btn-primary");
 		}
+		if (frm.doc.docstatus !== 1 || ["Closed", "Cancelled"].includes(frm.doc.status)) return;
+		const policy = await frappe.call({
+			method: "vuna_transport.services.demand.source_policy_service.get_transport_source_policy",
+			args: { source_type: "Sales Order" },
+		});
+		if (!policy.message?.enabled || frm.doc.docstatus !== 1) return;
+		frm.add_custom_button(
+			__("Transport Demand"),
+			async () => {
+				const response = await frappe.call({
+					method: "vuna_transport.services.demand.transport_demand_service.create_transport_demands",
+					args: { source_doctype: "Delivery Order", source_name: frm.doc.name },
+					freeze: true,
+				});
+				if (response.message?.length === 1)
+					frappe.set_route("Form", "Transport Demand", response.message[0]);
+				else
+					frappe.set_route("List", "Transport Demand", {
+						source_document: frm.doc.name,
+					});
+			},
+			__("Create")
+		);
 	},
 });
 
