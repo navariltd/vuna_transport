@@ -54,6 +54,8 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.wrapper = wrapper;
 		this.page = wrapper.page;
 		this.start = 0;
+		this.transfer_start = 0;
+		this.transfer_items = [];
 		this.page_length = 30;
 		this.orders = [];
 		this.details = {};
@@ -104,8 +106,30 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					</div>
 					<div class="dp-filter-grid dp-filter-grid-collapsed"></div>
 				</div>
+				<div class="dp-planning-tabs" role="tablist" aria-label="${__("Planning demand type")}">
+					<button type="button" class="dp-planning-tab active" id="dp-customer-tab" role="tab" aria-selected="true" aria-controls="dp-customer-panel" tabindex="0" data-planning-tab="customers">${__(
+						"Customer Orders"
+					)}</button>
+					<button type="button" class="dp-planning-tab" id="dp-depot-tab" role="tab" aria-selected="false" aria-controls="dp-depot-panel" tabindex="-1" data-planning-tab="depots">${__(
+						"Depots"
+					)}</button>
+				</div>
 				<div class="dp-grid">
 					<div class="dp-main">
+						<div class="dp-tab-panel" id="dp-depot-panel" role="tabpanel" aria-labelledby="dp-depot-tab" hidden>
+						<div class="dp-section">
+							<div class="dp-plan-actions dp-transfer-actions" hidden>
+							<button class="btn btn-primary btn-sm btn-create-transfer">${__(
+								"Create Transfer Load"
+							)}</button></div>
+							<div class="dp-transfer-demand"></div>
+							<div class="dp-transfer-pagination" hidden>
+							<button class="btn btn-default btn-sm btn-transfer-prev">${__("Previous")}</button>
+							<button class="btn btn-default btn-sm btn-transfer-next">${__("Next")}</button>
+							</div>
+						</div>
+						</div>
+						<div class="dp-tab-panel" id="dp-customer-panel" role="tabpanel" aria-labelledby="dp-customer-tab">
 						<div class="dp-section dp-demand-section">
 							<div class="dp-section-heading">
 								<div class="dp-section-title">${__("Delivery Demand")}</div>
@@ -118,6 +142,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 							<div class="dp-suggestions dp-empty">${__(
 								"Run suggestions for the current filters or selected demand."
 							)}</div>
+						</div>
 						</div>
 					</div>
 					<div class="dp-sidebar">
@@ -300,6 +325,32 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	bind_events() {
+		this.$root.on("click", ".dp-planning-tab", (event) =>
+			this.switch_planning_tab(event.currentTarget.dataset.planningTab)
+		);
+		this.$root.on("keydown", ".dp-planning-tab", (event) => {
+			if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+			event.preventDefault();
+			const tab =
+				event.key === "Home"
+					? "customers"
+					: event.key === "End"
+					? "depots"
+					: event.currentTarget.dataset.planningTab === "customers"
+					? "depots"
+					: "customers";
+			this.switch_planning_tab(tab);
+			this.$root.find(`[data-planning-tab="${tab}"]`).trigger("focus");
+		});
+		this.$root.on("click", ".btn-create-transfer", () => this.create_transfer_load());
+		this.$root.on("click", ".btn-transfer-prev", () => {
+			this.transfer_start = Math.max(0, this.transfer_start - 20);
+			this.refresh_transfers(this.refresh_request_id);
+		});
+		this.$root.on("click", ".btn-transfer-next", () => {
+			this.transfer_start += 20;
+			this.refresh_transfers(this.refresh_request_id);
+		});
 		this.$root.on("click keydown", ".dp-collapsible-header", (event) => {
 			if (event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
 			if (event.target.closest("button")) return;
@@ -327,6 +378,26 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		);
 		this.$root.on("click", ".dp-fleet-category", (event) => this.show_vehicle_details(event));
 		this.$root.on("click", ".dp-driver-details", () => this.show_driver_details());
+	}
+
+	switch_planning_tab(tab) {
+		if (!["customers", "depots"].includes(tab)) return;
+		this.active_planning_tab = tab;
+		const customers = tab === "customers";
+		this.$root.find("#dp-customer-panel").prop("hidden", !customers);
+		this.$root.find("#dp-depot-panel").prop("hidden", customers);
+		for (const name of ["customers", "depots"]) {
+			this.$root
+				.find(`[data-planning-tab="${name}"]`)
+				.toggleClass("active", name === tab)
+				.attr("aria-selected", String(name === tab))
+				.attr("tabindex", name === tab ? "0" : "-1");
+		}
+		this.$root
+			.find(
+				".btn-suggest, .btn-native-filter, .btn-clear-native-filter, .dp-sidebar > .dp-plan"
+			)
+			.toggle(customers);
 	}
 
 	category_changed() {
@@ -409,6 +480,8 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		const filters = this.get_filter_values();
 		if (!filters.company) return;
 		const request_id = ++this.refresh_request_id;
+		if (clear_selection) this.transfer_start = 0;
+		this.refresh_transfers(request_id);
 		this.clear_suggestions();
 		if (clear_selection) this.clear_plan();
 		this.$root.find(".dp-demand").html(this.loading());
@@ -441,6 +514,112 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 
 	selected_vehicle_category() {
 		return this.$root.find(".dp-category-select").val() || null;
+	}
+
+	async refresh_transfers(request_id) {
+		const transfer_request = (this.transfer_request_id = (this.transfer_request_id || 0) + 1);
+		const target = this.$root.find(".dp-transfer-demand");
+		this.$root.find(".dp-transfer-actions, .dp-transfer-pagination").prop("hidden", true);
+		target.html(this.loading());
+		try {
+			const filters = this.get_filter_values();
+			const response = await frappe.call({
+				method: "vuna_transport.services.planning.transport_load_service.get_transfer_planning_items",
+				args: {
+					company: filters.company,
+					source_warehouse: filters.source_warehouse,
+					date_from: filters.required_delivery_date_from,
+					date_to: filters.required_delivery_date_to,
+					start: this.transfer_start,
+				},
+			});
+			if (
+				request_id !== this.refresh_request_id ||
+				transfer_request !== this.transfer_request_id ||
+				this.destroyed
+			)
+				return;
+			this.transfer_items = response.message.items || [];
+			const escape = frappe.utils.escape_html;
+			const rows = this.transfer_items
+				.map(
+					(row, index) => `<tr>
+				<td><input type="checkbox" class="dp-transfer-select" data-index="${index}"></td>
+				<td>${escape(row.transport_demand)}<br>${escape(row.item_code)}</td>
+				<td>${escape(row.source_warehouse)} → ${escape(row.destination_warehouse)}</td>
+				<td>${escape(row.stock_uom)}<br>${frappe.format(row.available_stock_qty, {
+						fieldtype: "Float",
+					})}</td>
+				<td><input class="form-control dp-transfer-qty" data-index="${index}" type="number" min="0" step="any" max="${
+						row.available_stock_qty
+					}" value="${row.available_stock_qty}"></td></tr>`
+				)
+				.join("");
+			target.html(
+				rows
+					? `<div class="table-responsive"><table class="table"><thead><tr><th></th><th>${__(
+							"Demand / Item"
+					  )}</th><th>${__("Movement")}</th><th>${__("Available")}</th><th>${__(
+							"Quantity to Load (Stock UOM)"
+					  )}</th></tr></thead><tbody>${rows}</tbody></table></div>`
+					: `<div class="dp-empty">${__("No pending depot transfers.")}</div>`
+			);
+			this.$root.find(".dp-transfer-actions").prop("hidden", !this.transfer_items.length);
+			this.$root
+				.find(".dp-transfer-pagination")
+				.prop("hidden", !this.transfer_start && !response.message.has_more);
+			this.$root.find(".btn-transfer-prev").prop("disabled", !this.transfer_start);
+			this.$root.find(".btn-transfer-next").prop("disabled", !response.message.has_more);
+			if (response.message.truncated)
+				target.append(
+					$("<p>").text(__("Results limited to 500 items. Refine your filters."))
+				);
+		} catch (error) {
+			if (
+				request_id === this.refresh_request_id &&
+				transfer_request === this.transfer_request_id
+			)
+				target.html(this.error_message(error));
+		}
+	}
+
+	async create_transfer_load() {
+		const allocations = [];
+		for (const checkbox of this.$root.find(".dp-transfer-select:checked")) {
+			const index = Number(checkbox.dataset.index);
+			const row = this.transfer_items[index];
+			const quantity = Number(
+				this.$root.find(`.dp-transfer-qty[data-index="${index}"]`).val()
+			);
+			if (
+				!Number.isFinite(quantity) ||
+				quantity <= 0 ||
+				quantity > row.available_stock_qty
+			) {
+				frappe.msgprint(__("Enter a positive quantity within the available amount."));
+				return;
+			}
+			allocations.push({
+				transport_demand: row.transport_demand,
+				transport_demand_item: row.transport_demand_item,
+				allocated_quantity: quantity,
+			});
+		}
+		if (!allocations.length) {
+			frappe.msgprint(__("Select transfer items first."));
+			return;
+		}
+		const button = this.$root.find(".btn-create-transfer").prop("disabled", true);
+		try {
+			const response = await frappe.call({
+				method: "vuna_transport.services.planning.transport_load_service.create_transport_load_from_demands",
+				args: { allocations },
+				freeze: true,
+			});
+			if (response.message) frappe.set_route("Form", "Transport Load", response.message);
+		} finally {
+			button.prop("disabled", false);
+		}
 	}
 
 	async refresh_availability(request_id = this.availability_request_id) {

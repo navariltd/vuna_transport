@@ -43,8 +43,18 @@
 .dp-main,
 .dp-sidebar { min-height: 0; min-width: 0; }
 .dp-main { display: flex; flex-direction: column; min-height: 0; }
-.dp-main > .dp-section:first-child { display: flex; flex: 0 0 75vh; flex-direction: column; min-height: 0; }
-.dp-demand-section { min-height: 75vh; }
+.dp-planning-tabs { display: flex; flex: none; gap: 20px; border-bottom: 1px solid var(--border-color); margin-top: 10px; }
+.dp-planning-tab { background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--text-muted); cursor: pointer; font-weight: 500; padding: 10px 4px; }
+.dp-planning-tab.active { border-bottom-color: var(--primary); color: var(--text-color); }
+.dp-planning-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: var(--border-radius); }
+.dp-tab-panel { display: flex; flex-direction: column; min-width: 0; }
+.dp-tab-panel[hidden] { display: none !important; }
+.dp-transfer-actions[hidden],
+.dp-transfer-pagination[hidden] { display: none !important; }
+.dp-transfer-pagination { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
+.dp-tab-panel > .dp-section { flex: none; }
+.dp-demand-section { display: flex; flex-direction: column; height: 65vh; min-height: 320px; }
+.dp-transfer-demand { max-height: 65vh; overflow: auto; }
 .dp-sidebar { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
 .dp-sidebar > .dp-section { min-height: 0; }
 .dp-sidebar > .dp-plan { display: flex; flex: none; flex-direction: column; }
@@ -161,10 +171,8 @@
 	.dispatch-planning { height: auto; min-height: calc(100vh - 110px); overflow: visible; }
 	.dp-grid { grid-template-columns: 1fr; }
 	.dp-main,
-	.dp-sidebar,
-	.dp-main > .dp-section:first-child { display: block; }
-	.dp-main > .dp-section:first-child,
-	.dp-demand-section { flex-basis: 60vh; min-height: 60vh; }
+	.dp-sidebar { display: block; }
+	.dp-demand-section { height: 60vh; min-height: 320px; }
 	.dp-demand { max-height: 55vh; }
 	.dp-sidebar { overflow: visible; }
 	.dp-plan-content { max-height: none; overflow: visible; }
