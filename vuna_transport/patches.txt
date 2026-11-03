@@ -33,3 +33,4 @@ vuna_transport.patches.normalize_return_inspection_statuses
 vuna_transport.patches.reset_transport_load_naming
 vuna_transport.patches.backfill_transport_demand_links
 vuna_transport.patches.migrate_transport_demand_sources
+vuna_transport.patches.backfill_vehicle_allocation_items

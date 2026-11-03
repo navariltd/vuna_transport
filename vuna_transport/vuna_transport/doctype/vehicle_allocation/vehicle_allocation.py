@@ -21,6 +21,10 @@ from vuna_transport.services.fleet.vehicle_allocation_service import (
 class VehicleAllocation(Document):
 	def validate(self):
 		validate_allocation(self)
+		from vuna_transport.services.fleet.allocation_cargo_service import collect_load_items
+		from vuna_transport.services.fleet.vehicle_allocation_service import get_allocation_loads
+
+		self.set("loaded_items", collect_load_items(get_allocation_loads(self)))
 		from vuna_transport.services.fleet.vehicle_incident_service import (
 			validate_replacement_allocation_incident,
 		)
