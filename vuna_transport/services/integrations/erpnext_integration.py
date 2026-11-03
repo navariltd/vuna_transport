@@ -27,9 +27,15 @@ from vuna_transport.services.shared.workflow_policy_service import (
 )
 
 
+def _require_customer_load(load):
+	if any(row.get("transport_demand") and not row.get("delivery_order") for row in load.delivery_orders):
+		frappe.throw(_("Transfer loads require stock-transfer execution, not customer delivery documents."))
+
+
 def create_pick_list_for_load(load):
 	"""Create a draft ERPNext Pick List for a submitted Transport Load."""
 	load = get_locked_delivery_load(load)
+	_require_customer_load(load)
 	validate_load_is_operational(load, _("creating a Pick List"))
 	if load.pick_list:
 		existing_pick_list = frappe.get_doc("Pick List", load.pick_list)
@@ -79,6 +85,7 @@ def create_delivery_notes_for_load(load):
 	if isinstance(load, str):
 		load = frappe.get_doc("Transport Load", load)
 	load = get_locked_delivery_load(load)
+	_require_customer_load(load)
 	validate_load_is_operational(load, _("creating Delivery Notes"))
 	_repair_single_item_load_rows(load)
 	# Revalidate against live Sales Order balances. A direct ERPNext Delivery Note
@@ -140,6 +147,8 @@ def create_delivery_notes_for_allocation(allocation):
 	if not load_names:
 		frappe.throw(_("Add at least one Transport Load before creating Delivery Notes."))
 	loads = [get_locked_delivery_load(name) for name in load_names]
+	for selected_load in loads:
+		_require_customer_load(selected_load)
 	if len(loads) == 1:
 		return create_delivery_notes_for_load(loads[0])
 	existing_notes = _get_delivery_notes_for_loads(load_names)
@@ -400,6 +409,7 @@ def create_delivery_trip_for_load(load):
 	if isinstance(load, str):
 		load = frappe.get_doc("Transport Load", load)
 	load = get_locked_delivery_load(load)
+	_require_customer_load(load)
 	validate_load_is_operational(load, _("creating a Delivery Trip"))
 
 	requires_allocation = True

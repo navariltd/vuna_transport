@@ -67,6 +67,25 @@ def validate_load_allocations(load, lock=True, for_execution=False):
 			delivery_order_item,
 			available_quantities.get(delivery_order_item.name, 0),
 		)
+		if getattr(row, "transport_demand", None):
+			lineage = frappe.db.get_value(
+				"Transport Demand Item", row.transport_demand_item, ["parent", "source_item"], as_dict=True
+			)
+			demand_source = frappe.db.get_value(
+				"Transport Demand",
+				row.transport_demand,
+				["source_document_type", "source_document"],
+				as_dict=True,
+			)
+			if (
+				not lineage
+				or lineage.parent != row.transport_demand
+				or lineage.source_item != row.delivery_order_item
+				or not demand_source
+				or demand_source.source_document_type != "Delivery Order"
+				or demand_source.source_document != row.delivery_order
+			):
+				frappe.throw(_("Transport Demand lineage must match the selected Delivery Order item."))
 
 	for (_delivery_order_name, delivery_order_item_name), current_quantity in current_allocations.items():
 		available_quantity = available_quantities.get(delivery_order_item_name, 0)

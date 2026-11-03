@@ -1,0 +1,105 @@
+{
+ "doctype": "DocType",
+ "name": "Transport Demand Item",
+ "module": "Vuna Transport",
+ "engine": "InnoDB",
+ "istable": 1,
+ "is_submittable": 0,
+ "fields": [
+  {"fieldname":"reserved_stock_qty","fieldtype":"Float","label":"Reserved Stock Quantity","read_only":1,"allow_on_submit":1},
+  {"fieldname":"allocated_stock_qty","fieldtype":"Float","label":"Allocated Stock Quantity","read_only":1,"allow_on_submit":1},
+  {"fieldname":"remaining_stock_qty","fieldtype":"Float","label":"Remaining Stock Quantity","read_only":1,"allow_on_submit":1},
+  {"fieldname":"weight","fieldtype":"Float","label":"Weight","read_only":1},
+  {"fieldname":"weight_uom","fieldtype":"Link","label":"Weight UOM","options":"UOM","read_only":1},
+  {
+   "fieldname": "source_item",
+   "fieldtype": "Data",
+   "label": "Source Item",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1,
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "transaction_qty",
+   "fieldtype": "Float",
+   "label": "Transaction Quantity",
+   "reqd": 1,
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "transaction_uom",
+   "fieldtype": "Link",
+   "label": "Transaction UOM",
+   "options": "UOM",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "conversion_factor",
+   "fieldtype": "Float",
+   "label": "Conversion Factor",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "stock_qty",
+   "fieldtype": "Float",
+   "label": "Stock Quantity",
+   "reqd": 1,
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "label": "Stock UOM",
+   "options": "UOM",
+   "reqd": 1,
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_group",
+   "fieldtype": "Link",
+   "label": "Delivery Group",
+   "options": "Delivery Group",
+   "read_only": 1
+  },
+  {
+   "fieldname": "transport_compatibility_group",
+   "fieldtype": "Link",
+   "label": "Transport Compatibility Group",
+   "options": "Transport Compatibility Group",
+   "read_only": 1
+  }
+ ],
+ "field_order": [
+  "reserved_stock_qty",
+  "allocated_stock_qty",
+  "remaining_stock_qty",
+  "source_item",
+  "item_code",
+  "transaction_qty",
+  "transaction_uom",
+  "conversion_factor",
+  "stock_qty",
+  "stock_uom",
+  "delivery_group",
+  "transport_compatibility_group",
+  "weight",
+  "weight_uom"
+ ],
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

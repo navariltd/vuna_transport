@@ -1,7 +1,6 @@
 {
  "actions": [],
  "allow_bulk_edit": 1,
- "allow_rename": 1,
  "creation": "2026-08-10 09:58:45.455707",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -15,7 +14,8 @@
   "auto_create_delivery_orders",
   "auto_submit_delivery_orders",
   "require_sales_order_submission",
-  "planning_section",
+  "section_break_hbkq",
+  "demand_sources",
   "section_break_yskt",
   "allow_capacity_override",
   "vehicle_allocation_timing",
@@ -39,15 +39,38 @@
   "allowed_dispatched_scan_roles"
  ],
  "fields": [
-  {"fieldname":"general_tab","fieldtype":"Tab Break","label":"General"},
-  {"fieldname":"general_section","fieldtype":"Section Break","label":"Operating Defaults"},
-  {"fieldname":"planning_section","fieldtype":"Section Break","label":"Planning Controls"},
-  {"fieldname":"units_tab","fieldtype":"Tab Break","label":"Units"},
-  {"fieldname":"features_tab","fieldtype":"Tab Break","label":"Features"},
+  {
+   "fieldname": "demand_sources",
+   "fieldtype": "Table",
+   "label": "Transport Demand Sources",
+   "options": "Transport Demand Source",
+   "reqd": 1
+  },
+  {
+   "fieldname": "general_tab",
+   "fieldtype": "Tab Break",
+   "label": "General"
+  },
+  {
+   "fieldname": "general_section",
+   "fieldtype": "Section Break",
+   "label": "Operating Defaults"
+  },
+  {
+   "fieldname": "units_tab",
+   "fieldtype": "Tab Break",
+   "label": "Units"
+  },
+  {
+   "fieldname": "features_tab",
+   "fieldtype": "Tab Break",
+   "label": "Features"
+  },
   {
    "default": "Sales Order",
    "fieldname": "default_source_document_type",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Default Source Document Type",
    "options": "DocType"
   },
@@ -72,6 +95,7 @@
    "default": "1",
    "fieldname": "auto_create_delivery_orders",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Auto Create Delivery Orders"
   },
   {
@@ -79,12 +103,14 @@
    "description": "Automatically submit newly generated Delivery Orders. Leave disabled if transport demand should be reviewed before submission.",
    "fieldname": "auto_submit_delivery_orders",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Auto Submit Delivery Orders"
   },
   {
    "default": "1",
    "fieldname": "require_sales_order_submission",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Require Sales Order Submission"
   },
   {
@@ -102,6 +128,7 @@
    "description": "Controls whether a submitted vehicle allocation is required before Delivery Notes are generated, or whether Delivery Notes must be generated before the initial allocation.",
    "fieldname": "vehicle_allocation_timing",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Vehicle Allocation Timing",
    "options": "Before Delivery Notes\nAfter Delivery Notes",
    "reqd": 1
@@ -130,6 +157,7 @@
   {
    "fieldname": "default_weight_uom",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Default Weight UOM",
    "options": "UOM",
    "reqd": 1
@@ -137,6 +165,7 @@
   {
    "fieldname": "default_volume_uom",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Default Volume UOM",
    "options": "UOM",
    "reqd": 1
@@ -199,13 +228,17 @@
    "fieldtype": "Table MultiSelect",
    "label": "Roles Allowed to Mark Dispatched",
    "options": "Transport Scan Role"
+  },
+  {
+   "fieldname": "section_break_hbkq",
+   "fieldtype": "Section Break"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-21 15:52:26.122957",
+ "modified": "2026-11-03 14:20:27.995961",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Settings",

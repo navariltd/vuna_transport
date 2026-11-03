@@ -23,6 +23,11 @@ from vuna_transport.services.planning.delivery_load_service import (
 	validate_capacity,
 	validate_load_allocations,
 )
+from vuna_transport.services.planning.demand_lifecycle_service import lock_demands, sync_demand_allocations
+from vuna_transport.services.planning.transport_load_service import (
+	is_demand_load,
+	validate_demand_allocations,
+)
 from vuna_transport.services.routing.distance_estimation_service import (
 	apply_delivery_load_distance_estimate,
 )
@@ -32,6 +37,10 @@ from vuna_transport.services.routing.route_service import apply_route_defaults
 class TransportLoad(Document):
 	def validate(self):
 		_validate_source_warehouse_change(self)
+		if is_demand_load(self):
+			validate_demand_allocations(self)
+			validate_capacity(self)
+			return
 		apply_route_defaults(self)
 		apply_delivery_load_distance_estimate(self)
 		if self.delivery_orders:
@@ -40,6 +49,13 @@ class TransportLoad(Document):
 		validate_capacity(self)
 
 	def before_submit(self):
+		if is_demand_load(self):
+			validate_demand_allocations(self)
+			validate_capacity(self)
+			if not self.required_vehicle_category:
+				self.required_vehicle_category = recommend_vehicle_category(self)
+			self.status = "Approved"
+			return
 		if not self.delivery_orders:
 			frappe.throw(_("Add at least one Delivery Order using Get Items before submitting the load."))
 		validate_load_allocations(self)
@@ -50,24 +66,44 @@ class TransportLoad(Document):
 		self.status = "Approved"
 
 	def on_submit(self):
-		sync_delivery_order_allocations(self.get_delivery_order_names())
+		sync_demand_allocations(self.get_affected_demand_names())
+		if self.get_delivery_order_names():
+			sync_delivery_order_allocations(self.get_delivery_order_names())
 
 	def before_cancel(self):
+		lock_demands(self.get_affected_demand_names())
 		validate_load_can_be_cancelled(self)
 
 	def on_cancel(self):
 		set_delivery_load_status(self, "Cancelled", _("Transport Load cancelled"), force=True)
-		sync_delivery_order_allocations(self.get_delivery_order_names())
+		sync_demand_allocations(self.get_affected_demand_names())
+		if self.get_delivery_order_names():
+			sync_delivery_order_allocations(self.get_delivery_order_names())
 
 	def on_update(self):
-		if self.docstatus == 0:
+		sync_demand_allocations(self.get_affected_demand_names())
+		if self.docstatus == 0 and self.get_affected_delivery_order_names():
 			sync_delivery_order_allocations(self.get_affected_delivery_order_names())
 
 	def after_delete(self):
-		sync_delivery_order_allocations(self.get_delivery_order_names())
+		sync_demand_allocations(self.get_affected_demand_names())
+		if self.get_delivery_order_names():
+			sync_delivery_order_allocations(self.get_delivery_order_names())
 
 	def get_delivery_order_names(self):
 		return {row.delivery_order for row in self.delivery_orders if row.delivery_order}
+
+	def on_trash(self):
+		lock_demands(self.get_affected_demand_names())
+
+	def get_affected_demand_names(self):
+		names = {row.get("transport_demand") for row in self.delivery_orders if row.get("transport_demand")}
+		previous = self.get_doc_before_save()
+		if previous:
+			names.update(
+				row.get("transport_demand") for row in previous.delivery_orders if row.get("transport_demand")
+			)
+		return names
 
 	def get_affected_delivery_order_names(self):
 		names = self.get_delivery_order_names()
@@ -79,16 +115,19 @@ class TransportLoad(Document):
 	@frappe.whitelist()
 	def create_pick_list(self):
 		self.check_permission("write")
+		self._require_delivery_execution()
 		return create_pick_list_for_load(self).name
 
 	@frappe.whitelist()
 	def create_delivery_notes(self):
 		self.check_permission("write")
+		self._require_delivery_execution()
 		return create_delivery_notes_for_load(self)
 
 	@frappe.whitelist()
 	def create_delivery_trip(self):
 		self.check_permission("write")
+		self._require_delivery_execution()
 		return create_delivery_trip_for_load(self)
 
 	@frappe.whitelist()
@@ -100,6 +139,12 @@ class TransportLoad(Document):
 	def get_execution_summary(self):
 		self.check_permission("read")
 		return get_load_execution_summary(self)
+
+	def _require_delivery_execution(self):
+		if is_demand_load(self):
+			frappe.throw(
+				_("Warehouse transfer loads cannot create customer Delivery Notes or delivery-only trips.")
+			)
 
 
 def _validate_source_warehouse_change(load):

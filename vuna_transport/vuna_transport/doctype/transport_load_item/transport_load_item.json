@@ -7,6 +7,10 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "transport_demand",
+  "transport_demand_item",
+  "destination_warehouse",
+  "stock_uom",
   "delivery_order",
   "delivery_order_item",
   "item_code",
@@ -34,6 +38,10 @@
   "crates"
  ],
  "fields": [
+  {"fieldname":"transport_demand","fieldtype":"Link","label":"Transport Demand","options":"Transport Demand","in_list_view":1},
+  {"fieldname":"transport_demand_item","fieldtype":"Link","label":"Transport Demand Item","options":"Transport Demand Item"},
+  {"fieldname":"destination_warehouse","fieldtype":"Link","label":"Destination Warehouse","options":"Warehouse","read_only":1},
+  {"fieldname":"stock_uom","fieldtype":"Link","label":"Stock UOM","options":"UOM","read_only":1,"in_list_view":1},
   {
    "fieldname": "delivery_order",
    "fieldtype": "Link",
@@ -47,7 +55,7 @@
    "fieldtype": "Link",
    "label": "Delivery Order Item",
    "options": "Delivery Order Item",
-   "reqd": 1
+   "reqd": 0
   },
   {
    "fieldname": "item_code",

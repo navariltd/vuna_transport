@@ -159,9 +159,10 @@ doc_events = {
 		"validate": "vuna_transport.services.routing.location_service.synchronize_address_location",
 	},
 	"Sales Order": {
+		"before_cancel": "vuna_transport.services.planning.demand_lifecycle_service.guard_source_cancellation",
 		"before_submit": "vuna_transport.services.execution.return_service.validate_linked_replacement_sales_order",
 		"on_submit": [
-			"vuna_transport.services.demand.delivery_order_service.create_delivery_orders_for_sales_order",
+			"vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
 			"vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
 		],
 		"on_update_after_submit": "vuna_transport.services.demand.delivery_order_service.sync_delivery_orders_for_sales_order",
@@ -257,6 +258,9 @@ doc_events = {
 		"on_update": "vuna_transport.services.mobile.mobile_notification_service.notify_expense_claim",
 	},
 	"Material Request": {
+		"on_submit": "vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
+		"on_update_after_submit": "vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
+		"before_cancel": "vuna_transport.services.planning.demand_lifecycle_service.guard_source_cancellation",
 		"on_update": "vuna_transport.services.mobile.mobile_notification_service.notify_material_request",
 	},
 	"Vehicle": {
@@ -270,6 +274,10 @@ doc_events = {
 	},
 	"Transport Load": {
 		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+	},
+	"Delivery Order": {
+		"on_submit": "vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
+		"before_cancel": "vuna_transport.services.planning.demand_lifecycle_service.guard_source_cancellation",
 	},
 	"Asset": {
 		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
@@ -304,6 +312,7 @@ doc_events = {
 }
 
 doctype_js = {
+	"Material Request": "public/js/material_request_transport.js",
 	"Address": "public/js/address.js",
 	"Delivery Note": "public/js/delivery_note.js",
 	"Delivery Trip": "public/js/delivery_trip.js",
