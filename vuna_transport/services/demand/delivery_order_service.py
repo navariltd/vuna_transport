@@ -70,8 +70,12 @@ def create_delivery_orders_for_sales_order(sales_order):
 
 def sync_delivery_orders_for_sales_order(sales_order):
 	"""Refresh existing Delivery Orders after a submitted Sales Order changes."""
+	from vuna_transport.services.demand.source_policy_service import get_source_policy
+
+	if not get_source_policy("Sales Order").enabled:
+		return []
 	doc = _get_sales_order(sales_order)
-	_validate_sales_order(doc)
+	_validate_sales_order(doc, check_generation_policy=False)
 
 	delivery_order_names = frappe.get_all("Delivery Order", filters={"sales_order": doc.name}, pluck="name")
 	for delivery_order_name in delivery_order_names:
@@ -80,7 +84,9 @@ def sync_delivery_orders_for_sales_order(sales_order):
 		sync_delivery_order_status_from_sales_order(delivery_order, doc)
 
 	# The existing generator remains responsible for newly-added Sales Order Items.
-	return create_delivery_orders_for_sales_order(doc)
+	from vuna_transport.services.demand.source_policy_service import automatically_create_from_source
+
+	return automatically_create_from_source(doc)
 
 
 def sync_delivery_order_status_from_sales_order(delivery_order, sales_order=None):
@@ -104,6 +110,13 @@ def get_delivery_order_generation_status(sales_order):
 
 	if doc.docstatus != 1:
 		return {"can_generate": False, "reason": _("The Sales Order must be submitted first.")}
+	from vuna_transport.services.demand.source_policy_service import get_source_policy
+
+	policy = get_source_policy("Sales Order")
+	if not policy.enabled or (
+		policy.required_workflow_state and doc.get("workflow_state") != policy.required_workflow_state
+	):
+		return {"can_generate": False, "reason": _("The source is disabled or awaiting transport approval.")}
 	if not _requires_transport_planning(doc):
 		return {
 			"can_generate": False,
@@ -238,7 +251,7 @@ def _get_sales_order(sales_order):
 	return sales_order
 
 
-def _validate_sales_order(sales_order):
+def _validate_sales_order(sales_order, check_generation_policy=True):
 	if sales_order.doctype != "Sales Order":
 		frappe.throw(_("Delivery Orders can only be generated from a Sales Order."))
 
@@ -254,6 +267,10 @@ def _validate_sales_order(sales_order):
 	settings = frappe.get_single("Transport Settings")
 	if not settings.enabled:
 		frappe.throw(_("Transport Management is disabled in Transport Settings."))
+	from vuna_transport.services.demand.source_policy_service import require_source_enabled
+
+	if check_generation_policy:
+		require_source_enabled(sales_order)
 
 
 def _get_transport_quantity(item):
@@ -419,7 +436,9 @@ def _create_delivery_order(sales_order, group_key, group_items):
 
 
 def _should_auto_submit_delivery_orders():
-	return bool(frappe.db.get_single_value("Transport Settings", "auto_submit_delivery_orders"))
+	from vuna_transport.services.demand.source_policy_service import get_source_policy
+
+	return bool(get_source_policy("Sales Order").auto_submit_delivery_orders)
 
 
 def _get_group_transport_requirements(group_items, handling_profile=None, company=None):

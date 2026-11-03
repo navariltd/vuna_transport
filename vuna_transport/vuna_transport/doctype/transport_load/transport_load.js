@@ -3,6 +3,20 @@
 
 frappe.ui.form.on("Transport Load", {
 	setup(frm) {
+		frm.set_query("transport_demand", "delivery_orders", () => ({
+			filters: {
+				docstatus: 1,
+				company: frm.doc.company,
+				source_warehouse: frm.doc.source_warehouse,
+				movement_type: "Warehouse Transfer",
+			},
+		}));
+		frm.set_query("transport_demand_item", "delivery_orders", (doc, cdt, cdn) => ({
+			filters: {
+				parent: locals[cdt][cdn].transport_demand || "",
+				parenttype: "Transport Demand",
+			},
+		}));
 		frm.set_query("required_vehicle_category", () => ({
 			query: "vuna_transport.services.planning.delivery_load_service.get_compatible_vehicle_categories",
 			filters: {
@@ -146,6 +160,12 @@ frappe.ui.form.on("Transport Load", {
 				args: { load: frm.doc.name },
 			});
 			if (!response.message) return;
+			if (response.message.planning_only) {
+				frm.get_field("execution_overview")?.$wrapper.text(
+					__("Warehouse transfer planned. Trip-task execution is not yet available.")
+				);
+				return;
+			}
 			frm.execution_summary = response.message;
 			add_execution_actions(frm, response.message);
 			render_execution_progress(frm, response.message);

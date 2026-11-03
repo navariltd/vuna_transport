@@ -21,6 +21,10 @@ def get_load_execution_summary(load):
 	"""Return downstream execution progress and the single recommended next action."""
 	load = frappe.get_doc("Transport Load", load) if isinstance(load, str) else load
 	require_document_permission(load, "read")
+	from vuna_transport.services.planning.transport_load_service import is_demand_load
+
+	if is_demand_load(load):
+		return {"planning_only": True, "load": {"docstatus": load.docstatus, "status": load.status}}
 	delivery_orders = {row.delivery_order for row in load.delivery_orders if row.delivery_order}
 
 	pick_list = _get_pick_list(load)

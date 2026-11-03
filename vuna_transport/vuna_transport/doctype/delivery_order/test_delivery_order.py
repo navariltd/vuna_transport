@@ -197,18 +197,18 @@ class TestDeliveryOrder(UnitTestCase):
 		self.assertEqual(values["conversion_factor"], 12)
 		self.assertEqual(values["stock_qty"], 120)
 
-	@patch("vuna_transport.services.demand.delivery_order_service.frappe.db.get_single_value")
+	@patch("vuna_transport.services.demand.source_policy_service.get_source_policy")
 	def test_auto_submit_delivery_orders_setting_is_disabled_by_default(self, get_single_value):
-		get_single_value.return_value = 0
+		get_single_value.return_value = SimpleNamespace(auto_submit_delivery_orders=False)
 		from vuna_transport.services.demand.delivery_order_service import (
 			_should_auto_submit_delivery_orders,
 		)
 
 		self.assertFalse(_should_auto_submit_delivery_orders())
 
-	@patch("vuna_transport.services.demand.delivery_order_service.frappe.db.get_single_value")
+	@patch("vuna_transport.services.demand.source_policy_service.get_source_policy")
 	def test_auto_submit_delivery_orders_setting_can_be_enabled(self, get_single_value):
-		get_single_value.return_value = 1
+		get_single_value.return_value = SimpleNamespace(auto_submit_delivery_orders=True)
 		from vuna_transport.services.demand.delivery_order_service import (
 			_should_auto_submit_delivery_orders,
 		)
