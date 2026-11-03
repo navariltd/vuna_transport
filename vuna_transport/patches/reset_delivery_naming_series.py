@@ -7,10 +7,10 @@ def execute():
 	frappe.db.delete(
 		"Property Setter",
 		{
-			"doc_type": ("in", ("Delivery Order", "Delivery Load")),
+			"doc_type": ("in", ("Delivery Order", "Transport Load")),
 			"field_name": "naming_series",
 			"property": ("in", ("default", "options")),
 		},
 	)
 	frappe.clear_cache(doctype="Delivery Order")
-	frappe.clear_cache(doctype="Delivery Load")
+	frappe.clear_cache(doctype="Transport Load")

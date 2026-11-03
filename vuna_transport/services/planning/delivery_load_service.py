@@ -90,7 +90,7 @@ def get_available_delivery_orders(
 def get_compatible_vehicle_categories(doctype, txt, searchfield, start, page_len, filters, **kwargs):
 	"""Filter Vehicle Category choices using the current load requirements.
 
-	This query improves the form experience only; Delivery Load validation remains
+	This query improves the form experience only; Transport Load validation remains
 	the final authority when the document is saved or submitted.
 	"""
 	require_doctype_permission("Vehicle Category", "read")
@@ -158,7 +158,7 @@ def get_vehicle_category_capacity_summary(vehicle_category, totals=None, weight_
 @frappe.whitelist()
 def create_delivery_load(delivery_order_names):
 	"""Create a proposed load from one or more open Delivery Orders."""
-	require_doctype_permission("Delivery Load", "create")
+	require_doctype_permission("Transport Load", "create")
 	if isinstance(delivery_order_names, str):
 		delivery_order_names = frappe.parse_json(delivery_order_names)
 
@@ -194,7 +194,7 @@ def create_delivery_load(delivery_order_names):
 @frappe.whitelist()
 def create_delivery_load_from_plan(allocations, vehicle_category=None):
 	"""Create a draft load from planner-selected item quantities."""
-	require_doctype_permission("Delivery Load", "create")
+	require_doctype_permission("Transport Load", "create")
 	load = build_delivery_load_from_allocations(allocations, vehicle_category)
 	load.insert()
 	load.add_comment("Info", _("Created from the Dispatch Planning workbench."))
@@ -202,13 +202,13 @@ def create_delivery_load_from_plan(allocations, vehicle_category=None):
 
 
 def build_delivery_load_from_allocations(allocations, vehicle_category=None):
-	"""Build one unsaved authoritative Delivery Load from item allocations."""
+	"""Build one unsaved authoritative Transport Load from item allocations."""
 	allocations = frappe.parse_json(allocations) if isinstance(allocations, str) else allocations
 	if not isinstance(allocations, list) or not allocations:
 		frappe.throw(_("Select at least one Delivery Order item."))
 	if len(allocations) > MAX_PLANNING_ALLOCATION_ROWS:
 		frappe.throw(
-			_("A Delivery Load cannot contain more than {0} planning rows.").format(
+			_("A Transport Load cannot contain more than {0} planning rows.").format(
 				MAX_PLANNING_ALLOCATION_ROWS
 			)
 		)
@@ -225,7 +225,7 @@ def build_delivery_load_from_allocations(allocations, vehicle_category=None):
 	first = delivery_orders[delivery_order_names[0]]
 	require_company_access(first.company)
 
-	load = frappe.new_doc("Delivery Load")
+	load = frappe.new_doc("Transport Load")
 	load.company = first.company
 	load.source_warehouse = first.source_warehouse
 	load.delivery_method = canonical_delivery_method(first.delivery_method)
@@ -268,10 +268,10 @@ def add_delivery_orders_to_load(load, delivery_order_names):
 	if not delivery_order_names:
 		frappe.throw(_("Select at least one Delivery Order."))
 
-	load = frappe.get_doc("Delivery Load", load) if isinstance(load, str) else load
+	load = frappe.get_doc("Transport Load", load) if isinstance(load, str) else load
 	require_document_permission(load, "write")
 	if load.docstatus != 0:
-		frappe.throw(_("Items can only be fetched into a draft Delivery Load."))
+		frappe.throw(_("Items can only be fetched into a draft Transport Load."))
 
 	delivery_orders = [frappe.get_doc("Delivery Order", name) for name in delivery_order_names]
 	for delivery_order in delivery_orders:
@@ -372,7 +372,7 @@ def add_delivery_orders_to_load(load, delivery_order_names):
 @frappe.whitelist()
 def get_delivery_order_items(delivery_order_names, delivery_order_item_names=None, source_warehouse=None):
 	"""Return validated, still-unallocated load rows for a client-side draft Load."""
-	require_doctype_permission("Delivery Load", "create")
+	require_doctype_permission("Transport Load", "create")
 	if isinstance(delivery_order_names, str):
 		delivery_order_names = frappe.parse_json(delivery_order_names)
 	if not delivery_order_names:
@@ -526,7 +526,7 @@ def _validate_delivery_orders(delivery_orders):
 	for delivery_order in delivery_orders:
 		if delivery_order.docstatus != 1:
 			frappe.throw(
-				_("Delivery Order {0} must be submitted before creating a Delivery Load.").format(
+				_("Delivery Order {0} must be submitted before creating a Transport Load.").format(
 					delivery_order.name
 				)
 			)
@@ -548,7 +548,7 @@ def _validate_delivery_orders(delivery_orders):
 
 
 def calculate_load_totals(load):
-	"""Calculate aggregate capacity and stop values on a Delivery Load."""
+	"""Calculate aggregate capacity and stop values on a Transport Load."""
 	uoms = get_transport_uoms()
 	load.weight_uom = uoms.weight_uom or next(
 		(

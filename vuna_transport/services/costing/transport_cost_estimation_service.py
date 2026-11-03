@@ -40,13 +40,13 @@ def estimate_transport_cost(
 	distance_source=None,
 ):
 	"""Estimate a load's cost for a vehicle without changing any documents."""
-	load = _resolve_document("Delivery Load", delivery_load)
+	load = _resolve_document("Transport Load", delivery_load)
 	vehicle_doc = _resolve_document("Vehicle", vehicle)
 	require_document_permission(load, "read")
 	require_document_permission(vehicle_doc, "read")
 
 	if load.company and getattr(vehicle_doc, "company", None) and load.company != vehicle_doc.company:
-		frappe.throw(_("Delivery Load and Vehicle must belong to the same Company."))
+		frappe.throw(_("Transport Load and Vehicle must belong to the same Company."))
 	require_company_access(load.company)
 
 	uoms = get_transport_uoms()
@@ -179,7 +179,7 @@ def estimate_transport_cost_for_cost_structure(
 	delivery_load, cost_structure, *, vehicle_category=None, as_of_date=None
 ):
 	"""Estimate a load against a Cost Structure before a physical Vehicle is selected."""
-	load = _resolve_document("Delivery Load", delivery_load)
+	load = _resolve_document("Transport Load", delivery_load)
 	require_document_permission(load, "read")
 	require_company_access(load.company)
 	uoms = get_transport_uoms()
@@ -233,15 +233,15 @@ def estimate_transport_cost_for_cost_structure(
 
 
 def estimate_transport_cost_for_loads(delivery_loads, vehicle):
-	"""Estimate one vehicle allocation containing multiple Delivery Loads.
+	"""Estimate one vehicle allocation containing multiple Transport Loads.
 
 	Each load keeps its own destination-rate context. The allocation snapshot
 	combines the results and explicitly warns that the distance is not a
 	route-optimized total.
 	"""
-	load_documents = [_resolve_document("Delivery Load", load) for load in (delivery_loads or [])]
+	load_documents = [_resolve_document("Transport Load", load) for load in (delivery_loads or [])]
 	if not load_documents:
-		frappe.throw(_("At least one Delivery Load is required for a combined estimate."))
+		frappe.throw(_("At least one Transport Load is required for a combined estimate."))
 	vehicle_doc = _resolve_document("Vehicle", vehicle)
 	results = [estimate_transport_cost(load, vehicle_doc) for load in load_documents]
 	assignments = {

@@ -9,7 +9,7 @@ class TestDeliveryTripDashboard(UnitTestCase):
 
 		result = get_data(data)
 
-		self.assertEqual(result["non_standard_fieldnames"]["Delivery Load"], "delivery_trip")
+		self.assertEqual(result["non_standard_fieldnames"]["Transport Load"], "delivery_trip")
 		self.assertEqual(
 			result["non_standard_fieldnames"]["Vehicle Allocation"],
 			"vuna_current_vehicle_allocation",

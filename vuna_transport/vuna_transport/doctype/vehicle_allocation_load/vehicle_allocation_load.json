@@ -21,8 +21,8 @@
    "fieldname": "delivery_load",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Delivery Load",
-   "options": "Delivery Load",
+   "label": "Transport Load",
+   "options": "Transport Load",
    "reqd": 1
   },
   {

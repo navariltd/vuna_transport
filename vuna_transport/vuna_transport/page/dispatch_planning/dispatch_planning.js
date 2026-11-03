@@ -14,8 +14,8 @@ frappe.pages["dispatch-planning"].on_page_load = function (wrapper) {
 		hide_sidebar: true,
 	});
 	wrapper.page.set_secondary_action(
-		__("Back to Delivery Loads"),
-		() => frappe.set_route("List", "Delivery Load"),
+		__("Back to Transport Loads"),
+		() => frappe.set_route("List", "Transport Load"),
 		"arrow-left"
 	);
 	// This planning page has its own full-height workspace and does not need the
@@ -133,7 +133,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 							<div class="dp-plan-actions">
 								<button class="btn btn-default btn-sm btn-evaluate" disabled>${__("Evaluate")}</button>
 								<button class="btn btn-primary btn-sm btn-create-load" disabled>${__(
-									"Create Delivery Load"
+									"Create Transport Load"
 								)}</button>
 							</div>
 						</div>
@@ -721,7 +721,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				)}</label><input type="number" class="form-control dp-allocation-qty" placeholder="${__(
 					"Enter quantity"
 				)}" title="${__(
-					"Enter the quantity to include in this Delivery Load"
+					"Enter the quantity to include in this Transport Load"
 				)}" data-order="${this.escape(order.name)}" data-item="${this.escape(
 					item.name
 				)}" min="0" max="${item.available_quantity}" step="any" value="${
@@ -968,10 +968,10 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				true
 			);
 			frappe.show_alert({
-				message: __("Delivery Load {0} created", [name]),
+				message: __("Transport Load {0} created", [name]),
 				indicator: "green",
 			});
-			frappe.set_route("Form", "Delivery Load", name);
+			frappe.set_route("Form", "Transport Load", name);
 		} catch (error) {
 			frappe.msgprint(this.error_message(error));
 		}
@@ -1155,9 +1155,9 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				method: "vuna_transport.services.planning.load_suggestion_service.create_delivery_load_from_suggestion",
 				args: { suggestion },
 				freeze: true,
-				freeze_message: __("Revalidating and creating Delivery Load..."),
+				freeze_message: __("Revalidating and creating Transport Load..."),
 			});
-			frappe.set_route("Form", "Delivery Load", response.message);
+			frappe.set_route("Form", "Transport Load", response.message);
 		} catch (error) {
 			frappe.msgprint(this.error_message(error));
 		}

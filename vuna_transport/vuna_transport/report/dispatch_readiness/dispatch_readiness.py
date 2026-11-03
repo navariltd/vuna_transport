@@ -27,7 +27,7 @@ def execute(filters=None):
 			(SELECT va.name FROM `tabVehicle Allocation` va
 			 WHERE va.delivery_load = dl.name AND va.docstatus < 2
 			 ORDER BY va.creation DESC LIMIT 1) AS vehicle_allocation
-		FROM `tabDelivery Load` dl
+		FROM `tabTransport Load` dl
 		WHERE {" AND ".join(conditions)}
 		ORDER BY dl.planned_departure ASC
 		LIMIT 500
@@ -36,7 +36,7 @@ def execute(filters=None):
 		as_dict=True,
 	)
 	columns = [
-		{"label": _("Delivery Load"), "fieldname": "name", "fieldtype": "Link", "options": "Delivery Load"},
+		{"label": _("Transport Load"), "fieldname": "name", "fieldtype": "Link", "options": "Transport Load"},
 		{"label": _("Company"), "fieldname": "company", "fieldtype": "Link", "options": "Company"},
 		{"label": _("Status"), "fieldname": "status", "fieldtype": "Data"},
 		{"label": _("Dispatch From"), "fieldname": "planned_departure", "fieldtype": "Datetime"},

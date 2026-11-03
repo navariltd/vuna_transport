@@ -51,7 +51,7 @@ def populate_delivery_note_delivery_links(doc, method=None):
 	validate_load_is_operational(load, _("creating or updating a Delivery Note"))
 	if not doc.vuna_delivery_order:
 		delivery_orders = frappe.get_all(
-			"Delivery Load Order",
+			"Transport Load Item",
 			filters={
 				"parent": load.name,
 				"customer": doc.customer,
@@ -67,27 +67,27 @@ def populate_delivery_note_delivery_links(doc, method=None):
 def _validate_delivery_note_against_load(doc, load):
 	if not doc.vuna_delivery_order:
 		frappe.throw(
-			_("Delivery Note must identify its Delivery Order for Delivery Load {0}.").format(load.name)
+			_("Delivery Note must identify its Delivery Order for Transport Load {0}.").format(load.name)
 		)
 	load_rows = frappe.get_all(
-		"Delivery Load Order",
+		"Transport Load Item",
 		filters={"parent": load.name, "delivery_order": doc.vuna_delivery_order},
 		fields=["delivery_order_item", "allocated_quantity"],
 	)
 	if not load_rows:
 		frappe.throw(
-			_("Delivery Order {0} does not belong to Delivery Load {1}.").format(
+			_("Delivery Order {0} does not belong to Transport Load {1}.").format(
 				doc.vuna_delivery_order, load.name
 			)
 		)
 	if doc.company != load.company:
-		frappe.throw(_("Delivery Note and Delivery Load must belong to the same company."))
+		frappe.throw(_("Delivery Note and Transport Load must belong to the same company."))
 	warehouse_companies = {
 		frappe.db.get_value("Warehouse", item.warehouse, "company") for item in doc.items if item.warehouse
 	}
 	warehouse_companies.discard(None)
 	if warehouse_companies and warehouse_companies != {load.company}:
-		frappe.throw(_("Every Delivery Note item warehouse must belong to the Delivery Load company."))
+		frappe.throw(_("Every Delivery Note item warehouse must belong to the Transport Load company."))
 
 	item_allocations = {}
 	for row in load_rows:
@@ -95,7 +95,7 @@ def _validate_delivery_note_against_load(doc, load):
 			continue
 		if row.delivery_order_item in item_allocations:
 			frappe.throw(
-				_("Delivery Order Item {0} appears more than once on Delivery Load {1}.").format(
+				_("Delivery Order Item {0} appears more than once on Transport Load {1}.").format(
 					row.delivery_order_item, load.name
 				)
 			)
@@ -153,7 +153,7 @@ def validate_delivery_note_item_allocations(
 	for item in items:
 		if item.so_detail not in allocated_by_sales_order_item:
 			frappe.throw(
-				_("Delivery Note item {0} is not allocated on Delivery Load {1}.").format(
+				_("Delivery Note item {0} is not allocated on Transport Load {1}.").format(
 					item.item_code, load_name
 				)
 			)
@@ -187,10 +187,10 @@ def validate_delivery_trip(doc, method=None):
 	)
 	if existing_trip:
 		frappe.throw(
-			_("Delivery Load {0} already has active Delivery Trip {1}.").format(load.name, existing_trip)
+			_("Transport Load {0} already has active Delivery Trip {1}.").format(load.name, existing_trip)
 		)
 	if doc.company != load.company or any(selected_load.company != load.company for selected_load in loads):
-		frappe.throw(_("Delivery Trip and Delivery Load must belong to the same company."))
+		frappe.throw(_("Delivery Trip and Transport Load must belong to the same company."))
 	requires_allocation = True
 	if load.delivery_method:
 		requires_allocation = bool(
@@ -263,7 +263,7 @@ def validate_delivery_trip(doc, method=None):
 			)
 		):
 			frappe.throw(
-				_("Delivery Note {0} does not belong to this Vehicle Allocation's Delivery Loads.").format(
+				_("Delivery Note {0} does not belong to this Vehicle Allocation's Transport Loads.").format(
 					stop.delivery_note
 				)
 			)
@@ -276,12 +276,12 @@ def validate_delivery_trip(doc, method=None):
 				"vuna_delivery_load_order",
 			)
 			if load_order:
-				stop.vuna_delivery_load = frappe.db.get_value("Delivery Load Order", load_order, "parent")
+				stop.vuna_delivery_load = frappe.db.get_value("Transport Load Item", load_order, "parent")
 				stop.vuna_delivery_order = frappe.db.get_value(
-					"Delivery Load Order", load_order, "delivery_order"
+					"Transport Load Item", load_order, "delivery_order"
 				)
 		load_rows = frappe.get_all(
-			"Delivery Load Order",
+			"Transport Load Item",
 			filters={
 				"parent": stop.vuna_delivery_load,
 				"delivery_order": stop.vuna_delivery_order,
@@ -292,7 +292,7 @@ def validate_delivery_trip(doc, method=None):
 
 
 def get_delivery_trip_load_names(doc):
-	"""Return every Delivery Load executed by a Delivery Trip."""
+	"""Return every Transport Load executed by a Delivery Trip."""
 	stop_names = [
 		row.vuna_delivery_load
 		for row in (getattr(doc, "delivery_stops", None) or [])
@@ -333,7 +333,7 @@ def get_delivery_notes_for_loads(load_names, *, docstatus=None):
 		select distinct dn.name
 		from `tabDelivery Note` dn
 		left join `tabDelivery Note Item` dni on dni.parent = dn.name
-		left join `tabDelivery Load Order` dlo on dlo.name = dni.vuna_delivery_load_order
+		left join `tabTransport Load Item` dlo on dlo.name = dni.vuna_delivery_load_order
 		where (dn.vuna_delivery_load in %(load_names)s or dlo.parent in %(load_names)s)
 		{status_condition}
 		and dn.docstatus != 2
@@ -346,7 +346,7 @@ def get_delivery_notes_for_loads(load_names, *, docstatus=None):
 
 def get_delivery_trip_loads(doc, *, lock=False):
 	return [
-		get_locked_delivery_load(name) if lock else frappe.get_doc("Delivery Load", name)
+		get_locked_delivery_load(name) if lock else frappe.get_doc("Transport Load", name)
 		for name in get_delivery_trip_load_names(doc)
 	]
 
@@ -379,8 +379,8 @@ def validate_delivery_note_quantities_for_loads(loads):
 	if not load_names:
 		return
 	load_rows = frappe.get_all(
-		"Delivery Load Order",
-		filters={"parent": ["in", load_names], "parenttype": "Delivery Load"},
+		"Transport Load Item",
+		filters={"parent": ["in", load_names], "parenttype": "Transport Load"},
 		fields=["parent", "delivery_order_item", "allocated_quantity"],
 	)
 	if not load_rows:
@@ -401,7 +401,7 @@ def validate_delivery_note_quantities_for_loads(loads):
 				dni.so_detail, coalesce(sum(dni.qty), 0) as quantity
 			from `tabDelivery Note` dn
 			join `tabDelivery Note Item` dni on dni.parent = dn.name
-			left join `tabDelivery Load Order` dlo on dlo.name = dni.vuna_delivery_load_order
+			left join `tabTransport Load Item` dlo on dlo.name = dni.vuna_delivery_load_order
 			where (dn.vuna_delivery_load in %(load_names)s or dlo.parent in %(load_names)s)
 			and dn.docstatus = 1
 			group by coalesce(dlo.parent, dn.vuna_delivery_load), dni.so_detail
@@ -421,13 +421,13 @@ def validate_delivery_note_quantities_for_loads(loads):
 		if delivered > allocated:
 			frappe.throw(
 				_(
-					"Submitted Delivery Note quantity for item {0} exceeds Delivery Load {1} allocation."
+					"Submitted Delivery Note quantity for item {0} exceeds Transport Load {1} allocation."
 				).format(row.delivery_order_item, row.parent)
 			)
 		if delivered < allocated:
 			frappe.throw(
 				_(
-					"Submitted Delivery Notes are missing {0} of item {1} allocated on Delivery Load {2}."
+					"Submitted Delivery Notes are missing {0} of item {1} allocated on Transport Load {2}."
 				).format(allocated - delivered, row.delivery_order_item, row.parent)
 			)
 
@@ -443,13 +443,13 @@ def link_delivery_trip(doc, method=None):
 	if not get_delivery_trip_load_names(doc):
 		return
 	for load_name in get_delivery_trip_load_names(doc):
-		linked_trip = frappe.db.get_value("Delivery Load", load_name, "delivery_trip")
+		linked_trip = frappe.db.get_value("Transport Load", load_name, "delivery_trip")
 		if linked_trip and linked_trip != doc.name:
 			frappe.throw(
-				_("Delivery Load {0} is already linked to Delivery Trip {1}.").format(load_name, linked_trip)
+				_("Transport Load {0} is already linked to Delivery Trip {1}.").format(load_name, linked_trip)
 			)
 		if linked_trip != doc.name:
-			frappe.db.set_value("Delivery Load", load_name, "delivery_trip", doc.name, update_modified=False)
+			frappe.db.set_value("Transport Load", load_name, "delivery_trip", doc.name, update_modified=False)
 
 
 def submit_delivery_trip(doc, method=None):
@@ -484,18 +484,18 @@ def prepare_delivery_trip_cancellation(doc, method=None):
 			)
 		)
 
-	# Delivery Trip cancellation unlinks Delivery Load in the on_cancel flow.
+	# Delivery Trip cancellation unlinks Transport Load in the on_cancel flow.
 	# Vehicle Allocation remains historical and must not make trip cancellation
 	# impossible merely because it references this execution trip.
-	doc.ignore_linked_doctypes = ["Delivery Load", "Vehicle Allocation"]
+	doc.ignore_linked_doctypes = ["Transport Load", "Vehicle Allocation"]
 
 
 def unlink_delivery_trip(doc, method=None):
 	if not get_delivery_trip_load_names(doc):
 		return
 	for load_name in get_delivery_trip_load_names(doc):
-		if frappe.db.get_value("Delivery Load", load_name, "delivery_trip") == doc.name:
-			frappe.db.set_value("Delivery Load", load_name, "delivery_trip", None, update_modified=False)
+		if frappe.db.get_value("Transport Load", load_name, "delivery_trip") == doc.name:
+			frappe.db.set_value("Transport Load", load_name, "delivery_trip", None, update_modified=False)
 
 
 def complete_load_without_trip(doc, method=None):
@@ -504,7 +504,7 @@ def complete_load_without_trip(doc, method=None):
 	load_name = getattr(doc, "vuna_delivery_load", None)
 	if not load_name or doc.docstatus != 1:
 		return
-	load = frappe.get_doc("Delivery Load", load_name)
+	load = frappe.get_doc("Transport Load", load_name)
 	if not load.delivery_method:
 		return
 	if frappe.db.get_value("Delivery Method", load.delivery_method, "requires_delivery_trip"):
@@ -550,8 +550,8 @@ def _recompute_delivery_order_statuses(delivery_load):
 def _get_delivery_orders(delivery_load):
 	return set(
 		frappe.get_all(
-			"Delivery Load Order",
-			filters={"parent": delivery_load, "parenttype": "Delivery Load"},
+			"Transport Load Item",
+			filters={"parent": delivery_load, "parenttype": "Transport Load"},
 			pluck="delivery_order",
 		)
 	)

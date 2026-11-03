@@ -102,7 +102,7 @@ def estimate_origin_to_destinations(origin, destinations):
 
 
 def estimate_delivery_load_distance(load):
-	"""Estimate a Delivery Load distance from its source warehouse and order snapshots."""
+	"""Estimate a Transport Load distance from its source warehouse and order snapshots."""
 	origin = get_warehouse_planning_data(getattr(load, "source_warehouse", None))
 	destinations = []
 	for order in getattr(load, "delivery_orders", []) or []:

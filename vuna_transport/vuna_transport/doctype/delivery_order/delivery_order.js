@@ -42,7 +42,7 @@ function show_delivery_load_item_dialog(items) {
 		__checked: 1,
 	}));
 	const dialog = new frappe.ui.Dialog({
-		title: __("Create Delivery Load"),
+		title: __("Create Transport Load"),
 		size: "large",
 		fields: [
 			{
@@ -93,7 +93,7 @@ function show_delivery_load_item_dialog(items) {
 				],
 			},
 		],
-		primary_action_label: __("Create Delivery Load"),
+		primary_action_label: __("Create Transport Load"),
 		primary_action(values) {
 			const selected = (values.items || []).filter((item) => item?.__checked == 1);
 			const invalid_quantity = selected.some(
@@ -124,16 +124,16 @@ function show_delivery_load_item_dialog(items) {
 					method: "vuna_transport.services.planning.delivery_load_service.create_delivery_load_from_plan",
 					args: { allocations },
 					freeze: true,
-					freeze_message: __("Creating Delivery Load..."),
+					freeze_message: __("Creating Transport Load..."),
 				})
 				.then(({ message: delivery_load }) => {
 					if (!delivery_load) return;
 					dialog.hide();
 					frappe.show_alert({
-						message: __("Delivery Load {0} created", [delivery_load]),
+						message: __("Transport Load {0} created", [delivery_load]),
 						indicator: "green",
 					});
-					frappe.set_route("Form", "Delivery Load", delivery_load);
+					frappe.set_route("Form", "Transport Load", delivery_load);
 				});
 		},
 	});

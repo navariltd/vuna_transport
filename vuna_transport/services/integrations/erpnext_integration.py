@@ -28,7 +28,7 @@ from vuna_transport.services.shared.workflow_policy_service import (
 
 
 def create_pick_list_for_load(load):
-	"""Create a draft ERPNext Pick List for a submitted Delivery Load."""
+	"""Create a draft ERPNext Pick List for a submitted Transport Load."""
 	load = get_locked_delivery_load(load)
 	validate_load_is_operational(load, _("creating a Pick List"))
 	if load.pick_list:
@@ -77,7 +77,7 @@ def create_pick_list_for_load(load):
 def create_delivery_notes_for_load(load):
 	"""Create one draft Delivery Note per Delivery Order using direct or picked fulfilment."""
 	if isinstance(load, str):
-		load = frappe.get_doc("Delivery Load", load)
+		load = frappe.get_doc("Transport Load", load)
 	load = get_locked_delivery_load(load)
 	validate_load_is_operational(load, _("creating Delivery Notes"))
 	_repair_single_item_load_rows(load)
@@ -133,20 +133,20 @@ def create_delivery_notes_for_load(load):
 def create_delivery_notes_for_allocation(allocation):
 	"""Create consolidated Delivery Notes for all compatible loads on an allocation.
 
-	Items retain their exact Delivery Load Order lineage, so one note can safely
+	Items retain their exact Transport Load Item lineage, so one note can safely
 	serve several Delivery Orders and loads without losing allocation history.
 	"""
 	load_names = get_allocation_load_names(allocation)
 	if not load_names:
-		frappe.throw(_("Add at least one Delivery Load before creating Delivery Notes."))
+		frappe.throw(_("Add at least one Transport Load before creating Delivery Notes."))
 	loads = [get_locked_delivery_load(name) for name in load_names]
 	if len(loads) == 1:
 		return create_delivery_notes_for_load(loads[0])
 	existing_notes = _get_delivery_notes_for_loads(load_names)
 	expected_load_orders = set(
 		frappe.get_all(
-			"Delivery Load Order",
-			filters={"parent": ["in", load_names], "parenttype": "Delivery Load"},
+			"Transport Load Item",
+			filters={"parent": ["in", load_names], "parenttype": "Transport Load"},
 			pluck="name",
 		)
 	)
@@ -260,7 +260,7 @@ def _delivery_order_has_existing_note(load_name, delivery_order_name):
 			select dni.parent
 			from `tabDelivery Note Item` dni
 			join `tabDelivery Note` dn on dn.name = dni.parent
-			join `tabDelivery Load Order` dlo on dlo.name = dni.vuna_delivery_load_order
+			join `tabTransport Load Item` dlo on dlo.name = dni.vuna_delivery_load_order
 			where dlo.parent = %(load_name)s
 			and dlo.delivery_order = %(delivery_order_name)s
 			and dn.docstatus != 2
@@ -283,7 +283,7 @@ def _get_delivery_notes_for_loads(load_names, docstatus=None):
 		select distinct dn.name
 		from `tabDelivery Note` dn
 		left join `tabDelivery Note Item` dni on dni.parent = dn.name
-		left join `tabDelivery Load Order` dlo on dlo.name = dni.vuna_delivery_load_order
+		left join `tabTransport Load Item` dlo on dlo.name = dni.vuna_delivery_load_order
 		where (dn.vuna_delivery_load in %(load_names)s or dlo.parent in %(load_names)s)
 		{filters}
 		and dn.docstatus != 2
@@ -353,7 +353,7 @@ def _make_delivery_note_direct(delivery_order_name, load_rows, source_warehouse)
 	for row in load_rows:
 		if row.delivery_order_item in allocated_by_item:
 			frappe.throw(
-				_("Delivery Order Item {0} appears more than once on Delivery Load {1}.").format(
+				_("Delivery Order Item {0} appears more than once on Transport Load {1}.").format(
 					row.delivery_order_item, row.parent or _("the selected load")
 				)
 			)
@@ -388,9 +388,9 @@ def apply_allocated_delivery_quantities(delivery_note, allocated_by_sales_order_
 
 @frappe.whitelist()
 def make_delivery_trip_from_load(source_name):
-	"""Return a populated, unsaved Delivery Trip for a Delivery Load."""
+	"""Return a populated, unsaved Delivery Trip for a Transport Load."""
 	require_doctype_permission("Delivery Trip", "create")
-	load = frappe.get_doc("Delivery Load", source_name)
+	load = frappe.get_doc("Transport Load", source_name)
 	require_document_permission(load, "write")
 	return create_delivery_trip_for_load(source_name)
 
@@ -398,7 +398,7 @@ def make_delivery_trip_from_load(source_name):
 def create_delivery_trip_for_load(load):
 	"""Build the ERPNext Delivery Trip for every Load on the active allocation."""
 	if isinstance(load, str):
-		load = frappe.get_doc("Delivery Load", load)
+		load = frappe.get_doc("Transport Load", load)
 	load = get_locked_delivery_load(load)
 	validate_load_is_operational(load, _("creating a Delivery Trip"))
 
@@ -437,7 +437,7 @@ def create_delivery_trip_for_load(load):
 	trip_names.update(selected_load.delivery_trip for selected_load in loads if selected_load.delivery_trip)
 	if len(trip_names) > 1:
 		frappe.throw(
-			_("The selected Delivery Loads are already linked to different Delivery Trips: {0}.").format(
+			_("The selected Transport Loads are already linked to different Delivery Trips: {0}.").format(
 				", ".join(sorted(trip_names))
 			)
 		)
@@ -461,7 +461,7 @@ def create_delivery_trip_for_load(load):
 	)
 	note_delivery_orders.update(
 		frappe.get_all(
-			"Delivery Load Order",
+			"Transport Load Item",
 			filters={
 				"name": [
 					"in",
@@ -548,11 +548,11 @@ def _populate_delivery_stop_links(delivery_trip, loads):
 				"vuna_delivery_load_order",
 			)
 			load_name = (
-				frappe.db.get_value("Delivery Load Order", load_order, "parent") if load_order else None
+				frappe.db.get_value("Transport Load Item", load_order, "parent") if load_order else None
 			)
 			load = next((row for row in loads if row.name == load_name), None)
 			if load and load_order:
-				delivery_order = frappe.db.get_value("Delivery Load Order", load_order, "delivery_order")
+				delivery_order = frappe.db.get_value("Transport Load Item", load_order, "delivery_order")
 		load_rows = [
 			row for row in (load.delivery_orders if load else []) if row.delivery_order == delivery_order
 		]
@@ -636,7 +636,7 @@ def _repair_single_item_load_rows(load):
 		item = delivery_order.items[0]
 		row.delivery_order_item = item.name
 		frappe.db.set_value(
-			"Delivery Load Order",
+			"Transport Load Item",
 			row.name,
 			"delivery_order_item",
 			item.name,

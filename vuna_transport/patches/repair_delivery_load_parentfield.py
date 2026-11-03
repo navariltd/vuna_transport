@@ -1,4 +1,4 @@
-"""Move existing Delivery Load child rows to the renamed table field."""
+"""Move existing Transport Load child rows to the renamed table field."""
 
 import frappe
 
@@ -6,9 +6,9 @@ import frappe
 def execute():
 	frappe.db.sql(
 		"""
-		update `tabDelivery Load Order`
+		update `tabTransport Load Item`
 		set parentfield = 'delivery_orders'
-		where parenttype = 'Delivery Load'
+		where parenttype = 'Transport Load'
 		and parentfield = 'load_requirements'
 		"""
 	)

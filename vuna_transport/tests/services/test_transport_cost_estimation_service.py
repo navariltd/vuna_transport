@@ -176,7 +176,7 @@ class TestTransportCostEstimationService(UnitTestCase):
 		from vuna_transport.services.costing.transport_cost_estimation_service import estimate_transport_cost
 
 		load = SimpleNamespace(
-			doctype="Delivery Load",
+			doctype="Transport Load",
 			name="DL-001",
 			company="Yovuna Tech",
 			dispatch_date="2026-09-09",

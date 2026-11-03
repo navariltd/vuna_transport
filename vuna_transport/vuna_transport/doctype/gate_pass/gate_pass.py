@@ -67,13 +67,13 @@ class GatePass(Document):
 			frappe.throw(_("Create the Gate Pass from a Delivery Trip."))
 
 		if self.delivery_load:
-			load = frappe.get_doc("Delivery Load", self.delivery_load)
+			load = frappe.get_doc("Transport Load", self.delivery_load)
 			if load.docstatus != 1:
 				frappe.throw(
-					_("Delivery Load {0} must be submitted before issuing a Gate Pass.").format(load.name)
+					_("Transport Load {0} must be submitted before issuing a Gate Pass.").format(load.name)
 				)
 			if self.company and load.company != self.company:
-				frappe.throw(_("Gate Pass and Delivery Load must belong to the same Company."))
+				frappe.throw(_("Gate Pass and Transport Load must belong to the same Company."))
 
 		if self.vehicle_allocation:
 			allocation = frappe.get_doc("Vehicle Allocation", self.vehicle_allocation)
@@ -95,7 +95,7 @@ class GatePass(Document):
 			trip_load_names = get_delivery_trip_load_names(trip)
 			if self.delivery_load and trip_load_names and self.delivery_load not in trip_load_names:
 				frappe.throw(
-					_("Delivery Load {0} is not part of Delivery Trip {1}.").format(
+					_("Transport Load {0} is not part of Delivery Trip {1}.").format(
 						self.delivery_load, trip.name
 					)
 				)
@@ -106,7 +106,7 @@ class GatePass(Document):
 				if trip_load_names and not trip_load_names.issubset(allocation_load_names):
 					frappe.throw(
 						_(
-							"Vehicle Allocation {0} does not contain every Delivery Load on Delivery Trip {1}."
+							"Vehicle Allocation {0} does not contain every Transport Load on Delivery Trip {1}."
 						).format(self.vehicle_allocation, trip.name)
 					)
 
@@ -126,7 +126,7 @@ class GatePass(Document):
 				self.delivery_load = trip_load_names[0]
 
 		if self.delivery_load:
-			load = frappe.get_doc("Delivery Load", self.delivery_load)
+			load = frappe.get_doc("Transport Load", self.delivery_load)
 			self.company = self.company or load.company
 			if load.active_vehicle_allocation and not self.vehicle_allocation:
 				self.vehicle_allocation = load.active_vehicle_allocation
@@ -137,7 +137,7 @@ class GatePass(Document):
 	def _validate_outbound_documents(self):
 		load_names = set(get_delivery_trip_load_names(frappe.get_doc("Delivery Trip", self.delivery_trip)))
 		if not load_names:
-			frappe.throw(_("The Delivery Trip must contain at least one Delivery Load."))
+			frappe.throw(_("The Delivery Trip must contain at least one Transport Load."))
 		delivery_notes = frappe.get_all(
 			"Delivery Note",
 			filters={"vuna_delivery_load": ["in", sorted(load_names)], "docstatus": 1},

@@ -156,7 +156,7 @@ def get_driver_availability_map(
 		{
 			row.name: row
 			for row in frappe.get_all(
-				"Delivery Load",
+				"Transport Load",
 				filters={"name": ["in", list(load_names)]},
 				fields=["name", "planned_departure", "planned_arrival"],
 			)
@@ -258,7 +258,7 @@ def _evaluate_driver(driver, allocations, trips, loads, from_time, to_time, expe
 		reasons.append(
 			_reason(
 				"ACTIVE_ALLOCATION",
-				_("Driver is allocated to Delivery Load(s) {0}.").format(", ".join(allocation_load_names)),
+				_("Driver is allocated to Transport Load(s) {0}.").format(", ".join(allocation_load_names)),
 				"Vehicle Allocation",
 				allocation.name,
 			)

@@ -11,5 +11,5 @@ class TestSalesOrderDashboard(UnitTestCase):
 		data = get_data({"non_standard_fieldnames": {}, "transactions": []})
 
 		self.assertEqual(data["non_standard_fieldnames"]["Delivery Order"], "sales_order")
-		self.assertEqual(data["non_standard_fieldnames"]["Delivery Load"], "sales_order")
-		self.assertEqual(data["transactions"][0]["items"], ["Delivery Order", "Delivery Load"])
+		self.assertEqual(data["non_standard_fieldnames"]["Transport Load"], "sales_order")
+		self.assertEqual(data["transactions"][0]["items"], ["Delivery Order", "Transport Load"])

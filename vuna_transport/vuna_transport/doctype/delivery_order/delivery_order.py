@@ -99,5 +99,5 @@ class DeliveryOrder(Document):
 	@frappe.whitelist()
 	def create_load(self):
 		self.check_permission("read")
-		require_doctype_permission("Delivery Load", "create")
+		require_doctype_permission("Transport Load", "create")
 		return create_delivery_load([self.name])

@@ -8,7 +8,7 @@ LEGACY_METHODS = ("Company Fleet", "Subcontracted Transport")
 REFERENCE_FIELDS = (
 	("Sales Order", "vuna_delivery_method"),
 	("Delivery Order", "delivery_method"),
-	("Delivery Load", "delivery_method"),
+	("Transport Load", "delivery_method"),
 )
 FULFILMENT_TYPE_MAP = {
 	"Internal Fleet": COMPANY_DELIVERY,

@@ -29,7 +29,7 @@ from vuna_transport.services.routing.distance_estimation_service import (
 from vuna_transport.services.routing.route_service import apply_route_defaults
 
 
-class DeliveryLoad(Document):
+class TransportLoad(Document):
 	def validate(self):
 		_validate_source_warehouse_change(self)
 		apply_route_defaults(self)
@@ -56,7 +56,7 @@ class DeliveryLoad(Document):
 		validate_load_can_be_cancelled(self)
 
 	def on_cancel(self):
-		set_delivery_load_status(self, "Cancelled", _("Delivery Load cancelled"), force=True)
+		set_delivery_load_status(self, "Cancelled", _("Transport Load cancelled"), force=True)
 		sync_delivery_order_allocations(self.get_delivery_order_names())
 
 	def on_update(self):
@@ -110,11 +110,11 @@ def _validate_source_warehouse_change(load):
 	if load.docstatus != 1:
 		return
 	if load.pick_list and frappe.db.get_value("Pick List", load.pick_list, "docstatus") != 2:
-		frappe.throw(_("Cancel the Pick List before changing the Delivery Load dispatch warehouse."))
+		frappe.throw(_("Cancel the Pick List before changing the Transport Load dispatch warehouse."))
 	if frappe.db.exists(
 		"Delivery Note",
 		{"vuna_delivery_load": load.name, "docstatus": ["!=", 2]},
 	):
-		frappe.throw(_("The Delivery Load dispatch warehouse cannot change after Delivery Notes exist."))
+		frappe.throw(_("The Transport Load dispatch warehouse cannot change after Delivery Notes exist."))
 	if load.delivery_trip:
-		frappe.throw(_("The Delivery Load dispatch warehouse cannot change after a Delivery Trip exists."))
+		frappe.throw(_("The Transport Load dispatch warehouse cannot change after a Delivery Trip exists."))

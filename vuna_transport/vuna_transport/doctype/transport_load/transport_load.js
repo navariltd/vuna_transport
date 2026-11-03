@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Yovuna Technologies Limited and contributors
 // For license information, please see license.txt
 
-frappe.ui.form.on("Delivery Load", {
+frappe.ui.form.on("Transport Load", {
 	setup(frm) {
 		frm.set_query("required_vehicle_category", () => ({
 			query: "vuna_transport.services.planning.delivery_load_service.get_compatible_vehicle_categories",
@@ -150,7 +150,7 @@ frappe.ui.form.on("Delivery Load", {
 			add_execution_actions(frm, response.message);
 			render_execution_progress(frm, response.message);
 		} catch (error) {
-			console.error("Unable to load Delivery Load execution progress", error);
+			console.error("Unable to load Transport Load execution progress", error);
 			frm.get_field("execution_overview")?.$wrapper.html(
 				`<div class="alert alert-warning">${__(
 					"Execution progress could not be loaded. Reload the form or use the available action above."
@@ -369,7 +369,7 @@ function render_execution_progress(frm, summary) {
 	`);
 }
 
-frappe.ui.form.on("Delivery Load Order", {
+frappe.ui.form.on("Transport Load Item", {
 	delivery_orders_add(frm) {
 		recalculate_load_totals(frm);
 	},
@@ -540,7 +540,7 @@ function show_item_selection_dialog(frm, result) {
 			frm.dirty();
 			dialog.hide();
 			frappe.show_alert({
-				message: __("Selected items added to the Delivery Load"),
+				message: __("Selected items added to the Transport Load"),
 				indicator: "green",
 			});
 		},

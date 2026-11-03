@@ -47,7 +47,7 @@ function configure_allocation_aware_delivery_trip_action(listview) {
 
 		const current_selection = ++selection_version;
 		frappe.db
-			.get_list("Delivery Load", {
+			.get_list("Transport Load", {
 				filters: {
 					name: ["in", delivery_loads],
 					active_vehicle_allocation: ["is", "set"],

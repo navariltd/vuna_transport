@@ -24,7 +24,7 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 	if trip.docstatus != 1:
 		frappe.throw(_("Submit the Delivery Trip before creating a Proof of Delivery."))
 	if not get_delivery_trip_load_names(trip):
-		frappe.throw(_("Delivery Trip is not linked to a Vehicle Allocation or Delivery Load."))
+		frappe.throw(_("Delivery Trip is not linked to a Vehicle Allocation or Transport Load."))
 
 	stop = next((row for row in trip.delivery_stops if row.name == delivery_stop), None)
 	if not stop:
@@ -244,10 +244,10 @@ def recompute_delivery_order_status(delivery_order_name):
 	loads = frappe.db.sql(
 		"""
 			select distinct dl.name, dl.status
-			from `tabDelivery Load` dl
-			join `tabDelivery Load Order` dlo on dlo.parent = dl.name
+			from `tabTransport Load` dl
+			join `tabTransport Load Item` dlo on dlo.parent = dl.name
 			where dl.docstatus = 1
-			and dlo.parenttype = 'Delivery Load'
+			and dlo.parenttype = 'Transport Load'
 			and dlo.delivery_order = %s
 		""",
 		delivery_order_name,
@@ -322,7 +322,7 @@ def recompute_delivery_load_completion(delivery_load, delivery_trip=None):
 	Return Requests are follow-up cases and do not keep the trip or vehicle
 	blocked after the delivery event has been recorded.
 	"""
-	if not delivery_load or not frappe.db.exists("Delivery Load", delivery_load):
+	if not delivery_load or not frappe.db.exists("Transport Load", delivery_load):
 		return
 	trip_name = delivery_trip or frappe.db.get_value(
 		"Delivery Stop",

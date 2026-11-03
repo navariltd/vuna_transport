@@ -214,7 +214,7 @@
  "modified": "2026-09-15 21:27:15.257718",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
- "name": "Delivery Load Order",
+ "name": "Transport Load Item",
  "owner": "Administrator",
  "permissions": [],
  "row_format": "Dynamic",

@@ -1,4 +1,4 @@
-"""Execution progress and next-action state for Delivery Loads."""
+"""Execution progress and next-action state for Transport Loads."""
 
 import frappe
 from frappe import _
@@ -19,7 +19,7 @@ DOCSTATUS_LABELS = {0: "Draft", 1: "Submitted", 2: "Cancelled"}
 @frappe.whitelist()
 def get_load_execution_summary(load):
 	"""Return downstream execution progress and the single recommended next action."""
-	load = frappe.get_doc("Delivery Load", load) if isinstance(load, str) else load
+	load = frappe.get_doc("Transport Load", load) if isinstance(load, str) else load
 	require_document_permission(load, "read")
 	delivery_orders = {row.delivery_order for row in load.delivery_orders if row.delivery_order}
 
@@ -235,11 +235,11 @@ def _get_next_action(
 		}
 		delivery_notes_ready = not draft_notes and delivery_orders.issubset(submitted_orders)
 	if load.docstatus == 0:
-		return _action("submit_load", _("Submit Delivery Load"), _("Review capacity and submit this load."))
+		return _action("submit_load", _("Submit Transport Load"), _("Review capacity and submit this load."))
 	if load.docstatus == 2:
-		return _action("cancelled", _("Delivery Load Cancelled"), _("Amend the load to continue."))
+		return _action("cancelled", _("Transport Load Cancelled"), _("Amend the load to continue."))
 	if load.status in ("Completed", "Completed with Exceptions"):
-		return _action("completed", _("Execution Completed"), _("This Delivery Load is closed."))
+		return _action("completed", _("Execution Completed"), _("This Transport Load is closed."))
 	requires_vehicle_allocation = _requires_vehicle_allocation(load)
 	allocation_after_notes = vehicle_allocation_timing == ALLOCATION_AFTER_DELIVERY_NOTES
 	if requires_vehicle_allocation and not allocation_after_notes:

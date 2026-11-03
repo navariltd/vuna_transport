@@ -149,7 +149,7 @@ def sync_delivery_order_quantities(delivery_order, persist=False):
 			frappe.throw(
 				_(
 					"Sales Order quantity for item {0} cannot be reduced to {1}; "
-					"{2} is already reserved/allocated on Delivery Loads."
+					"{2} is already reserved/allocated on Transport Loads."
 				).format(row.item_code, transport_qty, reserved + allocated)
 			)
 
@@ -220,10 +220,10 @@ def _get_delivery_order_item_commitments(delivery_order_item):
 		select
 			coalesce(sum(case when dl.docstatus = 0 then dlo.allocated_quantity else 0 end), 0) as reserved,
 			coalesce(sum(case when dl.docstatus = 1 then dlo.allocated_quantity else 0 end), 0) as allocated
-		from `tabDelivery Load Order` dlo
-		join `tabDelivery Load` dl on dl.name = dlo.parent
+		from `tabTransport Load Item` dlo
+		join `tabTransport Load` dl on dl.name = dlo.parent
 		where dlo.delivery_order_item = %s
-		and dlo.parenttype = 'Delivery Load'
+		and dlo.parenttype = 'Transport Load'
 		and dl.docstatus in (0, 1)
 		""",
 		delivery_order_item,

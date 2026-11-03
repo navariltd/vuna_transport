@@ -5,6 +5,7 @@ vuna_transport.patches.rename_planning_doctypes
 vuna_transport.patches.rename_delivery_custom_fields
 vuna_transport.patches.rename_vehicle_operational_role
 vuna_transport.patches.remove_vehicle_category_minimum_uoms
+vuna_transport.patches.rename_transport_load_doctypes
 
 [post_model_sync]
 # Patches added in this section will be executed after doctypes are migrated
@@ -29,3 +30,4 @@ vuna_transport.patches.rename_motor_vehicle_plate_format
 vuna_transport.patches.sync_vehicle_allocation_execution_statuses
 vuna_transport.patches.mark_existing_return_requests_legacy
 vuna_transport.patches.normalize_return_inspection_statuses
+vuna_transport.patches.reset_transport_load_naming

@@ -30,8 +30,8 @@
    "type": "Link"
   },
   {
-   "label": "Delivery Load",
-   "link_to": "Delivery Load",
+   "label": "Transport Load",
+   "link_to": "Transport Load",
    "link_type": "DocType",
    "type": "Link"
   },

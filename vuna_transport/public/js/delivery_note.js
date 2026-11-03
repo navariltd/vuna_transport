@@ -67,7 +67,7 @@ function hide_standard_delivery_trip_action_for_allocated_load(frm) {
 	const delivery_note = frm.doc.name;
 
 	frappe.db
-		.get_value("Delivery Load", frm.doc.vuna_delivery_load, "active_vehicle_allocation")
+		.get_value("Transport Load", frm.doc.vuna_delivery_load, "active_vehicle_allocation")
 		.then(({ message }) => {
 			if (!message?.active_vehicle_allocation || frm.doc.name !== delivery_note) return;
 			// ERPNext's Delivery Note controller can add its buttons after custom
