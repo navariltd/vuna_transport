@@ -3,9 +3,9 @@ frappe.query_reports["Delivery Trips Pending POD"] = {
 		{ fieldname: "company", label: __("Company"), fieldtype: "Link", options: "Company" },
 		{
 			fieldname: "delivery_load",
-			label: __("Delivery Load"),
+			label: __("Transport Load"),
 			fieldtype: "Link",
-			options: "Delivery Load",
+			options: "Transport Load",
 		},
 	],
 };

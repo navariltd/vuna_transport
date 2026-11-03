@@ -1,4 +1,4 @@
-frappe.listview_settings["Delivery Load"] = {
+frappe.listview_settings["Transport Load"] = {
 	add_fields: ["status", "dispatch_date", "source_warehouse", "pick_list"],
 	get_indicator(doc) {
 		const colors = {

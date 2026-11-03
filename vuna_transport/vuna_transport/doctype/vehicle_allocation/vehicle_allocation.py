@@ -75,7 +75,7 @@ class VehicleAllocation(Document):
 
 		load_names = get_allocation_load_names(self)
 		if not load_names:
-			frappe.throw("Add at least one Delivery Load before creating a Delivery Trip.")
+			frappe.throw("Add at least one Transport Load before creating a Delivery Trip.")
 
 		from vuna_transport.services.integrations.erpnext_integration import create_delivery_trip_for_load
 

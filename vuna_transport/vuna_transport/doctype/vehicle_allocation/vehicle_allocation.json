@@ -85,7 +85,7 @@
   {
    "fieldname": "delivery_loads",
    "fieldtype": "Table",
-   "label": "Delivery Loads",
+   "label": "Transport Loads",
    "options": "Vehicle Allocation Load",
    "reqd": 1
   },
@@ -389,7 +389,7 @@
   {
    "fieldname": "delivery_load_section",
    "fieldtype": "Section Break",
-   "label": "Delivery Load"
+   "label": "Transport Load"
   },
   {
    "fieldname": "column_break_spyh",
@@ -434,7 +434,7 @@
    "is_child_table": 1,
    "link_doctype": "Vehicle Allocation Load",
    "link_fieldname": "delivery_load",
-   "parent_doctype": "Delivery Load",
+   "parent_doctype": "Transport Load",
    "table_fieldname": "delivery_loads"
   }
  ],

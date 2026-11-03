@@ -4,7 +4,7 @@
 def get_data(data):
 	data["non_standard_fieldnames"].update(
 		{
-			"Delivery Load": "delivery_trip",
+			"Transport Load": "delivery_trip",
 			"Vehicle Allocation": "vuna_current_vehicle_allocation",
 		}
 	)

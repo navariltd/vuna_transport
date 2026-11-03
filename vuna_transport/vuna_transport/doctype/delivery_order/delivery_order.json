@@ -568,7 +568,7 @@
  "links": [
   {
    "group": "Load Planning",
-   "link_doctype": "Delivery Load",
+   "link_doctype": "Transport Load",
    "link_fieldname": "delivery_order"
   }
  ],

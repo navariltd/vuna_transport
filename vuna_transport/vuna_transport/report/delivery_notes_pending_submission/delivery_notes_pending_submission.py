@@ -18,7 +18,7 @@ def execute(filters=None):
 	rows = frappe.db.sql(
 		f"""select dn.name, dn.company, dn.customer, dn.posting_date,
 			dn.vuna_delivery_load, dn.vuna_delivery_order, dl.status as load_status
-			from `tabDelivery Note` dn left join `tabDelivery Load` dl
+			from `tabDelivery Note` dn left join `tabTransport Load` dl
 			on dl.name = dn.vuna_delivery_load where {" and ".join(conditions)}
 			order by dn.posting_date, dn.creation limit 500""",
 		values,
@@ -29,10 +29,10 @@ def execute(filters=None):
 		{"label": _("Company"), "fieldname": "company", "fieldtype": "Link", "options": "Company"},
 		{"label": _("Customer"), "fieldname": "customer", "fieldtype": "Link", "options": "Customer"},
 		{
-			"label": _("Delivery Load"),
+			"label": _("Transport Load"),
 			"fieldname": "vuna_delivery_load",
 			"fieldtype": "Link",
-			"options": "Delivery Load",
+			"options": "Transport Load",
 		},
 		{
 			"label": _("Delivery Order"),

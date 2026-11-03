@@ -52,9 +52,9 @@ EXTRA_TEST_RECORD_DEPENDENCIES = []  # eg. ["User"]
 IGNORE_TEST_RECORD_DEPENDENCIES = []  # eg. ["User"]
 
 
-class TestDeliveryLoad(UnitTestCase):
+class TestTransportLoad(UnitTestCase):
 	"""
-	Integration tests for DeliveryLoad.
+	Integration tests for TransportLoad.
 	Use this class for testing interactions between multiple components.
 	"""
 

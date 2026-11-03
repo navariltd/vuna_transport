@@ -1,10 +1,10 @@
-"""Transaction locks, lifecycle guards, and auditable Delivery Load status changes."""
+"""Transaction locks, lifecycle guards, and auditable Transport Load status changes."""
 
 import frappe
 from frappe import _
 
 CLOSED_LOAD_STATUSES = ("Completed", "Completed with Exceptions", "Cancelled")
-LOCKABLE_DOCTYPES = {"Delivery Load", "Vehicle", "Driver"}
+LOCKABLE_DOCTYPES = {"Transport Load", "Vehicle", "Driver"}
 
 ALLOWED_LOAD_STATUS_TRANSITIONS = {
 	"Draft": {
@@ -85,16 +85,16 @@ def lock_document(doctype, name):
 
 def get_locked_delivery_load(load):
 	name = load if isinstance(load, str) else load.name
-	lock_document("Delivery Load", name)
-	return frappe.get_doc("Delivery Load", name)
+	lock_document("Transport Load", name)
+	return frappe.get_doc("Transport Load", name)
 
 
 def validate_load_is_operational(load, operation):
 	if load.docstatus != 1:
-		frappe.throw(_("Submit Delivery Load {0} before {1}.").format(load.name, operation))
+		frappe.throw(_("Submit Transport Load {0} before {1}.").format(load.name, operation))
 	if load.status in CLOSED_LOAD_STATUSES:
 		frappe.throw(
-			_("Delivery Load {0} is {1} and cannot be used for {2}.").format(
+			_("Transport Load {0} is {1} and cannot be used for {2}.").format(
 				load.name, load.status, operation
 			)
 		)
@@ -103,16 +103,16 @@ def validate_load_is_operational(load, operation):
 def set_delivery_load_status(load, status, reason=None, force=False):
 	"""Apply a checked state transition and leave an audit comment."""
 	name = load if isinstance(load, str) else load.name
-	lock_document("Delivery Load", name)
-	load = frappe.get_doc("Delivery Load", name)
+	lock_document("Transport Load", name)
+	load = frappe.get_doc("Transport Load", name)
 	current = load.status or "Draft"
 	if current == status:
 		return
 	if not force and not is_load_status_transition_allowed(current, status):
-		frappe.throw(_("Delivery Load {0} cannot move from {1} to {2}.").format(load.name, current, status))
+		frappe.throw(_("Transport Load {0} cannot move from {1} to {2}.").format(load.name, current, status))
 	load.db_set("status", status, update_modified=False)
 	load.status = status
-	message = _("Delivery Load status changed from {0} to {1}.").format(current, status)
+	message = _("Transport Load status changed from {0} to {1}.").format(current, status)
 	if reason:
 		message = _("{0} Reason: {1}").format(message, reason)
 	load.add_comment("Info", message)
@@ -142,7 +142,7 @@ def validate_load_can_be_cancelled(load):
 	if trip_rows:
 		trip_name = trip_rows[0].get("parent") if isinstance(trip_rows[0], dict) else trip_rows[0].parent
 		frappe.throw(
-			_("Cancel Delivery Trip {0} before cancelling Delivery Load {1}.").format(trip_name, load.name)
+			_("Cancel Delivery Trip {0} before cancelling Transport Load {1}.").format(trip_name, load.name)
 		)
 
 	note_name = frappe.db.get_value(
@@ -152,5 +152,5 @@ def validate_load_can_be_cancelled(load):
 	)
 	if note_name:
 		frappe.throw(
-			_("Cancel Delivery Note {0} before cancelling Delivery Load {1}.").format(note_name, load.name)
+			_("Cancel Delivery Note {0} before cancelling Transport Load {1}.").format(note_name, load.name)
 		)

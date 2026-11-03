@@ -42,7 +42,7 @@ def execute(filters=None):
 		{"label": _("Vehicle"), "fieldname": "vehicle", "fieldtype": "Link", "options": "Vehicle"},
 		{"label": _("Driver"), "fieldname": "driver", "fieldtype": "Link", "options": "Driver"},
 		{
-			"label": _("Delivery Loads"),
+			"label": _("Transport Loads"),
 			"fieldname": "delivery_load",
 			"fieldtype": "Data",
 		},

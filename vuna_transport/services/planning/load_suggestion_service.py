@@ -1,4 +1,4 @@
-"""Read-only, deterministic Delivery Load suggestions and secure acceptance."""
+"""Read-only, deterministic Transport Load suggestions and secure acceptance."""
 
 from collections import defaultdict
 
@@ -69,7 +69,7 @@ def suggest_delivery_loads(
 ):
 	"""Return ranked load configurations without changing transactional state."""
 	require_doctype_permission("Delivery Order", "read")
-	require_doctype_permission("Delivery Load", "create")
+	require_doctype_permission("Transport Load", "create")
 	require_company_access(company)
 	settings = frappe.get_cached_doc("Transport Settings")
 	requested_count = cint(option_count or settings.load_suggestion_option_count or 3)
@@ -183,8 +183,8 @@ def suggest_delivery_loads(
 
 @frappe.whitelist()
 def create_delivery_load_from_suggestion(suggestion):
-	"""Revalidate browser selections and create one draft Delivery Load atomically."""
-	require_doctype_permission("Delivery Load", "create")
+	"""Revalidate browser selections and create one draft Transport Load atomically."""
+	require_doctype_permission("Transport Load", "create")
 	suggestion = frappe.parse_json(suggestion) if isinstance(suggestion, str) else suggestion
 	if not isinstance(suggestion, dict):
 		frappe.throw(_("Select a valid load suggestion."))
@@ -404,11 +404,11 @@ def _populate_available_items(orders):
 		],
 		order_by="parent asc, idx asc",
 	)
-	active_loads = frappe.get_all("Delivery Load", filters={"docstatus": ["in", [0, 1]]}, pluck="name")
+	active_loads = frappe.get_all("Transport Load", filters={"docstatus": ["in", [0, 1]]}, pluck="name")
 	allocated_by_item = defaultdict(float)
 	if active_loads:
 		allocation_rows = frappe.get_all(
-			"Delivery Load Order",
+			"Transport Load Item",
 			filters={
 				"parent": ["in", active_loads],
 				"delivery_order": ["in", list(order_map)],

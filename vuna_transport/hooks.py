@@ -268,7 +268,7 @@ doc_events = {
 		"on_submit": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 		"on_cancel": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
-	"Delivery Load": {
+	"Transport Load": {
 		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 	"Asset": {

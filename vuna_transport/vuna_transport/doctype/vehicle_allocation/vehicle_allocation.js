@@ -40,9 +40,9 @@ frappe.ui.form.on("Vehicle Allocation", {
 	},
 
 	refresh(frm) {
-		// Delivery Loads are retained as the demand record. The server-side
+		// Transport Loads are retained as the demand record. The server-side
 		// cancellation flow detaches this allocation before Frappe checks links.
-		frm.ignore_doctypes_on_cancel_all = ["Delivery Load"];
+		frm.ignore_doctypes_on_cancel_all = ["Transport Load"];
 		set_allocation_execution_indicator(frm, frm.doc.status || "Draft");
 		update_load_selection_button(frm);
 		frm.remove_custom_button(__("Delivery Notes"), __("Create"));
@@ -198,7 +198,7 @@ function set_allocation_execution_indicator(frm, status) {
 
 function select_delivery_loads(frm) {
 	if (!frm.doc.company) {
-		frappe.msgprint(__("Select a Company before selecting Delivery Loads."));
+		frappe.msgprint(__("Select a Company before selecting Transport Loads."));
 		return;
 	}
 	if (!frm.doc.required_vehicle_category) {
@@ -207,7 +207,7 @@ function select_delivery_loads(frm) {
 	}
 
 	new frappe.ui.form.MultiSelectDialog({
-		doctype: "Delivery Load",
+		doctype: "Transport Load",
 		target: frm,
 		size: "extra-large",
 		add_filters_group: 1,
@@ -230,7 +230,7 @@ function select_delivery_loads(frm) {
 		},
 		action(selections) {
 			if (!selections.length) {
-				frappe.msgprint(__("Select at least one Delivery Load."));
+				frappe.msgprint(__("Select at least one Transport Load."));
 				return;
 			}
 			const existing = new Set(
@@ -247,10 +247,10 @@ function select_delivery_loads(frm) {
 }
 
 function update_load_selection_button(frm) {
-	frm.remove_custom_button(__("Select Delivery Loads"), __("Planning"));
+	frm.remove_custom_button(__("Select Transport Loads"), __("Planning"));
 	if (frm.doc.docstatus === 0 && frm.doc.required_vehicle_category) {
 		frm.add_custom_button(
-			__("Select Delivery Loads"),
+			__("Select Transport Loads"),
 			() => select_delivery_loads(frm),
 			__("Planning")
 		);
@@ -285,7 +285,7 @@ frappe.ui.form.on("Vehicle Allocation Load", {
 		if (!frm.doc.required_vehicle_category) {
 			frm.fields_dict.delivery_loads.grid.grid_rows_by_docname[cdn]?.remove();
 			frappe.msgprint(
-				__("Select a Required Vehicle Category before selecting Delivery Loads.")
+				__("Select a Required Vehicle Category before selecting Transport Loads.")
 			);
 			return;
 		}

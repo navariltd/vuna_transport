@@ -281,7 +281,7 @@ def sync_related_vehicle_snapshots(doc, method=None):
 		maintenance = getattr(doc, "asset_maintenance", None)
 		asset = frappe.db.get_value("Asset Maintenance", maintenance, "asset_name")
 		vehicle_names.update(_vehicles_for_asset(asset))
-	elif doctype == "Delivery Load":
+	elif doctype == "Transport Load":
 		from vuna_transport.services.fleet.vehicle_allocation_service import get_allocation_names_for_load
 
 		allocation_names = get_allocation_names_for_load(doc.name)

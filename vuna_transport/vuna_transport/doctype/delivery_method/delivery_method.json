@@ -84,7 +84,7 @@
    "link_fieldname": "delivery_method"
   },
   {
-   "link_doctype": "Delivery Load",
+   "link_doctype": "Transport Load",
    "link_fieldname": "delivery_method"
   }
  ],

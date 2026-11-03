@@ -62,7 +62,7 @@ frappe.ui.form.on("Vehicle Incident", {
 function add_view_buttons(frm) {
 	[
 		["vehicle", "Vehicle", __("Vehicle")],
-		["delivery_load", "Delivery Load", __("Delivery Load")],
+		["delivery_load", "Transport Load", __("Transport Load")],
 		["delivery_trip", "Delivery Trip", __("Delivery Trip")],
 		["vehicle_allocation", "Vehicle Allocation", __("Affected Allocation")],
 		["replacement_vehicle_allocation", "Vehicle Allocation", __("Replacement Allocation")],

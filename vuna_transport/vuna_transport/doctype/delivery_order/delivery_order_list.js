@@ -15,7 +15,7 @@ frappe.listview_settings["Delivery Order"] = {
 	},
 	onload(listview) {
 		listview.page.add_inner_button(
-			__("Suggest Delivery Loads"),
+			__("Suggest Transport Loads"),
 			() => {
 				open_load_suggestion_dialog(listview);
 			},
@@ -37,10 +37,10 @@ frappe.listview_settings["Delivery Order"] = {
 				.then((response) => {
 					if (response.message) {
 						frappe.show_alert({
-							message: __("Delivery Load {0} created", [response.message]),
+							message: __("Transport Load {0} created", [response.message]),
 							indicator: "green",
 						});
-						frappe.set_route("Form", "Delivery Load", response.message);
+						frappe.set_route("Form", "Transport Load", response.message);
 					}
 				});
 		});
@@ -54,7 +54,7 @@ async function open_load_suggestion_dialog(listview) {
 		"load_suggestion_option_count"
 	);
 	const dialog = new frappe.ui.Dialog({
-		title: __("Delivery Load Planner"),
+		title: __("Transport Load Planner"),
 		size: "extra-large",
 		fields: [
 			{
@@ -234,7 +234,7 @@ function render_load_suggestions(wrapper, result) {
 				<div style="text-align:right; margin-top:14px;"><button class="btn ${
 					suggestion.recommended ? "btn-primary" : "btn-default"
 				} create-suggested-load" data-index="${index}">${__(
-				"Create Delivery Load"
+				"Create Transport Load"
 			)}</button></div>
 			</div>`;
 		})
@@ -248,15 +248,15 @@ function create_load_from_suggestion(dialog, suggestion) {
 			method: "vuna_transport.services.planning.load_suggestion_service.create_delivery_load_from_suggestion",
 			args: { suggestion },
 			freeze: true,
-			freeze_message: __("Revalidating and creating Delivery Load..."),
+			freeze_message: __("Revalidating and creating Transport Load..."),
 		})
 		.then(({ message }) => {
 			if (!message) return;
 			dialog.hide();
 			frappe.show_alert({
-				message: __("Delivery Load {0} created", [message]),
+				message: __("Transport Load {0} created", [message]),
 				indicator: "green",
 			});
-			frappe.set_route("Form", "Delivery Load", message);
+			frappe.set_route("Form", "Transport Load", message);
 		});
 }

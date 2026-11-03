@@ -65,7 +65,7 @@ def generate_dispatch_test_data():
 		"submitted_sales_orders": sales_orders,
 		"generated_delivery_orders": delivery_orders,
 		"downstream_documents_created": {
-			"delivery_loads": _count_linked_documents("Delivery Load", "delivery_orders", sales_orders),
+			"delivery_loads": _count_linked_documents("Transport Load", "delivery_orders", sales_orders),
 			"delivery_notes": frappe.db.count("Delivery Note", {"po_no": ["like", f"{DEMO_PREFIX}%"]})
 			if frappe.get_meta("Delivery Note").has_field("po_no")
 			else 0,
@@ -550,12 +550,12 @@ def _point_geojson(latitude, longitude):
 
 
 def _count_linked_documents(doctype, child_fieldname, sales_orders):
-	if doctype != "Delivery Load":
+	if doctype != "Transport Load":
 		return 0
 	return frappe.db.sql(
 		"""
 			select count(distinct parent)
-			from `tabDelivery Load Order`
+			from `tabTransport Load Item`
 			where sales_order in %(sales_orders)s
 		""",
 		{"sales_orders": sales_orders},

@@ -295,7 +295,7 @@ def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
 	load_name = filters.get("delivery_load")
 	if not load_name:
 		return []
-	load = frappe.get_doc("Delivery Load", load_name)
+	load = frappe.get_doc("Transport Load", load_name)
 	require_document_permission(load, "read")
 	if filters.get("company") and filters.get("company") != load.company:
 		return []
@@ -348,7 +348,7 @@ def get_drivers_for_load(doctype, txt, searchfield, start, page_len, filters):
 	load_name = filters.get("delivery_load")
 	if not load_name:
 		return []
-	load = frappe.get_doc("Delivery Load", load_name)
+	load = frappe.get_doc("Transport Load", load_name)
 	require_document_permission(load, "read")
 	from_time, to_time = get_load_resource_window(load)
 	driver_names = frappe.get_list(
@@ -410,7 +410,7 @@ def get_delivery_loads_for_allocation(
 	if vehicle_category:
 		load_filters["required_vehicle_category"] = vehicle_category
 	candidates = frappe.get_all(
-		"Delivery Load",
+		"Transport Load",
 		filters=load_filters,
 		or_filters={"name": ["like", f"%{txt}%"]},
 		fields=[
@@ -493,7 +493,7 @@ def _loads_at_vehicle_allocation_step(candidates):
 	# In the after-notes flow, the allocation step begins only after every
 	# Delivery Order on the load has a submitted Delivery Note and no draft note.
 	load_order_rows = frappe.get_all(
-		"Delivery Load Order",
+		"Transport Load Item",
 		filters={"parent": ["in", [row.name for row in eligible]]},
 		fields=["parent", "delivery_order"],
 	)

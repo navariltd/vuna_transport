@@ -15,7 +15,7 @@
   "name": "Dispatch Readiness",
   "owner": "Administrator",
   "prepared_report": 0,
-  "ref_doctype": "Delivery Load",
+  "ref_doctype": "Transport Load",
   "report_name": "Dispatch Readiness",
   "report_type": "Script Report",
   "roles": [

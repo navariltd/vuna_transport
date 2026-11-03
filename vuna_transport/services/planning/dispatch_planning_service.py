@@ -198,7 +198,7 @@ def get_delivery_order_details(delivery_order_names):
 @frappe.whitelist()
 def evaluate_manual_load_plan(allocations, vehicle_category=None):
 	"""Recalculate a proposed manual load without reserving or saving anything."""
-	require_doctype_permission("Delivery Load", "create")
+	require_doctype_permission("Transport Load", "create")
 	load = build_delivery_load_from_allocations(allocations, vehicle_category)
 	validate_load_allocations(load, lock=False)
 	calculate_load_totals(load)
@@ -289,7 +289,7 @@ def get_vehicle_availability_details(company, vehicle_category, from_time, to_ti
 @frappe.whitelist()
 def get_costed_vehicle_candidates(allocations, vehicle_category=None):
 	"""Return eligible physical vehicles ranked by estimated marginal cost."""
-	require_doctype_permission("Delivery Load", "read")
+	require_doctype_permission("Transport Load", "read")
 	require_doctype_permission("Vehicle", "read")
 	load = build_delivery_load_from_allocations(allocations, vehicle_category)
 	validate_load_allocations(load, lock=False)
@@ -347,7 +347,7 @@ def get_costed_vehicle_candidates(allocations, vehicle_category=None):
 @frappe.whitelist()
 def get_cost_structure_estimates(allocations, vehicle_category=None):
 	"""Compare applicable Cost Structures before a physical Vehicle is selected."""
-	require_doctype_permission("Delivery Load", "read")
+	require_doctype_permission("Transport Load", "read")
 	require_doctype_permission("Transport Cost Structure", "read")
 	load = build_delivery_load_from_allocations(allocations, vehicle_category)
 	validate_load_allocations(load, lock=False)
@@ -589,8 +589,8 @@ def _get_order_metrics(order_names, include_items=False):
 				dlo.delivery_order_item,
 				coalesce(sum(case when dl.docstatus = 0 then dlo.allocated_quantity else 0 end), 0) as reserved_quantity,
 				coalesce(sum(case when dl.docstatus = 1 then dlo.allocated_quantity else 0 end), 0) as allocated_quantity
-			from `tabDelivery Load Order` dlo
-			join `tabDelivery Load` dl on dl.name = dlo.parent
+			from `tabTransport Load Item` dlo
+			join `tabTransport Load` dl on dl.name = dlo.parent
 			where dlo.delivery_order in %(order_names)s
 			and dl.docstatus in (0, 1)
 			group by dlo.delivery_order_item

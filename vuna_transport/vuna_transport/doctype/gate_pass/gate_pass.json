@@ -82,8 +82,8 @@
   {
    "fieldname": "delivery_load",
    "fieldtype": "Link",
-   "label": "Delivery Load",
-   "options": "Delivery Load"
+   "label": "Transport Load",
+   "options": "Transport Load"
   },
   {
    "fieldname": "vehicle_allocation",
