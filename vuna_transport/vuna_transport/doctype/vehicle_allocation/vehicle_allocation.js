@@ -40,6 +40,7 @@ frappe.ui.form.on("Vehicle Allocation", {
 	},
 
 	refresh(frm) {
+		refresh_allocation_items(frm);
 		// Transport Loads are retained as the demand record. The server-side
 		// cancellation flow detaches this allocation before Frappe checks links.
 		frm.ignore_doctypes_on_cancel_all = ["Transport Load"];
@@ -258,6 +259,7 @@ function update_load_selection_button(frm) {
 }
 
 function refresh_load_context(frm) {
+	refresh_allocation_items(frm);
 	const loads = (frm.doc.delivery_loads || []).map((row) => row.delivery_load).filter(Boolean);
 	if (!loads.length) return;
 	frappe
@@ -282,6 +284,7 @@ function refresh_load_context(frm) {
 
 frappe.ui.form.on("Vehicle Allocation Load", {
 	delivery_load(frm, cdt, cdn) {
+		refresh_allocation_items(frm);
 		if (!frm.doc.required_vehicle_category) {
 			frm.fields_dict.delivery_loads.grid.grid_rows_by_docname[cdn]?.remove();
 			frappe.msgprint(
@@ -314,6 +317,7 @@ frappe.ui.form.on("Vehicle Allocation Load", {
 	},
 
 	delivery_loads_remove(frm) {
+		refresh_allocation_items(frm);
 		frappe
 			.call({
 				method: "vuna_transport.services.fleet.vehicle_allocation_service.get_allocation_load_context",
@@ -333,6 +337,56 @@ frappe.ui.form.on("Vehicle Allocation Load", {
 			});
 	},
 });
+
+async function refresh_allocation_items(frm) {
+	// Never add unsaved child rows to a submitted document merely by opening it.
+	if (frm.doc.docstatus !== 0) return;
+	const request = (frm._allocation_items_request = (frm._allocation_items_request || 0) + 1);
+	const names = () =>
+		(frm.doc.delivery_loads || []).map((row) => row.delivery_load).filter(Boolean);
+	const loads = names();
+	const fields = [
+		"item_code",
+		"item_name",
+		"qty",
+		"uom",
+		"weight",
+		"weight_uom",
+		"transport_load",
+	];
+	try {
+		const rows = loads.length
+			? (
+					await frappe.call({
+						method: "vuna_transport.services.fleet.allocation_cargo_service.get_allocation_items",
+						args: { load_names: loads },
+					})
+			  ).message || []
+			: [];
+		if (
+			frm.doc.docstatus !== 0 ||
+			request !== frm._allocation_items_request ||
+			JSON.stringify(loads) !== JSON.stringify(names())
+		)
+			return;
+		const values = (row) => fields.map((field) => row[field] ?? null);
+		if (
+			JSON.stringify((frm.doc.loaded_items || []).map(values)) ===
+			JSON.stringify(rows.map(values))
+		)
+			return;
+		frm.clear_table("loaded_items");
+		rows.forEach((row) => frm.add_child("loaded_items", row));
+		frm.refresh_field("loaded_items");
+		if (frm.doc.docstatus === 0) frm.dirty();
+	} catch (error) {
+		if (request !== frm._allocation_items_request) return;
+		frappe.show_alert({
+			message: __("Unable to load allocation items. Reload the form to retry."),
+			indicator: "orange",
+		});
+	}
+}
 
 function render_capacity_summary(frm, context) {
 	const $wrapper = frm.get_field("allocation_capacity_summary")?.$wrapper;
