@@ -4,6 +4,8 @@
 
 **Status:** Proposed for implementation
 
+**Implementation update:** Phase 5 uses pre-trip allocation-bound stock, destination-only transfer tasks and the existing Proof of Delivery model. Depot POD submission automatically posts End Transit for physically received accepted/quarantined quantities; rejected goods retained on the vehicle remain in transit. See `transport_orchestration_phase_5_progress.md` for implemented scope, configuration and verification. Broader workflows below remain design proposals; offline transfer POD and Phase 6 pickup execution are not yet complete.
+
 **Business reference:** `vuna_transport_operational_scenarios_for_codex.md`
 
 **Initial implementation scope:** Main Warehouse to Depot and Depot to Main Warehouse
@@ -32,7 +34,7 @@ Ordered Delivery Stops
         ↓
 Transport Trip Tasks
         ↓
-Proof of Delivery / Transport Execution Proof
+Proof of Delivery
         ↓
 Draft ERPNext Completion Document
         ↓
@@ -464,7 +466,6 @@ exception_reason
 
 ```text
 Customer Delivery
-Transfer Dispatch
 Transfer Receipt
 Return Pickup
 Supplier Pickup
@@ -510,11 +511,11 @@ Customer delivery fields and Delivery Note remain populated for standard custome
 
 Stops are merged only when tasks resolve to the same physical Address. Matching merely by customer, supplier, warehouse name, or text label is insufficient.
 
-### 4.9 New: Transport Execution Proof
+### 4.9 Extended: Proof of Delivery
 
 This is the generic proof for pickup, transfer receipt, warehouse drop-off, and other non-customer-delivery tasks.
 
-Existing Proof of Delivery remains authoritative for customer Delivery Notes in the first implementation.
+Use the existing POD and POD Item DocTypes for both customer deliveries and warehouse-transfer handovers. Direction and the authoritative document/task link distinguish the operation. Do not introduce a second persisted proof model.
 
 #### Core fields
 
@@ -562,7 +563,7 @@ Rejected
 Failed
 ```
 
-### 4.10 New: Transport Execution Proof Item
+### 4.10 Extended: Proof of Delivery Item
 
 ```text
 transport_demand_item
@@ -1064,13 +1065,12 @@ These may be derived task milestones rather than a single freely editable status
 ```text
 Approved Material Request
 → Transport Demand
-→ Transport Load / Vehicle Allocation / Trip
+→ Transport Load / Vehicle Allocation
 → Warehouse creates and submits Add-to-Transit Stock Entry
-→ Transfer Dispatch task confirms loading
+→ Delivery Trip with receiving-destination stops only (no loading POD)
 → Driver transports goods
 → Depot Transfer Receipt task records actual receipt
-→ Server prepares End Transit Stock Entry draft
-→ Authorized depot user reviews and submits
+→ Server creates and submits End Transit for confirmed receipt quantities
 → Demand completes
 ```
 
@@ -1408,12 +1408,12 @@ Deliverables:
 
 Deliverables:
 
-- Transfer Dispatch and Transfer Receipt tasks.
-- Transport Execution Proof and item DocTypes.
+- Pre-trip allocation stock preparation and destination Transfer Receipt tasks.
+- Proof of Delivery and item DocTypes.
 - mobile transfer-task UI and offline support;
 - Material Request to Add-to-Transit Stock Entry linking;
-- draft End Transit Stock Entry generation;
-- receiving-user review flow;
+- automatic End Transit posting on depot POD submission;
+- normal receiving versus quarantine stock routing, preserving vehicle-held rejection;
 - demand/task/manifest reconciliation.
 
 Acceptance scenarios:

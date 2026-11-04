@@ -8,7 +8,7 @@
 - Use TL naming by default, retaining historical DL identifiers.
 - Add demand/item references, destination warehouse, and Stock UOM to load items.
 - Allocate warehouse-transfer and customer demand in the requested transaction UOM; reserve and reconcile quantities internally in Stock UOM.
-- Allow Material Requests without a source warehouse to generate draft demands. The planner must resolve the source warehouse before submitting the demand and creating a load; automatic policies leave unresolved demands in draft.
+- Allow Material Requests, submitted Transport Demands and draft Transport Loads without a source warehouse. Source selection is mandatory on load submission, not draft creation; any source selected must still be valid and compatible with known demand origins. Source-free draft rows still reserve demand quantities.
 - Lock demand parents during allocation and check existing draft/submitted commitments.
 - Recheck source eligibility and outstanding quantities on load save/submission.
 - Reject duplicate rows, over-allocation, non-finite quantities, company/origin mismatches, and fractional whole-number UOMs.

@@ -1,5 +1,7 @@
 # Phase 4: task-based Delivery Trip planning
 
+Planning revision (2026-11-04): outbound depot loads are loaded and posted through Vehicle Allocation before trip creation. New trips generate Transfer Receipt tasks only, with no loading stop/POD. The original dispatch-task design below is historical; legacy submitted manifests remain intact and their loading-only stops are omitted from mobile responses. See Phase 5 progress for the current flow.
+
 ## Implemented backend planning
 
 - Warehouse-transfer allocations can generate Delivery Trips without customer Delivery Notes.
