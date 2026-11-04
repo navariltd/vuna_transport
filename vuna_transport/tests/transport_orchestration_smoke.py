@@ -79,7 +79,7 @@ def run():
 					{
 						"transport_demand": demand.name,
 						"transport_demand_item": item.name,
-						"allocated_quantity": item.stock_qty,
+						"allocated_quantity": item.transaction_qty,
 					}
 				]
 			)
@@ -118,7 +118,7 @@ def run():
 					{
 						"transport_demand": demand.name,
 						"transport_demand_item": item.name,
-						"allocated_quantity": item.stock_qty,
+						"allocated_quantity": item.transaction_qty,
 					}
 				]
 			)

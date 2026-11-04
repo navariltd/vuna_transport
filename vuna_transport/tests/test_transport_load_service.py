@@ -51,6 +51,8 @@ class TestTransportLoadAllocations(unittest.TestCase):
 			item_code="MILK",
 			stock_qty=100,
 			stock_uom="Pcs",
+			transaction_uom="Pcs",
+			conversion_factor=1,
 			weight=50,
 			weight_uom="Kg",
 		)
@@ -83,6 +85,16 @@ class TestTransportLoadAllocations(unittest.TestCase):
 		self.assertEqual(self.load.total_weight, 20)
 		self.assertEqual(self.row.stock_uom, "Pcs")
 		self.assertIn("for update", self.framework.db.sql.call_args.args[0])
+
+	def test_cartons_remain_cartons_while_stock_balance_uses_pieces(self):
+		self.item.transaction_uom = "Carton"
+		self.item.conversion_factor = 10
+		self.row.allocated_quantity = 4
+		validate_demand_allocations(self.load)
+		self.assertEqual(self.row.allocated_quantity, 4)
+		self.assertEqual(self.row.uom, "Carton")
+		self.assertEqual(self.row.allocated_stock_qty, 40)
+		self.assertEqual(self.row.weight, 20)
 
 	def test_reservations_prevent_over_allocation(self):
 		self.commitments.return_value = {"TDI-1": 70}

@@ -32,7 +32,7 @@ def collect_load_items(loads):
 			item = next((item for item in sources[key].items if item.name == item_name), None)
 			if not item or item.item_code != row.item_code:
 				frappe.throw(_("Item lineage is invalid in Transport Load {0}.").format(load.name))
-			uom = item.stock_uom if transfer else item.uom
+			uom = item.transaction_uom if transfer else item.uom
 			key = (load.name, row.item_code, uom, row.weight_uom)
 			if key not in groups:
 				groups[key] = {

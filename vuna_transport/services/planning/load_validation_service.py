@@ -238,6 +238,8 @@ def _populate_load_row(row, delivery_order, delivery_order_item, available_quant
 	row.item_name = delivery_order_item.item_name
 	row.uom = delivery_order_item.uom
 	row.stock_uom = delivery_order_item.stock_uom
+	row.conversion_factor = flt(delivery_order_item.conversion_factor)
+	row.allocated_stock_qty = flt(row.allocated_quantity) * row.conversion_factor
 	row.sales_order = delivery_order.sales_order
 	row.customer = delivery_order.customer
 	row.delivery_address = delivery_order.delivery_address

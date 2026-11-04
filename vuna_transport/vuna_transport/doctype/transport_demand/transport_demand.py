@@ -19,7 +19,8 @@ class TransportDemand(Document):
 				{
 					"transport_demand": self.name,
 					"transport_demand_item": row.name,
-					"allocated_quantity": row.stock_qty - committed.get(row.name, 0),
+					"allocated_quantity": (row.stock_qty - committed.get(row.name, 0))
+					/ row.conversion_factor,
 				}
 				for row in self.items
 				if row.stock_qty > committed.get(row.name, 0)

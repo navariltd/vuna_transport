@@ -53,6 +53,15 @@ class TestTransportDemandService(unittest.TestCase):
 		self.assertEqual(leg["destination_warehouse"], "Depot A")
 		self.assertIsNone(leg["customer"])
 
+	def test_request_can_defer_source_selection_to_transport(self):
+		source = transfer_source()
+		source["items"][0].from_warehouse = None
+		leg = build_source_legs(source)[0]
+		self.assertIsNone(leg["source_warehouse"])
+		self.assertEqual(leg["destination_warehouse"], "Depot A")
+		self.assertEqual(leg["items"][0]["transaction_qty"], 8)
+		self.assertEqual(leg["items"][0]["transaction_uom"], "Carton")
+
 	def test_different_warehouse_pairs_produce_separate_legs(self):
 		source = transfer_source()
 		row = frappe._dict(source["items"][0])
