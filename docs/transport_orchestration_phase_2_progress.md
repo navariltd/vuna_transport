@@ -7,7 +7,8 @@
 - Pre-model-sync rename patch preserves existing records instead of deleting/recreating them.
 - Use TL naming by default, retaining historical DL identifiers.
 - Add demand/item references, destination warehouse, and Stock UOM to load items.
-- Allocate warehouse-transfer demand in Stock UOM; retain transaction-UOM allocation for legacy customer delivery rows.
+- Allocate warehouse-transfer and customer demand in the requested transaction UOM; reserve and reconcile quantities internally in Stock UOM.
+- Allow Material Requests without a source warehouse to generate draft demands. The planner must resolve the source warehouse before submitting the demand and creating a load; automatic policies leave unresolved demands in draft.
 - Lock demand parents during allocation and check existing draft/submitted commitments.
 - Recheck source eligibility and outstanding quantities on load save/submission.
 - Reject duplicate rows, over-allocation, non-finite quantities, company/origin mismatches, and fractional whole-number UOMs.
@@ -15,7 +16,7 @@
 - Provide multi-demand bundling through the Transport Demand list action.
 - Block transfer loads from delivery-only stock and trip-generation helpers.
 - Block cancellation of demand with active load allocations.
-- Add a depot-transfer planning panel with source/date filters, editable Stock UOM quantities and load creation.
+- Add a depot-transfer planning panel with source/date filters, editable requested-UOM quantities and load creation.
 - Derive demand allocation status and per-item reserved, allocated and remaining balances on load save, submit, removal, cancellation and deletion.
 - Guard source cancellation for Material Request, Delivery Order and the originating Sales Order.
 - Backfill demand links for eligible unexecuted legacy customer loads; retain their existing execution path.
