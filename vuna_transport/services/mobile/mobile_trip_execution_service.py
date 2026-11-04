@@ -79,6 +79,9 @@ def complete_mobile_delivery_trip(installation_id, trip_name, device_identifier=
 	if trip.vuna_actual_completion:
 		return _execution_response(trip)
 	_require_started_trip(trip)
+	from vuna_transport.services.execution.trip_task_service import require_tasks_complete
+
+	require_tasks_complete(trip)
 	stops = _trip_stop_rows(trip.name)
 	incomplete = [stop.name for stop in stops if not cint(stop.visited)]
 	if incomplete:

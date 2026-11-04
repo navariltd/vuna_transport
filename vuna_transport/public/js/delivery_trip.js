@@ -15,11 +15,12 @@ frappe.ui.form.on("Delivery Trip", {
 	},
 
 	refresh(frm) {
+		frm.toggle_display("optimize_route", !frm.doc.vuna_task_based);
 		const loads = (frm.doc.delivery_stops || [])
 			.map((row) => row.vuna_delivery_load)
 			.filter(Boolean);
 
-		if (frm.doc.docstatus === 0) {
+		if (frm.doc.docstatus === 0 && !frm.doc.vuna_task_based) {
 			frm.remove_custom_button(__("Delivery Note"), __("Get stops from"));
 			frm.add_custom_button(
 				__("Delivery Note"),
@@ -46,6 +47,8 @@ frappe.ui.form.on("Delivery Trip", {
 				__("Get stops from")
 			);
 		}
+		if (frm.doc.vuna_task_based)
+			frm.remove_custom_button(__("Delivery Note"), __("Get stops from"));
 		if (
 			loads.length &&
 			frm.doc.docstatus < 2 &&

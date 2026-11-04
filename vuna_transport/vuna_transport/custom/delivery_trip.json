@@ -1,5 +1,6 @@
 {
  "custom_fields": [
+  {"dt":"Delivery Trip","fieldname":"vuna_task_based","fieldtype":"Check","label":"Task-based Transport Trip","read_only":1,"insert_after":"company","module":"Vuna Transport","name":"Delivery Trip-vuna_task_based"},
   {
    "_assign": null,
    "_comments": null,
