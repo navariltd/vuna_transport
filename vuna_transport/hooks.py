@@ -221,14 +221,36 @@ doc_events = {
 		"on_cancel": "vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
 	},
 	"Stock Entry": {
+		"validate": [
+			"vuna_transport.services.execution.allocation_transfer_service.validate_allocation_stock_entry",
+			"vuna_transport.services.execution.transfer_execution_service.validate_dispatch_stock_entry",
+			"vuna_transport.services.execution.transfer_proof_service.validate_receipt_stock_entry",
+		],
 		"before_submit": "vuna_transport.services.execution.return_v2_service.validate_return_stock_entry",
-		"before_cancel": "vuna_transport.services.execution.return_v2_service.prepare_return_stock_entry_removal",
-		"on_submit": "vuna_transport.services.execution.return_v2_service.sync_return_inspection_from_stock_entry",
-		"on_cancel": "vuna_transport.services.execution.return_v2_service.sync_return_inspection_from_stock_entry",
+		"before_cancel": [
+			"vuna_transport.services.execution.allocation_transfer_service.guard_allocation_stock_cancellation",
+			"vuna_transport.services.execution.transfer_execution_service.guard_dispatch_cancellation",
+			"vuna_transport.services.execution.return_v2_service.prepare_return_stock_entry_removal",
+		],
+		"on_submit": [
+			"vuna_transport.services.execution.return_v2_service.sync_return_inspection_from_stock_entry",
+			"vuna_transport.services.execution.allocation_transfer_service.sync_allocation_stock",
+			"vuna_transport.services.execution.transfer_execution_service.sync_dispatch_load_status",
+			"vuna_transport.services.execution.transfer_proof_service.sync_receipt_stock",
+		],
+		"on_cancel": [
+			"vuna_transport.services.execution.return_v2_service.sync_return_inspection_from_stock_entry",
+			"vuna_transport.services.execution.allocation_transfer_service.sync_allocation_stock",
+			"vuna_transport.services.execution.transfer_execution_service.sync_dispatch_load_status",
+			"vuna_transport.services.execution.transfer_proof_service.sync_receipt_stock",
+		],
 		"on_trash": "vuna_transport.services.execution.return_v2_service.prepare_return_stock_entry_removal",
 	},
 	"Delivery Trip": {
-		"before_cancel": "vuna_transport.services.execution.lineage_service.prepare_delivery_trip_cancellation",
+		"before_cancel": [
+			"vuna_transport.services.execution.transfer_execution_service.guard_trip_stock_cancellation",
+			"vuna_transport.services.execution.lineage_service.prepare_delivery_trip_cancellation",
+		],
 		"validate": "vuna_transport.services.execution.lineage_service.validate_delivery_trip",
 		"on_update": [
 			"vuna_transport.services.execution.trip_task_service.sync_task_plan",

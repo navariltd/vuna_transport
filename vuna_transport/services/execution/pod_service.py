@@ -38,7 +38,13 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 
 	existing = stop.vuna_proof_of_delivery or frappe.db.get_value(
 		"Proof of Delivery",
-		{"delivery_trip": trip.name, "delivery_stop": stop.name, "docstatus": ["!=", 2]},
+		{
+			"delivery_trip": trip.name,
+			"delivery_stop": stop.name,
+			"delivery_note": delivery_note.name,
+			"transport_trip_task": ["is", "not set"],
+			"docstatus": ["!=", 2],
+		},
 	)
 	pod = frappe.get_doc("Proof of Delivery", existing) if existing else frappe.new_doc("Proof of Delivery")
 	pod.company = trip.company

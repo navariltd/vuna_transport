@@ -1,0 +1,177 @@
+"""Depot rejection cases: operational returns, never customer credit documents."""
+
+import math
+
+import frappe
+from frappe import _
+from frappe.utils import flt, nowdate
+
+from vuna_transport.services.execution.depot_custody_service import rejection_custody_groups
+
+
+def create_depot_return_from_pod(pod):
+	if pod.docstatus != 1 or pod.proof_type != "Transfer Receipt":
+		return None
+	rejected = [row for row in pod.items if flt(row.rejected_qty) > 0]
+	if not rejected:
+		return None
+	frappe.db.get_value("Proof of Delivery", pod.name, "name", for_update=True)
+	if existing := frappe.db.get_value(
+		"Return Request", {"proof_of_delivery": pod.name, "docstatus": ["!=", 2]}, "name"
+	):
+		return existing
+	stock = frappe.get_doc("Stock Entry", pod.dispatch_stock_entry)
+	task = frappe.get_doc("Transport Trip Task", pod.transport_trip_task)
+	demand = frappe.get_doc("Transport Demand", task.transport_demand)
+	groups = rejection_custody_groups(pod, stock.to_warehouse)
+	warehouses = {group.warehouse for group in groups.values()}
+	request = frappe.new_doc("Return Request")
+	request.update(
+		{
+			"return_context": "Depot",
+			"company": pod.company,
+			"proof_of_delivery": pod.name,
+			"source_stock_entry": stock.name,
+			"source_warehouse": next(iter(warehouses)) if len(warehouses) == 1 else None,
+			"rejecting_warehouse": demand.destination_warehouse,
+			"return_warehouse": stock.from_warehouse,
+			"delivery_trip": pod.delivery_trip,
+			"return_source": "Depot Rejection",
+			"initiated_by": "Driver",
+			"return_method": "Driver Return" if warehouses == {stock.to_warehouse} else "Company Pickup",
+			"custody": "Still With Vehicle"
+			if warehouses == {stock.to_warehouse}
+			else "Returned To Depot"
+			if len(warehouses) == 1
+			else "Split Custody",
+			"status": "Draft",
+			"return_remarks": pod.remarks,
+		}
+	)
+	for group in groups.values():
+		row = group.result
+		request.append(
+			"items",
+			{
+				"source_pod_item": row.name,
+				"stock_entry_detail": row.source_row,
+				"item_code": row.item_code,
+				"item_name": row.item_name,
+				"requested_return_qty": group.qty,
+				"custody_warehouse": group.warehouse,
+				"delivered_qty": row.delivered_qty,
+				"uom": row.uom,
+				"stock_uom": row.stock_uom,
+				"conversion_factor": row.conversion_factor,
+				"batch_no": row.batch_no,
+				"serial_no": group.serial_no,
+				"source_bundle": row.source_bundle,
+				"return_reason": row.rejection_reason_remarks or row.rejection_reason or pod.remarks,
+			},
+		)
+	# The submitted, permission-checked POD is the sole authority for this exact
+	# draft. Drivers do not gain arbitrary Return Request or stock permissions.
+	request.flags.ignore_permissions = True
+	request.insert(ignore_permissions=True)
+	pod.db_set("return_request", request.name, update_modified=False)
+	return request.name
+
+
+def validate_depot_return(request):
+	if not request.proof_of_delivery:
+		frappe.throw(_("Depot rejection returns require a submitted POD."))
+	frappe.db.get_value("Proof of Delivery", request.proof_of_delivery, "name", for_update=True)
+	pod = frappe.get_doc("Proof of Delivery", request.proof_of_delivery)
+	if (
+		pod.docstatus != 1
+		or pod.proof_type != "Transfer Receipt"
+		or request.source_stock_entry != pod.dispatch_stock_entry
+	):
+		frappe.throw(_("Depot return must reference its submitted transfer POD and original dispatch."))
+	if (
+		request.customer
+		or request.delivery_note
+		or request.sales_invoice
+		or request.credit_note
+		or request.return_stock_document
+	):
+		frappe.throw(_("Depot returns use Stock Entries, not customer Sales Returns or credit documents."))
+	if frappe.db.exists(
+		"Return Request",
+		{"proof_of_delivery": pod.name, "docstatus": ["!=", 2], "name": ["!=", request.name or ""]},
+	):
+		frappe.throw(_("This POD already has an active Return Request."))
+	stock = frappe.get_doc("Stock Entry", pod.dispatch_stock_entry)
+	task = frappe.get_doc("Transport Trip Task", pod.transport_trip_task)
+	demand = frappe.get_doc("Transport Demand", task.transport_demand)
+	if request.company != pod.company or stock.docstatus != 1:
+		frappe.throw(_("Depot return company and posted dispatch must match its POD."))
+	expected = rejection_custody_groups(pod, stock.to_warehouse)
+	warehouses = {group.warehouse for group in expected.values()}
+	request.source_warehouse = next(iter(warehouses)) if len(warehouses) == 1 else None
+	request.rejecting_warehouse = demand.destination_warehouse
+	request.return_context, request.return_source = "Depot", "Depot Rejection"
+	request.initiation_date = request.initiation_date or nowdate()
+	if not request.return_warehouse:
+		request.return_warehouse = stock.from_warehouse
+	warehouse = frappe.get_doc("Warehouse", request.return_warehouse)
+	if (
+		warehouse.company != pod.company
+		or warehouse.disabled
+		or warehouse.is_group
+		or warehouse.name in warehouses
+	):
+		frappe.throw(
+			_("Select an active same-company return warehouse different from current transit custody.")
+		)
+	seen = set()
+	precision = frappe.get_precision("Return Request Item", "requested_return_qty")
+	for row in request.items:
+		# Old driver-only requests did not snapshot a per-row custody warehouse.
+		key = (row.source_pod_item, row.get("custody_warehouse") or stock.to_warehouse)
+		group = expected.get(key)
+		source = group.result if group else None
+		quantity = flt(row.requested_return_qty)
+		if (
+			not source
+			or key in seen
+			or not math.isfinite(quantity)
+			or quantity <= 0
+			or flt(quantity - group.qty, precision)
+		):
+			frappe.throw(_("Return expectations must preserve each POD rejection group and its quantity."))
+		for field in (
+			"item_code",
+			"item_name",
+			"uom",
+			"stock_uom",
+			"conversion_factor",
+			"batch_no",
+			"source_bundle",
+		):
+			row.set(field, source.get(field))
+		row.stock_entry_detail, row.serial_no = source.source_row, group.serial_no
+		row.custody_warehouse = group.warehouse
+		row.return_reason = row.return_reason or source.rejection_reason_remarks or source.rejection_reason
+		row.received_qty, row.remaining_qty = 0, quantity
+		seen.add(key)
+	if seen != set(expected):
+		frappe.throw(_("Keep all rejected POD item groups in the Return Request."))
+	state = depot_return_state(request)
+	for field in ("status", "expected_return_qty", "returned_qty", "return_difference_qty"):
+		request.set(field, state[field])
+
+
+def depot_return_state(request):
+	expected = sum(flt(row.requested_return_qty) for row in request.items)
+	return {
+		"status": "Cancelled"
+		if request.docstatus == 2
+		else "Draft"
+		if request.docstatus == 0
+		else "Awaiting Receipt",
+		"expected_return_qty": expected,
+		"returned_qty": 0,
+		"return_difference_qty": expected,
+		"returned_by_item": {row.source_pod_item: 0 for row in request.items},
+	}

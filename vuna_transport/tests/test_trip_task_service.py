@@ -7,6 +7,7 @@ from vuna_transport.services.execution.trip_task_service import (
 	group_stops,
 	guard_task_source_cancellation,
 	map_tasks_to_stops,
+	plan_tasks,
 	require_tasks_complete,
 )
 
@@ -21,7 +22,7 @@ def transfer_specs(origin="Main", destination="Depot", load="TL-1", demand="TD-1
 			"address": address,
 			"delivery_note": None,
 		}
-		for kind, address in (("Transfer Dispatch", origin), ("Transfer Receipt", destination))
+		for kind, address in (("Transfer Receipt", destination),)
 	]
 
 
@@ -50,8 +51,67 @@ class TestTripTaskPlanning(unittest.TestCase):
 	def test_transfer_needs_no_delivery_note(self):
 		specs = transfer_specs()
 		stops = self.stops(specs)
+		self.assertEqual(len(stops), 1)
+		self.assertEqual(stops[0].address, "Depot")
+		self.assertEqual(len(map_tasks_to_stops(specs, stops)), 1)
+
+	def test_planner_requests_only_destination_address_not_loading_address(self):
+		item = frappe._dict(
+			name="ITEM-1", item_code="MILK", transaction_uom="Carton", conversion_factor=10, stock_uom="Pcs"
+		)
+		demand = unittest.mock.MagicMock(
+			docstatus=1,
+			movement_type="Warehouse Transfer",
+			company="Company",
+			source_warehouse="Main",
+			destination_warehouse="Depot",
+			items=[item],
+		)
+		load = unittest.mock.MagicMock(
+			company="Company",
+			source_warehouse="Main",
+			delivery_orders=[
+				frappe._dict(
+					transport_demand="TD-1",
+					transport_demand_item="ITEM-1",
+					item_code="MILK",
+					allocated_quantity=2,
+					allocated_stock_qty=20,
+				)
+			],
+		)
+		load.name = "TL-1"
+		self.framework.get_doc.return_value = demand
+		with (
+			patch("vuna_transport.services.execution.trip_task_service.require_document_permission"),
+			patch(
+				"vuna_transport.services.execution.trip_task_service.get_warehouse_planning_data",
+				return_value={"address": "Depot Address"},
+			) as location,
+		):
+			specs = plan_tasks([load])
+		location.assert_called_once_with("Depot")
+		self.assertEqual([spec["task_type"] for spec in specs], ["Transfer Receipt"])
+		self.assertEqual(specs[0]["items"][0]["qty"], 2)
+
+	def test_mixed_trip_has_customer_and_depot_stops_but_no_loading_stop(self):
+		specs = [
+			*transfer_specs(),
+			{
+				"task_key": "DN-1",
+				"task_type": "Customer Delivery",
+				"delivery_note": "DN-1",
+				"transport_load": "TL-2",
+				"address": "Customer",
+				"customer": "Customer",
+			},
+		]
+		stops = self.stops(specs)
+		self.assertEqual({stop.address for stop in stops}, {"Customer", "Depot"})
 		self.assertEqual(len(stops), 2)
-		self.assertEqual(len(map_tasks_to_stops(specs, stops)), 2)
+
+	def test_multiple_transfer_loads_to_one_location_have_one_stop(self):
+		self.assertEqual(len(self.stops(transfer_specs() + transfer_specs(load="TL-2", demand="TD-2"))), 1)
 
 	def test_customer_and_transfer_share_stop_without_sharing_pod(self):
 		specs = [
@@ -66,22 +126,21 @@ class TestTripTaskPlanning(unittest.TestCase):
 			},
 		]
 		stops = self.stops(specs)
-		self.assertEqual(len(stops), 2)
-		self.assertEqual(len(frappe.parse_json(stops[1].vuna_task_keys)), 2)
-		self.assertEqual(len(map_tasks_to_stops(specs, stops)), 3)
+		self.assertEqual(len(stops), 1)
+		self.assertEqual(len(frappe.parse_json(stops[0].vuna_task_keys)), 2)
+		self.assertEqual(len(map_tasks_to_stops(specs, stops)), 2)
 
-	def test_round_trip_keeps_repeat_visit_to_origin(self):
+	def test_preloaded_transfers_generate_only_their_receiving_destinations(self):
 		specs = transfer_specs() + transfer_specs("Depot", "Main", "TL-2", "TD-2")
 		stops = self.stops(specs)
-		self.assertEqual([stop.address for stop in stops], ["Main", "Depot", "Main"])
-		self.assertEqual(len(map_tasks_to_stops(specs, stops)), 4)
+		self.assertEqual([stop.address for stop in stops], ["Depot", "Main"])
+		self.assertEqual(len(map_tasks_to_stops(specs, stops)), 2)
 
-	def test_receipt_before_dispatch_is_rejected(self):
-		specs = transfer_specs()
+	def test_receiving_destinations_can_be_reordered(self):
+		specs = transfer_specs() + transfer_specs(destination="Other", load="TL-2", demand="TD-2")
 		stops = self.stops(specs)
 		stops[0].idx, stops[1].idx = 2, 1
-		with self.assertRaises(ValueError):
-			map_tasks_to_stops(specs, stops)
+		self.assertEqual(len(map_tasks_to_stops(specs, stops)), 2)
 
 	def test_extra_delivery_note_is_rejected(self):
 		specs = transfer_specs()
@@ -91,7 +150,7 @@ class TestTripTaskPlanning(unittest.TestCase):
 			map_tasks_to_stops(specs, stops)
 
 	def test_missing_or_duplicate_task_assignment_is_rejected(self):
-		specs = transfer_specs()
+		specs = transfer_specs() + transfer_specs(destination="Other", load="TL-2", demand="TD-2")
 		stops = self.stops(specs)
 		stops[1].vuna_task_keys = stops[0].vuna_task_keys
 		with self.assertRaises(ValueError):

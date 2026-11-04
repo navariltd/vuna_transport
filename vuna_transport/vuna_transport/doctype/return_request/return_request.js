@@ -47,6 +47,18 @@ frappe.ui.form.on("Return Request", {
 	},
 
 	refresh(frm) {
+		if (frm.doc.return_context === "Depot") {
+			[
+				"customer",
+				"delivery_note",
+				"sales_invoice",
+				"sales_order",
+				"credit_note",
+				"return_stock_document",
+			].forEach((field) => frm.toggle_display(field, false));
+			frm.ignore_doctypes_on_cancel_all = ["Proof of Delivery"];
+			return;
+		}
 		// The POD is historical delivery evidence, not a dependent transaction
 		// that should be cancelled together with its Return Request.
 		frm.ignore_doctypes_on_cancel_all = [

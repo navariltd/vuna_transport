@@ -47,7 +47,7 @@ def plan_tasks(loads):
 				demand.docstatus != 1
 				or demand.movement_type != "Warehouse Transfer"
 				or demand.company != load.company
-				or demand.source_warehouse != load.source_warehouse
+				or (demand.source_warehouse and demand.source_warehouse != load.source_warehouse)
 			):
 				frappe.throw(_("Transfer demand does not match the selected load."))
 			items = {row.name: row for row in demand.items}
@@ -68,10 +68,9 @@ def plan_tasks(loads):
 						"stock_uom": item.stock_uom,
 					}
 				)
-			for kind, warehouse in (
-				("Transfer Dispatch", demand.source_warehouse),
-				("Transfer Receipt", demand.destination_warehouse),
-			):
+			# Loading is completed on allocation before the trip. Only the actual
+			# receiving destination is a driver stop/POD operation.
+			for kind, warehouse in (("Transfer Receipt", demand.destination_warehouse),):
 				address = get_warehouse_planning_data(warehouse).get("address")
 				if not address:
 					frappe.throw(
@@ -139,7 +138,7 @@ def plan_tasks(loads):
 
 
 def group_stops(specs):
-	"""Group shared locations, keeping dispatch before receipt and repeat visits safe."""
+	"""Group physical delivery destinations; loading is not a driver stop."""
 
 	def single(spec):
 		return {
@@ -161,38 +160,7 @@ def group_stops(specs):
 		else:
 			target["tasks"].append(spec)
 
-	def order(nodes):
-		owners = {task["task_key"]: index for index, node in enumerate(nodes) for task in node["tasks"]}
-		legs = defaultdict(dict)
-		for task in specs:
-			if task["task_type"].startswith("Transfer"):
-				legs[(task["transport_load"], task["transport_demand"])][task["task_type"]] = owners[
-					task["task_key"]
-				]
-		edges = {(leg["Transfer Dispatch"], leg["Transfer Receipt"]) for leg in legs.values()}
-		pending = list(range(len(nodes)))
-		result = []
-		while pending:
-			next_node = next(
-				(
-					index
-					for index in pending
-					if not any(end == index and start in pending for start, end in edges)
-				),
-				None,
-			)
-			if next_node is None:
-				return None
-			pending.remove(next_node)
-			result.append(nodes[next_node])
-		return result
-
-	ordered = order(stops)
-	if ordered is None:
-		# A return to the origin needs another visit, not a merged cyclic stop.
-		ordered = order([single(spec) for spec in specs])
-	if ordered is None:
-		frappe.throw(_("Unable to order transport dispatch and receipt tasks."))
+	ordered = stops
 	merged = []
 	for stop in ordered:
 		can_merge = bool(
@@ -226,6 +194,17 @@ def make_task_trip(allocation, loads):
 	)
 	if existing:
 		return frappe.get_doc("Delivery Trip", existing)
+	from vuna_transport.services.execution.allocation_transfer_service import allocation_stock_entry
+
+	for load in loads:
+		if is_demand_load(load):
+			stock = allocation_stock_entry(allocation.name, load.name)
+			if not stock or frappe.db.get_value("Stock Entry", stock, "docstatus") != 1:
+				frappe.throw(
+					_(
+						"Submit the allocation's Add-to-Transit Stock Entry for {0} before creating the trip."
+					).format(load.name)
+				)
 	trip = frappe.new_doc("Delivery Trip")
 	trip.company = allocation.company
 	trip.vehicle = trip.vuna_current_vehicle = allocation.vehicle
@@ -276,7 +255,13 @@ def map_tasks_to_stops(specs, stops):
 			positions.setdefault((spec["transport_load"], spec["transport_demand"]), {})[
 				spec["task_type"]
 			] = stop.idx
-	if any(value["Transfer Dispatch"] >= value["Transfer Receipt"] for value in positions.values()):
+	# Old submitted manifests may retain historical loading records. Their old
+	# order is checked only when both sides exist; new plans have destinations only.
+	if any(
+		value["Transfer Dispatch"] >= value["Transfer Receipt"]
+		for value in positions.values()
+		if "Transfer Dispatch" in value and "Transfer Receipt" in value
+	):
 		frappe.throw(_("Transfer dispatch stops must precede their receiving stops."))
 	return assignments
 
@@ -368,6 +353,12 @@ def sync_task_plan(doc, method=None):
 		elif doc.docstatus == 1 and task.status == "Planned":
 			task.status = "Ready"
 		task.set("items", spec["items"])
+		if spec["task_type"] in ("Transfer Dispatch", "Transfer Receipt"):
+			from vuna_transport.services.execution.allocation_transfer_service import allocation_stock_entry
+
+			task.dispatch_stock_entry = allocation_stock_entry(
+				doc.vuna_current_vehicle_allocation or doc.vuna_vehicle_allocation, spec["transport_load"]
+			)
 		task.save(ignore_permissions=True)
 		active.add(task.name)
 	for name in frappe.get_all("Transport Trip Task", filters={"delivery_trip": doc.name}, pluck="name"):
@@ -388,6 +379,13 @@ def sync_task_execution(doc, method=None):
 	if not tasks:
 		return
 	for task in tasks:
+		if task.task_type in ("Transfer Dispatch", "Transfer Receipt"):
+			from vuna_transport.services.execution.transfer_proof_service import derive_transfer_status
+
+			task.status = derive_transfer_status(frappe.get_doc("Transport Trip Task", task.name))
+			frappe.db.set_value(
+				"Transport Trip Task", task.name, "status", task.status, update_modified=False
+			)
 		if task.task_type == "Customer Delivery":
 			pod = frappe.db.get_value(
 				"Proof of Delivery",
