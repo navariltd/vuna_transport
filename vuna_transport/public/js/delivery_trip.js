@@ -15,6 +15,19 @@ frappe.ui.form.on("Delivery Trip", {
 	},
 
 	refresh(frm) {
+		// ERPNext resets this list in refresh, so setup is too early.
+		// Stop upstream traversal, but retain POD and its downstream cascade.
+		frm.ignore_doctypes_on_cancel_all = [
+			...new Set([
+				...(frm.ignore_doctypes_on_cancel_all || []),
+				"Vehicle Allocation",
+				"Transport Load",
+				"Transport Trip Task",
+				"Delivery Note",
+				// ERPNext cancels bundles with their stock voucher, not before it.
+				"Serial and Batch Bundle",
+			]),
+		];
 		frm.toggle_display("optimize_route", !frm.doc.vuna_task_based);
 		const loads = (frm.doc.delivery_stops || [])
 			.map((row) => row.vuna_delivery_load)

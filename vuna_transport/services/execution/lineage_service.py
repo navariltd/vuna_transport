@@ -472,12 +472,9 @@ def link_delivery_trip(doc, method=None):
 def submit_delivery_trip(doc, method=None):
 	if get_delivery_trip_load_names(doc):
 		for load_name in get_delivery_trip_load_names(doc):
-			from vuna_transport.services.planning.transport_load_service import is_demand_load
-
-			load = frappe.get_doc("Transport Load", load_name) if getattr(doc, "vuna_task_based", 0) else None
 			set_delivery_load_status(
 				load_name,
-				"Ready for Dispatch" if load and is_demand_load(load) else "Dispatched",
+				"Dispatched",
 				_("Delivery Trip {0} submitted").format(doc.name),
 			)
 			_recompute_delivery_order_statuses(load_name)
@@ -486,8 +483,15 @@ def submit_delivery_trip(doc, method=None):
 def cancel_delivery_trip(doc, method=None):
 	if get_delivery_trip_load_names(doc):
 		for load_name in get_delivery_trip_load_names(doc):
+			# Cancelling a route is not a reversal of pre-trip stock movement.
+			posted_transfer = frappe.db.exists(
+				"Stock Entry", {"vuna_transport_load": load_name, "docstatus": 1, "add_to_transit": 1}
+			)
 			set_delivery_load_status(
-				load_name, "Ready for Dispatch", _("Delivery Trip {0} cancelled").format(doc.name)
+				load_name,
+				"Dispatched" if posted_transfer else "Ready for Dispatch",
+				_("Delivery Trip {0} cancelled").format(doc.name),
+				force=True,
 			)
 			_recompute_delivery_order_statuses(load_name)
 
@@ -509,7 +513,10 @@ def prepare_delivery_trip_cancellation(doc, method=None):
 	# Delivery Trip cancellation unlinks Transport Load in the on_cancel flow.
 	# Vehicle Allocation remains historical and must not make trip cancellation
 	# impossible merely because it references this execution trip.
-	doc.ignore_linked_doctypes = ["Transport Load", "Vehicle Allocation", "Transport Trip Task"]
+	doc.ignore_linked_doctypes = list(
+		set(getattr(doc, "ignore_linked_doctypes", []) or [])
+		| {"Transport Load", "Vehicle Allocation", "Transport Trip Task"}
+	)
 
 
 def unlink_delivery_trip(doc, method=None):
