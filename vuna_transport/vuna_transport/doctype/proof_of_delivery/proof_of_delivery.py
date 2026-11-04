@@ -20,6 +20,14 @@ from vuna_transport.services.execution.stock_identity_service import (
 
 class ProofofDelivery(Document):
 	def validate(self):
+		if self.get("transport_trip_task"):
+			from vuna_transport.services.execution.transfer_proof_service import validate_proof
+
+			validate_proof(self)
+			return
+		if self.get("proof_type") not in (None, "", "Customer Delivery"):
+			frappe.throw(_("Transfer and pickup PODs require an authoritative transport task."))
+		self.proof_type, self.direction = "Customer Delivery", "Delivery"
 		self.populate_stop_details()
 		self.validate_unique_active_pod()
 		self.populate_item_details()
@@ -59,6 +67,7 @@ class ProofofDelivery(Document):
 			{
 				"delivery_trip": self.delivery_trip,
 				"delivery_stop": self.delivery_stop,
+				"transport_trip_task": ["is", "not set"],
 				"docstatus": ["!=", 2],
 				"name": ["!=", self.name or ""],
 			},
@@ -130,6 +139,13 @@ class ProofofDelivery(Document):
 				)
 
 	def on_submit(self):
+		if self.get("transport_trip_task"):
+			from vuna_transport.services.execution.depot_return_service import create_depot_return_from_pod
+			from vuna_transport.services.execution.transfer_proof_service import submit_receipt_stock_from_pod
+
+			submit_receipt_stock_from_pod(self)
+			create_depot_return_from_pod(self)
+			return
 		update_delivery_stop_from_pod(self, self.status)
 		if self.status in ("Partially Delivered", "Rejected", "Failed"):
 			create_return_request_from_pod(self.name)
@@ -139,6 +155,10 @@ class ProofofDelivery(Document):
 		self.check_permission("read")
 		if self.docstatus != 1:
 			frappe.throw(_("Submit the Proof of Delivery before creating a Return Request."))
+		if self.get("transport_trip_task"):
+			from vuna_transport.services.execution.depot_return_service import create_depot_return_from_pod
+
+			return create_depot_return_from_pod(self)
 		if self.status not in ("Partially Delivered", "Rejected", "Failed"):
 			frappe.throw(_("Accepted Proofs of Delivery do not require a Return Request."))
 		return create_return_request_from_pod(self.name)
@@ -147,11 +167,17 @@ class ProofofDelivery(Document):
 		from vuna_transport.services.execution.pod_service import prepare_pod_cancellation
 
 		prepare_pod_cancellation(self)
+		if self.get("transport_trip_task"):
+			from vuna_transport.services.execution.transfer_proof_service import guard_proof_cancellation
+
+			guard_proof_cancellation(self)
 
 	def on_trash(self):
 		from vuna_transport.services.execution.pod_service import clear_pod_stop_reference
 
-		clear_pod_stop_reference(self)
+		if not self.get("transport_trip_task"):
+			clear_pod_stop_reference(self)
 
 	def on_cancel(self):
-		reset_delivery_stop_from_pod(self)
+		if not self.get("transport_trip_task"):
+			reset_delivery_stop_from_pod(self)

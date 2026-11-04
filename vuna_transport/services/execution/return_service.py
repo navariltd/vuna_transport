@@ -64,6 +64,11 @@ RETURN_SALES_ITEM_COMMERCIAL_FIELDS = (
 
 def validate_return_request(request):
 	"""Validate the return against the submitted delivery and live return balance."""
+	if request.get("source_stock_entry") or request.get("return_context") == "Depot":
+		from vuna_transport.services.execution.depot_return_service import validate_depot_return
+
+		validate_depot_return(request)
+		return
 	if not request.initiation_date:
 		request.initiation_date = nowdate()
 	if request.status not in VALID_STATUSES:
@@ -87,6 +92,8 @@ def _set_return_source(request):
 
 def _get_return_source(request):
 	"""Resolve one authoritative return source without guessing across deliveries."""
+	if request.get("source_stock_entry") or request.get("return_context") == "Depot":
+		frappe.throw(_("Depot returns must use warehouse-transfer stock documents, not Sales Returns."))
 	if request.delivery_note:
 		delivery_note = frappe.get_doc("Delivery Note", request.delivery_note)
 		require_document_permission(delivery_note, "read")
@@ -306,6 +313,10 @@ def _get_source_sales_invoices(delivery_note):
 
 def get_return_request_state(request):
 	"""Derive return progress from ERPNext documents instead of browser-maintained status."""
+	if request.get("return_context") == "Depot":
+		from vuna_transport.services.execution.depot_return_service import depot_return_state
+
+		return depot_return_state(request)
 	if request.get("process_version") == "Custody and Inspection":
 		return _get_v2_return_request_state(request)
 	has_delivery_note = bool(request.get("delivery_note"))
@@ -490,7 +501,9 @@ def _apply_return_state(request, state):
 	request.returned_qty = state["returned_qty"]
 	request.return_difference_qty = state["return_difference_qty"]
 	for row in request.items:
-		row.received_qty = state["returned_by_item"].get(row.delivery_note_item or row.sales_invoice_item, 0)
+		row.received_qty = state["returned_by_item"].get(
+			getattr(row, "source_pod_item", None) or row.delivery_note_item or row.sales_invoice_item, 0
+		)
 		row.remaining_qty = max(flt(row.requested_return_qty) - flt(row.received_qty), 0)
 
 

@@ -1,215 +1,248 @@
 {
- "actions": [],
- "creation": "2026-09-07 07:29:34.478202",
- "doctype": "DocType",
- "editable_grid": 1,
- "engine": "InnoDB",
- "field_order": [
-  "item_code",
-  "item_name",
-  "column_break_links",
-  "delivery_note_item",
-  "sales_invoice_item",
-  "delivery_order_item",
-  "quantity_section",
-  "delivered_qty",
-  "requested_return_qty",
-  "remaining_qty",
-  "uom",
-  "column_break_quantities",
-  "received_qty",
-  "accepted_return_qty",
-  "rejected_return_qty",
-  "stock_uom",
-  "conversion_factor",
-  "batch_no",
-  "serial_no",
-  "reason_section",
-  "return_reason",
-  "quality_inspection",
-  "resolution_type",
-  "resolution_qty"
- ],
- "fields": [
-  {
-   "fieldname": "item_code",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Item",
-   "options": "Item",
-   "read_only": 1,
-   "reqd": 1
-  },
-  {
-   "fieldname": "item_name",
-   "fieldtype": "Data",
-   "label": "Item Name",
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_links",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "delivery_note_item",
-   "fieldtype": "Link",
-   "label": "Delivery Note Item",
-   "options": "Delivery Note Item",
-   "read_only": 1
-  },
-  {
-   "fieldname": "sales_invoice_item",
-   "fieldtype": "Link",
-   "label": "Sales Invoice Item",
-   "options": "Sales Invoice Item",
-   "read_only": 1
-  },
-  {
-   "fieldname": "delivery_order_item",
-   "fieldtype": "Link",
-   "label": "Delivery Order Item",
-   "options": "Delivery Order Item",
-   "read_only": 1
-  },
-  {
-   "fieldname": "quantity_section",
-   "fieldtype": "Section Break",
-   "label": "Return Quantities"
-  },
-  {
-   "fieldname": "delivered_qty",
-   "fieldtype": "Float",
-   "in_list_view": 1,
-   "label": "Delivered Quantity",
-   "non_negative": 1,
-   "read_only": 1,
-   "reqd": 1
-  },
-  {
-   "fieldname": "requested_return_qty",
-   "fieldtype": "Float",
-   "in_list_view": 1,
-   "label": "Requested Return Quantity",
-   "non_negative": 1,
-   "reqd": 1
-  },
-  {
-   "fieldname": "remaining_qty",
-   "fieldtype": "Float",
-   "label": "Remaining to Receive",
-   "non_negative": 1,
-   "read_only": 1
-  },
-  {
-   "fieldname": "uom",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "UOM",
-   "options": "UOM",
-   "read_only": 1,
-   "reqd": 1
-  },
-  {
-   "fieldname": "column_break_quantities",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "0",
-   "fieldname": "received_qty",
-   "fieldtype": "Float",
-   "in_list_view": 1,
-   "label": "Returned Quantity",
-   "non_negative": 1,
-   "read_only": 1
-  },
-  {
-   "default": "0",
-   "fieldname": "accepted_return_qty",
-   "fieldtype": "Float",
-   "label": "Inspection Accepted Quantity",
-   "non_negative": 1,
-   "read_only": 1
-  },
-  {
-   "default": "0",
-   "fieldname": "rejected_return_qty",
-   "fieldtype": "Float",
-   "label": "Inspection Rejected Quantity",
-   "non_negative": 1,
-   "read_only": 1
-  },
-  {
-   "fieldname": "stock_uom",
-   "fieldtype": "Link",
-   "label": "Stock UOM",
-   "options": "UOM",
-   "read_only": 1
-  },
-  {
-   "default": "1",
-   "fieldname": "conversion_factor",
-   "fieldtype": "Float",
-   "hidden": 1,
-   "label": "Conversion Factor",
-   "positive": 1,
-   "read_only": 1,
-   "reqd": 1
-  },
-  {
-   "fieldname": "batch_no",
-   "fieldtype": "Link",
-   "label": "Batch No",
-   "options": "Batch"
-  },
-  {
-   "fieldname": "serial_no",
-   "fieldtype": "Long Text",
-   "label": "Serial No(s)"
-  },
-  {
-   "fieldname": "reason_section",
-   "fieldtype": "Section Break",
-   "label": "Inspection & Resolution"
-  },
-  {
-   "fieldname": "return_reason",
-   "fieldtype": "Small Text",
-   "label": "Item Return Reason",
-   "description": "Required before submitting the Return Request."
-  },
-  {
-   "fieldname": "quality_inspection",
-   "fieldtype": "Link",
-   "label": "Quality Inspection",
-   "options": "Quality Inspection"
-  },
-  {
-   "fieldname": "resolution_type",
-   "fieldtype": "Link",
-   "hidden": 1,
-   "label": "Resolution Type",
-   "options": "Return Resolution Type"
-  },
-  {
-   "default": "0",
-   "fieldname": "resolution_qty",
-   "fieldtype": "Float",
-   "hidden": 1,
-   "label": "Resolution Quantity",
-   "non_negative": 1
-  }
- ],
- "grid_page_length": 50,
- "istable": 1,
- "links": [],
- "modified": "2026-10-27 07:26:01.000000",
- "modified_by": "Administrator",
- "module": "Vuna Transport",
- "name": "Return Request Item",
- "owner": "Administrator",
- "permissions": [],
- "row_format": "Dynamic",
- "sort_field": "creation",
- "sort_order": "DESC",
- "states": []
+  "actions": [],
+  "creation": "2026-09-07 07:29:34.478202",
+  "doctype": "DocType",
+  "editable_grid": 1,
+  "engine": "InnoDB",
+  "field_order": [
+    "source_pod_item",
+    "custody_warehouse",
+    "stock_entry_detail",
+    "source_bundle",
+    "item_code",
+    "item_name",
+    "column_break_links",
+    "delivery_note_item",
+    "sales_invoice_item",
+    "delivery_order_item",
+    "quantity_section",
+    "delivered_qty",
+    "requested_return_qty",
+    "remaining_qty",
+    "uom",
+    "column_break_quantities",
+    "received_qty",
+    "accepted_return_qty",
+    "rejected_return_qty",
+    "stock_uom",
+    "conversion_factor",
+    "batch_no",
+    "serial_no",
+    "reason_section",
+    "return_reason",
+    "quality_inspection",
+    "resolution_type",
+    "resolution_qty"
+  ],
+  "fields": [
+    {
+      "fieldname": "custody_warehouse",
+      "fieldtype": "Link",
+      "options": "Warehouse",
+      "label": "Current Custody Warehouse",
+      "read_only": 1,
+      "depends_on": "eval:doc.source_pod_item"
+    },
+    {
+      "fieldname": "source_pod_item",
+      "label": "POD Item",
+      "fieldtype": "Data",
+      "read_only": 1,
+      "hidden": 1
+    },
+    {
+      "fieldname": "stock_entry_detail",
+      "label": "Original Dispatch Row",
+      "fieldtype": "Data",
+      "read_only": 1,
+      "hidden": 1
+    },
+    {
+      "fieldname": "source_bundle",
+      "label": "Dispatch Serial and Batch Bundle",
+      "fieldtype": "Link",
+      "options": "Serial and Batch Bundle",
+      "read_only": 1
+    },
+    {
+      "fieldname": "item_code",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "Item",
+      "options": "Item",
+      "read_only": 1,
+      "reqd": 1
+    },
+    {
+      "fieldname": "item_name",
+      "fieldtype": "Data",
+      "label": "Item Name",
+      "read_only": 1
+    },
+    {
+      "fieldname": "column_break_links",
+      "fieldtype": "Column Break"
+    },
+    {
+      "fieldname": "delivery_note_item",
+      "fieldtype": "Link",
+      "label": "Delivery Note Item",
+      "options": "Delivery Note Item",
+      "read_only": 1
+    },
+    {
+      "fieldname": "sales_invoice_item",
+      "fieldtype": "Link",
+      "label": "Sales Invoice Item",
+      "options": "Sales Invoice Item",
+      "read_only": 1
+    },
+    {
+      "fieldname": "delivery_order_item",
+      "fieldtype": "Link",
+      "label": "Delivery Order Item",
+      "options": "Delivery Order Item",
+      "read_only": 1
+    },
+    {
+      "fieldname": "quantity_section",
+      "fieldtype": "Section Break",
+      "label": "Return Quantities"
+    },
+    {
+      "fieldname": "delivered_qty",
+      "fieldtype": "Float",
+      "in_list_view": 1,
+      "label": "Delivered Quantity",
+      "non_negative": 1,
+      "read_only": 1,
+      "reqd": 1
+    },
+    {
+      "fieldname": "requested_return_qty",
+      "fieldtype": "Float",
+      "in_list_view": 1,
+      "label": "Requested Return Quantity",
+      "non_negative": 1,
+      "reqd": 1
+    },
+    {
+      "fieldname": "remaining_qty",
+      "fieldtype": "Float",
+      "label": "Remaining to Receive",
+      "non_negative": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "uom",
+      "fieldtype": "Link",
+      "in_list_view": 1,
+      "label": "UOM",
+      "options": "UOM",
+      "read_only": 1,
+      "reqd": 1
+    },
+    {
+      "fieldname": "column_break_quantities",
+      "fieldtype": "Column Break"
+    },
+    {
+      "default": "0",
+      "fieldname": "received_qty",
+      "fieldtype": "Float",
+      "in_list_view": 1,
+      "label": "Returned Quantity",
+      "non_negative": 1,
+      "read_only": 1
+    },
+    {
+      "default": "0",
+      "fieldname": "accepted_return_qty",
+      "fieldtype": "Float",
+      "label": "Inspection Accepted Quantity",
+      "non_negative": 1,
+      "read_only": 1
+    },
+    {
+      "default": "0",
+      "fieldname": "rejected_return_qty",
+      "fieldtype": "Float",
+      "label": "Inspection Rejected Quantity",
+      "non_negative": 1,
+      "read_only": 1
+    },
+    {
+      "fieldname": "stock_uom",
+      "fieldtype": "Link",
+      "label": "Stock UOM",
+      "options": "UOM",
+      "read_only": 1
+    },
+    {
+      "default": "1",
+      "fieldname": "conversion_factor",
+      "fieldtype": "Float",
+      "hidden": 1,
+      "label": "Conversion Factor",
+      "positive": 1,
+      "read_only": 1,
+      "reqd": 1
+    },
+    {
+      "fieldname": "batch_no",
+      "fieldtype": "Link",
+      "label": "Batch No",
+      "options": "Batch"
+    },
+    {
+      "fieldname": "serial_no",
+      "fieldtype": "Long Text",
+      "label": "Serial No(s)"
+    },
+    {
+      "fieldname": "reason_section",
+      "fieldtype": "Section Break",
+      "label": "Inspection & Resolution"
+    },
+    {
+      "fieldname": "return_reason",
+      "fieldtype": "Small Text",
+      "label": "Item Return Reason",
+      "description": "Required before submitting the Return Request."
+    },
+    {
+      "fieldname": "quality_inspection",
+      "fieldtype": "Link",
+      "label": "Quality Inspection",
+      "options": "Quality Inspection"
+    },
+    {
+      "fieldname": "resolution_type",
+      "fieldtype": "Link",
+      "hidden": 1,
+      "label": "Resolution Type",
+      "options": "Return Resolution Type"
+    },
+    {
+      "default": "0",
+      "fieldname": "resolution_qty",
+      "fieldtype": "Float",
+      "hidden": 1,
+      "label": "Resolution Quantity",
+      "non_negative": 1
+    }
+  ],
+  "grid_page_length": 50,
+  "istable": 1,
+  "links": [],
+  "modified": "2026-10-27 07:26:01.000000",
+  "modified_by": "Administrator",
+  "module": "Vuna Transport",
+  "name": "Return Request Item",
+  "owner": "Administrator",
+  "permissions": [],
+  "row_format": "Dynamic",
+  "sort_field": "creation",
+  "sort_order": "DESC",
+  "states": []
 }

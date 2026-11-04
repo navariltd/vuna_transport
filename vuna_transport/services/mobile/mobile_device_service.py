@@ -207,10 +207,10 @@ def get_assigned_delivery_trips(installation_id, device_identifier=None):
 		stops_by_trip.setdefault(stop.parent, []).append(stop)
 	for trip in trips:
 		trip["stops"] = stops_by_trip.get(trip.name, [])
+		_enrich_trip_execution(trip, trip["stops"])
 		trip["stop_count"] = len(trip["stops"])
 		trip["completed_stop_count"] = sum(cint(stop.visited) for stop in trip["stops"])
 		trip["next_stop"] = next((stop.name for stop in trip["stops"] if not cint(stop.visited)), None)
-		_enrich_trip_execution(trip, trip["stops"])
 
 	return {"linked": True, "driver": profile["driver"], "trips": trips}
 
@@ -921,13 +921,13 @@ def _mobile_trip_actions(trip, stops=None):
 
 
 def _enrich_trip_execution(trip, stops):
+	_attach_transport_tasks(trip, stops)
 	trip["erpnext_status"] = trip.status
 	trip["status"] = _mobile_trip_status(trip, stops)
 	trip["actual_start"] = trip.vuna_actual_start
 	trip["actual_completion"] = trip.vuna_actual_completion
 	trip["actions"] = _mobile_trip_actions(trip, stops)
 	_set_mobile_stop_actions(trip, stops)
-	_attach_transport_tasks(trip, stops)
 
 
 def _attach_transport_tasks(trip, stops):
@@ -935,7 +935,9 @@ def _attach_transport_tasks(trip, stops):
 		return
 	from vuna_transport.services.execution.trip_task_service import TERMINAL_TASK_STATUSES
 
-	trip["task_based"] = True
+	# Detail responses use a Document; list responses use frappe._dict rows.
+	if isinstance(trip, dict):
+		trip["task_based"] = True
 	tasks = frappe.get_all(
 		"Transport Trip Task",
 		filters={"delivery_trip": trip.name},
@@ -943,10 +945,39 @@ def _attach_transport_tasks(trip, stops):
 		order_by="sequence asc, creation asc",
 	)
 	by_stop = {}
+	loading_stops = {task.delivery_stop for task in tasks if task.task_type == "Transfer Dispatch"}
+	actual_stops = {task.delivery_stop for task in tasks if task.task_type != "Transfer Dispatch"}
+	# Preserve old submitted loading records in Desk history, but do not ask
+	# the driver to visit/confirm work completed before departure.
+	stops[:] = [
+		stop
+		for stop in stops
+		if stop.name not in loading_stops or stop.name in actual_stops or stop.get("delivery_note")
+	]
+	tasks = [task for task in tasks if task.task_type != "Transfer Dispatch"]
 	for task in tasks:
+		task["operation_label"] = {
+			"Transfer Dispatch": "Loading",
+			"Transfer Receipt": "Depot delivery",
+			"Customer Delivery": "Customer delivery",
+		}.get(task.task_type, task.task_type)
+		task["can_record_proof"] = (
+			task.task_type == "Transfer Receipt"
+			and task.status == "Ready"
+			and not getattr(trip, "vuna_actual_completion", None)
+			and bool(getattr(trip, "vuna_actual_start", None))
+		)
 		by_stop.setdefault(task.delivery_stop, []).append(task)
-	for stop in stops:
+	for index, stop in enumerate(stops, start=1):
+		if loading_stops:
+			stop["idx"] = index
 		stop["tasks"] = by_stop.get(stop.name, [])
+		stop["location_label"] = (
+			stop.get("customer")
+			or (stop.get("address_details") or {}).get("address_title")
+			or stop.get("address")
+			or "Depot"
+		)
 		stop["can_complete_delivery"] = bool(getattr(trip, "vuna_actual_start", None)) and any(
 			task.task_type == "Customer Delivery" and task.status not in TERMINAL_TASK_STATUSES
 			for task in stop["tasks"]
