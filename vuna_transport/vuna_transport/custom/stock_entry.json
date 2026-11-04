@@ -1,0 +1,55 @@
+{
+  "doctype": "Stock Entry",
+  "custom_fields": [
+    {
+      "dt": "Stock Entry",
+      "name": "Stock Entry-vuna_vehicle_allocation",
+      "fieldname": "vuna_vehicle_allocation",
+      "label": "Vehicle Allocation",
+      "fieldtype": "Link",
+      "options": "Vehicle Allocation",
+      "read_only": 1,
+      "no_copy": 1,
+      "insert_after": "outgoing_stock_entry",
+      "module": "Vuna Transport"
+    },
+    {
+      "dt": "Stock Entry",
+      "name": "Stock Entry-vuna_transport_load",
+      "fieldname": "vuna_transport_load",
+      "label": "Transport Load",
+      "fieldtype": "Link",
+      "options": "Transport Load",
+      "read_only": 1,
+      "no_copy": 1,
+      "insert_after": "vuna_vehicle_allocation",
+      "module": "Vuna Transport"
+    },
+    {
+      "dt": "Stock Entry",
+      "name": "Stock Entry-vuna_transport_proof",
+      "fieldname": "vuna_transport_proof",
+      "label": "Proof of Delivery",
+      "fieldtype": "Link",
+      "options": "Proof of Delivery",
+      "read_only": 1,
+      "no_copy": 1,
+      "insert_after": "vuna_transport_task",
+      "module": "Vuna Transport"
+    },
+    {
+      "dt": "Stock Entry",
+      "name": "Stock Entry-vuna_transport_task",
+      "fieldname": "vuna_transport_task",
+      "label": "Transport Trip Task",
+      "fieldtype": "Link",
+      "options": "Transport Trip Task",
+      "read_only": 1,
+      "no_copy": 1,
+      "insert_after": "outgoing_stock_entry",
+      "module": "Vuna Transport"
+    }
+  ],
+  "property_setters": [],
+  "sync_on_migrate": 1
+}

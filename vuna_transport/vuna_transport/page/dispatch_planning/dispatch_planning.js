@@ -606,10 +606,11 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			return;
 		}
 		const button = this.$root.find(".btn-create-transfer").prop("disabled", true);
+		const source_warehouse = this.get_filter_values().source_warehouse;
 		try {
 			const response = await frappe.call({
 				method: "vuna_transport.services.planning.transport_load_service.create_transport_load_from_demands",
-				args: { allocations },
+				args: { allocations, source_warehouse },
 				freeze: true,
 			});
 			if (response.message) frappe.set_route("Form", "Transport Load", response.message);

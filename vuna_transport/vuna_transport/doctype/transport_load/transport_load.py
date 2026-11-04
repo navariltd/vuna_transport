@@ -49,6 +49,8 @@ class TransportLoad(Document):
 		validate_capacity(self)
 
 	def before_submit(self):
+		if not self.source_warehouse:
+			frappe.throw(_("Select a Source Warehouse before submitting this Transport Load."))
 		if is_demand_load(self):
 			validate_demand_allocations(self)
 			validate_capacity(self)
@@ -155,6 +157,8 @@ def _validate_source_warehouse_change(load):
 		return
 	if load.pick_list and frappe.db.get_value("Pick List", load.pick_list, "docstatus") != 2:
 		frappe.throw(_("Cancel the Pick List before changing the Transport Load dispatch warehouse."))
+	if frappe.db.exists("Stock Entry", {"vuna_transport_load": load.name, "docstatus": ["!=", 2]}):
+		frappe.throw(_("Cancel or delete dispatch Stock Entries before changing the source warehouse."))
 	if frappe.db.exists(
 		"Delivery Note",
 		{"vuna_delivery_load": load.name, "docstatus": ["!=", 2]},

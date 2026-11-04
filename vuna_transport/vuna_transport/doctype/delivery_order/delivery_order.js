@@ -3,6 +3,7 @@
 
 frappe.ui.form.on("Delivery Order", {
 	async refresh(frm) {
+		frm.remove_custom_button(__("Transport Load"), __("Create"));
 		if (frm.doc.docstatus === 1 && ["Open", "Partially Allocated"].includes(frm.doc.status)) {
 			const button = frm.add_custom_button(
 				__("Transport Load"),
@@ -122,7 +123,7 @@ function show_delivery_load_item_dialog(items) {
 		],
 		primary_action_label: __("Create Transport Load"),
 		primary_action(values) {
-			const selected = (values.items || []).filter((item) => item?.__checked == 1);
+			const selected = dialog.fields_dict.items.grid.get_selected_children();
 			const invalid_quantity = selected.some(
 				(item) =>
 					flt(item.allocated_quantity) <= 0 ||

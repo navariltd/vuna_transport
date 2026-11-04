@@ -39,6 +39,12 @@ class TestTransportLoadAllocations(unittest.TestCase):
 		)
 		self.enterContext(
 			patch(
+				"vuna_transport.services.planning.transport_load_service.get_posted_transfer_quantities",
+				return_value={},
+			)
+		)
+		self.enterContext(
+			patch(
 				"vuna_transport.services.planning.transport_load_service.validate_transport_compatibility_groups"
 			)
 		)
@@ -66,7 +72,11 @@ class TestTransportLoadAllocations(unittest.TestCase):
 			source_key="leg",
 			items=[self.item],
 		)
-		self.framework.get_doc.return_value = self.demand
+		self.framework.get_doc.side_effect = (
+			lambda doctype, name: MagicMock(company="Company", is_group=0, disabled=0)
+			if doctype == "Warehouse"
+			else self.demand
+		)
 		self.framework.get_cached_value.return_value = 0
 		self.legs.return_value = [
 			{"source_key": "leg", "items": [{"source_item": "MRI-1", "stock_qty": 100}]}
@@ -95,6 +105,23 @@ class TestTransportLoadAllocations(unittest.TestCase):
 		self.assertEqual(self.row.uom, "Carton")
 		self.assertEqual(self.row.allocated_stock_qty, 40)
 		self.assertEqual(self.row.weight, 20)
+
+	def test_draft_load_can_reserve_without_a_source_warehouse(self):
+		self.load.source_warehouse = None
+		self.load.docstatus = 0
+		validate_demand_allocations(self.load)
+		self.assertEqual(self.row.allocated_stock_qty, 40)
+
+	def test_submitted_load_requires_a_source_warehouse(self):
+		self.load.source_warehouse = None
+		self.load.docstatus = 1
+		with self.assertRaises(ValueError):
+			validate_demand_allocations(self.load)
+
+	def test_chosen_source_must_match_a_known_demand_origin(self):
+		self.load.source_warehouse = "Other"
+		with self.assertRaises(ValueError):
+			validate_demand_allocations(self.load)
 
 	def test_reservations_prevent_over_allocation(self):
 		self.commitments.return_value = {"TDI-1": 70}

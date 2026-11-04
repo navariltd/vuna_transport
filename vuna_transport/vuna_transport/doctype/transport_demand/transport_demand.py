@@ -6,7 +6,7 @@ from vuna_transport.services.demand.transport_demand_service import validate_tra
 
 class TransportDemand(Document):
 	@frappe.whitelist()
-	def create_load(self):
+	def create_load(self, source_warehouse: str | None = None):
 		self.check_permission("read")
 		from vuna_transport.services.planning.transport_load_service import (
 			create_transport_load_from_demands,
@@ -24,7 +24,8 @@ class TransportDemand(Document):
 				}
 				for row in self.items
 				if row.stock_qty > committed.get(row.name, 0)
-			]
+			],
+			source_warehouse=source_warehouse,
 		)
 
 	def validate(self):
