@@ -547,12 +547,12 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				<td><input type="checkbox" class="dp-transfer-select" data-index="${index}"></td>
 				<td>${escape(row.transport_demand)}<br>${escape(row.item_code)}</td>
 				<td>${escape(row.source_warehouse)} → ${escape(row.destination_warehouse)}</td>
-				<td>${escape(row.stock_uom)}<br>${frappe.format(row.available_stock_qty, {
+				<td>${escape(row.uom)}<br>${frappe.format(row.available_quantity, {
 						fieldtype: "Float",
 					})}</td>
 				<td><input class="form-control dp-transfer-qty" data-index="${index}" type="number" min="0" step="any" max="${
-						row.available_stock_qty
-					}" value="${row.available_stock_qty}"></td></tr>`
+						row.available_quantity
+					}" value="${row.available_quantity}"></td></tr>`
 				)
 				.join("");
 			target.html(
@@ -560,7 +560,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					? `<div class="table-responsive"><table class="table"><thead><tr><th></th><th>${__(
 							"Demand / Item"
 					  )}</th><th>${__("Movement")}</th><th>${__("Available")}</th><th>${__(
-							"Quantity to Load (Stock UOM)"
+							"Quantity to Load"
 					  )}</th></tr></thead><tbody>${rows}</tbody></table></div>`
 					: `<div class="dp-empty">${__("No pending depot transfers.")}</div>`
 			);
@@ -591,11 +591,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			const quantity = Number(
 				this.$root.find(`.dp-transfer-qty[data-index="${index}"]`).val()
 			);
-			if (
-				!Number.isFinite(quantity) ||
-				quantity <= 0 ||
-				quantity > row.available_stock_qty
-			) {
+			if (!Number.isFinite(quantity) || quantity <= 0 || quantity > row.available_quantity) {
 				frappe.msgprint(__("Enter a positive quantity within the available amount."));
 				return;
 			}

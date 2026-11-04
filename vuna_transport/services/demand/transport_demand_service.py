@@ -31,7 +31,7 @@ def build_source_legs(source):
 		if factor <= 0:
 			frappe.throw(_("Source row {0} requires a positive UOM conversion factor.").format(row.idx))
 		if is_transfer:
-			origin = row.from_warehouse or source.get("set_from_warehouse")
+			origin = row.from_warehouse or source.get("set_from_warehouse") or None
 			destination = row.warehouse or source.get("set_warehouse")
 			# ERPNext tracks Material Request fulfilment in stock UOM as ordered_qty.
 			quantity = max(flt(row.stock_qty) - flt(row.ordered_qty), 0)
@@ -41,7 +41,11 @@ def build_source_legs(source):
 			quantity = flt(row.transport_qty) * factor
 		if quantity <= 0:
 			continue
-		if not origin or not destination or (is_transfer and origin == destination):
+		if (
+			(not is_transfer and not origin)
+			or not destination
+			or (origin and is_transfer and origin == destination)
+		):
 			frappe.throw(_("Source row {0} requires distinct, valid movement endpoints.").format(row.idx))
 		legs[(origin, destination)].append(
 			{
@@ -71,7 +75,9 @@ def build_source_legs(source):
 			"transport_zone": None if is_transfer else source.transport_zone,
 			"items": items,
 		}
-		for (origin, destination), items in sorted(legs.items())
+		for (origin, destination), items in sorted(
+			legs.items(), key=lambda pair: (pair[0][0] or "", pair[0][1] or "")
+		)
 	]
 
 
@@ -122,7 +128,7 @@ def _create_transport_demands(source_doctype, source_name, automated=False):
 		demand = frappe.get_doc({"doctype": "Transport Demand", **leg})
 		demand.flags.ignore_permissions = automated
 		demand.insert()
-		if policy.auto_submit_demand:
+		if policy.auto_submit_demand and demand.source_warehouse:
 			demand.submit()
 		names.append(demand.name)
 	return names
@@ -145,6 +151,14 @@ def validate_transport_demand(demand):
 	leg = next((leg for leg in build_source_legs(source) if leg["source_key"] == demand.source_key), None)
 	if not leg:
 		frappe.throw(_("This movement leg no longer has outstanding source quantity."))
+	# A requester may know the depot but not the fulfilment warehouse. Preserve
+	# the original source-leg key while the transport planner resolves its origin.
+	if not leg["source_warehouse"] and leg["movement_type"] == "Warehouse Transfer":
+		leg["source_warehouse"] = demand.source_warehouse
+	if demand.docstatus == 1 and not leg["source_warehouse"]:
+		frappe.throw(_("Select a Source Warehouse before submitting this Transport Demand."))
+	if leg["source_warehouse"] and leg["source_warehouse"] == leg["destination_warehouse"]:
+		frappe.throw(_("Source Warehouse and Destination Warehouse must be different."))
 	for warehouse_name in (leg["source_warehouse"], leg["destination_warehouse"]):
 		if not warehouse_name:
 			continue

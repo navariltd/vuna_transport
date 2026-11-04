@@ -1,4 +1,4 @@
-"""Stock-UOM allocation of normalized transport demand into transport loads."""
+"""Requested-UOM allocation, reconciled internally in Stock UOM."""
 
 import math
 
@@ -12,7 +12,10 @@ from vuna_transport.services.shared.security_service import require_company_acce
 
 
 def is_demand_load(load):
-	return any(row.get("transport_demand") and not row.get("delivery_order") for row in load.delivery_orders)
+	return any(
+		getattr(row, "transport_demand", None) and not getattr(row, "delivery_order", None)
+		for row in load.delivery_orders
+	)
 
 
 def get_committed_quantities(item_names, exclude_load=None):
@@ -20,8 +23,8 @@ def get_committed_quantities(item_names, exclude_load=None):
 		return {}
 	return dict(
 		frappe.db.sql(
-			"""select li.transport_demand_item, sum(li.allocated_quantity *
-		(case when ifnull(li.delivery_order, '') != '' then di.conversion_factor else 1 end))
+			"""select li.transport_demand_item, sum(coalesce(nullif(li.allocated_stock_qty, 0),
+		li.allocated_quantity * di.conversion_factor))
 		from `tabTransport Load Item` li join `tabTransport Load` l on l.name = li.parent
 		join `tabTransport Demand Item` di on di.name = li.transport_demand_item
 		where li.parenttype = 'Transport Load' and l.docstatus in (0, 1)
@@ -75,24 +78,36 @@ def validate_demand_allocations(load):
 		if not item or not live:
 			frappe.throw(_("The selected demand row is no longer available from its source document."))
 		quantity = flt(row.allocated_quantity)
-		precision = row.precision("allocated_quantity")
+		factor = flt(item.conversion_factor)
+		if not math.isfinite(factor) or factor <= 0:
+			frappe.throw(_("The requested UOM requires a positive conversion factor."))
+		stock_quantity = flt(quantity * factor, row.precision("allocated_stock_qty"))
 		available = max(min(flt(item.stock_qty), flt(live["stock_qty"])) - flt(committed.get(item.name)), 0)
 		if (
 			item.name in seen
 			or not math.isfinite(quantity)
+			or not math.isfinite(stock_quantity)
 			or quantity <= 0
-			or flt(quantity - available, precision) > 0
+			or stock_quantity <= 0
+			or flt(stock_quantity - available, row.precision("allocated_stock_qty")) > 0
 		):
 			frappe.throw(
-				_("Demand item {0} is duplicated or exceeds its available stock quantity {1}.").format(
-					item.item_code, available
+				_("Demand item {0} is duplicated or exceeds its available quantity {1} {2}.").format(
+					item.item_code, available / factor, item.transaction_uom
 				)
 			)
 		seen.add(item.name)
-		if frappe.get_cached_value("UOM", item.stock_uom, "must_be_whole_number") and quantity != int(
-			quantity
+		if (
+			frappe.get_cached_value("UOM", item.stock_uom, "must_be_whole_number")
+			and abs(stock_quantity - round(stock_quantity)) > 1e-9
 		):
 			frappe.throw(_("Stock UOM {0} requires a whole-number allocation.").format(item.stock_uom))
+		if frappe.get_cached_value("UOM", item.transaction_uom, "must_be_whole_number") and quantity != int(
+			quantity
+		):
+			frappe.throw(
+				_("Requested UOM {0} requires a whole-number allocation.").format(item.transaction_uom)
+			)
 		for field in (
 			"item_code",
 			"stock_uom",
@@ -102,8 +117,11 @@ def validate_demand_allocations(load):
 		):
 			row.set(field, item.get(field))
 		row.item_name = frappe.get_cached_value("Item", item.item_code, "item_name")
-		row.available_quantity = available
-		row.weight = flt(item.weight) * quantity / flt(item.stock_qty)
+		row.available_quantity = available / factor
+		row.uom = item.transaction_uom
+		row.conversion_factor = factor
+		row.allocated_stock_qty = stock_quantity
+		row.weight = flt(item.weight) * stock_quantity / flt(item.stock_qty)
 		row.destination_warehouse = demand.destination_warehouse
 		row.delivery_order = row.delivery_order_item = row.sales_order = row.customer = (
 			row.delivery_address
@@ -119,13 +137,15 @@ def validate_demand_allocations(load):
 
 @frappe.whitelist()
 def create_transport_load_from_demands(allocations: list | str) -> str:
-	"""Create a draft from demand-item allocations expressed in Stock UOM."""
+	"""Create a draft from quantities expressed in the requested transaction UOM."""
 	require_doctype_permission("Transport Load", "create")
 	rows = frappe.parse_json(allocations) if isinstance(allocations, str) else allocations
 	if not isinstance(rows, list) or not rows or len(rows) > 500:
 		frappe.throw(_("Select between 1 and 500 Transport Demand items."))
 	first = frappe.get_doc("Transport Demand", rows[0].get("transport_demand"))
 	first.check_permission("read")
+	if not first.source_warehouse:
+		frappe.throw(_("Select and submit the demand's Source Warehouse before creating a Transport Load."))
 	load = frappe.new_doc("Transport Load")
 	load.company = first.company
 	load.source_warehouse = first.source_warehouse
@@ -157,7 +177,7 @@ def bundle_transport_demands(demand_names: list | str) -> str:
 		require_company_access(demand.company)
 		committed = get_committed_quantities([item.name for item in demand.items])
 		for item in demand.items:
-			quantity = flt(item.stock_qty) - flt(committed.get(item.name))
+			quantity = (flt(item.stock_qty) - flt(committed.get(item.name))) / flt(item.conversion_factor)
 			if quantity > 0:
 				allocations.append(
 					{
@@ -224,6 +244,9 @@ def get_transfer_planning_items(
 					"required_date": demand.required_date,
 					"available_stock_qty": available,
 					"stock_uom": item.stock_uom,
+					"available_quantity": available / flt(item.conversion_factor),
+					"uom": item.transaction_uom,
+					"conversion_factor": item.conversion_factor,
 					"weight": flt(item.weight) * available / flt(item.stock_qty),
 					"weight_uom": item.weight_uom,
 				}

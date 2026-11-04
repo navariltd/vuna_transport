@@ -31,7 +31,9 @@ class TestAllocationItems(unittest.TestCase):
 		self.permissions = self.enterContext(
 			patch("vuna_transport.services.fleet.allocation_cargo_service.require_document_permission")
 		)
-		self.source_item = frappe._dict(name="ITEM-1", item_code="MILK", uom="Carton", stock_uom="Pcs")
+		self.source_item = frappe._dict(
+			name="ITEM-1", item_code="MILK", uom="Carton", transaction_uom="Carton", stock_uom="Pcs"
+		)
 		self.framework.get_doc.return_value = MagicMock(items=[self.source_item])
 
 	def load(self, name="TL-1", transfer=False, qty=2, weight=10):
@@ -56,9 +58,9 @@ class TestAllocationItems(unittest.TestCase):
 		self.assertEqual(rows[0]["uom"], "Carton")
 		self.assertEqual(rows[0]["transport_load"], "TL-1")
 
-	def test_transfer_quantity_is_in_stock_uom(self):
+	def test_transfer_quantity_preserves_requested_uom(self):
 		rows = collect_load_items([self.load(transfer=True)])
-		self.assertEqual(rows[0]["uom"], "Pcs")
+		self.assertEqual(rows[0]["uom"], "Carton")
 
 	def test_same_item_in_different_loads_stays_separate(self):
 		self.assertEqual(len(collect_load_items([self.load(), self.load("TL-2")])), 2)

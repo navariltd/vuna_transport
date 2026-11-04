@@ -36,10 +36,8 @@ def sync_demand_allocations(names):
 		commitments = frappe.db.sql(
 			"""
 			select i.transport_demand_item,
-			sum(case when l.docstatus = 0 then i.allocated_quantity *
-			(case when ifnull(i.delivery_order, '') != '' then di.conversion_factor else 1 end) else 0 end) as reserved,
-			sum(case when l.docstatus = 1 then i.allocated_quantity *
-			(case when ifnull(i.delivery_order, '') != '' then di.conversion_factor else 1 end) else 0 end) as allocated
+			sum(case when l.docstatus = 0 then coalesce(nullif(i.allocated_stock_qty, 0), i.allocated_quantity * di.conversion_factor) else 0 end) as reserved,
+			sum(case when l.docstatus = 1 then coalesce(nullif(i.allocated_stock_qty, 0), i.allocated_quantity * di.conversion_factor) else 0 end) as allocated
 			from `tabTransport Load Item` i join `tabTransport Load` l on l.name = i.parent
 			join `tabTransport Demand Item` di on di.name = i.transport_demand_item
 			where i.transport_demand = %s and i.parenttype = 'Transport Load' and l.docstatus in (0, 1)
