@@ -179,6 +179,28 @@ frappe.ui.form.on("Transport Load", {
 						frm.add_custom_button(__("Complete Vehicle Allocation"), () =>
 							frappe.set_route("Form", "Vehicle Allocation", allocation.name)
 						);
+					} else if (
+						!response.message.delivery_trip &&
+						response.message.transfer_stock_entry?.docstatus !== 1
+					) {
+						frm.add_custom_button(
+							__("Stock Entry (Add to Transit)"),
+							() =>
+								frappe
+									.call({
+										method: "vuna_transport.services.execution.allocation_transfer_service.make_allocation_stock_entry",
+										args: {
+											source_name: allocation.name,
+											load_name: frm.doc.name,
+										},
+										freeze: true,
+									})
+									.then(({ message: doc }) => {
+										const mapped = frappe.model.sync(doc)[0];
+										frappe.set_route("Form", mapped.doctype, mapped.name);
+									}),
+							__("Create")
+						);
 					} else if (!response.message.delivery_trip) {
 						frm.add_custom_button(
 							__("Delivery Trip"),
@@ -193,7 +215,7 @@ frappe.ui.form.on("Transport Load", {
 				}
 				frm.get_field("execution_overview")?.$wrapper.text(
 					__(
-						"Allocate the vehicle, then create its Delivery Trip. Transfer proof and stock execution will follow."
+						"Allocate the vehicle, submit its Add-to-Transit Stock Entry, then create the Delivery Trip."
 					)
 				);
 				return;

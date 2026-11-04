@@ -48,6 +48,7 @@ frappe.ui.form.on("Vehicle Allocation", {
 		update_load_selection_button(frm);
 		frm.remove_custom_button(__("Delivery Notes"), __("Create"));
 		frm.remove_custom_button(__("Delivery Trip"), __("Create"));
+		frm.remove_custom_button(__("Stock Entry (Add to Transit)"), __("Create"));
 		const loads = (frm.doc.delivery_loads || [])
 			.map((row) => row.delivery_load)
 			.filter(Boolean);
@@ -58,7 +59,10 @@ frappe.ui.form.on("Vehicle Allocation", {
 			frappe
 				.call({
 					method: "vuna_transport.services.fleet.vehicle_allocation_service.get_allocation_load_context",
-					args: { delivery_loads: loads },
+					args: {
+						delivery_loads: loads,
+						vehicle_category: frm.doc.required_vehicle_category,
+					},
 				})
 				.then(({ message }) => render_capacity_summary(frm, message));
 		}
@@ -78,23 +82,11 @@ frappe.ui.form.on("Vehicle Allocation", {
 			.then(({ message }) => {
 				if (!message || frm.doc.vehicle !== frm._vehicle_used_for_allocation_defaults)
 					return;
-				if (
-					frm.doc.required_vehicle_category &&
-					message.vuna_vehicle_category !== frm.doc.required_vehicle_category
-				) {
-					frm.set_value("vehicle", null);
-					frappe.msgprint(
-						__(
-							"Vehicle {0} belongs to category {1}, but this allocation requires {2}.",
-							[
-								vehicle_name,
-								message.vuna_vehicle_category || __("Not Set"),
-								frm.doc.required_vehicle_category,
-							]
-						)
+				if (message.vuna_vehicle_category !== frm.doc.required_vehicle_category)
+					frm.set_value(
+						"required_vehicle_category",
+						message.vuna_vehicle_category || null
 					);
-					return;
-				}
 				frm.set_value("vehicle_owner", message.vuna_vehicle_owner || null);
 				frm.set_value(
 					"allocation_type",
@@ -145,6 +137,42 @@ function add_next_execution_action(frm) {
 			if (frm.doc.docstatus !== 1 || !message) return;
 			set_allocation_execution_indicator(frm, message.execution_status);
 			if (message.active_delivery_trip) return;
+			const pending_transfers = (message.transfer_stock || []).filter(
+				(row) => !row.submitted
+			);
+			if (pending_transfers.length) {
+				frm.add_custom_button(
+					__("Stock Entry (Add to Transit)"),
+					() => {
+						const open_stock = (load_name) =>
+							frappe
+								.call({
+									method: "vuna_transport.services.execution.allocation_transfer_service.make_allocation_stock_entry",
+									args: { source_name: frm.doc.name, load_name },
+									freeze: true,
+								})
+								.then(({ message: doc }) => {
+									const mapped = frappe.model.sync(doc)[0];
+									frappe.set_route("Form", mapped.doctype, mapped.name);
+								});
+						if (pending_transfers.length === 1) open_stock(pending_transfers[0].load);
+						else
+							frappe.prompt(
+								{
+									fieldname: "load",
+									fieldtype: "Select",
+									label: __("Transport Load"),
+									options: pending_transfers.map((row) => row.load),
+									reqd: true,
+								},
+								(values) => open_stock(values.load)
+							);
+					},
+					__("Create")
+				);
+				frm.page.set_inner_btn_group_as_primary(__("Create"));
+				if (!(message.draft_delivery_notes || []).length && message.task_based) return;
+			}
 			if (message.ready_for_delivery_trip) {
 				frm.add_custom_button(
 					__("Delivery Trip"),
@@ -186,6 +214,7 @@ function set_allocation_execution_indicator(frm, status) {
 		Accepted: "green",
 		Rejected: "red",
 		"Awaiting Delivery Notes": "orange",
+		"Awaiting Transfer Stock Entry": "orange",
 		"Ready for Delivery Trip": "blue",
 		"Delivery Trip Draft": "orange",
 		"Delivery Trip Scheduled": "blue",
@@ -265,7 +294,7 @@ function refresh_load_context(frm) {
 	frappe
 		.call({
 			method: "vuna_transport.services.fleet.vehicle_allocation_service.get_allocation_load_context",
-			args: { delivery_loads: loads },
+			args: { delivery_loads: loads, vehicle_category: frm.doc.required_vehicle_category },
 		})
 		.then(({ message }) => {
 			if (!message) return;
@@ -296,6 +325,7 @@ frappe.ui.form.on("Vehicle Allocation Load", {
 			.call({
 				method: "vuna_transport.services.fleet.vehicle_allocation_service.get_allocation_load_context",
 				args: {
+					vehicle_category: frm.doc.required_vehicle_category,
 					delivery_loads: (frm.doc.delivery_loads || [])
 						.map((row) => row.delivery_load)
 						.filter(Boolean),
@@ -304,10 +334,11 @@ frappe.ui.form.on("Vehicle Allocation Load", {
 			.then(({ message }) => {
 				if (!message) return;
 				frm.set_value("company", message.company || null);
-				frm.set_value(
-					"required_vehicle_category",
-					message.required_vehicle_category || null
-				);
+				if (!frm.doc.required_vehicle_category)
+					frm.set_value(
+						"required_vehicle_category",
+						message.required_vehicle_category || null
+					);
 				if (!frm.doc.planned_reporting_time && message.planned_reporting_time) {
 					frm.set_value("planned_reporting_time", message.planned_reporting_time);
 				}
@@ -322,6 +353,7 @@ frappe.ui.form.on("Vehicle Allocation Load", {
 			.call({
 				method: "vuna_transport.services.fleet.vehicle_allocation_service.get_allocation_load_context",
 				args: {
+					vehicle_category: frm.doc.required_vehicle_category,
 					delivery_loads: (frm.doc.delivery_loads || [])
 						.map((row) => row.delivery_load)
 						.filter(Boolean),
@@ -329,10 +361,11 @@ frappe.ui.form.on("Vehicle Allocation Load", {
 			})
 			.then(({ message }) => {
 				frm.set_value("company", message?.company || null);
-				frm.set_value(
-					"required_vehicle_category",
-					message?.required_vehicle_category || null
-				);
+				if (!frm.doc.required_vehicle_category)
+					frm.set_value(
+						"required_vehicle_category",
+						message?.required_vehicle_category || null
+					);
 				render_capacity_summary(frm, message);
 			});
 	},

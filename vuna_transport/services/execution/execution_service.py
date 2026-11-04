@@ -24,10 +24,20 @@ def get_load_execution_summary(load):
 	from vuna_transport.services.planning.transport_load_service import is_demand_load
 
 	if is_demand_load(load):
+		allocation = _get_vehicle_allocation(load)
+		from vuna_transport.services.execution.allocation_transfer_service import allocation_stock_entry
+
+		stock_name = allocation_stock_entry(allocation.name, load.name) if allocation else None
+		stock = (
+			frappe.db.get_value("Stock Entry", stock_name, ["name", "docstatus"], as_dict=True)
+			if stock_name
+			else None
+		)
 		return {
 			"planning_only": True,
 			"load": {"docstatus": load.docstatus, "status": load.status},
-			"vehicle_allocation": _serialize_doc(_get_vehicle_allocation(load)),
+			"vehicle_allocation": _serialize_doc(allocation),
+			"transfer_stock_entry": stock,
 			"delivery_trip": load.delivery_trip,
 		}
 	delivery_orders = {row.delivery_order for row in load.delivery_orders if row.delivery_order}

@@ -39,7 +39,9 @@ ACTIVE_STATUSES = (
 
 
 @frappe.whitelist()
-def get_allocation_load_context(delivery_loads=None):
+def get_allocation_load_context(
+	delivery_loads: list[str] | str | None = None, vehicle_category: str | None = None
+):
 	"""Return the shared form context for currently selected load rows."""
 	if isinstance(delivery_loads, str):
 		delivery_loads = frappe.parse_json(delivery_loads)
@@ -52,13 +54,14 @@ def get_allocation_load_context(delivery_loads=None):
 	_validate_selected_load_compatibility(loads)
 	combined = _build_combined_capacity_load(loads)
 	capacity = None
-	if loads[0].required_vehicle_category:
+	capacity_category = vehicle_category or loads[0].required_vehicle_category
+	if capacity_category:
 		from vuna_transport.services.planning.delivery_load_service import (
 			get_vehicle_category_capacity_summary,
 		)
 
 		capacity = get_vehicle_category_capacity_summary(
-			loads[0].required_vehicle_category,
+			capacity_category,
 			{
 				"weight": combined.total_weight,
 				"volume": combined.total_volume,
@@ -71,7 +74,7 @@ def get_allocation_load_context(delivery_loads=None):
 		)
 	return {
 		"company": loads[0].company,
-		"required_vehicle_category": loads[0].required_vehicle_category,
+		"required_vehicle_category": capacity_category,
 		"planned_reporting_time": _earliest_planned_departure(loads),
 		"totals": {
 			"weight": combined.total_weight,
@@ -270,14 +273,7 @@ def validate_allocation(allocation):
 	_validate_selected_load_compatibility(loads)
 
 	allocation.company = load.company
-	selected_category = allocation.required_vehicle_category
-	if load.required_vehicle_category:
-		if selected_category and selected_category != load.required_vehicle_category:
-			frappe.throw(
-				_(
-					"Selected Vehicle Category {0} does not match Transport Load {1}'s required category {2}."
-				).format(selected_category, load.name, load.required_vehicle_category)
-			)
+	if not allocation.required_vehicle_category:
 		allocation.required_vehicle_category = load.required_vehicle_category
 	allocation.allocated_by = allocation.allocated_by or frappe.session.user
 	allocation.allocated_on = allocation.allocated_on or now_datetime()
@@ -391,12 +387,8 @@ def _derive_vehicle_source(allocation):
 	allocation.allocation_type = derived_type
 	allocation.vehicle_owner = owner or "Company"
 	vehicle_category = getattr(vehicle, "vuna_vehicle_category", None)
-	if allocation.required_vehicle_category and vehicle_category != allocation.required_vehicle_category:
-		frappe.throw(
-			_("Vehicle {0} belongs to category {1}, but this allocation requires {2}.").format(
-				vehicle.name, vehicle_category or _("Not Set"), allocation.required_vehicle_category
-			)
-		)
+	# The vehicle is authoritative; the load's category is only a recommendation.
+	allocation.required_vehicle_category = vehicle_category
 	if getattr(vehicle, "vuna_supplier", None):
 		allocation.supplier = vehicle.vuna_supplier
 	vehicle_structure = getattr(vehicle, "vuna_transport_cost_structure", None)
@@ -473,9 +465,6 @@ def _validate_selected_load_compatibility(loads):
 	companies = {load.company for load in loads}
 	if len(companies) != 1:
 		frappe.throw(_("All Transport Loads in one Vehicle Allocation must belong to the same Company."))
-	categories = {load.required_vehicle_category for load in loads if load.required_vehicle_category}
-	if len(categories) > 1:
-		frappe.throw(_("Selected Transport Loads must use the same Required Vehicle Category."))
 	methods = {load.delivery_method for load in loads if load.delivery_method}
 	if len(methods) > 1:
 		frappe.throw(_("Selected Transport Loads must use compatible Delivery Methods."))
@@ -647,6 +636,20 @@ def _get_allocation_execution_state(allocation):
 	from vuna_transport.services.planning.transport_load_service import is_demand_load
 
 	task_based = any(is_demand_load(load) for load in loads)
+	from vuna_transport.services.execution.allocation_transfer_service import allocation_stock_entry
+
+	transfer_stock = []
+	for load in loads:
+		if is_demand_load(load):
+			stock = allocation_stock_entry(allocation.name, load.name)
+			transfer_stock.append(
+				{
+					"load": load.name,
+					"stock_entry": stock,
+					"submitted": bool(stock and frappe.db.get_value("Stock Entry", stock, "docstatus") == 1),
+				}
+			)
+	transfer_ready = all(row["submitted"] for row in transfer_stock)
 	trip = (
 		frappe.db.get_value(
 			"Delivery Trip", active_delivery_trip, ["name", "docstatus", "status"], as_dict=True
@@ -655,10 +658,12 @@ def _get_allocation_execution_state(allocation):
 		else None
 	)
 	return {
+		"transfer_stock": transfer_stock,
 		"task_based": task_based,
 		"active_delivery_trip": active_delivery_trip,
 		"ready_for_delivery_trip": not active_delivery_trip
 		and bool(statuses)
+		and transfer_ready
 		and all(status["ready"] for status in statuses),
 		"draft_delivery_notes": sorted(
 			{note for status in statuses for note in status["draft_delivery_notes"]}
@@ -666,7 +671,9 @@ def _get_allocation_execution_state(allocation):
 		"submitted_delivery_notes": sorted(
 			{note for status in statuses for note in status["submitted_delivery_notes"]}
 		),
-		"execution_status": "Ready for Delivery Trip"
+		"execution_status": "Awaiting Transfer Stock Entry"
+		if not transfer_ready and not trip
+		else "Ready for Delivery Trip"
 		if task_based and not trip and all(status["ready"] for status in statuses)
 		else _get_allocation_execution_status(allocation, statuses, trip),
 	}
@@ -756,13 +763,6 @@ def _get_allocation_execution_status(allocation, note_statuses, trip=None):
 def _validate_vehicle_category_for_loads(loads, vehicle_category):
 	if not vehicle_category:
 		frappe.throw(_("Select a Vehicle Category for the allocated vehicle."))
-	for load in loads:
-		if load.required_vehicle_category and vehicle_category != load.required_vehicle_category:
-			frappe.throw(
-				_("Vehicle Category {0} does not match Transport Load {1}'s required category {2}.").format(
-					vehicle_category, load.name, load.required_vehicle_category
-				)
-			)
 	from vuna_transport.services.fleet.vehicle_category_service import validate_minimum_load_requirements
 	from vuna_transport.services.planning.delivery_load_service import validate_capacity
 

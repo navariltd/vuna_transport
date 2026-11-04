@@ -47,6 +47,41 @@ from vuna_transport.services.shared.workflow_policy_service import (
 
 
 @frappe.whitelist()
+def submit_mobile_transport_proof(
+	installation_id: str, task_name: str, payload: dict | str, device_identifier: str | None = None
+):
+	from vuna_transport.services.execution.transfer_proof_service import submit_mobile_transfer_proof
+
+	return submit_mobile_transfer_proof(installation_id, task_name, payload, device_identifier)
+
+
+@frappe.whitelist()
+def prepare_mobile_transport_proof(
+	installation_id: str, task_name: str, device_identifier: str | None = None
+):
+	from vuna_transport.services.execution.transfer_execution_service import _lock_task
+	from vuna_transport.services.execution.transfer_proof_service import prepare_proof
+	from vuna_transport.services.mobile.mobile_device_service import (
+		_get_assigned_trip,
+		_require_mobile_driver,
+	)
+
+	driver = _require_mobile_driver(installation_id, device_identifier)
+	task = _lock_task(task_name)
+	_get_assigned_trip(task.delivery_trip, driver.name)
+	proof = prepare_proof(task)
+	return {
+		"name": proof.name if not proof.is_new() else None,
+		"docstatus": proof.docstatus,
+		"task": task.name,
+		"task_type": task.task_type,
+		"items": [
+			{**row.as_dict(), "qty": row.delivered_qty, "planned_qty": row.ordered_qty} for row in proof.items
+		],
+	}
+
+
+@frappe.whitelist()
 def bootstrap_mobile_device(
 	installation_id,
 	device_identifier=None,
@@ -299,11 +334,6 @@ def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
 	require_document_permission(load, "read")
 	if filters.get("company") and filters.get("company") != load.company:
 		return []
-	if (
-		filters.get("required_vehicle_category")
-		and filters.get("required_vehicle_category") != load.required_vehicle_category
-	):
-		return []
 	from_time, to_time = get_load_resource_window(load)
 	vehicle_filters = {"docstatus": ["<", 2], "vuna_transport_enabled": 1}
 	if (filters or {}).get("allocation_type") == "Subcontractor":
@@ -311,8 +341,6 @@ def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
 	if load.company:
 		vehicle_filters["company"] = ["in", (load.company, "", None)]
 	compatible_categories = get_compatible_vehicle_category_names(load)
-	if load.required_vehicle_category:
-		compatible_categories = {load.required_vehicle_category}
 	if compatible_categories:
 		vehicle_filters["vuna_vehicle_category"] = ["in", compatible_categories]
 	else:
@@ -407,8 +435,6 @@ def get_delivery_loads_for_allocation(
 	}
 	if company:
 		load_filters["company"] = company
-	if vehicle_category:
-		load_filters["required_vehicle_category"] = vehicle_category
 	candidates = frappe.get_all(
 		"Transport Load",
 		filters=load_filters,
