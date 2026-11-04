@@ -24,7 +24,12 @@ def get_load_execution_summary(load):
 	from vuna_transport.services.planning.transport_load_service import is_demand_load
 
 	if is_demand_load(load):
-		return {"planning_only": True, "load": {"docstatus": load.docstatus, "status": load.status}}
+		return {
+			"planning_only": True,
+			"load": {"docstatus": load.docstatus, "status": load.status},
+			"vehicle_allocation": _serialize_doc(_get_vehicle_allocation(load)),
+			"delivery_trip": load.delivery_trip,
+		}
 	delivery_orders = {row.delivery_order for row in load.delivery_orders if row.delivery_order}
 
 	pick_list = _get_pick_list(load)

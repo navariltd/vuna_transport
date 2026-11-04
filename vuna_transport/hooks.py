@@ -178,7 +178,10 @@ doc_events = {
 			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_note",
 		],
 		"before_submit": "vuna_transport.services.execution.return_service.validate_linked_sales_return_submission",
-		"before_cancel": "vuna_transport.services.execution.return_service.prepare_sales_return_cancellation",
+		"before_cancel": [
+			"vuna_transport.services.execution.return_service.prepare_sales_return_cancellation",
+			"vuna_transport.services.execution.trip_task_service.guard_task_source_cancellation",
+		],
 		"on_submit": [
 			"vuna_transport.services.demand.delivery_order_service.sync_delivery_orders_after_direct_delivery_note",
 			"vuna_transport.services.execution.lineage_service.complete_load_without_trip",
@@ -228,22 +231,28 @@ doc_events = {
 		"before_cancel": "vuna_transport.services.execution.lineage_service.prepare_delivery_trip_cancellation",
 		"validate": "vuna_transport.services.execution.lineage_service.validate_delivery_trip",
 		"on_update": [
+			"vuna_transport.services.execution.trip_task_service.sync_task_plan",
+			"vuna_transport.services.execution.trip_task_service.sync_task_execution",
 			"vuna_transport.services.execution.lineage_service.link_delivery_trip",
 			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_trip",
 			"vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 		],
 		"on_submit": [
+			"vuna_transport.services.execution.trip_task_service.sync_task_plan",
+			"vuna_transport.services.execution.trip_task_service.sync_task_execution",
 			"vuna_transport.services.execution.lineage_service.submit_delivery_trip",
 			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_trip",
 			"vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 			"vuna_transport.services.mobile.mobile_notification_service.notify_delivery_trip",
 		],
 		"on_update_after_submit": [
+			"vuna_transport.services.execution.trip_task_service.sync_task_execution",
 			"vuna_transport.services.mobile.mobile_trip_execution_service.synchronize_mobile_trip_execution_status",
 			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_trip",
 			"vuna_transport.services.mobile.mobile_notification_service.notify_delivery_trip",
 		],
 		"on_cancel": [
+			"vuna_transport.services.execution.trip_task_service.cancel_tasks",
 			"vuna_transport.services.execution.lineage_service.cancel_delivery_trip",
 			"vuna_transport.services.execution.lineage_service.unlink_delivery_trip",
 			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_trip",
@@ -251,11 +260,16 @@ doc_events = {
 		],
 		"on_trash": [
 			"vuna_transport.services.execution.lineage_service.unlink_delivery_trip",
+			"vuna_transport.services.execution.trip_task_service.remove_draft_tasks",
 		],
 		"after_delete": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 	"Expense Claim": {
 		"on_update": "vuna_transport.services.mobile.mobile_notification_service.notify_expense_claim",
+	},
+	"Proof of Delivery": {
+		"on_submit": "vuna_transport.services.execution.trip_task_service.sync_task_execution",
+		"on_cancel": "vuna_transport.services.execution.trip_task_service.sync_task_execution",
 	},
 	"Material Request": {
 		"on_submit": "vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
@@ -273,11 +287,15 @@ doc_events = {
 		"on_cancel": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 	"Transport Load": {
+		"before_cancel": "vuna_transport.services.execution.trip_task_service.guard_task_source_cancellation",
 		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 	"Delivery Order": {
 		"on_submit": "vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
 		"before_cancel": "vuna_transport.services.planning.demand_lifecycle_service.guard_source_cancellation",
+	},
+	"Transport Demand": {
+		"before_cancel": "vuna_transport.services.execution.trip_task_service.guard_task_source_cancellation",
 	},
 	"Asset": {
 		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",

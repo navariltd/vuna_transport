@@ -6,6 +6,8 @@ def get_data(data):
 		{
 			"Transport Load": "delivery_trip",
 			"Vehicle Allocation": "vuna_current_vehicle_allocation",
+			"Transport Trip Task": "delivery_trip",
 		}
 	)
+	data.setdefault("transactions", []).append({"label": "Transport Tasks", "items": ["Transport Trip Task"]})
 	return data

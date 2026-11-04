@@ -175,6 +175,13 @@ def validate_delivery_trip(doc, method=None):
 		return
 	load = loads[0]
 	for selected_load in loads:
+		if (
+			getattr(doc, "vuna_task_based", 0)
+			and doc.docstatus == 1
+			and selected_load.delivery_trip == doc.name
+			and selected_load.status in ("Completed", "Completed with Exceptions")
+		):
+			continue
 		validate_load_is_operational(selected_load, _("creating or updating a Delivery Trip"))
 	existing_trip = frappe.db.get_value(
 		"Delivery Stop",
@@ -240,6 +247,16 @@ def validate_delivery_trip(doc, method=None):
 		_validate_vehicle_category_for_loads(loads, vehicle_category)
 
 	stop_delivery_notes = [stop.delivery_note for stop in doc.delivery_stops if stop.delivery_note]
+	from vuna_transport.services.planning.transport_load_service import is_demand_load
+
+	if any(is_demand_load(selected) for selected in loads):
+		from vuna_transport.services.execution.trip_task_service import validate_task_trip
+
+		doc.vuna_task_based = 1
+		validate_task_trip(doc, loads)
+		return
+	if getattr(doc, "vuna_task_based", 0):
+		frappe.throw(_("A task-based trip must include a warehouse-transfer load."))
 	expected_delivery_notes = set(
 		get_delivery_notes_for_loads([selected_load.name for selected_load in loads], docstatus=1)
 	)
@@ -455,8 +472,13 @@ def link_delivery_trip(doc, method=None):
 def submit_delivery_trip(doc, method=None):
 	if get_delivery_trip_load_names(doc):
 		for load_name in get_delivery_trip_load_names(doc):
+			from vuna_transport.services.planning.transport_load_service import is_demand_load
+
+			load = frappe.get_doc("Transport Load", load_name) if getattr(doc, "vuna_task_based", 0) else None
 			set_delivery_load_status(
-				load_name, "Dispatched", _("Delivery Trip {0} submitted").format(doc.name)
+				load_name,
+				"Ready for Dispatch" if load and is_demand_load(load) else "Dispatched",
+				_("Delivery Trip {0} submitted").format(doc.name),
 			)
 			_recompute_delivery_order_statuses(load_name)
 
@@ -487,7 +509,7 @@ def prepare_delivery_trip_cancellation(doc, method=None):
 	# Delivery Trip cancellation unlinks Transport Load in the on_cancel flow.
 	# Vehicle Allocation remains historical and must not make trip cancellation
 	# impossible merely because it references this execution trip.
-	doc.ignore_linked_doctypes = ["Transport Load", "Vehicle Allocation"]
+	doc.ignore_linked_doctypes = ["Transport Load", "Vehicle Allocation", "Transport Trip Task"]
 
 
 def unlink_delivery_trip(doc, method=None):

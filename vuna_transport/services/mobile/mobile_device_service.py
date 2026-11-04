@@ -184,6 +184,7 @@ def get_assigned_delivery_trips(installation_id, device_identifier=None):
 			"uom",
 			"vuna_actual_start",
 			"vuna_actual_completion",
+			"vuna_task_based",
 		],
 		order_by="departure_time asc, creation asc",
 		limit_page_length=100,
@@ -356,11 +357,13 @@ def get_delivery_trip_details(installation_id, trip_name, device_identifier=None
 	)
 	_enrich_stops(stops)
 	_set_mobile_stop_actions(trip, stops)
+	_attach_transport_tasks(trip, stops)
 	completed = sum(cint(stop.visited) for stop in stops)
 	next_stop = next((stop.name for stop in stops if not cint(stop.visited)), None)
 	return {
 		"trip": {
 			"name": trip.name,
+			"task_based": bool(getattr(trip, "vuna_task_based", 0)),
 			"status": _mobile_trip_status(trip, stops),
 			"erpnext_status": trip.status,
 			"company": trip.company,
@@ -924,6 +927,30 @@ def _enrich_trip_execution(trip, stops):
 	trip["actual_completion"] = trip.vuna_actual_completion
 	trip["actions"] = _mobile_trip_actions(trip, stops)
 	_set_mobile_stop_actions(trip, stops)
+	_attach_transport_tasks(trip, stops)
+
+
+def _attach_transport_tasks(trip, stops):
+	if not getattr(trip, "vuna_task_based", 0):
+		return
+	from vuna_transport.services.execution.trip_task_service import TERMINAL_TASK_STATUSES
+
+	trip["task_based"] = True
+	tasks = frappe.get_all(
+		"Transport Trip Task",
+		filters={"delivery_trip": trip.name},
+		fields=["name", "delivery_stop", "task_type", "status", "address", "transport_load", "delivery_note"],
+		order_by="sequence asc, creation asc",
+	)
+	by_stop = {}
+	for task in tasks:
+		by_stop.setdefault(task.delivery_stop, []).append(task)
+	for stop in stops:
+		stop["tasks"] = by_stop.get(stop.name, [])
+		stop["can_complete_delivery"] = bool(getattr(trip, "vuna_actual_start", None)) and any(
+			task.task_type == "Customer Delivery" and task.status not in TERMINAL_TASK_STATUSES
+			for task in stop["tasks"]
+		)
 
 
 def _set_mobile_stop_actions(trip, stops):
@@ -931,7 +958,12 @@ def _set_mobile_stop_actions(trip, stops):
 	trip_completed = bool(getattr(trip, "vuna_actual_completion", None) or trip.get("actual_completion"))
 	for stop in stops:
 		stop["can_arrive"] = False
-		stop["can_complete_delivery"] = trip_started and not trip_completed and not cint(stop.visited)
+		stop["can_complete_delivery"] = (
+			trip_started
+			and not trip_completed
+			and not cint(stop.visited)
+			and (not getattr(trip, "vuna_task_based", 0) or bool(stop.get("delivery_note")))
+		)
 		stop["requires_trip_start"] = not trip_started
 
 

@@ -147,8 +147,12 @@ def create_delivery_notes_for_allocation(allocation):
 	if not load_names:
 		frappe.throw(_("Add at least one Transport Load before creating Delivery Notes."))
 	loads = [get_locked_delivery_load(name) for name in load_names]
-	for selected_load in loads:
-		_require_customer_load(selected_load)
+	from vuna_transport.services.planning.transport_load_service import is_demand_load
+
+	loads = [load for load in loads if not is_demand_load(load)]
+	if not loads:
+		frappe.throw(_("This allocation contains only warehouse transfers; Delivery Notes are not required."))
+	load_names = [load.name for load in loads]
 	if len(loads) == 1:
 		return create_delivery_notes_for_load(loads[0])
 	existing_notes = _get_delivery_notes_for_loads(load_names)
@@ -409,7 +413,6 @@ def create_delivery_trip_for_load(load):
 	if isinstance(load, str):
 		load = frappe.get_doc("Transport Load", load)
 	load = get_locked_delivery_load(load)
-	_require_customer_load(load)
 	validate_load_is_operational(load, _("creating a Delivery Trip"))
 
 	requires_allocation = True
@@ -432,6 +435,14 @@ def create_delivery_trip_for_load(load):
 		)
 
 	loads = get_allocation_loads(allocation) if allocation else [load]
+	from vuna_transport.services.planning.transport_load_service import is_demand_load
+
+	if any(is_demand_load(selected) for selected in loads):
+		if not allocation:
+			frappe.throw(_("Warehouse transfer trips require a submitted Vehicle Allocation."))
+		from vuna_transport.services.execution.trip_task_service import make_task_trip
+
+		return make_task_trip(allocation, loads)
 	load_names = [selected_load.name for selected_load in loads]
 	trip_names = set(
 		frappe.get_all(

@@ -161,8 +161,40 @@ frappe.ui.form.on("Transport Load", {
 			});
 			if (!response.message) return;
 			if (response.message.planning_only) {
+				const allocation = response.message.vehicle_allocation;
+				if (
+					frm.doc.docstatus === 1 &&
+					!["Cancelled", "Completed", "Completed with Exceptions"].includes(
+						frm.doc.status
+					)
+				) {
+					if (!allocation) {
+						frm.add_custom_button(__("Allocate Vehicle"), () =>
+							frappe.model.open_mapped_doc({
+								method: "vuna_transport.services.fleet.vehicle_allocation_service.make_vehicle_allocation_from_load",
+								frm,
+							})
+						).addClass("btn-primary");
+					} else if (allocation.docstatus === 0) {
+						frm.add_custom_button(__("Complete Vehicle Allocation"), () =>
+							frappe.set_route("Form", "Vehicle Allocation", allocation.name)
+						);
+					} else if (!response.message.delivery_trip) {
+						frm.add_custom_button(
+							__("Delivery Trip"),
+							() =>
+								frappe.model.open_mapped_doc({
+									method: "vuna_transport.services.fleet.vehicle_allocation_service.make_delivery_trip_from_allocation",
+									source_name: allocation.name,
+								}),
+							__("Create")
+						);
+					}
+				}
 				frm.get_field("execution_overview")?.$wrapper.text(
-					__("Warehouse transfer planned. Trip-task execution is not yet available.")
+					__(
+						"Allocate the vehicle, then create its Delivery Trip. Transfer proof and stock execution will follow."
+					)
 				);
 				return;
 			}

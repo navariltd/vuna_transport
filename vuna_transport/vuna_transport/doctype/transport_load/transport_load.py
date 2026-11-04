@@ -127,7 +127,6 @@ class TransportLoad(Document):
 	@frappe.whitelist()
 	def create_delivery_trip(self):
 		self.check_permission("write")
-		self._require_delivery_execution()
 		return create_delivery_trip_for_load(self)
 
 	@frappe.whitelist()

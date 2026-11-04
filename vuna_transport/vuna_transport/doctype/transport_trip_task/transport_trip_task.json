@@ -1,0 +1,130 @@
+{
+ "doctype": "DocType",
+ "name": "Transport Trip Task",
+ "module": "Vuna Transport",
+ "engine": "InnoDB",
+ "istable": 0,
+ "autoname": "hash",
+ "fields": [
+  {"fieldname":"company","fieldtype":"Link","options":"Company","label":"Company","reqd":1,"read_only":1},
+  {
+   "fieldname": "delivery_trip",
+   "fieldtype": "Link",
+   "options": "Delivery Trip",
+   "label": "Delivery Trip",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "delivery_stop",
+   "fieldtype": "Data",
+   "label": "Delivery Stop Row",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Link",
+   "options": "Address",
+   "label": "Address",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "sequence",
+   "fieldtype": "Int",
+   "label": "Stop Sequence",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "task_type",
+   "fieldtype": "Select",
+   "options": "Customer Delivery\nTransfer Dispatch\nTransfer Receipt",
+   "label": "Task",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "options": "Planned\nReady\nCompleted\nCompleted with Variance\nFailed\nCancelled",
+   "label": "Status",
+   "default": "Planned",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "transport_load",
+   "fieldtype": "Link",
+   "options": "Transport Load",
+   "label": "Transport Load",
+   "read_only": 1
+  },
+  {
+   "fieldname": "transport_demand",
+   "fieldtype": "Link",
+   "options": "Transport Demand",
+   "label": "Transport Demand",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_note",
+   "fieldtype": "Link",
+   "options": "Delivery Note",
+   "label": "Delivery Note",
+   "read_only": 1
+  },
+  {
+   "fieldname": "task_key",
+   "fieldtype": "Data",
+   "label": "Task Key",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "options": "Transport Trip Task Item",
+   "label": "Items",
+   "read_only": 1
+  }
+ ],
+ "field_order": [
+  "company",
+  "delivery_trip",
+  "delivery_stop",
+  "address",
+  "sequence",
+  "task_type",
+  "status",
+  "transport_load",
+  "transport_demand",
+  "delivery_note",
+  "task_key",
+  "items"
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1
+  },
+  {
+   "role": "Transport Manager",
+   "read": 1
+  },
+  {
+   "role": "Transport Planner",
+   "read": 1
+  },
+  {
+   "role": "Transport Dispatcher",
+   "read": 1
+  }
+ ],
+ "sort_field": "sequence",
+ "sort_order": "ASC"
+}

@@ -484,7 +484,12 @@ def _validate_selected_load_compatibility(loads):
 	)
 
 	validate_transport_compatibility_groups(
-		[row for load in loads for row in load.delivery_orders if row.delivery_order]
+		[
+			row
+			for load in loads
+			for row in load.delivery_orders
+			if row.delivery_order or getattr(row, "transport_demand", None)
+		]
 	)
 
 
@@ -639,6 +644,9 @@ def _get_allocation_execution_state(allocation):
 	)
 	loads = get_allocation_loads(allocation)
 	statuses = [get_delivery_note_submission_status(load) for load in loads]
+	from vuna_transport.services.planning.transport_load_service import is_demand_load
+
+	task_based = any(is_demand_load(load) for load in loads)
 	trip = (
 		frappe.db.get_value(
 			"Delivery Trip", active_delivery_trip, ["name", "docstatus", "status"], as_dict=True
@@ -647,6 +655,7 @@ def _get_allocation_execution_state(allocation):
 		else None
 	)
 	return {
+		"task_based": task_based,
 		"active_delivery_trip": active_delivery_trip,
 		"ready_for_delivery_trip": not active_delivery_trip
 		and bool(statuses)
@@ -657,7 +666,9 @@ def _get_allocation_execution_state(allocation):
 		"submitted_delivery_notes": sorted(
 			{note for status in statuses for note in status["submitted_delivery_notes"]}
 		),
-		"execution_status": _get_allocation_execution_status(allocation, statuses, trip),
+		"execution_status": "Ready for Delivery Trip"
+		if task_based and not trip and all(status["ready"] for status in statuses)
+		else _get_allocation_execution_status(allocation, statuses, trip),
 	}
 
 
