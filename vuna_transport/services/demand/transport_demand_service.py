@@ -128,7 +128,7 @@ def _create_transport_demands(source_doctype, source_name, automated=False):
 		demand = frappe.get_doc({"doctype": "Transport Demand", **leg})
 		demand.flags.ignore_permissions = automated
 		demand.insert()
-		if policy.auto_submit_demand and demand.source_warehouse:
+		if policy.auto_submit_demand:
 			demand.submit()
 		names.append(demand.name)
 	return names
@@ -155,8 +155,6 @@ def validate_transport_demand(demand):
 	# the original source-leg key while the transport planner resolves its origin.
 	if not leg["source_warehouse"] and leg["movement_type"] == "Warehouse Transfer":
 		leg["source_warehouse"] = demand.source_warehouse
-	if demand.docstatus == 1 and not leg["source_warehouse"]:
-		frappe.throw(_("Select a Source Warehouse before submitting this Transport Demand."))
 	if leg["source_warehouse"] and leg["source_warehouse"] == leg["destination_warehouse"]:
 		frappe.throw(_("Source Warehouse and Destination Warehouse must be different."))
 	for warehouse_name in (leg["source_warehouse"], leg["destination_warehouse"]):

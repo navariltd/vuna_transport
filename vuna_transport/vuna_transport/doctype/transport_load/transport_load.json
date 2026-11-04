@@ -149,7 +149,7 @@
    "in_standard_filter": 1,
    "label": "Source Warehouse",
    "options": "Warehouse",
-   "reqd": 1
+   "mandatory_depends_on": "eval:doc.docstatus == 1"
   },
   {
    "fieldname": "delivery_method",
@@ -286,7 +286,8 @@
   {
    "fieldname": "required_vehicle_category",
    "fieldtype": "Link",
-   "label": "Required Vehicle Category",
+   "label": "Recommended Vehicle Category",
+   "description": "Planning recommendation only. Allocation checks the selected vehicle's actual capacity and cargo requirements.",
    "options": "Vehicle Category"
   },
   {

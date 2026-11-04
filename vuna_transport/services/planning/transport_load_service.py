@@ -35,8 +35,37 @@ def get_committed_quantities(item_names, exclude_load=None):
 	)
 
 
+def get_posted_transfer_quantities(item_names, exclude_load=None):
+	"""Posted stock already reduces MR outstanding; do not subtract it twice."""
+	if not item_names:
+		return {}
+	return dict(
+		frappe.db.sql(
+			"""select li.transport_demand_item, sum(sed.transfer_qty)
+		from `tabStock Entry Detail` sed join `tabStock Entry` se on se.name = sed.parent
+		left join `tabTransport Trip Task Item` ti on ti.name = sed.vuna_transport_task_item
+		join `tabTransport Load Item` li on li.name = coalesce(nullif(sed.vuna_transport_load_item, ''), ti.load_item)
+		where se.docstatus = 1 and se.add_to_transit = 1
+		and li.transport_demand_item in %(items)s and li.parent != %(exclude)s
+		group by li.transport_demand_item""",
+			{"items": tuple(item_names), "exclude": exclude_load or ""},
+		)
+	)
+
+
+def available_stock_quantity(snapshot, live, committed, posted=0):
+	return max(min(flt(snapshot) - flt(committed), flt(live) - max(flt(committed) - flt(posted), 0)), 0)
+
+
 def validate_demand_allocations(load):
 	"""Lock parent demands first so concurrent loads cannot over-reserve rows."""
+	if not load.source_warehouse and load.docstatus == 1:
+		frappe.throw(_("Select a Source Warehouse before submitting this Transport Load."))
+	if load.source_warehouse:
+		warehouse = frappe.get_doc("Warehouse", load.source_warehouse)
+		warehouse.check_permission("read")
+		if warehouse.company != load.company or warehouse.is_group or warehouse.disabled:
+			frappe.throw(_("The loading warehouse must be active, non-group and in the load's company."))
 	names = sorted(
 		{row.get("transport_demand") for row in load.delivery_orders if row.get("transport_demand")}
 	)
@@ -50,6 +79,9 @@ def validate_demand_allocations(load):
 	committed = get_committed_quantities(
 		[row.transport_demand_item for row in load.delivery_orders], load.name
 	)
+	posted = get_posted_transfer_quantities(
+		[row.transport_demand_item for row in load.delivery_orders], load.name
+	)
 	seen = set()
 	stops = set()
 	for row in load.delivery_orders:
@@ -58,8 +90,14 @@ def validate_demand_allocations(load):
 		require_company_access(demand.company)
 		if demand.docstatus != 1 or demand.status in ("Cancelled", "Closed"):
 			frappe.throw(_("Submit an open Transport Demand before allocating it."))
-		if demand.company != load.company or demand.source_warehouse != load.source_warehouse:
+		if demand.company != load.company or (
+			load.source_warehouse
+			and demand.source_warehouse
+			and demand.source_warehouse != load.source_warehouse
+		):
 			frappe.throw(_("Transport Load demands must share a company and loading warehouse."))
+		if load.source_warehouse and load.source_warehouse == demand.destination_warehouse:
+			frappe.throw(_("Choose a loading warehouse different from the destination before bundling."))
 		# Phase 2 keeps warehouse transfers isolated from customer execution.
 		if demand.movement_type != "Warehouse Transfer":
 			frappe.throw(_("Customer deliveries currently use the Delivery Order planning path."))
@@ -82,7 +120,9 @@ def validate_demand_allocations(load):
 		if not math.isfinite(factor) or factor <= 0:
 			frappe.throw(_("The requested UOM requires a positive conversion factor."))
 		stock_quantity = flt(quantity * factor, row.precision("allocated_stock_qty"))
-		available = max(min(flt(item.stock_qty), flt(live["stock_qty"])) - flt(committed.get(item.name)), 0)
+		available = available_stock_quantity(
+			item.stock_qty, live["stock_qty"], committed.get(item.name), posted.get(item.name)
+		)
 		if (
 			item.name in seen
 			or not math.isfinite(quantity)
@@ -136,7 +176,7 @@ def validate_demand_allocations(load):
 
 
 @frappe.whitelist()
-def create_transport_load_from_demands(allocations: list | str) -> str:
+def create_transport_load_from_demands(allocations: list | str, source_warehouse: str | None = None) -> str:
 	"""Create a draft from quantities expressed in the requested transaction UOM."""
 	require_doctype_permission("Transport Load", "create")
 	rows = frappe.parse_json(allocations) if isinstance(allocations, str) else allocations
@@ -144,11 +184,9 @@ def create_transport_load_from_demands(allocations: list | str) -> str:
 		frappe.throw(_("Select between 1 and 500 Transport Demand items."))
 	first = frappe.get_doc("Transport Demand", rows[0].get("transport_demand"))
 	first.check_permission("read")
-	if not first.source_warehouse:
-		frappe.throw(_("Select and submit the demand's Source Warehouse before creating a Transport Load."))
 	load = frappe.new_doc("Transport Load")
 	load.company = first.company
-	load.source_warehouse = first.source_warehouse
+	load.source_warehouse = source_warehouse or first.source_warehouse
 	load.dispatch_date = first.required_date
 	load.status = "Proposed"
 	for row in rows:
@@ -164,7 +202,7 @@ def create_transport_load_from_demands(allocations: list | str) -> str:
 
 
 @frappe.whitelist()
-def bundle_transport_demands(demand_names: list | str) -> str:
+def bundle_transport_demands(demand_names: list | str, source_warehouse: str | None = None) -> str:
 	"""Bundle outstanding items from planner-selected submitted demands."""
 	require_doctype_permission("Transport Load", "create")
 	names = frappe.parse_json(demand_names) if isinstance(demand_names, str) else demand_names
@@ -186,7 +224,7 @@ def bundle_transport_demands(demand_names: list | str) -> str:
 						"allocated_quantity": quantity,
 					}
 				)
-	return create_transport_load_from_demands(allocations)
+	return create_transport_load_from_demands(allocations, source_warehouse=source_warehouse)
 
 
 @frappe.whitelist()
@@ -205,8 +243,11 @@ def get_transfer_planning_items(
 	if date_from and date_to and getdate(date_from) > getdate(date_to):
 		frappe.throw(_("Required date range is invalid."))
 	filters = [["company", "=", company], ["docstatus", "=", 1], ["movement_type", "=", "Warehouse Transfer"]]
-	if source_warehouse:
-		filters.append(["source_warehouse", "=", source_warehouse])
+	or_filters = (
+		[["source_warehouse", "=", source_warehouse], ["source_warehouse", "is", "not set"]]
+		if source_warehouse
+		else None
+	)
 	if date_from:
 		filters.append(["required_date", ">=", date_from])
 	if date_to:
@@ -214,6 +255,7 @@ def get_transfer_planning_items(
 	demands = frappe.get_list(
 		"Transport Demand",
 		filters=filters,
+		or_filters=or_filters,
 		pluck="name",
 		order_by="required_date asc, name asc",
 		limit_start=max(cint(start), 0),
@@ -228,9 +270,10 @@ def get_transfer_planning_items(
 		leg = next((leg for leg in build_source_legs(source) if leg["source_key"] == demand.source_key), None)
 		live = {item["source_item"]: item["stock_qty"] for item in (leg or {}).get("items", [])}
 		committed = get_committed_quantities([item.name for item in demand.items])
+		posted = get_posted_transfer_quantities([item.name for item in demand.items])
 		for item in demand.items:
-			available = max(
-				min(flt(item.stock_qty), flt(live.get(item.source_item))) - flt(committed.get(item.name)), 0
+			available = available_stock_quantity(
+				item.stock_qty, live.get(item.source_item), committed.get(item.name), posted.get(item.name)
 			)
 			if available <= 0:
 				continue

@@ -38,14 +38,9 @@ def run():
 				demand = frappe.get_doc("Transport Demand", demand_name)
 				if demand.source_warehouse:
 					continue
-				assert demand.docstatus == 0
-				try:
+				if demand.docstatus == 0:
 					demand.submit()
-				except frappe.ValidationError:
-					pass
-				else:
-					raise AssertionError("Demand submitted without a fulfilment warehouse")
-				demand.reload()
+				assert not demand.source_warehouse
 				warehouse = frappe.db.get_value(
 					"Warehouse",
 					{
@@ -57,9 +52,6 @@ def run():
 					"name",
 				)
 				assert warehouse
-				demand.source_warehouse = warehouse
-				demand.save()
-				demand.submit()
 				item = demand.items[0]
 				load = frappe.get_doc(
 					"Transport Load",
@@ -70,10 +62,11 @@ def run():
 								"transport_demand_item": item.name,
 								"allocated_quantity": item.transaction_qty,
 							}
-						]
+						],
 					),
 				)
 				row = load.delivery_orders[0]
+				assert load.docstatus == 0 and not load.source_warehouse
 				assert row.uom == item.transaction_uom
 				assert flt(row.allocated_quantity) == flt(item.transaction_qty)
 				assert abs(flt(row.allocated_stock_qty) - flt(item.stock_qty)) < 1e-6
@@ -81,12 +74,23 @@ def run():
 				preview = collect_load_items([load])[0]
 				assert preview["uom"] == item.transaction_uom
 				assert preview["qty"] == flt(item.transaction_qty)
+				try:
+					load.submit()
+				except frappe.ValidationError:
+					pass
+				else:
+					raise AssertionError("Load submitted without a source warehouse")
+				load.reload()
+				load.source_warehouse = warehouse
+				load.save()
 				load.submit()
 				summary = get_load_execution_summary(load.name)
 				assert summary["planning_only"] and not summary["vehicle_allocation"]
 				allocation = make_vehicle_allocation_from_load(load.name)
 				assert allocation.delivery_loads[0].delivery_load == load.name
 				return {
+					"source_free_draft_load": "passed",
+					"source_required_on_submission": "passed",
 					"deferred_source": "passed",
 					"requested_uom": item.transaction_uom,
 					"quantity": item.transaction_qty,
