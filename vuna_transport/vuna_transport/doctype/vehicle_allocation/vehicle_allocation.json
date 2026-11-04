@@ -131,7 +131,7 @@
   {
    "fieldname": "required_vehicle_category",
    "fieldtype": "Link",
-   "label": "Required Vehicle Category",
+   "label": "Vehicle Category",
    "options": "Vehicle Category",
    "reqd": 1
   },
@@ -150,7 +150,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nAllocated\nAwaiting Delivery Notes\nReady for Delivery Trip\nDelivery Trip Draft\nDelivery Trip Scheduled\nIn Transit\nCompleted\nAccepted\nRejected\nReplaced\nCancelled",
+   "options": "Draft\nAllocated\nAwaiting Delivery Notes\nAwaiting Transfer Stock Entry\nReady for Delivery Trip\nDelivery Trip Draft\nDelivery Trip Scheduled\nIn Transit\nCompleted\nAccepted\nRejected\nReplaced\nCancelled",
    "read_only": 1
   },
   {
