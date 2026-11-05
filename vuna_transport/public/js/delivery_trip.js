@@ -1,6 +1,21 @@
 /* global erpnext */
 
+function is_depot_only_stop(frm, stop) {
+	return (
+		stop.vuna_stop_type === "Depot" ||
+		(frm.doc.vuna_task_based &&
+			stop.vuna_task_keys &&
+			!stop.delivery_note &&
+			stop.vuna_stop_type !== "Mixed")
+	);
+}
+
 frappe.ui.form.on("Delivery Stop", {
+	form_render(frm, cdt, cdn) {
+		const stop = frappe.get_doc(cdt, cdn);
+		const row = frm.fields_dict.delivery_stops.grid.grid_rows_by_docname[cdn];
+		if (row) row.toggle_editable("customer", !is_depot_only_stop(frm, stop));
+	},
 	async vuna_record_collection(frm, cdt, cdn) {
 		if (
 			frm.doc.docstatus !== 1 ||
@@ -53,6 +68,12 @@ frappe.ui.form.on("Delivery Trip", {
 	refresh(frm) {
 		const grid = frm.fields_dict?.delivery_stops?.grid;
 		if (grid) {
+			const stops = frm.doc.delivery_stops || [];
+			grid.update_docfield_property(
+				"customer",
+				"hidden",
+				stops.length > 0 && stops.every((stop) => is_depot_only_stop(frm, stop))
+			);
 			grid.update_docfield_property("vuna_record_collection", "hidden", true);
 			if (
 				frm.doc.docstatus === 1 &&

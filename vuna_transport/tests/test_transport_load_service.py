@@ -69,6 +69,7 @@ class TestTransportLoadAllocations(unittest.TestCase):
 			source_warehouse="Main",
 			destination_warehouse="Depot",
 			movement_type="Warehouse Transfer",
+			source_document_type="Material Request",
 			source_key="leg",
 			items=[self.item],
 		)
@@ -118,8 +119,32 @@ class TestTransportLoadAllocations(unittest.TestCase):
 		with self.assertRaises(ValueError):
 			validate_demand_allocations(self.load)
 
-	def test_chosen_source_must_match_a_known_demand_origin(self):
+	def test_material_request_can_be_fulfilled_from_another_loading_warehouse(self):
 		self.load.source_warehouse = "Other"
+		validate_demand_allocations(self.load)
+		self.assertEqual(self.demand.source_warehouse, "Main")
+		self.assertEqual(self.load.source_warehouse, "Other")
+		self.assertEqual(self.row.allocated_stock_qty, 40)
+
+	def test_return_pickup_source_must_match_custody(self):
+		self.demand.source_document_type = "Return Request"
+		self.load.source_warehouse = "Other"
+		with self.assertRaises(ValueError):
+			validate_demand_allocations(self.load)
+
+	def test_planning_pool_includes_material_requests_from_other_preferred_origins(self):
+		from vuna_transport.services.planning.transport_load_service import get_transfer_planning_items
+
+		self.framework.get_list.return_value = []
+		with patch("vuna_transport.services.planning.transport_load_service.require_doctype_permission"):
+			get_transfer_planning_items("Company", source_warehouse="Production")
+		self.assertIn(
+			["source_document_type", "=", "Material Request"],
+			self.framework.get_list.call_args.kwargs["or_filters"],
+		)
+
+	def test_loading_warehouse_cannot_equal_the_destination(self):
+		self.load.source_warehouse = "Depot"
 		with self.assertRaises(ValueError):
 			validate_demand_allocations(self.load)
 
@@ -152,3 +177,37 @@ class TestTransportLoadAllocations(unittest.TestCase):
 		self.load.delivery_orders.append(self.row)
 		with self.assertRaises(ValueError):
 			validate_demand_allocations(self.load)
+
+
+class TestLoadingWarehouseChangeGuard(unittest.TestCase):
+	def setUp(self):
+		from vuna_transport.vuna_transport.doctype.transport_load import transport_load
+
+		self.validate = transport_load._validate_source_warehouse_change
+		self.framework = self.enterContext(patch.object(transport_load, "frappe"))
+		self.framework.throw.side_effect = ValueError
+		self.enterContext(patch.object(transport_load, "_", side_effect=lambda value: value))
+		self.framework.db.exists.return_value = False
+		self.load = MagicMock(docstatus=0, source_warehouse="Production", pick_list=None, delivery_trip=None)
+		self.load.name = "TL-1"
+		self.load.get_doc_before_save.return_value = MagicMock(source_warehouse="Preferred Main")
+
+	def test_draft_source_can_change_before_execution(self):
+		self.validate(self.load)
+
+	def test_submitted_source_can_change_before_execution(self):
+		self.load.docstatus = 1
+		self.validate(self.load)
+
+	def test_existing_dispatch_stock_blocks_source_change(self):
+		for status in (0, 1):
+			with self.subTest(docstatus=status):
+				self.load.docstatus = status
+				self.framework.db.exists.side_effect = lambda doctype, filters: doctype == "Stock Entry"
+				with self.assertRaises(ValueError):
+					self.validate(self.load)
+
+	def test_existing_trip_blocks_source_change(self):
+		self.load.delivery_trip = "TRIP-1"
+		with self.assertRaises(ValueError):
+			self.validate(self.load)

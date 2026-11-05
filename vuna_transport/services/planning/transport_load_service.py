@@ -18,6 +18,16 @@ def is_demand_load(load):
 	)
 
 
+def demand_origin_matches_load(demand, load):
+	"""MR source is a preference; other demands retain their custody origin."""
+	return (
+		demand.source_document_type == "Material Request"
+		or not load.source_warehouse
+		or not demand.source_warehouse
+		or demand.source_warehouse == load.source_warehouse
+	)
+
+
 def get_committed_quantities(item_names, exclude_load=None):
 	if not item_names:
 		return {}
@@ -103,12 +113,14 @@ def validate_demand_allocations(load):
 		require_company_access(demand.company)
 		if demand.docstatus != 1 or demand.status in ("Cancelled", "Closed"):
 			frappe.throw(_("Submit an open Transport Demand before allocating it."))
-		if demand.company != load.company or (
-			load.source_warehouse
-			and demand.source_warehouse
-			and demand.source_warehouse != load.source_warehouse
-		):
-			frappe.throw(_("Transport Load demands must share a company and loading warehouse."))
+		if demand.company != load.company:
+			frappe.throw(_("Transport Load demands must belong to the load's company."))
+		if not demand_origin_matches_load(demand, load):
+			frappe.throw(
+				_("The loading warehouse must match the demand's pickup custody warehouse {0}.").format(
+					demand.source_warehouse
+				)
+			)
 		if load.source_warehouse and load.source_warehouse == demand.destination_warehouse:
 			frappe.throw(_("Choose a loading warehouse different from the destination before bundling."))
 		# Phase 2 keeps warehouse transfers isolated from customer execution.
@@ -257,7 +269,11 @@ def get_transfer_planning_items(
 		frappe.throw(_("Required date range is invalid."))
 	filters = [["company", "=", company], ["docstatus", "=", 1], ["movement_type", "=", "Warehouse Transfer"]]
 	or_filters = (
-		[["source_warehouse", "=", source_warehouse], ["source_warehouse", "is", "not set"]]
+		[
+			["source_warehouse", "=", source_warehouse],
+			["source_warehouse", "is", "not set"],
+			["source_document_type", "=", "Material Request"],
+		]
 		if source_warehouse
 		else None
 	)
