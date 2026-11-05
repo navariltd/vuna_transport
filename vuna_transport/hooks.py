@@ -222,23 +222,34 @@ doc_events = {
 	},
 	"Stock Entry": {
 		"validate": [
+			"vuna_transport.services.execution.depot_return_receiving_service.validate_vehicle_receipt",
+			"vuna_transport.services.execution.unplanned_pickup_service.validate_collection_stock",
+			"vuna_transport.services.execution.return_pickup_service.validate_pickup_stock",
 			"vuna_transport.services.execution.allocation_transfer_service.validate_allocation_stock_entry",
 			"vuna_transport.services.execution.transfer_execution_service.validate_dispatch_stock_entry",
 			"vuna_transport.services.execution.transfer_proof_service.validate_receipt_stock_entry",
 		],
 		"before_submit": "vuna_transport.services.execution.return_v2_service.validate_return_stock_entry",
 		"before_cancel": [
+			"vuna_transport.services.execution.return_pickup_service.guard_pickup_stock_cancellation",
 			"vuna_transport.services.execution.allocation_transfer_service.guard_allocation_stock_cancellation",
 			"vuna_transport.services.execution.transfer_execution_service.guard_dispatch_cancellation",
 			"vuna_transport.services.execution.return_v2_service.prepare_return_stock_entry_removal",
 		],
 		"on_submit": [
+			"vuna_transport.services.execution.depot_return_receiving_service.sync_vehicle_receipt",
+			"vuna_transport.services.execution.unplanned_pickup_service.sync_collection_stock",
+			"vuna_transport.services.execution.return_pickup_service.sync_pickup_stock",
 			"vuna_transport.services.execution.return_v2_service.sync_return_inspection_from_stock_entry",
 			"vuna_transport.services.execution.allocation_transfer_service.sync_allocation_stock",
 			"vuna_transport.services.execution.transfer_execution_service.sync_dispatch_load_status",
 			"vuna_transport.services.execution.transfer_proof_service.sync_receipt_stock",
 		],
 		"on_cancel": [
+			"vuna_transport.services.execution.depot_return_receiving_service.sync_vehicle_receipt",
+			"vuna_transport.services.execution.return_pickup_service.guard_pickup_stock_cancellation",
+			"vuna_transport.services.execution.unplanned_pickup_service.sync_collection_stock",
+			"vuna_transport.services.execution.return_pickup_service.sync_pickup_stock",
 			"vuna_transport.services.execution.return_v2_service.sync_return_inspection_from_stock_entry",
 			"vuna_transport.services.execution.allocation_transfer_service.sync_allocation_stock",
 			"vuna_transport.services.execution.transfer_execution_service.sync_dispatch_load_status",
@@ -352,6 +363,7 @@ doc_events = {
 }
 
 doctype_js = {
+	"Stock Entry": "public/js/return_pickup_stock_entry.js",
 	"Material Request": "public/js/material_request_transport.js",
 	"Address": "public/js/address.js",
 	"Delivery Note": "public/js/delivery_note.js",

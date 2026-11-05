@@ -1,5 +1,6 @@
 {
  "custom_fields": [
+  {"dt":"Delivery Stop","fieldname":"vuna_record_collection","fieldtype":"Button","label":"Record Unplanned Collection","depends_on":"eval:doc.docstatus == 1","insert_after":"address","module":"Vuna Transport","name":"Delivery Stop-vuna_record_collection","allow_on_submit":1},
   {"dt":"Delivery Stop","fieldname":"vuna_task_keys","fieldtype":"Small Text","label":"Transport Task Keys","hidden":1,"read_only":1,"insert_after":"address","module":"Vuna Transport","name":"Delivery Stop-vuna_task_keys"},
   {
    "_assign": null,

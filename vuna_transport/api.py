@@ -47,6 +47,50 @@ from vuna_transport.services.shared.workflow_policy_service import (
 
 
 @frappe.whitelist()
+def report_mobile_unplanned_collection(
+	installation_id: str, trip_name: str, payload: dict | str, device_identifier: str | None = None
+):
+	from vuna_transport.services.execution.unplanned_pickup_service import report_collection
+
+	return report_collection(installation_id, trip_name, payload, device_identifier)
+
+
+@frappe.whitelist()
+def get_mobile_unplanned_collections(
+	installation_id: str, trip_name: str, stop_name: str, device_identifier: str | None = None
+):
+	from vuna_transport.services.execution.unplanned_pickup_service import collection_history
+
+	return collection_history(installation_id, trip_name, stop_name, device_identifier)
+
+
+@frappe.whitelist()
+def get_mobile_collection_setup(
+	installation_id: str, trip_name: str, stop_name: str, device_identifier: str | None = None
+):
+	from vuna_transport.services.execution.unplanned_pickup_service import collection_setup
+
+	return collection_setup(installation_id, trip_name, stop_name, device_identifier)
+
+
+@frappe.whitelist()
+def search_mobile_collection_items(
+	installation_id: str,
+	trip_name: str,
+	stop_name: str,
+	reference_doctype: str,
+	reference_name: str,
+	txt: str = "",
+	device_identifier: str | None = None,
+):
+	from vuna_transport.services.execution.unplanned_pickup_service import collection_catalog
+
+	return collection_catalog(
+		installation_id, trip_name, stop_name, reference_doctype, reference_name, txt, device_identifier
+	)
+
+
+@frappe.whitelist()
 def submit_mobile_transport_proof(
 	installation_id: str, task_name: str, payload: dict | str, device_identifier: str | None = None
 ):
@@ -75,6 +119,10 @@ def prepare_mobile_transport_proof(
 		"docstatus": proof.docstatus,
 		"task": task.name,
 		"task_type": task.task_type,
+		"return_request": task.get("return_request") or proof.return_request,
+		"return_context": frappe.db.get_value("Return Request", task.return_request, "return_context")
+		if task.get("return_request")
+		else None,
 		"items": [
 			{**row.as_dict(), "qty": row.delivered_qty, "planned_qty": row.ordered_qty} for row in proof.items
 		],

@@ -31,9 +31,26 @@ class ReturnRequest(Document):
 
 	def on_submit(self):
 		recalculate_return_request(self.name)
+		if self.return_context == "Depot":
+			from vuna_transport.services.demand.source_policy_service import automatically_create_from_source
+
+			automatically_create_from_source(self)
 
 	def before_cancel(self):
-		self.ignore_linked_doctypes = ["Proof of Delivery"]
+		from vuna_transport.services.execution.direct_return_pickup_service import guard_return_cancellation
+
+		guard_return_cancellation(self)
+		if self.return_context == "Depot":
+			if frappe.db.exists("Return Inspection", {"return_request": self.name, "docstatus": ["!=", 2]}):
+				frappe.throw(_("Cancel or delete depot Return Inspections before cancelling this request."))
+			from vuna_transport.services.execution.depot_return_service import depot_return_state
+
+			if depot_return_state(self)["returned_qty"]:
+				frappe.throw(_("Cancel the receiving Stock Entries before cancelling this depot return."))
+			from vuna_transport.services.planning.demand_lifecycle_service import guard_source_cancellation
+
+			guard_source_cancellation(self)
+		self.ignore_linked_doctypes = ["Proof of Delivery", "Transport Trip Task"]
 		if self.process_version == "Custody and Inspection":
 			self.ignore_linked_doctypes.append("Return Inspection")
 		for doctype, fieldname, label in (
@@ -54,10 +71,16 @@ class ReturnRequest(Document):
 				frappe.throw(_("Cancel {0} {1} before cancelling this Return Request.").format(label, name))
 
 	def on_cancel(self):
+		from vuna_transport.services.execution.unplanned_pickup_service import unlink_collection_cases
+
+		unlink_collection_cases(self)
 		self.unlink_proof_of_delivery()
 		self.db_set("status", "Cancelled", update_modified=False)
 
 	def on_trash(self):
+		from vuna_transport.services.execution.unplanned_pickup_service import unlink_collection_cases
+
+		unlink_collection_cases(self)
 		self.unlink_proof_of_delivery()
 
 	def unlink_proof_of_delivery(self):

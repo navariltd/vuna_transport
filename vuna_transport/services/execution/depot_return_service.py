@@ -79,9 +79,17 @@ def create_depot_return_from_pod(pod):
 
 def validate_depot_return(request):
 	if not request.proof_of_delivery:
-		frappe.throw(_("Depot rejection returns require a submitted POD."))
+		from vuna_transport.services.execution.manual_depot_return_service import validate_manual_depot_return
+
+		validate_manual_depot_return(request)
+		return
 	frappe.db.get_value("Proof of Delivery", request.proof_of_delivery, "name", for_update=True)
 	pod = frappe.get_doc("Proof of Delivery", request.proof_of_delivery)
+	if pod.proof_type == "Unplanned Collection":
+		from vuna_transport.services.execution.unplanned_pickup_service import validate_depot_collection_case
+
+		validate_depot_collection_case(request, pod)
+		return
 	if (
 		pod.docstatus != 1
 		or pod.proof_type != "Transfer Receipt"
@@ -158,20 +166,89 @@ def validate_depot_return(request):
 	if seen != set(expected):
 		frappe.throw(_("Keep all rejected POD item groups in the Return Request."))
 	state = depot_return_state(request)
+	for row in request.items:
+		row.received_qty = state["returned_by_item"].get(row.name, 0)
+		row.remaining_qty = max(flt(row.requested_return_qty) - row.received_qty, 0)
 	for field in ("status", "expected_return_qty", "returned_qty", "return_difference_qty"):
 		request.set(field, state[field])
 
 
 def depot_return_state(request):
 	expected = sum(flt(row.requested_return_qty) for row in request.items)
+	stock_received = dict(
+		frappe.db.sql(
+			"""select picked.vuna_return_request_item, sum(received.transfer_qty)
+		from `tabStock Entry Detail` received
+		join `tabStock Entry` receipt on receipt.name=received.parent and receipt.docstatus=1
+		join `tabStock Entry Detail` picked on picked.name=received.ste_detail
+		join `tabStock Entry` pickup on pickup.name=picked.parent and pickup.docstatus=1
+		where pickup.vuna_return_pickup_proof is not null and pickup.add_to_transit=1
+		and receipt.outgoing_stock_entry=pickup.name
+		and received.t_warehouse=%(warehouse)s
+		and picked.vuna_return_request_item in %(items)s group by picked.vuna_return_request_item""",
+			{
+				"items": tuple(row.name for row in request.items) or ("",),
+				"warehouse": request.return_warehouse,
+			},
+		)
+	)
+	for item_name, quantity in frappe.db.sql(
+		"""select d.vuna_return_request_item, sum(d.transfer_qty)
+		from `tabStock Entry Detail` d join `tabStock Entry` s on s.name=d.parent
+		where s.docstatus=1 and s.add_to_transit=0 and s.vuna_return_request=%s
+		group by d.vuna_return_request_item""",
+		request.name,
+	):
+		stock_received[item_name] = flt(stock_received.get(item_name)) + flt(quantity)
+	by_item = {
+		row.name: min(
+			flt(row.requested_return_qty),
+			flt(stock_received.get(row.name)) / (flt(row.conversion_factor) or 1),
+		)
+		for row in request.items
+	}
+	received = sum(by_item.values())
+	progress = inspection_progress(request)
+	quality = {"Accepted": {}, "Rejected": {}}
+	for item_name, result, quantity in frappe.db.sql(
+		"""select r.return_request_item, r.result, sum(r.inspection_qty)
+		from `tabReturn Inspection Result` r join `tabReturn Inspection` i on i.name=r.parent
+		where i.return_request=%s and i.docstatus=1
+		group by r.return_request_item, r.result""",
+		request.name,
+	):
+		if result in quality:
+			quality[result][item_name] = flt(quantity)
 	return {
 		"status": "Cancelled"
 		if request.docstatus == 2
 		else "Draft"
 		if request.docstatus == 0
+		else "Resolved"
+		if received >= expected and expected and progress["posted"] >= sum(stock_received.values())
+		else "Awaiting Disposition"
+		if received >= expected and expected and progress["inspected"] >= sum(stock_received.values())
+		else "Awaiting Inspection"
+		if received >= expected and expected
 		else "Awaiting Receipt",
 		"expected_return_qty": expected,
-		"returned_qty": 0,
-		"return_difference_qty": expected,
-		"returned_by_item": {row.source_pod_item: 0 for row in request.items},
+		"returned_qty": received,
+		"return_difference_qty": max(expected - received, 0),
+		"returned_by_item": by_item,
+		"accepted_by_item": quality["Accepted"],
+		"rejected_by_item": quality["Rejected"],
 	}
+
+
+def inspection_progress(request):
+	"""Physical stock and submitted inspection/redistribution, never client counters."""
+	inspected = posted = 0.0
+	for row in frappe.get_all(
+		"Return Inspection",
+		filters={"return_request": request.name, "docstatus": 1},
+		fields=["total_inspected_stock_qty", "stock_entry"],
+	):
+		inspected += flt(row.total_inspected_stock_qty)
+		if row.stock_entry and frappe.db.get_value("Stock Entry", row.stock_entry, "docstatus") == 1:
+			posted += flt(row.total_inspected_stock_qty)
+	return {"inspected": inspected, "posted": posted}

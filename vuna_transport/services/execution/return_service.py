@@ -502,9 +502,16 @@ def _apply_return_state(request, state):
 	request.return_difference_qty = state["return_difference_qty"]
 	for row in request.items:
 		row.received_qty = state["returned_by_item"].get(
-			getattr(row, "source_pod_item", None) or row.delivery_note_item or row.sales_invoice_item, 0
+			row.name
+			if request.get("return_context") == "Depot"
+			else getattr(row, "source_pod_item", None) or row.delivery_note_item or row.sales_invoice_item,
+			0,
 		)
 		row.remaining_qty = max(flt(row.requested_return_qty) - flt(row.received_qty), 0)
+		if request.get("return_context") == "Depot":
+			factor = flt(row.conversion_factor) or 1
+			row.accepted_return_qty = state.get("accepted_by_item", {}).get(row.name, 0) / factor
+			row.rejected_return_qty = state.get("rejected_by_item", {}).get(row.name, 0) / factor
 
 
 def recalculate_return_request(return_request):
@@ -526,10 +533,15 @@ def recalculate_return_request(return_request):
 		update_modified=False,
 	)
 	for row in request.items:
+		values = {"received_qty": row.received_qty, "remaining_qty": row.remaining_qty}
+		if request.get("return_context") == "Depot":
+			values.update(
+				accepted_return_qty=row.accepted_return_qty, rejected_return_qty=row.rejected_return_qty
+			)
 		frappe.db.set_value(
 			"Return Request Item",
 			row.name,
-			{"received_qty": row.received_qty, "remaining_qty": row.remaining_qty},
+			values,
 			update_modified=False,
 		)
 	return state

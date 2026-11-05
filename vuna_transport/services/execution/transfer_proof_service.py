@@ -34,6 +34,12 @@ def proof_context(task):
 		)
 	name = get_dispatch_entry(task.name)
 	stock = frappe.get_doc("Stock Entry", name) if name else None
+	if (
+		not stock
+		and frappe.db.get_value("Transport Demand", task.transport_demand, "source_document_type")
+		== "Return Request"
+	):
+		frappe.throw(_("Record the return pickup POD before confirming receipt at the destination."))
 	if not stock or stock.docstatus != 1 or not stock.add_to_transit or stock.company != task.company:
 		frappe.throw(_("Submit the linked Add-to-Transit Stock Entry before recording transfer proof."))
 	if stock.get("vuna_vehicle_allocation"):
@@ -105,6 +111,10 @@ def make_transfer_proof(source_name: str):
 
 
 def prepare_proof(task):
+	if task.task_type == "Return Pickup":
+		from vuna_transport.services.execution.return_pickup_service import prepare_pickup_proof
+
+		return prepare_pickup_proof(task)
 	trip, stock = proof_context(task)
 	if existing := frappe.db.get_value(
 		"Proof of Delivery", {"transport_trip_task": task.name, "docstatus": ["!=", 2]}, "name"
@@ -278,6 +288,15 @@ def derive_transfer_status(task):
 		as_dict=True,
 	)
 	if not proof:
+		if (
+			task.task_type == "Transfer Receipt"
+			and frappe.db.get_value("Transport Demand", task.transport_demand, "source_document_type")
+			== "Return Request"
+		):
+			from vuna_transport.services.execution.return_pickup_service import failed_pickup
+
+			if failed_pickup(task):
+				return "Failed"
 		return "Ready"
 	if not frappe.db.exists("Stock Entry", {"vuna_transport_proof": proof.name, "docstatus": 1}):
 		depot_receipt = proof.outcome == "Failed" and frappe.db.exists(
@@ -316,12 +335,16 @@ def make_receipt_stock_entry(source_name: str):
 	return _make_receipt_stock_entry(proof)
 
 
-def _make_receipt_stock_entry(proof, check_permissions=True):
+def _make_receipt_stock_entry(proof, check_permissions=True, allow_draft_proof=False):
 	task = _lock_task(proof.transport_trip_task)
 	_trip, stock = proof_context(task)
 	if check_permissions:
 		require_document_permission(stock)
-	if proof.docstatus != 1 or proof.proof_type != "Transfer Receipt" or not receipt_groups(proof):
+	if (
+		proof.docstatus not in ((0, 1) if allow_draft_proof else (1,))
+		or proof.proof_type != "Transfer Receipt"
+		or not receipt_groups(proof)
+	):
 		frappe.throw(_("Submit a receipt proof with positive received quantities first."))
 	if existing := frappe.db.get_value(
 		"Stock Entry", {"vuna_transport_proof": proof.name, "docstatus": ["!=", 2]}, "name"
@@ -353,6 +376,7 @@ def _make_receipt_stock_entry(proof, check_permissions=True):
 	demand = frappe.get_doc("Transport Demand", task.transport_demand)
 	entry.set("items", [])
 	entry.vuna_transport_task = None
+	entry.vuna_return_pickup_proof = None
 	entry.vuna_vehicle_allocation = entry.vuna_transport_load = None
 	entry.vuna_transport_proof = proof.name
 	entry.stock_entry_type = entry.purpose = "Material Transfer"
@@ -469,7 +493,11 @@ def validate_receipt_stock_entry(doc, method=None):
 	_lock_task(proof.transport_trip_task)
 	if not doc.flags.ignore_permissions:
 		require_document_permission(proof)
-	if proof.docstatus != 1 or proof.proof_type != "Transfer Receipt" or not receipt_groups(proof):
+	if (
+		(proof.docstatus != 1 and not (proof.docstatus == 0 and doc.docstatus == 0))
+		or proof.proof_type != "Transfer Receipt"
+		or not receipt_groups(proof)
+	):
 		frappe.throw(_("End Transit requires a submitted receipt proof."))
 	task = frappe.get_doc("Transport Trip Task", proof.transport_trip_task)
 	_trip, stock = proof_context(task)
@@ -534,7 +562,14 @@ def validate_receipt_stock_entry(doc, method=None):
 
 def sync_receipt_stock(doc, method=None):
 	if doc.get("vuna_transport_proof"):
-		sync_proof(frappe.get_doc("Proof of Delivery", doc.vuna_transport_proof))
+		proof = frappe.get_doc("Proof of Delivery", doc.vuna_transport_proof)
+		sync_proof(proof)
+		task = frappe.get_doc("Transport Trip Task", proof.transport_trip_task)
+		demand = frappe.get_doc("Transport Demand", task.transport_demand)
+		if demand.source_document_type == "Return Request":
+			from vuna_transport.services.execution.return_service import recalculate_return_request
+
+			recalculate_return_request(demand.source_document)
 
 
 def submit_mobile_transfer_proof(installation_id, task_name, payload, device_identifier=None):

@@ -7,6 +7,7 @@
   "editable_grid": 1,
   "engine": "InnoDB",
   "field_order": [
+    "collection_reference_row",
     "source_row",
     "source_bundle",
     "serial_no",
@@ -38,6 +39,13 @@
   ],
   "fields": [
     {
+      "fieldname": "collection_reference_row",
+      "fieldtype": "Data",
+      "label": "Collection Reference Item Row",
+      "hidden": 1,
+      "read_only": 1
+    },
+    {
       "fieldname": "rejected_goods_handling",
       "label": "Where Are the Rejected Goods?",
       "fieldtype": "Select",
@@ -68,7 +76,7 @@
     { "fieldname": "remarks", "label": "Remarks", "fieldtype": "Small Text" },
     {
       "fieldname": "source_row",
-      "label": "Stock Entry Row",
+      "label": "Source Stock / Return Row",
       "fieldtype": "Data",
       "read_only": 1,
       "hidden": 1

@@ -11,6 +11,8 @@
   "column_break_uaca",
   "target_warehouse",
   "delivery_note_item",
+  "stock_entry_detail",
+  "return_request_item",
   "serial_and_batch_bundle",
   "quality_inspection",
   "section_break_jmse",
@@ -32,8 +34,23 @@
    "label": "Delivery Note Item",
    "options": "Delivery Note Item",
    "hidden": 1,
-   "read_only": 1,
-   "reqd": 1
+   "read_only": 1
+  },
+  {
+   "fieldname": "stock_entry_detail",
+   "fieldtype": "Link",
+   "label": "Receiving Stock Entry Item",
+   "options": "Stock Entry Detail",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "return_request_item",
+   "fieldtype": "Link",
+   "label": "Return Request Item",
+   "options": "Return Request Item",
+   "hidden": 1,
+   "read_only": 1
   },
   {
    "fieldname": "serial_and_batch_bundle",
@@ -94,8 +111,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Target Warehouse",
-	"options": "Warehouse",
-	"reqd": 1
+   "options": "Warehouse"
   },
   {
    "fieldname": "batch_no",

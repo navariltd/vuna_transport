@@ -29,6 +29,9 @@ def sync_demand_allocations(names):
 	if not names:
 		return
 	lock_demands(names)
+	from vuna_transport.services.demand.depot_return_demand_service import unpicked_releases
+
+	releases = unpicked_releases()
 	for name in names:
 		demand = frappe.get_doc("Transport Demand", name)
 		if demand.docstatus != 1:
@@ -50,6 +53,7 @@ def sync_demand_allocations(names):
 		states = []
 		for item in demand.items:
 			values = by_item.get(item.name, frappe._dict(reserved=0, allocated=0))
+			values.allocated = max(flt(values.allocated) - flt(releases.get(item.name)), 0)
 			frappe.db.set_value(
 				"Transport Demand Item",
 				item.name,

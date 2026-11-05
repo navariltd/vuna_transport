@@ -641,6 +641,10 @@ def _get_allocation_execution_state(allocation):
 	transfer_stock = []
 	for load in loads:
 		if is_demand_load(load):
+			from vuna_transport.services.demand.depot_return_demand_service import is_return_load
+
+			if is_return_load(load):
+				continue
 			stock = allocation_stock_entry(allocation.name, load.name)
 			transfer_stock.append(
 				{

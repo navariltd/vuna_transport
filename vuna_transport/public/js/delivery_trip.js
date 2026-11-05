@@ -1,5 +1,41 @@
 /* global erpnext */
 
+frappe.ui.form.on("Delivery Stop", {
+	async vuna_record_collection(frm, cdt, cdn) {
+		if (
+			frm.doc.docstatus !== 1 ||
+			!frm.doc.vuna_actual_start ||
+			frm.doc.vuna_actual_completion ||
+			frm.doc.status === "Completed"
+		) {
+			frappe.msgprint(__("Collections require a started, active trip."));
+			return;
+		}
+		const { message } = await frappe.call({
+			method: "vuna_transport.services.execution.unplanned_pickup_policy.get_unplanned_pickup_policy",
+		});
+		if (!message.enabled) {
+			frappe.msgprint(
+				__(
+					"Unplanned return pickups are disabled. Use an approved Return Request pickup task."
+				)
+			);
+			return;
+		}
+		const stop = frappe.get_doc(cdt, cdn);
+		frappe.new_doc("Proof of Delivery", {
+			proof_type: "Unplanned Collection",
+			company: frm.doc.company,
+			delivery_trip: frm.doc.name,
+			collection_stop: stop.name,
+			direction: "Pickup",
+			collection_party_type: stop.customer ? "Customer" : "Depot",
+			collection_location: [stop.customer, stop.address].filter(Boolean).join(" — "),
+			delivery_datetime: frappe.datetime.now_datetime(),
+		});
+	},
+});
+
 frappe.ui.form.on("Delivery Trip", {
 	setup(frm) {
 		frm.set_query("vehicle", () => {
@@ -15,6 +51,26 @@ frappe.ui.form.on("Delivery Trip", {
 	},
 
 	refresh(frm) {
+		const grid = frm.fields_dict?.delivery_stops?.grid;
+		if (grid) {
+			grid.update_docfield_property("vuna_record_collection", "hidden", true);
+			if (
+				frm.doc.docstatus === 1 &&
+				frm.doc.vuna_actual_start &&
+				!frm.doc.vuna_actual_completion &&
+				frm.doc.status !== "Completed"
+			) {
+				frappe.call({
+					method: "vuna_transport.services.execution.unplanned_pickup_policy.get_unplanned_pickup_policy",
+					callback: ({ message }) =>
+						grid.update_docfield_property(
+							"vuna_record_collection",
+							"hidden",
+							!message.enabled
+						),
+				});
+			}
+		}
 		// ERPNext resets this list in refresh, so setup is too early.
 		// Stop upstream traversal, but retain POD and its downstream cascade.
 		frm.ignore_doctypes_on_cancel_all = [

@@ -9,6 +9,7 @@
   "identity_section",
   "naming_series",
   "sales_return",
+  "receiving_stock_entry",
   "return_request",
   "company",
   "customer",
@@ -62,7 +63,14 @@
    "in_standard_filter": 1,
    "label": "Sales Return",
    "options": "Delivery Note",
-   "reqd": 1
+   "mandatory_depends_on": "eval:!doc.receiving_stock_entry"
+  },
+  {
+   "fieldname": "receiving_stock_entry",
+   "fieldtype": "Link",
+   "label": "Receiving Stock Entry",
+   "options": "Stock Entry",
+   "read_only": 1
   },
   {
    "fieldname": "return_request",
@@ -87,7 +95,8 @@
    "label": "Customer",
    "options": "Customer",
    "read_only": 1,
-   "reqd": 1
+   "mandatory_depends_on": "eval:!doc.receiving_stock_entry",
+   "depends_on": "eval:!doc.receiving_stock_entry"
   },
   {
    "fieldname": "column_break_identity",

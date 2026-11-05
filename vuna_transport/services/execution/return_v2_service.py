@@ -122,6 +122,11 @@ def _validate_return_inspection_sales_return(inspection) -> None:
 
 
 def validate_return_inspection(inspection) -> None:
+	if inspection.get("receiving_stock_entry"):
+		from vuna_transport.services.execution.depot_return_inspection_service import validate_inspection
+
+		validate_inspection(inspection)
+		return
 	_validate_return_inspection_sales_return(inspection)
 
 
@@ -184,6 +189,11 @@ def validate_return_stock_entry(doc, method=None) -> None:
 	if not inspection_name:
 		return
 	inspection = frappe.get_doc("Return Inspection", inspection_name)
+	if inspection.get("receiving_stock_entry"):
+		from vuna_transport.services.execution.depot_return_inspection_service import validate_stock_entry
+
+		validate_stock_entry(doc, inspection)
+		return
 	if doc.company != inspection.company or doc.purpose != "Material Transfer":
 		frappe.throw(
 			_("Stock Entry must remain a Material Transfer for Company {0}.").format(inspection.company)
@@ -403,6 +413,7 @@ def get_sales_return_inspection_batch_query(
 
 @frappe.whitelist()
 def create_return_stock_entry(return_inspection: str) -> str:
+	frappe.db.get_value("Return Inspection", return_inspection, "name", for_update=True)
 	inspection = frappe.get_doc("Return Inspection", return_inspection)
 	require_document_permission(inspection, "read")
 	require_doctype_permission("Stock Entry", "create")
@@ -412,6 +423,10 @@ def create_return_stock_entry(return_inspection: str) -> str:
 		status = frappe.db.get_value("Stock Entry", inspection.stock_entry, "docstatus")
 		if status is not None and status != 2:
 			return inspection.stock_entry
+	if inspection.get("receiving_stock_entry"):
+		from vuna_transport.services.execution.depot_return_inspection_service import create_stock_entry
+
+		return create_stock_entry(inspection)
 
 	grouped = defaultdict(float)
 	for row in inspection.results:
@@ -480,9 +495,19 @@ def prepare_return_stock_entry_removal(doc, method=None) -> None:
 def prepare_return_quality_inspection_removal(doc, method=None) -> None:
 	"""Clear optional result-group evidence links before cancelling a Quality Inspection."""
 	rows = frappe.get_all(
-		"Return Inspection Result", filters={"quality_inspection": doc.name}, fields=["name"]
+		"Return Inspection Result",
+		filters={"quality_inspection": doc.name},
+		fields=["name", "parent", "docstatus"],
 	)
 	for row in rows:
+		if row.docstatus == 1 and frappe.db.get_value(
+			"Return Inspection", row.parent, "receiving_stock_entry"
+		):
+			frappe.throw(
+				_(
+					"Cancel depot Return Inspection {0} before removing its Quality Inspection evidence."
+				).format(row.parent)
+			)
 		frappe.db.set_value(
 			"Return Inspection Result", row.name, "quality_inspection", None, update_modified=False
 		)

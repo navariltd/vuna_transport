@@ -15,6 +15,21 @@
     "outcome",
     "recorded_by",
     "payload_hash",
+    "collection_section",
+    "collection_stop",
+    "collection_reference_doctype",
+    "collection_reference_name",
+    "collection_customer",
+    "collection_warehouse",
+    "collection_party_type",
+    "collection_location",
+    "collection_review_status",
+    "collection_reported_at",
+    "collection_driver",
+    "collection_vehicle",
+    "collection_reviewed_by",
+    "collection_reviewed_at",
+    "collection_review_notes",
     "delivery_tab",
     "delivery_context_section",
     "company",
@@ -50,6 +65,115 @@
   ],
   "fields": [
     {
+      "fieldname": "collection_reference_doctype",
+      "fieldtype": "Link",
+      "options": "DocType",
+      "label": "Collection Reference Type",
+      "mandatory_depends_on": "eval:doc.proof_type == 'Unplanned Collection'",
+      "depends_on": "eval:doc.proof_type == 'Unplanned Collection'"
+    },
+    {
+      "fieldname": "collection_reference_name",
+      "fieldtype": "Dynamic Link",
+      "options": "collection_reference_doctype",
+      "label": "Delivery Note / Stock Entry",
+      "mandatory_depends_on": "eval:doc.proof_type == 'Unplanned Collection'",
+      "depends_on": "eval:doc.proof_type == 'Unplanned Collection'"
+    },
+    {
+      "fieldname": "collection_customer",
+      "fieldtype": "Link",
+      "options": "Customer",
+      "label": "Collection Customer",
+      "read_only": 1,
+      "depends_on": "eval:doc.proof_type == 'Unplanned Collection' && doc.collection_customer"
+    },
+    {
+      "fieldname": "collection_warehouse",
+      "fieldtype": "Link",
+      "options": "Warehouse",
+      "label": "Collection Warehouse",
+      "read_only": 1,
+      "depends_on": "eval:doc.proof_type == 'Unplanned Collection' && doc.collection_warehouse"
+    },
+    {
+      "fieldname": "collection_stop",
+      "fieldtype": "Link",
+      "options": "Delivery Stop",
+      "label": "Collection Stop",
+      "read_only": 1,
+      "mandatory_depends_on": "eval:doc.proof_type == 'Unplanned Collection'",
+      "depends_on": "eval:doc.proof_type == 'Unplanned Collection'"
+    },
+    {
+      "fieldname": "collection_section",
+      "fieldtype": "Section Break",
+      "label": "Unplanned Collection — Evidence Only",
+      "depends_on": "eval:doc.proof_type == 'Unplanned Collection'"
+    },
+    {
+      "fieldname": "collection_party_type",
+      "read_only": 1,
+      "fieldtype": "Select",
+      "label": "Collected From",
+      "options": "\nCustomer\nDepot",
+      "mandatory_depends_on": "eval:doc.proof_type == 'Unplanned Collection'"
+    },
+    {
+      "fieldname": "collection_location",
+      "read_only": 1,
+      "fieldtype": "Small Text",
+      "label": "Source Name and Location",
+      "mandatory_depends_on": "eval:doc.proof_type == 'Unplanned Collection'"
+    },
+    {
+      "fieldname": "collection_review_status",
+      "fieldtype": "Select",
+      "label": "Collection Review",
+      "options": "\nPending Review\nReviewed",
+      "read_only": 1,
+      "in_standard_filter": 1
+    },
+    {
+      "fieldname": "collection_reported_at",
+      "fieldtype": "Datetime",
+      "label": "Reported At",
+      "read_only": 1
+    },
+    {
+      "fieldname": "collection_driver",
+      "fieldtype": "Link",
+      "options": "Driver",
+      "label": "Collecting Driver",
+      "read_only": 1
+    },
+    {
+      "fieldname": "collection_vehicle",
+      "fieldtype": "Link",
+      "options": "Vehicle",
+      "label": "Collecting Vehicle",
+      "read_only": 1
+    },
+    {
+      "fieldname": "collection_reviewed_by",
+      "fieldtype": "Link",
+      "options": "User",
+      "label": "Reviewed By",
+      "read_only": 1
+    },
+    {
+      "fieldname": "collection_reviewed_at",
+      "fieldtype": "Datetime",
+      "label": "Reviewed At",
+      "read_only": 1
+    },
+    {
+      "fieldname": "collection_review_notes",
+      "fieldtype": "Small Text",
+      "label": "Review and Receipt Follow-up",
+      "read_only": 1
+    },
+    {
       "fieldname": "rejected_goods_warehouse",
       "label": "Depot Returns / Quarantine Warehouse",
       "fieldtype": "Link",
@@ -61,7 +185,7 @@
       "fieldname": "proof_type",
       "label": "Handover Type",
       "fieldtype": "Select",
-      "options": "Customer Delivery\nTransfer Dispatch\nTransfer Receipt\nReturn Pickup",
+      "options": "Customer Delivery\nTransfer Dispatch\nTransfer Receipt\nReturn Pickup\nUnplanned Collection",
       "default": "Customer Delivery",
       "read_only": 1
     },
@@ -153,7 +277,7 @@
       "in_standard_filter": 1,
       "label": "Transport Load",
       "options": "Transport Load",
-      "reqd": 1
+      "mandatory_depends_on": "eval:doc.proof_type != 'Unplanned Collection' && !doc.transport_trip_task"
     },
     {
       "fieldname": "delivery_trip",
@@ -167,7 +291,7 @@
       "fieldtype": "Link",
       "label": "Delivery Stop",
       "options": "Delivery Stop",
-      "reqd": 1
+      "mandatory_depends_on": "eval:doc.proof_type != 'Unplanned Collection'"
     },
     {
       "fieldname": "delivery_order",
@@ -196,14 +320,14 @@
       "in_standard_filter": 1,
       "label": "Customer",
       "options": "Customer",
-      "mandatory_depends_on": "eval:!doc.transport_trip_task"
+      "mandatory_depends_on": "eval:!doc.transport_trip_task && doc.proof_type != 'Unplanned Collection'"
     },
     {
       "fieldname": "delivery_address",
       "fieldtype": "Link",
       "label": "Delivery Address",
       "options": "Address",
-      "reqd": 1
+      "mandatory_depends_on": "eval:doc.proof_type != 'Unplanned Collection'"
     },
     {
       "fieldname": "delivery_datetime",
@@ -229,7 +353,7 @@
       "in_list_view": 1,
       "in_standard_filter": 1,
       "label": "Status",
-      "options": "Pending\nAccepted\nPartially Delivered\nRejected\nFailed",
+      "options": "Pending\nAccepted\nPartially Delivered\nRejected\nFailed\nCollected",
       "read_only": 1
     },
     {

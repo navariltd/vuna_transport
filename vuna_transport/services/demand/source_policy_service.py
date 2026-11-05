@@ -3,7 +3,7 @@
 import frappe
 from frappe import _
 
-SUPPORTED_SOURCES = ("Sales Order", "Material Request")
+SUPPORTED_SOURCES = ("Sales Order", "Material Request", "Return Request")
 
 
 @frappe.whitelist()
@@ -42,7 +42,7 @@ def get_source_policy(source_type):
 		)
 	# Compatibility only for sites that have not run the source-settings migration.
 	return frappe._dict(
-		enabled=bool(settings.enabled and source_type in SUPPORTED_SOURCES),
+		enabled=bool(settings.enabled and source_type in ("Sales Order", "Material Request")),
 		creation_mode="Automatic"
 		if source_type == "Sales Order" and settings.get("auto_create_delivery_orders")
 		else "Manual",
@@ -91,7 +91,9 @@ def automatically_create_from_source(doc, method=None):
 		return create_delivery_orders_for_sales_order(doc)
 	if doc.doctype == "Material Request" and doc.material_request_type != "Material Transfer":
 		return []
-	if doc.doctype not in ("Delivery Order", "Material Request"):
+	if doc.doctype == "Return Request" and doc.get("return_context") != "Depot":
+		return []
+	if doc.doctype not in ("Delivery Order", "Material Request", "Return Request"):
 		return []
 	from vuna_transport.services.demand.transport_demand_service import (
 		_create_transport_demands,

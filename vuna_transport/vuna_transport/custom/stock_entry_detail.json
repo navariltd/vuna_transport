@@ -3,6 +3,17 @@
   "custom_fields": [
     {
       "dt": "Stock Entry Detail",
+      "name": "Stock Entry Detail-vuna_return_request_item",
+      "fieldname": "vuna_return_request_item",
+      "label": "Return Request Item",
+      "fieldtype": "Data",
+      "read_only": 1,
+      "hidden": 1,
+      "insert_after": "vuna_transport_load_item",
+      "module": "Vuna Transport"
+    },
+    {
+      "dt": "Stock Entry Detail",
       "name": "Stock Entry Detail-vuna_transport_proof_outcome",
       "fieldname": "vuna_transport_proof_outcome",
       "label": "POD Stock Outcome",

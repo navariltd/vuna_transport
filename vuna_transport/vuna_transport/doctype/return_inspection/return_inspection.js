@@ -2,15 +2,42 @@
 
 frappe.ui.form.on("Return Inspection", {
 	setup(frm) {
+		frm.set_query("quality_inspection", "results", (doc, cdt, cdn) => {
+			const row = frappe.get_doc(cdt, cdn);
+			return {
+				filters: {
+					docstatus: 1,
+					reference_type: frm.doc.receiving_stock_entry
+						? "Stock Entry"
+						: "Delivery Note",
+					reference_name: frm.doc.receiving_stock_entry || frm.doc.sales_return,
+					item_code: row.item_code,
+					child_row_reference: row.stock_entry_detail || row.delivery_note_item,
+				},
+			};
+		});
 		frm.set_query("item_code", "results", () => ({
-			query: "vuna_transport.services.execution.return_v2_service.get_sales_return_inspection_item_query",
-			filters: { sales_return: frm.doc.sales_return },
+			query: frm.doc.receiving_stock_entry
+				? "vuna_transport.services.execution.depot_return_inspection_service.item_query"
+				: "vuna_transport.services.execution.return_v2_service.get_sales_return_inspection_item_query",
+			filters: {
+				sales_return: frm.doc.sales_return,
+				receiving_stock_entry: frm.doc.receiving_stock_entry,
+				return_request: frm.doc.return_request,
+			},
 		}));
 		frm.set_query("batch_no", "results", (doc, cdt, cdn) => {
 			const row = frappe.get_doc(cdt, cdn);
 			return {
-				query: "vuna_transport.services.execution.return_v2_service.get_sales_return_inspection_batch_query",
-				filters: { sales_return: frm.doc.sales_return, item_code: row.item_code },
+				query: frm.doc.receiving_stock_entry
+					? "vuna_transport.services.execution.depot_return_inspection_service.item_query"
+					: "vuna_transport.services.execution.return_v2_service.get_sales_return_inspection_batch_query",
+				filters: {
+					sales_return: frm.doc.sales_return,
+					receiving_stock_entry: frm.doc.receiving_stock_entry,
+					return_request: frm.doc.return_request,
+					item_code: row.item_code,
+				},
 			};
 		});
 		frm.set_query("target_warehouse", "results", () => ({
@@ -24,12 +51,13 @@ frappe.ui.form.on("Return Inspection", {
 				company: frm.doc.company,
 				is_group: 0,
 				disabled: 0,
-				is_rejected_warehouse: 1,
+				is_rejected_warehouse: frm.doc.receiving_stock_entry ? 0 : 1,
 			},
 		}));
 	},
 
 	refresh(frm) {
+		frm.toggle_display("sales_return", !frm.doc.receiving_stock_entry);
 		if (frm.doc.docstatus !== 1 || frm.doc.stock_entry) return;
 		frm.add_custom_button(
 			__("Stock Entry (Material Transfer)"),
@@ -49,6 +77,8 @@ frappe.ui.form.on("Return Inspection", {
 	},
 
 	validate(frm) {
+		// Depot receipts are validated per source row AND batch on the server.
+		if (frm.doc.receiving_stock_entry) return;
 		const totals = {};
 		for (const row of frm.doc.results || []) {
 			if (!row.delivery_note_item) continue;
@@ -178,26 +208,89 @@ function set_result_warehouses(frm) {
 
 function resolve_receipt_item(frm, cdt, cdn) {
 	const row = frappe.get_doc(cdt, cdn);
+	const selected_item = row.item_code;
+	const selected_batch = row.batch_no;
 	frappe
 		.call({
-			method: "vuna_transport.services.execution.return_v2_service.get_sales_return_inspection_item_options",
+			method: frm.doc.receiving_stock_entry
+				? "vuna_transport.services.execution.depot_return_inspection_service.get_item_options"
+				: "vuna_transport.services.execution.return_v2_service.get_sales_return_inspection_item_options",
 			args: {
 				sales_return: frm.doc.sales_return,
+				receiving_stock_entry: frm.doc.receiving_stock_entry,
+				return_request: frm.doc.return_request,
 				item_code: row.item_code,
 				batch_no: row.batch_no,
 			},
 		})
 		.then(({ message: matches }) => {
+			if (row.item_code !== selected_item || row.batch_no !== selected_batch) return;
 			matches = matches || [];
 			if (matches.length === 1) {
-				frappe.model.set_value(cdt, cdn, "delivery_note_item", matches[0].name);
+				frappe.model.set_value(
+					cdt,
+					cdn,
+					frm.doc.receiving_stock_entry ? "stock_entry_detail" : "delivery_note_item",
+					matches[0].name
+				);
+				if (frm.doc.receiving_stock_entry)
+					frappe.model.set_value(
+						cdt,
+						cdn,
+						"return_request_item",
+						matches[0].return_request_item
+					);
 				apply_receipt_item_details(cdt, cdn, matches[0]);
 			} else if (matches.length > 1) {
-				frappe.model.set_value(cdt, cdn, "delivery_note_item", null);
+				if (frm.doc.receiving_stock_entry) {
+					frappe.prompt(
+						{
+							fieldname: "source",
+							fieldtype: "Select",
+							label: __("Received Item Group"),
+							reqd: 1,
+							options: matches.map((item, index) => ({
+								value: String(index),
+								label: `${item.item_code} · ${
+									item.batch_no || __("No batch")
+								} · ${__("Row")} ${item.source_row_idx} · ${item.stock_qty} ${
+									item.stock_uom
+								}`,
+							})),
+						},
+						({ source }) => {
+							if (row.item_code !== selected_item || row.batch_no !== selected_batch)
+								return;
+							const item = matches[Number(source)];
+							frappe.model.set_value(cdt, cdn, "stock_entry_detail", item.name);
+							frappe.model.set_value(
+								cdt,
+								cdn,
+								"return_request_item",
+								item.return_request_item
+							);
+							apply_receipt_item_details(cdt, cdn, item);
+						}
+					);
+					return;
+				}
+				frappe.model.set_value(
+					cdt,
+					cdn,
+					frm.doc.receiving_stock_entry ? "stock_entry_detail" : "delivery_note_item",
+					null
+				);
 				frappe.msgprint(__("Select the batch for this item before continuing."));
 			} else {
-				frappe.model.set_value(cdt, cdn, "delivery_note_item", null);
-				frappe.msgprint(__("Select an item included on this Sales Return."));
+				frappe.model.set_value(
+					cdt,
+					cdn,
+					frm.doc.receiving_stock_entry ? "stock_entry_detail" : "delivery_note_item",
+					null
+				);
+				frappe.msgprint(
+					__("Select an item and batch included on the receiving document.")
+				);
 			}
 		});
 }
@@ -214,4 +307,3 @@ function apply_receipt_item_details(cdt, cdn, item) {
 		item.serial_and_batch_bundle || null
 	);
 }
-

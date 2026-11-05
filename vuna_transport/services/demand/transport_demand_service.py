@@ -13,7 +13,7 @@ from vuna_transport.services.shared.security_service import (
 	require_doctype_permission,
 )
 
-SUPPORTED_SOURCES = {"Delivery Order", "Material Request"}
+SUPPORTED_SOURCES = {"Delivery Order", "Material Request", "Return Request"}
 
 
 def build_source_legs(source):
@@ -22,6 +22,10 @@ def build_source_legs(source):
 		frappe.throw(_("Transport demand requires a supported, submitted source document."))
 	if source.status in ("Stopped", "Closed", "Cancelled"):
 		frappe.throw(_("The source document is no longer available for transport planning."))
+	if source.doctype == "Return Request":
+		from vuna_transport.services.demand.depot_return_demand_service import build_depot_return_legs
+
+		return build_depot_return_legs(source)
 	is_transfer = source.doctype == "Material Request"
 	if is_transfer and source.material_request_type != "Material Transfer":
 		frappe.throw(_("Only Material Transfer requests can generate transport demand."))
@@ -109,6 +113,21 @@ def _create_transport_demands(source_doctype, source_name, automated=False):
 	source.reload()
 	legs = build_source_legs(source)
 	if not legs:
+		if source_doctype == "Return Request":
+			existing_names = frappe.get_all(
+				"Transport Demand",
+				filters={
+					"source_document_type": source_doctype,
+					"source_document": source_name,
+					"docstatus": ["!=", 2],
+				},
+				pluck="name",
+			)
+			if existing_names:
+				for name in existing_names:
+					if not automated:
+						frappe.get_doc("Transport Demand", name).check_permission("read")
+				return existing_names
 		frappe.throw(_("The source has no outstanding transport quantity."))
 	names = []
 	for leg in legs:

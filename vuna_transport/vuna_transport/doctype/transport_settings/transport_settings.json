@@ -34,11 +34,19 @@
   "enable_gps_tracking",
   "enable_route_optimization",
   "require_quality_inspection_for_return_inspection",
+  "allow_unplanned_return_pickups",
   "scan_permissions_section",
   "allowed_loaded_scan_roles",
   "allowed_dispatched_scan_roles"
  ],
  "fields": [
+  {
+   "fieldname": "allow_unplanned_return_pickups",
+   "fieldtype": "Check",
+   "label": "Allow Unplanned Return Pickups",
+   "default": "0",
+   "description": "Allow drivers to record unplanned collections at delivery stops. Disabled by default: use an approved, submitted Return Request and assigned pickup task. Turning this off does not prevent reviewing or receiving previously recorded collections."
+  },
   {
    "fieldname": "demand_sources",
    "fieldtype": "Table",

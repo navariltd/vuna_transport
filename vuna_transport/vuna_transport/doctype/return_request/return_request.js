@@ -1,12 +1,118 @@
 // Copyright (c) 2026, Yovuna Technologies Limited and contributors
 // For license information, please see license.txt
 
+async function select_depot_return_items(frm) {
+	if (!frm.doc.source_stock_entry || !frm.doc.source_warehouse) {
+		frappe.msgprint(__("Select the depot warehouse and its incoming Stock Entry first."));
+		return;
+	}
+	const { message: items } = await frappe.call({
+		method: "vuna_transport.services.execution.manual_depot_return_service.get_depot_return_items",
+		args: {
+			source_stock_entry: frm.doc.source_stock_entry,
+			source_warehouse: frm.doc.source_warehouse,
+		},
+	});
+	const dialog = new frappe.ui.Dialog({
+		title: __("Select Received Items to Return"),
+		size: "extra-large",
+		fields: [
+			{
+				fieldname: "items",
+				fieldtype: "Table",
+				label: __("Received Items"),
+				cannot_add_rows: true,
+				cannot_delete_rows: true,
+				data: (items || []).map((row) => ({ ...row, requested_return_qty: 0 })),
+				fields: [
+					{
+						fieldname: "item_code",
+						fieldtype: "Data",
+						label: __("Item"),
+						in_list_view: 1,
+						read_only: 1,
+					},
+					{
+						fieldname: "batch_no",
+						fieldtype: "Data",
+						label: __("Batch"),
+						in_list_view: 1,
+						read_only: 1,
+					},
+					{
+						fieldname: "delivered_qty",
+						fieldtype: "Float",
+						label: __("Originally Received"),
+						in_list_view: 1,
+						read_only: 1,
+					},
+					{
+						fieldname: "uom",
+						fieldtype: "Data",
+						label: __("UOM"),
+						in_list_view: 1,
+						read_only: 1,
+					},
+					{
+						fieldname: "requested_return_qty",
+						fieldtype: "Float",
+						label: __("Return Quantity"),
+						in_list_view: 1,
+					},
+					{
+						fieldname: "serial_no",
+						fieldtype: "Small Text",
+						label: __("Serial Numbers to Return"),
+					},
+				],
+			},
+		],
+		primary_action_label: __("Use Selected Quantities"),
+		primary_action(values) {
+			const rows = (values.items || []).filter((row) => flt(row.requested_return_qty) > 0);
+			if (!rows.length) {
+				frappe.msgprint(__("Enter at least one return quantity."));
+				return;
+			}
+			frm.clear_table("items");
+			for (const row of rows) {
+				const source = items.find(
+					(item) =>
+						item.stock_entry_detail === row.stock_entry_detail &&
+						item.batch_no === row.batch_no
+				);
+				frm.add_child("items", {
+					...source,
+					requested_return_qty: row.requested_return_qty,
+					serial_no: row.serial_no,
+				});
+			}
+			frm.refresh_field("items");
+			frm.dirty();
+			dialog.hide();
+		},
+	});
+	dialog.show();
+}
+
 frappe.ui.form.on("Return Request", {
 	onload(frm) {
 		frm._return_request_customer = frm.doc.customer;
 	},
 
 	setup(frm) {
+		frm.set_query("source_warehouse", () => ({
+			filters: {
+				company: frm.doc.company,
+				is_group: 0,
+				disabled: 0,
+				warehouse_type: ["!=", "Transit"],
+			},
+		}));
+		frm.set_query("source_stock_entry", () => ({
+			query: "vuna_transport.services.execution.manual_depot_return_service.get_depot_receipt_query",
+			filters: { company: frm.doc.company, warehouse: frm.doc.source_warehouse },
+		}));
 		frm.set_query("delivery_note", () => {
 			if (!require_customer_before_source_selection(frm))
 				return { filters: { name: ["=", ""] } };
@@ -47,6 +153,101 @@ frappe.ui.form.on("Return Request", {
 	},
 
 	refresh(frm) {
+		for (const field of [
+			"customer",
+			"delivery_note",
+			"sales_invoice",
+			"sales_order",
+			"credit_note",
+			"return_stock_document",
+		])
+			frm.toggle_display(field, frm.doc.return_context !== "Depot");
+		if (
+			frm.doc.return_context === "Depot" &&
+			!frm.doc.proof_of_delivery &&
+			frm.doc.docstatus === 0
+		) {
+			frm.add_custom_button(
+				__("Get Received Items"),
+				() => select_depot_return_items(frm),
+				__("Actions")
+			);
+		}
+		if (
+			frm.doc.docstatus === 1 &&
+			frm.perm?.[0]?.write &&
+			!["Closed", "Cancelled", "Resolved"].includes(frm.doc.status)
+		) {
+			frm.add_custom_button(
+				__("Assign Pickup to Delivery Trip"),
+				() => {
+					const dialog = new frappe.ui.Dialog({
+						title: __("Assign Approved Return Pickup"),
+						fields: [
+							{
+								fieldname: "delivery_trip",
+								fieldtype: "Link",
+								options: "Delivery Trip",
+								label: __("Delivery Trip"),
+								reqd: 1,
+								get_query: () => ({
+									query: "vuna_transport.services.execution.direct_return_pickup_service.get_assignment_trip_query",
+									filters: { return_request: frm.doc.name },
+								}),
+								onchange: async () => {
+									const trip = dialog.get_value("delivery_trip");
+									dialog.set_value("delivery_stop", "");
+									dialog.set_df_property("delivery_stop", "options", []);
+									if (!trip) return;
+									const { message } = await frappe.call({
+										method: "vuna_transport.services.execution.direct_return_pickup_service.get_assignment_stops",
+										args: {
+											return_request: frm.doc.name,
+											delivery_trip: trip,
+										},
+									});
+									if (dialog.get_value("delivery_trip") !== trip) return;
+									dialog.set_df_property(
+										"delivery_stop",
+										"options",
+										message || []
+									);
+									if (message?.length === 1)
+										dialog.set_value("delivery_stop", message[0].value);
+									if (!message?.length)
+										frappe.msgprint(
+											__(
+												"This trip has no unfinished stop matching this return's depot or customer."
+											)
+										);
+								},
+							},
+							{
+								fieldname: "delivery_stop",
+								fieldtype: "Select",
+								label: __("Pickup Stop"),
+								reqd: 1,
+								options: [],
+							},
+						],
+						primary_action_label: __("Assign Pickup"),
+						primary_action: (values) =>
+							frappe.call({
+								method: "vuna_transport.services.execution.direct_return_pickup_service.assign_return_pickup",
+								args: { return_request: frm.doc.name, ...values },
+								freeze: true,
+								callback: ({ message }) => {
+									dialog.hide();
+									if (message)
+										frappe.set_route("Form", "Transport Trip Task", message);
+								},
+							}),
+					});
+					dialog.show();
+				},
+				__("Actions")
+			);
+		}
 		if (frm.doc.return_context === "Depot") {
 			[
 				"customer",
@@ -57,6 +258,52 @@ frappe.ui.form.on("Return Request", {
 				"return_stock_document",
 			].forEach((field) => frm.toggle_display(field, false));
 			frm.ignore_doctypes_on_cancel_all = ["Proof of Delivery"];
+			if (frm.doc.docstatus === 1) {
+				if (
+					(frm.doc.items || []).some(
+						(row) => row.custody_warehouse && flt(row.remaining_qty) > 0
+					) &&
+					frm.doc.proof_of_delivery &&
+					["Still With Vehicle", "Split Custody"].includes(frm.doc.custody)
+				) {
+					frm.add_custom_button(
+						__("End Transit Stock Entry"),
+						() =>
+							frappe.call({
+								method: "vuna_transport.services.execution.depot_return_receiving_service.create_vehicle_receipt",
+								args: { return_request: frm.doc.name },
+								freeze: true,
+								callback: ({ message }) => {
+									if (message) frappe.set_route("Form", "Stock Entry", message);
+								},
+							}),
+						__("Create")
+					);
+				}
+				frm.add_custom_button(
+					__("Transport Demand"),
+					() =>
+						frappe
+							.call({
+								method: "vuna_transport.services.demand.transport_demand_service.create_transport_demands",
+								args: {
+									source_doctype: "Return Request",
+									source_name: frm.doc.name,
+								},
+								freeze: true,
+							})
+							.then(({ message }) => {
+								if (message?.length === 1)
+									frappe.set_route("Form", "Transport Demand", message[0]);
+								else if (message?.length)
+									frappe.set_route("List", "Transport Demand", {
+										name: ["in", message],
+									});
+							}),
+					__("Create")
+				);
+				frm.page.set_inner_btn_group_as_primary(__("Create"));
+			}
 			return;
 		}
 		// The POD is historical delivery evidence, not a dependent transaction
@@ -106,6 +353,35 @@ frappe.ui.form.on("Return Request", {
 
 	delivery_note(frm) {
 		add_get_delivered_items_button(frm);
+	},
+
+	return_context(frm) {
+		if (frm.doc.docstatus !== 0 || frm.doc.proof_of_delivery) return;
+		frm.clear_table("items");
+		for (const field of [
+			"customer",
+			"delivery_note",
+			"sales_invoice",
+			"source_stock_entry",
+			"source_warehouse",
+		])
+			frm.set_value(field, null);
+		frm.refresh();
+	},
+
+	source_warehouse(frm) {
+		if (!frm.doc.proof_of_delivery && frm.doc.docstatus === 0) {
+			frm.set_value("source_stock_entry", null);
+			frm.clear_table("items");
+			frm.refresh_field("items");
+		}
+	},
+
+	source_stock_entry(frm) {
+		if (!frm.doc.proof_of_delivery && frm.doc.docstatus === 0) {
+			frm.clear_table("items");
+			frm.refresh_field("items");
+		}
 	},
 
 	sales_invoice(frm) {
