@@ -116,11 +116,10 @@ def validate_depot_custody(proof, stock, destination):
 	proof.rejected_goods_warehouse = None
 	if not depot_qty:
 		return
-	warehouse = frappe.db.get_value("Warehouse", destination, "vuna_returns_warehouse")
-	if not warehouse:
-		frappe.throw(
-			_("Configure Returns / Quarantine Warehouse on receiving warehouse {0}.").format(destination)
-		)
+	configured_warehouse = frappe.db.get_value("Warehouse", destination, "vuna_returns_warehouse")
+	# A separate holding warehouse is optional. Preserve the rejected outcome
+	# and custody on the POD/RR even when both groups enter the depot's stock.
+	warehouse = configured_warehouse or destination
 	config = frappe.get_doc("Warehouse", warehouse)
 	if config.get("is_rejected_warehouse") and "nl_vms" in frappe.get_installed_apps():
 		frappe.throw(
@@ -132,12 +131,13 @@ def validate_depot_custody(proof, stock, destination):
 		config.company != proof.company
 		or config.disabled
 		or config.is_group
-		or warehouse in (destination, stock.to_warehouse)
+		or warehouse == stock.to_warehouse
+		or (configured_warehouse and warehouse == destination)
 		or config.warehouse_type == "Transit"
 	):
 		frappe.throw(
 			_(
-				"The depot Returns / Quarantine Warehouse must be an active, distinct same-company storage warehouse."
+				"Receive rejected goods into an active same-company storage warehouse, not vehicle transit. A configured Returns / Quarantine Warehouse must be distinct from the receiving depot."
 			)
 		)
 	proof.rejected_goods_warehouse = warehouse
