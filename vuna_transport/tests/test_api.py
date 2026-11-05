@@ -3,7 +3,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import UnitTestCase
 
-from vuna_transport.api import get_drivers_for_allocation
+from vuna_transport.api import get_delivery_loads_for_allocation, get_drivers_for_allocation
 
 
 class TestVehicleAllocationDriverSearch(UnitTestCase):
@@ -32,3 +32,91 @@ class TestVehicleAllocationDriverSearch(UnitTestCase):
 		availability_arguments = get_availability_map.call_args.kwargs
 		self.assertEqual(availability_arguments["company"], "Yovuna Tech")
 		self.assertEqual(availability_arguments["driver_names"], ["DR-001"])
+
+
+class TestAllocationLoadSearch(UnitTestCase):
+	def setUp(self):
+		super().setUp()
+		self.candidates = [
+			frappe._dict(
+				name=name, company="Company", required_vehicle_category="FH", active_vehicle_allocation=None
+			)
+			for name in ("BAD-UNITS", "TOO-HEAVY", "FITS")
+		]
+		self.enterContext(patch("vuna_transport.api.frappe.get_all", return_value=self.candidates))
+		self.enterContext(
+			patch("vuna_transport.api._loads_at_vehicle_allocation_step", side_effect=lambda rows: rows)
+		)
+		self.permission = self.enterContext(patch("vuna_transport.api.require_document_permission"))
+		self.validation = self.enterContext(patch("vuna_transport.api.validate_allocation_load_set"))
+		self.old_mute = frappe.flags.mute_messages
+		self.old_messages = frappe.local.message_log
+		frappe.flags.mute_messages = False
+		frappe.local.message_log = []
+		self.addCleanup(self.restore_messages)
+
+	def restore_messages(self):
+		frappe.flags.mute_messages = self.old_mute
+		frappe.local.message_log = self.old_messages
+
+	def search(self, **kwargs):
+		return get_delivery_loads_for_allocation(
+			"Transport Load",
+			"",
+			"name",
+			0,
+			20,
+			{
+				"company": "Company",
+				"required_vehicle_category": "FH",
+				"selected_delivery_loads": ["SELECTED"],
+			},
+			**kwargs,
+		)
+
+	def reject_incompatible(self, names, category):
+		if names[-1] == "BAD-UNITS":
+			frappe.throw("Selected Transport Loads must use the same transport Weight and Volume UOMs.")
+		if names[-1] == "TOO-HEAVY":
+			frappe.throw("Vehicle Category FH is incompatible: Weight capacity exceeded.")
+		return [frappe._dict(name=name) for name in names]
+
+	def test_search_returns_only_fitting_loads_without_popup_messages(self):
+		self.validation.side_effect = self.reject_incompatible
+		self.assertEqual(self.search(), [("FITS", "FITS")])
+		self.assertEqual(frappe.local.message_log, [])
+		self.assertFalse(frappe.flags.mute_messages)
+		self.validation.assert_any_call(["SELECTED", "FITS"], "FH")
+
+	def test_dictionary_search_also_silently_filters_rejected_candidates(self):
+		self.validation.side_effect = self.reject_incompatible
+		self.assertEqual([row["name"] for row in self.search(as_dict=True)], ["FITS"])
+		self.assertEqual(frappe.local.message_log, [])
+
+	def test_permission_denied_candidates_are_not_offered(self):
+		self.validation.return_value = [frappe._dict(name="LOAD")]
+		self.permission.side_effect = lambda *args: frappe.throw("No read permission", frappe.PermissionError)
+		self.assertEqual(self.search(), [])
+		self.assertEqual(frappe.local.message_log, [])
+		self.assertFalse(frappe.flags.mute_messages)
+
+	def test_unexpected_errors_propagate_and_restore_message_state(self):
+		self.validation.side_effect = RuntimeError("Unexpected failure")
+		with self.assertRaisesRegex(RuntimeError, "Unexpected failure"):
+			self.search()
+		self.assertFalse(frappe.flags.mute_messages)
+
+	def test_existing_message_and_mute_state_are_preserved(self):
+		frappe.flags.mute_messages = True
+		frappe.local.message_log.append(frappe._dict(message="Existing message"))
+		self.validation.side_effect = self.reject_incompatible
+		self.search()
+		self.assertTrue(frappe.flags.mute_messages)
+		self.assertEqual([row.message for row in frappe.local.message_log], ["Existing message"])
+
+	def test_actual_validation_still_raises_and_displays_errors_outside_search(self):
+		self.validation.side_effect = self.reject_incompatible
+		self.search()
+		with self.assertRaises(frappe.ValidationError):
+			self.reject_incompatible(["TOO-HEAVY"], "FH")
+		self.assertEqual(len(frappe.local.message_log), 1)

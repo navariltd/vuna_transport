@@ -251,6 +251,7 @@ function select_delivery_loads(frm) {
 				query: "vuna_transport.api.get_delivery_loads_for_allocation",
 				filters: {
 					company: frm.doc.company,
+					vehicle: frm.doc.vehicle,
 					required_vehicle_category: frm.doc.required_vehicle_category,
 					selected_delivery_loads: (frm.doc.delivery_loads || [])
 						.map((row) => row.delivery_load)
