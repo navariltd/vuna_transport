@@ -19,6 +19,8 @@ def run(
 	depot_fraction=0,
 	accepted_fraction=0.5,
 	verify_return_pickup=False,
+	override_source=False,
+	use_depot_fallback=False,
 ):
 	frappe.db.savepoint("task_trip_smoke")
 	try:
@@ -60,6 +62,22 @@ def run(
 						}
 					).insert()
 			item = demand.items[0]
+			loading_warehouse = demand.source_warehouse
+			if override_source:
+				original = frappe.get_doc("Warehouse", demand.source_warehouse)
+				loading_warehouse = (
+					frappe.get_doc(
+						{
+							"doctype": "Warehouse",
+							"warehouse_name": "Rollback fulfillment " + frappe.generate_hash(length=8),
+							"company": demand.company,
+							"parent_warehouse": original.parent_warehouse,
+							"warehouse_type": original.warehouse_type,
+						}
+					)
+					.insert()
+					.name
+				)
 			load = frappe.get_doc(
 				"Transport Load",
 				create_transport_load_from_demands(
@@ -69,7 +87,8 @@ def run(
 							"transport_demand_item": item.name,
 							"allocated_quantity": item.transaction_qty,
 						}
-					]
+					],
+					source_warehouse=loading_warehouse,
 				),
 			)
 			load.submit()
@@ -102,7 +121,34 @@ def run(
 				row.parent = allocation.name
 				row.db_insert()
 			load.db_set("active_vehicle_allocation", allocation.name)
+			if override_source:
+				# A fresh warehouse has no valuation history. Seed real disposable
+				# stock before ERPNext maps/revalues dispatch from the chosen origin.
+				seed = frappe.new_doc("Stock Entry")
+				seed.company = load.company
+				for cargo in load.delivery_orders:
+					seed.append(
+						"items",
+						{
+							"item_code": cargo.item_code,
+							"qty": cargo.allocated_quantity,
+							"uom": cargo.uom,
+							"stock_uom": cargo.stock_uom,
+							"conversion_factor": cargo.conversion_factor,
+							"transfer_qty": cargo.allocated_stock_qty,
+							"s_warehouse": loading_warehouse,
+						},
+					)
+				_seed_dispatch_stock(seed)
 			pretrip_stock = _prepare_allocation_stock(allocation, load)
+			assert pretrip_stock.from_warehouse == loading_warehouse
+			assert all(row.s_warehouse == loading_warehouse for row in pretrip_stock.items)
+			if override_source:
+				assert loading_warehouse != demand.source_warehouse
+				assert (
+					frappe.db.get_value("Transport Demand", demand.name, "source_warehouse")
+					== demand.source_warehouse
+				)
 			trip = create_delivery_trip_for_load(load.name)
 			trip.insert()
 			tasks = frappe.get_all(
@@ -113,6 +159,9 @@ def run(
 			assert {task.task_type for task in tasks} == {"Transfer Receipt"}
 			assert len(trip.delivery_stops) == 1
 			assert all(not stop.delivery_note for stop in trip.delivery_stops)
+			assert trip.delivery_stops[0].vuna_depot_names == demand.destination_warehouse
+			assert trip.delivery_stops[0].vuna_stop_type == "Depot"
+			assert not trip.delivery_stops[0].customer
 			trip.save()
 			assert frappe.db.count("Transport Trip Task", {"delivery_trip": trip.name}) == 1
 			if verify_cancel:
@@ -146,6 +195,7 @@ def run(
 					depot_fraction=depot_fraction,
 					accepted_fraction=accepted_fraction,
 					verify_return_pickup=verify_return_pickup,
+					use_depot_fallback=use_depot_fallback,
 				)
 			if verify_dispatch:
 				return {
@@ -434,6 +484,7 @@ def _verify_proof_cycle(
 	depot_fraction=0,
 	accepted_fraction=0.5,
 	verify_return_pickup=False,
+	use_depot_fallback=False,
 ):
 	assert not frappe.db.exists("DocType", "Transport Execution Proof")
 	assert not frappe.db.exists("DocType", "Transport Execution Proof Item")
@@ -474,8 +525,32 @@ def _verify_proof_cycle(
 		"Transport Trip Task", {"delivery_trip": trip.name, "task_type": "Transfer Receipt"}, "name"
 	)
 	receipt = make_transfer_proof(receipt_name)
+	# Evidence uploads need a real draft, but must not receive inventory or
+	# finish the stop until the driver's final submission.
+	from vuna_transport.api import prepare_mobile_transport_proof
+
+	stock_count = frappe.db.count("Stock Entry")
+	with patch(
+		"vuna_transport.services.mobile.mobile_device_service._require_mobile_driver",
+		return_value=frappe._dict(name=trip.driver),
+	):
+		draft = prepare_mobile_transport_proof("rollback-fixture", receipt_name, save_draft=True)
+	assert draft["docstatus"] == 0 and draft["name"]
+	assert frappe.db.count("Stock Entry") == stock_count
+	receipt = frappe.get_doc("Proof of Delivery", draft["name"])
 	quarantine = None
-	if depot_fraction:
+	quarantine_opening_qty = 0
+	if depot_fraction and use_depot_fallback:
+		demand = frappe.get_doc("Transport Demand", dispatch_task.transport_demand)
+		quarantine = frappe.get_doc("Warehouse", demand.destination_warehouse)
+		frappe.db.set_value("Warehouse", quarantine.name, "vuna_returns_warehouse", None)
+		quarantine_opening_qty = (
+			frappe.db.get_value(
+				"Bin", {"warehouse": quarantine.name, "item_code": stock.items[0].item_code}, "actual_qty"
+			)
+			or 0
+		)
+	elif depot_fraction:
 		demand = frappe.get_doc("Transport Demand", dispatch_task.transport_demand)
 		source_warehouse = frappe.get_doc("Warehouse", stock.from_warehouse)
 		quarantine = frappe.get_doc(
@@ -505,7 +580,7 @@ def _verify_proof_cycle(
 		# All-depot deliberately supplies no second quantity: the selector derives it.
 		row.depot_received_rejected_qty = row.rejected_qty * depot_fraction if depot_fraction < 1 else 0
 		row.rejection_reason_remarks = "Rejected packaging: rollback fixture"
-	receipt.insert()
+	receipt.save()
 	# This fixture item's policy requires outgoing QI. Supply genuine accepted
 	# fixture inspections before auto-posting; production never fabricates QI.
 	from vuna_transport.services.execution import transfer_proof_service
@@ -553,6 +628,7 @@ def _verify_proof_cycle(
 				frappe.db.get_value(
 					"Bin", {"warehouse": quarantine.name, "item_code": stock.items[0].item_code}, "actual_qty"
 				)
+				- quarantine_opening_qty
 				- sum(row.transfer_qty for row in entry.items if row.t_warehouse == quarantine.name)
 			)
 			< 0.00001
