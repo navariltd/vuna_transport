@@ -83,12 +83,23 @@ def run_customer():
 		):
 			proof = prepare_mobile_transport_proof("rollback", task_name)
 			assert proof["return_context"] == "Customer"
+			assert (proof["reference_doctype"], proof["reference_name"]) == ("Return Request", request.name)
+			from vuna_transport.services.mobile.mobile_device_service import get_delivery_trip_details
+
+			details = get_delivery_trip_details("rollback", trip.name)
+			actions = details["trip"]["stops"][0]["tasks"]
+			assert len(actions) == 1 and actions[0]["reference_name"] == request.name
+			assert actions[0]["items"][0]["item_code"] == item["item_code"]
+			draft = prepare_mobile_transport_proof("rollback", task_name, save_draft=True)
+			assert draft["name"] and draft["docstatus"] == 0
+			assert frappe.db.count("Stock Entry") == stock_count
 			result = submit_mobile_transport_proof(
 				"rollback",
 				task_name,
 				{
 					"request_id": str(uuid4()),
 					"received_by": "Customer release contact",
+					"receiver_phone": "0712345678",
 					"items": [
 						{
 							"source_row": row["source_row"],
@@ -99,6 +110,10 @@ def run_customer():
 					],
 				},
 			)
+			recorded = prepare_mobile_transport_proof("rollback", task_name)
+			assert recorded["docstatus"] == 1 and recorded["received_by"] == "Customer release contact"
+			assert recorded["name"] == draft["name"] and recorded["receiver_phone"] == "0712345678"
+			assert recorded["items"][0]["qty"] == proof["items"][0]["qty"]
 		pod = frappe.get_doc("Proof of Delivery", result["name"])
 		assert pod.docstatus == 1 and not pod.dispatch_stock_entry
 		assert frappe.db.count("Stock Entry") == stock_count
