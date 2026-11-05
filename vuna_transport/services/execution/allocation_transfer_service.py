@@ -21,7 +21,7 @@ def allocation_stock_entry(allocation, load):
 	)
 
 
-def resolve_vehicle_transit_warehouse(allocation):
+def resolve_vehicle_transit_warehouse(allocation, check_permissions=True):
 	if not frappe.get_meta("Warehouse").has_field("vehicle"):
 		frappe.throw(_("Configure a Vehicle link on Warehouse before preparing vehicle transit stock."))
 	names = frappe.get_all(
@@ -43,7 +43,8 @@ def resolve_vehicle_transit_warehouse(allocation):
 			)
 		)
 	warehouse = frappe.get_doc("Warehouse", names[0])
-	require_document_permission(warehouse)
+	if check_permissions:
+		require_document_permission(warehouse)
 	return warehouse.name
 
 
@@ -81,6 +82,10 @@ def set_allocation_stock_defaults(entry, allocation):
 def make_allocation_stock_entry(source_name: str, load_name: str):
 	require_doctype_permission("Stock Entry", "create")
 	allocation, load = _context(source_name, load_name)
+	from vuna_transport.services.demand.depot_return_demand_service import is_return_load
+
+	if is_return_load(load):
+		frappe.throw(_("Depot return stock is posted when the driver submits the pickup POD."))
 	if existing := allocation_stock_entry(allocation.name, load.name):
 		entry = frappe.get_doc("Stock Entry", existing)
 		require_document_permission(entry)

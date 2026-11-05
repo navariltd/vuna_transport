@@ -9,6 +9,7 @@ from vuna_transport.services.execution.trip_task_service import (
 	map_tasks_to_stops,
 	plan_tasks,
 	require_tasks_complete,
+	standard_stop_complete,
 )
 
 
@@ -27,6 +28,64 @@ def transfer_specs(origin="Main", destination="Depot", load="TL-1", demand="TD-1
 
 
 class TestTripTaskPlanning(unittest.TestCase):
+	def test_standard_stop_requires_delivery_and_direct_pickup(self):
+		stop = frappe._dict(delivery_note="DN-1", visited=0)
+		pending = [frappe._dict(status="Ready")]
+		complete = [frappe._dict(status="Completed")]
+		self.assertFalse(standard_stop_complete(stop, pending, True))
+		self.assertFalse(standard_stop_complete(stop, complete, False))
+		self.assertTrue(standard_stop_complete(stop, complete, True))
+
+	def test_pickup_only_stop_does_not_require_a_fake_delivery_note(self):
+		self.assertTrue(
+			standard_stop_complete(
+				frappe._dict(delivery_note=None, visited=0), [frappe._dict(status="Completed")], False
+			)
+		)
+
+	def test_return_pickup_and_receipt_preserve_order_and_real_visits(self):
+		specs = [
+			{
+				"task_key": "PICK",
+				"task_type": "Return Pickup",
+				"transport_load": "RETURN-LOAD",
+				"transport_demand": "RETURN-DEMAND",
+				"address": "Depot",
+				"delivery_note": None,
+			},
+			{
+				"task_key": "RECEIVE",
+				"task_type": "Transfer Receipt",
+				"transport_load": "RETURN-LOAD",
+				"transport_demand": "RETURN-DEMAND",
+				"address": "Factory",
+				"delivery_note": None,
+			},
+		]
+		stops = self.stops(specs)
+		self.assertEqual([stop.address for stop in stops], ["Depot", "Factory"])
+		self.assertEqual(len(map_tasks_to_stops(specs, stops)), 2)
+		stops[0].idx, stops[1].idx = 2, 1
+		with self.assertRaises(ValueError):
+			map_tasks_to_stops(specs, stops)
+
+	def test_bundled_return_requests_share_pickup_and_receiving_visits(self):
+		specs = [
+			{
+				"task_key": f"{kind}:{demand}",
+				"task_type": kind,
+				"transport_load": "RETURN-LOAD",
+				"transport_demand": demand,
+				"address": address,
+				"delivery_note": None,
+			}
+			for demand in ("RR-DEMAND-1", "RR-DEMAND-2")
+			for kind, address in (("Return Pickup", "Depot"), ("Transfer Receipt", "Factory"))
+		]
+		stops = self.stops(specs)
+		self.assertEqual([stop.address for stop in stops], ["Depot", "Factory"])
+		self.assertEqual(len(map_tasks_to_stops(specs, stops)), 4)
+
 	def setUp(self):
 		self.framework = self.enterContext(
 			patch("vuna_transport.services.execution.trip_task_service.frappe")

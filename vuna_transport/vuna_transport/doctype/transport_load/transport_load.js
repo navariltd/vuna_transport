@@ -180,6 +180,7 @@ frappe.ui.form.on("Transport Load", {
 							frappe.set_route("Form", "Vehicle Allocation", allocation.name)
 						);
 					} else if (
+						!response.message.return_pickup &&
 						!response.message.delivery_trip &&
 						response.message.transfer_stock_entry?.docstatus !== 1
 					) {

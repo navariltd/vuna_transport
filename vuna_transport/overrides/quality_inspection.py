@@ -15,6 +15,16 @@ class ReturnQualityInspectionMixin:
 		return super().validate_inspection_required()
 
 	def _is_vuna_return_inspection(self):
+		if self.reference_type == "Stock Entry" and self.reference_name:
+			return bool(
+				frappe.db.exists(
+					"Return Inspection",
+					{
+						"receiving_stock_entry": self.reference_name,
+						"docstatus": ["!=", 2],
+					},
+				)
+			)
 		if self.reference_type != "Delivery Note" or not self.reference_name:
 			return False
 		if not frappe.db.get_value("Delivery Note", self.reference_name, "is_return"):

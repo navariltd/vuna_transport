@@ -18,6 +18,7 @@ def run(
 	verify_cascade=False,
 	depot_fraction=0,
 	accepted_fraction=0.5,
+	verify_return_pickup=False,
 ):
 	frappe.db.savepoint("task_trip_smoke")
 	try:
@@ -144,6 +145,7 @@ def run(
 					verify_cascade=verify_cascade,
 					depot_fraction=depot_fraction,
 					accepted_fraction=accepted_fraction,
+					verify_return_pickup=verify_return_pickup,
 				)
 			if verify_dispatch:
 				return {
@@ -425,7 +427,13 @@ def _seed_dispatch_stock(entry):
 
 
 def _verify_proof_cycle(
-	trip, dispatch_task, stock, verify_cascade=False, depot_fraction=0, accepted_fraction=0.5
+	trip,
+	dispatch_task,
+	stock,
+	verify_cascade=False,
+	depot_fraction=0,
+	accepted_fraction=0.5,
+	verify_return_pickup=False,
 ):
 	assert not frappe.db.exists("DocType", "Transport Execution Proof")
 	assert not frappe.db.exists("DocType", "Transport Execution Proof Item")
@@ -550,6 +558,10 @@ def _verify_proof_cycle(
 			< 0.00001
 		)
 	assert all(row.uom == stock.items[0].uom for row in entry.items)
+	if verify_return_pickup:
+		from vuna_transport.tests.depot_return_pickup_smoke import exercise
+
+		return exercise(request, trip)
 	if verify_cascade:
 		from frappe.desk.form.linked_with import cancel_all_linked_docs, get_submitted_linked_docs
 

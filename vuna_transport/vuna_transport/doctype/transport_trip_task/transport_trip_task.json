@@ -7,6 +7,13 @@
   "autoname": "hash",
   "fields": [
     {
+      "fieldname": "return_request",
+      "fieldtype": "Link",
+      "options": "Return Request",
+      "label": "Direct Return Request",
+      "read_only": 1
+    },
+    {
       "fieldname": "dispatch_stock_entry",
       "fieldtype": "Link",
       "options": "Stock Entry",
@@ -56,7 +63,7 @@
     {
       "fieldname": "task_type",
       "fieldtype": "Select",
-      "options": "Customer Delivery\nTransfer Dispatch\nTransfer Receipt",
+      "options": "Customer Delivery\nTransfer Dispatch\nTransfer Receipt\nReturn Pickup",
       "label": "Task",
       "reqd": 1,
       "read_only": 1,
@@ -73,6 +80,7 @@
     },
     {
       "fieldname": "transport_load",
+      "depends_on": "eval:!doc.return_request",
       "fieldtype": "Link",
       "options": "Transport Load",
       "label": "Transport Load",
@@ -80,6 +88,7 @@
     },
     {
       "fieldname": "transport_demand",
+      "depends_on": "eval:!doc.return_request",
       "fieldtype": "Link",
       "options": "Transport Demand",
       "label": "Transport Demand",
@@ -108,6 +117,7 @@
     }
   ],
   "field_order": [
+    "return_request",
     "dispatch_stock_entry",
     "company",
     "delivery_trip",

@@ -20,7 +20,17 @@ from vuna_transport.services.execution.stock_identity_service import (
 
 class ProofofDelivery(Document):
 	def validate(self):
+		if self.get("proof_type") == "Unplanned Collection":
+			from vuna_transport.services.execution.unplanned_pickup_service import validate_collection
+
+			validate_collection(self)
+			return
 		if self.get("transport_trip_task"):
+			if self.proof_type == "Return Pickup":
+				from vuna_transport.services.execution.return_pickup_service import validate_pickup_proof
+
+				validate_pickup_proof(self)
+				return
 			from vuna_transport.services.execution.transfer_proof_service import validate_proof
 
 			validate_proof(self)
@@ -139,7 +149,18 @@ class ProofofDelivery(Document):
 				)
 
 	def on_submit(self):
+		if self.proof_type == "Unplanned Collection":
+			return
 		if self.get("transport_trip_task"):
+			if self.proof_type == "Return Pickup":
+				from vuna_transport.services.execution.return_pickup_service import (
+					post_pickup_stock,
+					sync_pickup_proof,
+				)
+
+				post_pickup_stock(self)
+				sync_pickup_proof(self)
+				return
 			from vuna_transport.services.execution.depot_return_service import create_depot_return_from_pod
 			from vuna_transport.services.execution.transfer_proof_service import submit_receipt_stock_from_pod
 
@@ -164,20 +185,42 @@ class ProofofDelivery(Document):
 		return create_return_request_from_pod(self.name)
 
 	def before_cancel(self):
+		if self.proof_type == "Unplanned Collection":
+			if self.return_request and frappe.db.exists(
+				"Return Request",
+				{"name": self.return_request, "proof_of_delivery": self.name, "docstatus": ["!=", 2]},
+			):
+				frappe.throw(_("Resolve the linked Return Request before cancelling collection evidence."))
+			return
 		from vuna_transport.services.execution.pod_service import prepare_pod_cancellation
 
 		prepare_pod_cancellation(self)
 		if self.get("transport_trip_task"):
+			if self.proof_type == "Return Pickup":
+				from vuna_transport.services.execution.return_pickup_service import (
+					guard_pickup_proof_cancellation,
+				)
+
+				guard_pickup_proof_cancellation(self)
+				return
 			from vuna_transport.services.execution.transfer_proof_service import guard_proof_cancellation
 
 			guard_proof_cancellation(self)
 
 	def on_trash(self):
+		if self.proof_type == "Unplanned Collection":
+			return
 		from vuna_transport.services.execution.pod_service import clear_pod_stop_reference
 
 		if not self.get("transport_trip_task"):
 			clear_pod_stop_reference(self)
 
 	def on_cancel(self):
+		if self.proof_type == "Unplanned Collection":
+			return
+		if self.proof_type == "Return Pickup":
+			from vuna_transport.services.execution.return_pickup_service import sync_pickup_proof
+
+			sync_pickup_proof(self)
 		if not self.get("transport_trip_task"):
 			reset_delivery_stop_from_pod(self)

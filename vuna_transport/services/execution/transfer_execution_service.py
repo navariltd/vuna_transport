@@ -47,6 +47,14 @@ def get_dispatch_entry(task_name):
 	if legacy:
 		return legacy
 	task = frappe.get_doc("Transport Trip Task", task_name)
+	if (
+		task.transport_demand
+		and frappe.db.get_value("Transport Demand", task.transport_demand, "source_document_type")
+		== "Return Request"
+	):
+		from vuna_transport.services.execution.return_pickup_service import pickup_stock_for_task
+
+		return pickup_stock_for_task(task)
 	trip = frappe.get_doc("Delivery Trip", task.delivery_trip)
 	from vuna_transport.services.execution.allocation_transfer_service import allocation_stock_entry
 
@@ -230,7 +238,12 @@ def require_dispatch_stock_posted(trip):
 			_("The transfer trip has no receiving operations. Rebuild its delivery stops before departure.")
 		)
 	for task in tasks:
-		_lock_task(task)
+		locked = _lock_task(task)
+		if (
+			frappe.db.get_value("Transport Demand", locked.transport_demand, "source_document_type")
+			== "Return Request"
+		):
+			continue
 		entry = get_dispatch_entry(task)
 		if not entry or frappe.db.get_value("Stock Entry", entry, "docstatus") != 1:
 			frappe.throw(_("Submit the Add-to-Transit Stock Entry for every transfer before departure."))

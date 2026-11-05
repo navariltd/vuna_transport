@@ -20,16 +20,24 @@ def get_data():
 			"Delivery Order": "replacement_delivery_reference",
 		},
 		"non_standard_fieldnames": {
+			"Transport Trip Task": "return_request",
+			"Transport Demand": "source_document",
 			"Return Inspection": "return_request",
 		},
 		"transactions": [
 			{
 				"label": _("Delivery Context"),
-				"items": ["Proof of Delivery", "Delivery Trip"],
+				"items": ["Proof of Delivery", "Delivery Trip", "Transport Trip Task"],
 			},
 			{
 				"label": _("Physical Return"),
-				"items": ["Delivery Note", "Return Inspection", "Quality Inspection"],
+				"items": [
+					"Delivery Note",
+					"Stock Entry",
+					"Return Inspection",
+					"Quality Inspection",
+					"Transport Demand",
+				],
 			},
 			{
 				"label": _("Commercial Resolution"),

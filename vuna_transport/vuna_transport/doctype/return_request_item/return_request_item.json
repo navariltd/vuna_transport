@@ -39,7 +39,8 @@
       "fieldname": "custody_warehouse",
       "fieldtype": "Link",
       "options": "Warehouse",
-      "label": "Current Custody Warehouse",
+      "label": "Pickup Source Warehouse",
+      "description": "Custody snapshot from the original rejection. Subsequent pickup and receiving PODs record later handovers.",
       "read_only": 1,
       "depends_on": "eval:doc.source_pod_item"
     },

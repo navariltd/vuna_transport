@@ -56,21 +56,23 @@
       "fieldtype": "Select",
       "options": "Customer\nDepot",
       "default": "Customer",
-      "read_only": 1
+      "read_only_depends_on": "eval:doc.docstatus != 0 || !!doc.proof_of_delivery"
     },
     {
       "fieldname": "source_stock_entry",
-      "label": "Original Dispatch Stock Entry",
+      "label": "Source Stock Entry",
       "fieldtype": "Link",
       "options": "Stock Entry",
-      "read_only": 1
+      "read_only_depends_on": "eval:doc.docstatus != 0 || !!doc.proof_of_delivery",
+      "depends_on": "eval:doc.return_context == 'Depot'"
     },
     {
       "fieldname": "source_warehouse",
       "label": "Current Custody Warehouse",
       "fieldtype": "Link",
       "options": "Warehouse",
-      "read_only": 1
+      "read_only_depends_on": "eval:doc.docstatus != 0 || !!doc.proof_of_delivery",
+      "depends_on": "eval:doc.return_context == 'Depot'"
     },
     {
       "fieldname": "rejecting_warehouse",

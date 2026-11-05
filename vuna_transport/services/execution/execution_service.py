@@ -24,6 +24,8 @@ def get_load_execution_summary(load):
 	from vuna_transport.services.planning.transport_load_service import is_demand_load
 
 	if is_demand_load(load):
+		from vuna_transport.services.demand.depot_return_demand_service import is_return_load
+
 		allocation = _get_vehicle_allocation(load)
 		from vuna_transport.services.execution.allocation_transfer_service import allocation_stock_entry
 
@@ -35,6 +37,7 @@ def get_load_execution_summary(load):
 		)
 		return {
 			"planning_only": True,
+			"return_pickup": is_return_load(load),
 			"load": {"docstatus": load.docstatus, "status": load.status},
 			"vehicle_allocation": _serialize_doc(allocation),
 			"transfer_stock_entry": stock,

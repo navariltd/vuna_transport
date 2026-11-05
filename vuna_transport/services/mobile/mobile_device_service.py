@@ -931,17 +931,29 @@ def _enrich_trip_execution(trip, stops):
 
 
 def _attach_transport_tasks(trip, stops):
-	if not getattr(trip, "vuna_task_based", 0):
+	if not getattr(trip, "vuna_task_based", 0) and not frappe.db.exists(
+		"Transport Trip Task",
+		{"delivery_trip": trip.name, "return_request": ["is", "set"], "status": ["!=", "Cancelled"]},
+	):
 		return
 	from vuna_transport.services.execution.trip_task_service import TERMINAL_TASK_STATUSES
 
 	# Detail responses use a Document; list responses use frappe._dict rows.
 	if isinstance(trip, dict):
-		trip["task_based"] = True
+		trip["task_based"] = bool(getattr(trip, "vuna_task_based", 0))
 	tasks = frappe.get_all(
 		"Transport Trip Task",
-		filters={"delivery_trip": trip.name},
-		fields=["name", "delivery_stop", "task_type", "status", "address", "transport_load", "delivery_note"],
+		filters={"delivery_trip": trip.name, "status": ["!=", "Cancelled"]},
+		fields=[
+			"name",
+			"delivery_stop",
+			"task_type",
+			"status",
+			"address",
+			"transport_load",
+			"delivery_note",
+			"return_request",
+		],
 		order_by="sequence asc, creation asc",
 	)
 	by_stop = {}
@@ -957,12 +969,15 @@ def _attach_transport_tasks(trip, stops):
 	tasks = [task for task in tasks if task.task_type != "Transfer Dispatch"]
 	for task in tasks:
 		task["operation_label"] = {
+			"Return Pickup": "Return pickup",
 			"Transfer Dispatch": "Loading",
 			"Transfer Receipt": "Depot delivery",
 			"Customer Delivery": "Customer delivery",
 		}.get(task.task_type, task.task_type)
+		if task.return_request:
+			task["operation_label"] = _("Return pickup: {0}").format(task.return_request)
 		task["can_record_proof"] = (
-			task.task_type == "Transfer Receipt"
+			task.task_type in ("Transfer Receipt", "Return Pickup")
 			and task.status == "Ready"
 			and not getattr(trip, "vuna_actual_completion", None)
 			and bool(getattr(trip, "vuna_actual_start", None))
@@ -985,6 +1000,9 @@ def _attach_transport_tasks(trip, stops):
 
 
 def _set_mobile_stop_actions(trip, stops):
+	from vuna_transport.services.execution.unplanned_pickup_policy import attach_collection_visibility
+
+	attach_collection_visibility(trip.name, stops)
 	trip_started = bool(getattr(trip, "vuna_actual_start", None) or trip.get("actual_start"))
 	trip_completed = bool(getattr(trip, "vuna_actual_completion", None) or trip.get("actual_completion"))
 	for stop in stops:

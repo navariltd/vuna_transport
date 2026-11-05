@@ -21,7 +21,7 @@ def is_demand_load(load):
 def get_committed_quantities(item_names, exclude_load=None):
 	if not item_names:
 		return {}
-	return dict(
+	committed = dict(
 		frappe.db.sql(
 			"""select li.transport_demand_item, sum(coalesce(nullif(li.allocated_stock_qty, 0),
 		li.allocated_quantity * di.conversion_factor))
@@ -33,6 +33,12 @@ def get_committed_quantities(item_names, exclude_load=None):
 			{"items": tuple(item_names), "exclude": exclude_load or ""},
 		)
 	)
+	from vuna_transport.services.demand.depot_return_demand_service import unpicked_releases
+
+	for name, released in unpicked_releases(exclude_load).items():
+		if name in committed:
+			committed[name] = max(flt(committed[name]) - flt(released), 0)
+	return committed
 
 
 def get_posted_transfer_quantities(item_names, exclude_load=None):
@@ -76,6 +82,13 @@ def validate_demand_allocations(load):
 		{"names": tuple(names)},
 	)
 	demands = {name: frappe.get_doc("Transport Demand", name) for name in names}
+	return_sources = {d.source_document_type == "Return Request" for d in demands.values()}
+	if len(return_sources) > 1:
+		frappe.throw(
+			_(
+				"Keep depot return pickups and outbound transfers in separate loads. They may share a Vehicle Allocation."
+			)
+		)
 	committed = get_committed_quantities(
 		[row.transport_demand_item for row in load.delivery_orders], load.name
 	)

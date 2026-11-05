@@ -70,7 +70,10 @@ def plan_tasks(loads):
 				)
 			# Loading is completed on allocation before the trip. Only the actual
 			# receiving destination is a driver stop/POD operation.
-			for kind, warehouse in (("Transfer Receipt", demand.destination_warehouse),):
+			operations = [("Transfer Receipt", demand.destination_warehouse)]
+			if demand.source_document_type == "Return Request":
+				operations.insert(0, ("Return Pickup", load.source_warehouse))
+			for kind, warehouse in operations:
 				address = get_warehouse_planning_data(warehouse).get("address")
 				if not address:
 					frappe.throw(
@@ -150,9 +153,22 @@ def group_stops(specs):
 		}
 
 	stops = []
-	for spec in sorted(specs, key=lambda value: value["task_type"] != "Customer Delivery"):
+	pickup_legs = {
+		(spec["transport_load"], spec["transport_demand"])
+		for spec in specs
+		if spec["task_type"] == "Return Pickup"
+	}
+	for spec in sorted(
+		specs, key=lambda value: {"Customer Delivery": 0, "Return Pickup": 1}.get(value["task_type"], 2)
+	):
 		target = next(
-			(stop for stop in stops if stop["address"] == spec["address"] and not spec.get("delivery_note")),
+			(
+				stop
+				for stop in stops
+				if stop["address"] == spec["address"]
+				and not spec.get("delivery_note")
+				and (spec["transport_load"], spec.get("transport_demand")) not in pickup_legs
+			),
 			None,
 		)
 		if target is None:
@@ -198,6 +214,10 @@ def make_task_trip(allocation, loads):
 
 	for load in loads:
 		if is_demand_load(load):
+			from vuna_transport.services.demand.depot_return_demand_service import is_return_load
+
+			if is_return_load(load):
+				continue
 			stock = allocation_stock_entry(allocation.name, load.name)
 			if not stock or frappe.db.get_value("Stock Entry", stock, "docstatus") != 1:
 				frappe.throw(
@@ -251,7 +271,7 @@ def map_tasks_to_stops(specs, stops):
 		frappe.throw(_("Remove stops that have no assigned transport task."))
 	positions = {}
 	for spec, stop in assignments:
-		if spec["task_type"].startswith("Transfer"):
+		if spec["task_type"].startswith("Transfer") or spec["task_type"] == "Return Pickup":
 			positions.setdefault((spec["transport_load"], spec["transport_demand"]), {})[
 				spec["task_type"]
 			] = stop.idx
@@ -263,6 +283,12 @@ def map_tasks_to_stops(specs, stops):
 		if "Transfer Dispatch" in value and "Transfer Receipt" in value
 	):
 		frappe.throw(_("Transfer dispatch stops must precede their receiving stops."))
+	if any(
+		value["Return Pickup"] >= value["Transfer Receipt"]
+		for value in positions.values()
+		if "Return Pickup" in value and "Transfer Receipt" in value
+	):
+		frappe.throw(_("Return pickup stops must precede their receiving stops."))
 	return assignments
 
 
@@ -272,7 +298,7 @@ def validate_task_trip(doc, loads):
 	stored = (
 		frappe.get_all(
 			"Transport Trip Task",
-			filters={"delivery_trip": doc.name},
+			filters={"delivery_trip": doc.name, "return_request": ["is", "not set"]},
 			fields=[
 				"task_key",
 				"task_type",
@@ -293,7 +319,7 @@ def validate_task_trip(doc, loads):
 			(row.task_key, row.delivery_stop, row.sequence)
 			for row in frappe.get_all(
 				"Transport Trip Task",
-				filters={"delivery_trip": doc.name},
+				filters={"delivery_trip": doc.name, "return_request": ["is", "not set"]},
 				fields=["task_key", "delivery_stop", "sequence"],
 			)
 		}
@@ -361,24 +387,44 @@ def sync_task_plan(doc, method=None):
 			)
 		task.save(ignore_permissions=True)
 		active.add(task.name)
-	for name in frappe.get_all("Transport Trip Task", filters={"delivery_trip": doc.name}, pluck="name"):
+	for name in frappe.get_all(
+		"Transport Trip Task",
+		filters={"delivery_trip": doc.name, "return_request": ["is", "not set"]},
+		pluck="name",
+	):
 		if name not in active:
 			frappe.delete_doc("Transport Trip Task", name, ignore_permissions=True)
+
+
+def standard_stop_complete(stop, assigned, delivery_done):
+	base_done = delivery_done if stop.delivery_note else bool(assigned or stop.visited)
+	return bool(base_done and all(task.status in TERMINAL_TASK_STATUSES for task in assigned))
 
 
 def sync_task_execution(doc, method=None):
 	trip_name = doc.name if doc.doctype == "Delivery Trip" else doc.delivery_trip
 	trip = doc if doc.doctype == "Delivery Trip" else frappe.get_doc("Delivery Trip", trip_name)
-	if not is_task_trip(trip) or trip.docstatus != 1:
+	if trip.docstatus != 1:
+		return
+	if not is_task_trip(trip) and not frappe.db.exists(
+		"Transport Trip Task", {"delivery_trip": trip_name, "return_request": ["is", "set"]}
+	):
 		return
 	tasks = frappe.get_all(
 		"Transport Trip Task",
-		filters={"delivery_trip": trip_name},
+		filters={"delivery_trip": trip_name, "status": ["!=", "Cancelled"]},
 		fields=["name", "delivery_stop", "delivery_note", "task_type", "status"],
 	)
-	if not tasks:
+	if not tasks and is_task_trip(trip):
 		return
 	for task in tasks:
+		if task.task_type == "Return Pickup":
+			from vuna_transport.services.execution.return_pickup_service import pickup_status
+
+			task.status = pickup_status(frappe.get_doc("Transport Trip Task", task.name))
+			frappe.db.set_value(
+				"Transport Trip Task", task.name, "status", task.status, update_modified=False
+			)
 		if task.task_type in ("Transfer Dispatch", "Transfer Receipt"):
 			from vuna_transport.services.execution.transfer_proof_service import derive_transfer_status
 
@@ -411,7 +457,27 @@ def sync_task_execution(doc, method=None):
 			)
 	for stop in trip.delivery_stops:
 		assigned = [task for task in tasks if task.delivery_stop == stop.name]
-		stop.visited = int(bool(assigned) and all(task.status in TERMINAL_TASK_STATUSES for task in assigned))
+		if is_task_trip(trip):
+			stop.visited = int(
+				bool(assigned) and all(task.status in TERMINAL_TASK_STATUSES for task in assigned)
+			)
+		else:
+			delivery_done = (
+				bool(
+					frappe.db.exists(
+						"Proof of Delivery",
+						{
+							"delivery_trip": trip_name,
+							"delivery_stop": stop.name,
+							"proof_type": "Customer Delivery",
+							"docstatus": 1,
+						},
+					)
+				)
+				if stop.delivery_note
+				else bool(assigned or stop.visited)
+			)
+			stop.visited = int(standard_stop_complete(stop, assigned, delivery_done))
 		values = {"visited": stop.visited}
 		if not stop.visited:
 			values["vuna_actual_departure"] = None
@@ -455,7 +521,9 @@ def sync_task_execution(doc, method=None):
 
 
 def cancel_tasks(doc, method=None):
-	if is_task_trip(doc):
+	if is_task_trip(doc) or frappe.db.exists(
+		"Transport Trip Task", {"delivery_trip": doc.name, "return_request": ["is", "set"]}
+	):
 		frappe.db.set_value(
 			"Transport Trip Task", {"delivery_trip": doc.name}, "status", "Cancelled", update_modified=False
 		)
@@ -468,12 +536,11 @@ def remove_draft_tasks(doc, method=None):
 
 
 def require_tasks_complete(trip):
-	if is_task_trip(trip) and (
-		not frappe.db.exists("Transport Trip Task", {"delivery_trip": trip.name})
-		or frappe.db.exists(
-			"Transport Trip Task",
-			{"delivery_trip": trip.name, "status": ["not in", list(TERMINAL_TASK_STATUSES)]},
-		)
+	if (
+		is_task_trip(trip) and not frappe.db.exists("Transport Trip Task", {"delivery_trip": trip.name})
+	) or frappe.db.exists(
+		"Transport Trip Task",
+		{"delivery_trip": trip.name, "status": ["not in", [*TERMINAL_TASK_STATUSES, "Cancelled"]]},
 	):
 		frappe.throw(
 			_("Complete every transport task through its execution proof before completing this trip.")
