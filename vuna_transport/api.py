@@ -504,12 +504,19 @@ def get_delivery_loads_for_allocation(
 			continue
 		if candidate.active_vehicle_allocation:
 			continue
+		previous_mute = frappe.flags.mute_messages
 		try:
+			# Rejected candidates are normal search results, not form errors.
+			# frappe.throw still raises while muted, but does not append popup
+			# messages to this successful search response's message log.
+			frappe.flags.mute_messages = True
 			loads = validate_allocation_load_set([*selected, candidate.name], vehicle_category)
 			for load in loads:
 				require_document_permission(load, "read")
-		except frappe.ValidationError:
+		except (frappe.ValidationError, frappe.PermissionError):
 			continue
+		finally:
+			frappe.flags.mute_messages = previous_mute
 		if as_dict:
 			results.append(
 				{
