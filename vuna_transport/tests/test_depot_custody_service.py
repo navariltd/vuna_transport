@@ -112,10 +112,43 @@ class TestDepotCustody(unittest.TestCase):
 				self.row.depot_received_rejected_qty = qty
 				self.validate()
 
-	def test_missing_configuration_blocks_depot_receipt(self):
+	def test_missing_configuration_receives_rejected_goods_at_the_depot(self):
 		self.framework.db.get_value.return_value = None
-		with self.assertRaisesRegex(ValueError, "Configure"):
+		self.validate()
+		self.framework.get_doc.assert_called_once_with("Warehouse", "DEPOT")
+		self.assertEqual(self.proof.rejected_goods_warehouse, "DEPOT")
+		self.assertEqual(
+			[(g.kind, g.qty) for g in service.receipt_groups(self.proof)], [("Accepted", 8), ("Rejected", 1)]
+		)
+		groups = service.rejection_custody_groups(self.proof, "TRANSIT")
+		self.assertEqual(groups[("ROW", "DEPOT")].qty, 1)
+		self.assertEqual(groups[("ROW", "TRANSIT")].qty, 1)
+
+	def test_all_rejected_goods_can_be_received_at_the_depot_without_configuration(self):
+		self.framework.db.get_value.return_value = None
+		self.row.rejected_goods_handling = service.WITH_DEPOT
+		self.validate()
+		self.assertEqual(self.proof.rejected_goods_warehouse, "DEPOT")
+		self.assertEqual(self.row.depot_received_rejected_qty, 2)
+		self.assertEqual(self.row.rejected_with_driver_qty, 0)
+
+	def test_invalid_fallback_warehouse_is_still_rejected(self):
+		self.framework.db.get_value.return_value = None
+		self.warehouse.disabled = 1
+		with self.assertRaises(ValueError):
 			self.validate()
+
+	def test_fallback_cannot_trigger_automatic_writeoff(self):
+		self.framework.db.get_value.return_value = None
+		self.warehouse.is_rejected_warehouse = 1
+		with self.assertRaisesRegex(ValueError, "automatically writes off"):
+			self.validate()
+
+	def test_configured_transit_or_same_depot_warehouse_is_still_invalid(self):
+		for warehouse in ("TRANSIT", "DEPOT"):
+			self.framework.db.get_value.return_value = warehouse
+			with self.subTest(warehouse=warehouse), self.assertRaises(ValueError):
+				self.validate()
 
 	def test_invalid_warehouses_are_rejected(self):
 		for field, value in (
