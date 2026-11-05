@@ -629,6 +629,7 @@ def submit_mobile_transfer_proof(installation_id, task_name, payload, device_ide
 		],
 	)
 	proof.received_by = str(data.get("received_by") or data.get("confirmed_by") or "")[:140]
+	proof.receiver_phone = str(data.get("receiver_phone") or "")[:140]
 	proof.remarks = str(data.get("remarks") or "")[:4000]
 	proof.mobile_request_id, proof.payload_hash = key, digest
 	proof.flags.ignore_permissions = True
