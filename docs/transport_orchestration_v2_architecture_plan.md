@@ -1079,15 +1079,17 @@ Approved Material Request
 ```text
 Submitted Return Request
 → Transport Demand
-→ Depot creates and submits Add-to-Transit Stock Entry
-→ Driver Proof of Pickup
+→ Transport Load / Vehicle Allocation / Delivery Trip
+→ Driver Proof of Pickup records actual collected quantities
+→ Automatic Add-to-Transit Stock Entry for collected quantities only
 → In Driver Custody
 → Main/receiving depot confirms receipt
-→ End Transit Stock Entry draft
-→ Authorized submission into Returns Warehouse
+→ Automatic End Transit posting into the approved receiving Returns Warehouse
 → Return Inspection / Quality Inspection
 → Stock Entry to accepted or rejected destination
 ```
+
+Phase 6's depot-held rejection pickup/receiving slice is implemented for testing. Return Inspection integration for receiving Stock Entries and mandatory-QI operational preparation remain outstanding; see `transport_orchestration_phase_6_progress.md`. Vehicle-held recovery and customer/supplier pickups are separate follow-up work.
 
 ### 11.3 Customer return pickup
 
@@ -1428,6 +1430,12 @@ Acceptance scenarios:
 
 ### Phase 6 — Depot return execution (essential V1)
 
+Implementation update (2026-11-05): manual depot returns, receiving Stock
+Entry-based Return Inspection, vehicle-held End Transit recovery, warehouse
+draft-stock/QI preparation, and offline pickup/transfer POD queuing are implemented.
+See `transport_orchestration_phase_6_progress.md` for verified scenarios, deliberate
+V1 boundaries, and outstanding physical-device/concurrent-dispatch acceptance.
+
 Deliverables:
 
 - generalized Return Request party/location fields;
@@ -1655,3 +1663,137 @@ The architecture is complete when:
 - Quality Inspection remains separate from transport receipt;
 - existing customer delivery/POD behaviour remains supported;
 - cancellation, retry, partial execution, and batch/serial lineage are covered by automated tests.
+
+## 23. Unplanned Collection Slice (2026-11-04)
+
+The normal process is an approved/submitted Return Request followed by planned,
+assigned pickup work. Unplanned collections are an opt-in exception under
+**Transport Settings → Features → Allow Unplanned Return Pickups**, disabled by
+default. The switch governs new reports and draft submission in Desk and mobile,
+and the reference-item lookup endpoints. It does not create or bypass an approval
+workflow; existing demand-source workflow requirements continue to apply.
+Switching it off preserves submitted evidence, dispatch review, stock receipt,
+cancellation and idempotent retries of already-submitted reports. Stops with
+historical reports retain a read-only Collection History entry on mobile.
+
+Unplanned collections use the existing **Proof of Delivery**, with handover type
+**Unplanned Collection** and direction **Pickup**. They do not create a historical
+Transport Demand or pickup task. Every collection must reference an existing stop
+on that trip; no new stop is fabricated. An assigned driver can record them while
+the trip is started and not completed, from **Trip → Stop → Unplanned collections**.
+Desk users have **Delivery Trip → expand stop row → Record Unplanned Collection**.
+Collection history is scoped to that stop. Collection and delivery remain separate
+proofs, so either can be recorded first while the trip is active.
+
+The report records the collection stop and derives the source customer/warehouse
+from that stop and its transport tasks (or explicit Warehouse Address link).
+Drivers do not select Customer/Depot again. Before choosing items they must load
+a submitted non-return **Delivery Note** for that stop's customer, or a submitted
+**Stock Entry** with incoming rows at that depot. Wrong-company and unrelated
+documents are rejected. Mixed stops may choose the document type, not an arbitrary
+customer or depot. Loading/Add-to-Transit entries are not depot receipts.
+
+Only source-document item rows/batches appear in the picker. Original transaction
+UOM and conversion factor are retained, with source row identity preserved even
+when the same item appears on several lines. Bundle identities take precedence
+over legacy fields. Each batch gets its own option; serial subsets must belong to
+the referenced row. Collected stock quantities across non-cancelled reports cannot
+exceed the original source row/batch quantity; repeated serial reporting is blocked.
+These are collection-evidence limits, not a replacement for ERPNext's stock/return
+balance checks when receiving goods. The report also records the release contact,
+reason, actual collection time, reporting user/time and trip driver/vehicle.
+Mobile retries with the same request ID and payload return the same submitted
+proof; changing a previously used payload is rejected. Collection is not a QC
+acceptance: its outcome is **Collected**, review **Pending Review**.
+
+Dispatch can link an existing same-company Return Request using **Review
+Collection**. Customer cases must still be raised against the legitimate
+Delivery Note or stock-updating Sales Invoice through the existing returns flow;
+the report cannot manufacture that sales authority. For unknown depot cases,
+**Create → Return Request** creates a draft from the collected quantities after
+dispatch confirms the original stock warehouse derived from the reference and
+chooses the receiving holding warehouse.
+It does not assert an original outbound delivery. Review records an audit comment.
+
+For depot goods that have already arrived, submit the reviewed Return Request,
+then use **Collection POD → Create → Stock Entry (Material Transfer)**. This is a
+standard **draft** transfer from the approved depot stock warehouse to the
+receiving Returns/Quarantine Warehouse, with no fabricated intermediate transit
+posting. Warehouse staff confirm arrival by submitting it under their normal ERPNext
+permissions. Batch/serial bundles, availability, QI, valuation and GL checks remain
+ERPNext's responsibility. Drivers cannot invoke dispatch review or authorize stock
+or credit. Customer receipts continue through standard Sales Return processing.
+
+Every collected row must be received together in this slice; partial warehouse
+receipt of a single report is deferred. A collection can cover part of an existing
+Return Request. Ambiguous repeated item/batch source rows must be resolved before
+review. Existing active pickup demands must be resolved before linking an unplanned
+collection; reviewed quantities are excluded from subsequent pickup planning.
+
+One active stock receipt is permitted per report. Server validation prevents
+quantity/UOM/warehouse/identity substitution. Submitted receipt stock contributes
+to Return Request received quantities; cancelling stock reopens that balance.
+Cancelling/deleting its Return Request reopens collection review without deleting
+the physical collection evidence. This path does not complete the still-pending
+Stock Entry-based Return Inspection work.
+
+Verification: `test_unplanned_pickup_service`, `test_depot_return_demand_service`,
+and rollback-only `unplanned_pickup_smoke.run(batched=True/False)`. The latter seeds
+disposable stock, exercises real receipts and cancellation, and always rolls back.
+Offline collection queuing, supplier collections, physical-device UX validation,
+unknown batch/serial registration and historical/completed-trip collection reporting
+are deferred. No native dependency or release APK is added by this slice.
+
+## 24. Direct Approved Return Assignment (2026-11-05)
+
+An approved/submitted customer or depot Return Request can now be assigned directly
+to an existing submitted Delivery Trip and unfinished stop, without Transport
+Demand, Transport Load or another Vehicle Allocation. This is an authorized pickup
+task, not an unplanned collection, and remains available with unplanned pickups off.
+The trip must have a driver, match the company, and not be completed/cancelled.
+Existing configured Return Request workflow-state requirements still apply.
+
+Use **Return Request → Actions → Assign Pickup to Delivery Trip**, select the trip
+and stop, and refresh that trip on the main mobile app. A **Return pickup: RR…**
+task appears at the selected stop. Only dispatch roles with write access to both
+documents may assign/remove work; the driver only executes the assigned proof.
+Customer stops must identify the same customer. Depot stops must identify the
+source warehouse or its explicitly configured returns holding warehouse. Direct
+depot assignment currently requires one source warehouse. Approved batch/serial
+identities must be present; unresolved batch distributions must be resolved before
+assignment. No source expectation quantities are rewritten.
+
+The existing Transport Trip Task/POD models are reused with explicit Return
+Request and Return Request Item references; no hidden demand or load is created.
+Repeated assignment to the same active trip/stop returns the same task. Another
+active assignment, an existing pickup demand, an already-collected unplanned
+report or exhausted collection quantity blocks duplicate work. Partial pickup
+leaves only its actual uncollected balance eligible for later assignment.
+
+Driver proof retains UOM, batch/serial, quantity and assigned-trip checks. Customer
+pickup is custody evidence only: no inventory, Sales Return or credit is posted.
+Its existing approved RR sales-return/credit-note workflow handles receipt and
+commercial resolution. Depot pickup posts actual collection into the trip vehicle's
+transit warehouse, using standard ERPNext stock checks and without broad driver
+stock permissions. Warehouse staff use standard **End Transit** from that stock
+voucher, receiving into the RR Return Warehouse; no receiving stop is fabricated.
+Its posting/cancellation updates RR received quantities. Mandatory QI is not bypassed.
+
+On ordinary customer trips, a stop requires both its normal delivery POD and all
+direct pickup tasks to finish. Pickup-only stops need no fake Delivery Note.
+Demand-based trip plan validation ignores direct assignments, preserving existing
+planning snapshots. Cancelled tasks are excluded from execution/mobile display.
+Direct work does not run load suggestions, route optimization or load-level capacity
+planning; dispatch remains responsible for operationally suitable assignments.
+
+**Task → Actions → Remove Pickup Assignment** releases unexecuted work. If proof or
+stock exists, cancel downstream receiving, pickup stock and pickup proof first.
+The owning pickup POD/Task stock backlinks are navigation references; safe stock
+cancellation preserves ERPNext's own link exclusions without ignoring active
+receiving PODs or stock. RR cancellation requires releasing direct assignments.
+
+Verification includes direct-assignment permission/approval/quantity tests, stop
+completion regressions, and rollback-only `direct_return_pickup_smoke.run()` and
+`run_customer()`. These exercise mobile proofs, depot transit/receipt/cancellation,
+customer evidence without inventory/credit, and no new planning documents. No new
+approval workflow, native dependency, APK or supplier pickup support is introduced.
