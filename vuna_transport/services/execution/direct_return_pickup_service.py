@@ -116,7 +116,11 @@ def _matching_stops(request, trip):
 				continue
 		elif not request.customer or stop.customer != request.customer:
 			continue
-		result.append({"value": stop.name, "label": f"{stop.idx}. {stop.customer or stop.address}"})
+		party = source or stop.customer or stop.address
+		label = f"{stop.idx}. {party}"
+		if source and stop.address:
+			label += f" — {stop.address}"
+		result.append({"value": stop.name, "label": label})
 	return result
 
 

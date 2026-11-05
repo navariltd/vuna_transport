@@ -1,6 +1,79 @@
 // Copyright (c) 2026, Yovuna Technologies Limited and contributors
 // For license information, please see license.txt
 
+function update_pickup_assignment_action(dialog) {
+	const selected = dialog.get_value("delivery_stop");
+	const ready =
+		!dialog._pickup_stops_loading &&
+		dialog.get_value("delivery_trip") &&
+		(dialog._pickup_stop_options || []).some((stop) => stop.value === selected);
+	if (ready) dialog.enable_primary_action();
+	else dialog.disable_primary_action();
+}
+
+async function load_pickup_assignment_stops(dialog, request_name) {
+	const trip = dialog.get_value("delivery_trip");
+	const version = (dialog._pickup_stop_version || 0) + 1;
+	dialog._pickup_stop_version = version;
+	dialog._pickup_stops_loading = true;
+	dialog._pickup_stop_options = [];
+	dialog.disable_primary_action();
+	const current = () =>
+		dialog._pickup_stop_version === version && dialog.get_value("delivery_trip") === trip;
+	const set_stop = (value) => {
+		// Frappe dialog setters are asynchronous. Serialize writes so an old
+		// field reset cannot erase a newer trip's automatically selected stop.
+		const write = async () => {
+			if (current()) await dialog.set_value("delivery_stop", value);
+		};
+		dialog._pickup_stop_write = (dialog._pickup_stop_write || Promise.resolve()).then(
+			write,
+			write
+		);
+		return dialog._pickup_stop_write;
+	};
+	try {
+		await set_stop("");
+		if (!current()) return;
+		dialog.set_df_property("delivery_stop", "options", [""]);
+		dialog.set_df_property(
+			"delivery_stop",
+			"description",
+			trip ? __("Loading matching pickup stops…") : __("Select a Delivery Trip first.")
+		);
+		if (!trip) return;
+		const { message } = await frappe.call({
+			method: "vuna_transport.services.execution.direct_return_pickup_service.get_assignment_stops",
+			args: { return_request: request_name, delivery_trip: trip },
+		});
+		if (!current()) return;
+		const stops = message || [];
+		dialog._pickup_stop_options = stops;
+		// A blank option prevents an apparent DOM selection with no model value.
+		dialog.set_df_property("delivery_stop", "options", ["", ...stops]);
+		dialog.set_df_property(
+			"delivery_stop",
+			"description",
+			stops.length
+				? __("Choose the matching pickup stop.")
+				: __("This trip has no unfinished stop matching this return's depot or customer.")
+		);
+		if (stops.length === 1) await set_stop(stops[0].value);
+	} catch {
+		if (current())
+			dialog.set_df_property(
+				"delivery_stop",
+				"description",
+				__("Could not load pickup stops. Reselect the Delivery Trip to retry.")
+			);
+	} finally {
+		if (current()) {
+			dialog._pickup_stops_loading = false;
+			update_pickup_assignment_action(dialog);
+		}
+	}
+}
+
 async function select_depot_return_items(frm) {
 	if (!frm.doc.source_stock_entry || !frm.doc.source_warehouse) {
 		frappe.msgprint(__("Select the depot warehouse and its incoming Stock Entry first."));
@@ -194,33 +267,7 @@ frappe.ui.form.on("Return Request", {
 									query: "vuna_transport.services.execution.direct_return_pickup_service.get_assignment_trip_query",
 									filters: { return_request: frm.doc.name },
 								}),
-								onchange: async () => {
-									const trip = dialog.get_value("delivery_trip");
-									dialog.set_value("delivery_stop", "");
-									dialog.set_df_property("delivery_stop", "options", []);
-									if (!trip) return;
-									const { message } = await frappe.call({
-										method: "vuna_transport.services.execution.direct_return_pickup_service.get_assignment_stops",
-										args: {
-											return_request: frm.doc.name,
-											delivery_trip: trip,
-										},
-									});
-									if (dialog.get_value("delivery_trip") !== trip) return;
-									dialog.set_df_property(
-										"delivery_stop",
-										"options",
-										message || []
-									);
-									if (message?.length === 1)
-										dialog.set_value("delivery_stop", message[0].value);
-									if (!message?.length)
-										frappe.msgprint(
-											__(
-												"This trip has no unfinished stop matching this return's depot or customer."
-											)
-										);
-								},
+								onchange: () => load_pickup_assignment_stops(dialog, frm.doc.name),
 							},
 							{
 								fieldname: "delivery_stop",
@@ -228,6 +275,8 @@ frappe.ui.form.on("Return Request", {
 								label: __("Pickup Stop"),
 								reqd: 1,
 								options: [],
+								description: __("Select a Delivery Trip first."),
+								onchange: () => update_pickup_assignment_action(dialog),
 							},
 						],
 						primary_action_label: __("Assign Pickup"),
@@ -244,6 +293,7 @@ frappe.ui.form.on("Return Request", {
 							}),
 					});
 					dialog.show();
+					dialog.disable_primary_action();
 				},
 				__("Actions")
 			);
