@@ -7,7 +7,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt, now_datetime
 
-from vuna_transport.services.planning.transport_load_service import is_demand_load
+from vuna_transport.services.planning.transport_load_service import demand_origin_matches_load, is_demand_load
 from vuna_transport.services.routing.location_service import get_warehouse_planning_data
 from vuna_transport.services.shared.security_service import require_document_permission
 
@@ -47,7 +47,7 @@ def plan_tasks(loads):
 				demand.docstatus != 1
 				or demand.movement_type != "Warehouse Transfer"
 				or demand.company != load.company
-				or (demand.source_warehouse and demand.source_warehouse != load.source_warehouse)
+				or not demand_origin_matches_load(demand, load)
 			):
 				frappe.throw(_("Transfer demand does not match the selected load."))
 			items = {row.name: row for row in demand.items}
@@ -85,6 +85,7 @@ def plan_tasks(loads):
 						"transport_load": load.name,
 						"transport_demand": name,
 						"address": address,
+						"warehouse": warehouse,
 						"delivery_note": None,
 						"items": cargo,
 						"task_key": task_key(kind, load.name, name),
@@ -198,7 +199,52 @@ def group_stops(specs):
 			merged.append(stop)
 	for stop in merged:
 		stop["vuna_task_keys"] = frappe.as_json([task["task_key"] for task in stop["tasks"]])
+		stop.update(_stop_location_fields(stop["tasks"]))
 	return merged
+
+
+def _stop_location_fields(specs):
+	warehouses = sorted({spec["warehouse"] for spec in specs if spec.get("warehouse")})
+	has_customer = any(spec.get("delivery_note") for spec in specs)
+	has_depot = any(spec["task_type"] != "Customer Delivery" for spec in specs)
+	return {
+		"vuna_depot_names": ", ".join(warehouses),
+		"vuna_stop_type": "Mixed" if has_customer and has_depot else "Depot" if has_depot else "Customer",
+	}
+
+
+def set_stop_location_context(assignments):
+	"""Derive depot identity and customer ownership from the actual planned work."""
+	by_stop = {}
+	demands = {}
+	for spec, stop in assignments:
+		value = dict(spec)
+		if value["task_type"] != "Customer Delivery" and not value.get("warehouse"):
+			if value["task_type"] == "Transfer Receipt":
+				name = value.get("transport_demand")
+				if name not in demands:
+					demands[name] = frappe.get_doc("Transport Demand", name)
+				value["warehouse"] = demands[name].destination_warehouse
+			else:
+				value["warehouse"] = frappe.db.get_value(
+					"Transport Load", value["transport_load"], "source_warehouse"
+				)
+		by_stop.setdefault(stop.name, (stop, []))[1].append(value)
+	for stop, specs in by_stop.values():
+		customers = {
+			spec.get("customer") or frappe.db.get_value("Delivery Note", spec["delivery_note"], "customer")
+			for spec in specs
+			if spec.get("delivery_note")
+		}
+		if customers:
+			if len(customers) != 1 or not next(iter(customers)) or stop.customer not in customers:
+				frappe.throw(_("The stop Customer must match its planned Delivery Note."))
+		elif stop.customer:
+			frappe.throw(
+				_("Depot-only stops cannot have a Customer. Use the planned depot/warehouse instead.")
+			)
+		for field, value in _stop_location_fields(specs).items():
+			setattr(stop, field, value)
 
 
 def make_task_trip(allocation, loads):
@@ -314,6 +360,7 @@ def validate_task_trip(doc, loads):
 		else []
 	)
 	assignments = map_tasks_to_stops(stored or plan_tasks(loads), doc.delivery_stops)
+	set_stop_location_context(assignments)
 	if doc.docstatus == 1 and frappe.db.exists("Transport Trip Task", {"delivery_trip": doc.name}):
 		existing = {
 			(row.task_key, row.delivery_stop, row.sequence)

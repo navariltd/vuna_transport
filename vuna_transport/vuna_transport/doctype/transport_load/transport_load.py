@@ -153,8 +153,6 @@ def _validate_source_warehouse_change(load):
 	previous = load.get_doc_before_save()
 	if not previous or previous.source_warehouse == load.source_warehouse:
 		return
-	if load.docstatus != 1:
-		return
 	if load.pick_list and frappe.db.get_value("Pick List", load.pick_list, "docstatus") != 2:
 		frappe.throw(_("Cancel the Pick List before changing the Transport Load dispatch warehouse."))
 	if frappe.db.exists("Stock Entry", {"vuna_transport_load": load.name, "docstatus": ["!=", 2]}):

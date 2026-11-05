@@ -9,6 +9,7 @@ from vuna_transport.services.execution.trip_task_service import (
 	map_tasks_to_stops,
 	plan_tasks,
 	require_tasks_complete,
+	set_stop_location_context,
 	standard_stop_complete,
 )
 
@@ -21,6 +22,7 @@ def transfer_specs(origin="Main", destination="Depot", load="TL-1", demand="TD-1
 			"transport_load": load,
 			"transport_demand": demand,
 			"address": address,
+			"warehouse": destination,
 			"delivery_note": None,
 		}
 		for kind, address in (("Transfer Receipt", destination),)
@@ -92,7 +94,11 @@ class TestTripTaskPlanning(unittest.TestCase):
 		)
 		self.framework.as_json.side_effect = frappe.as_json
 		self.framework.parse_json.side_effect = frappe.parse_json
-		self.framework.throw.side_effect = ValueError
+
+		def fail(message):
+			raise ValueError(message)
+
+		self.framework.throw.side_effect = fail
 		self.enterContext(
 			patch("vuna_transport.services.execution.trip_task_service._", side_effect=lambda value: value)
 		)
@@ -113,6 +119,55 @@ class TestTripTaskPlanning(unittest.TestCase):
 		self.assertEqual(len(stops), 1)
 		self.assertEqual(stops[0].address, "Depot")
 		self.assertEqual(len(map_tasks_to_stops(specs, stops)), 1)
+		self.assertEqual(stops[0].vuna_depot_names, "Depot")
+		self.assertEqual(stops[0].vuna_stop_type, "Depot")
+
+	def test_depot_stop_rejects_customer_even_if_client_changes_stop_type(self):
+		spec = {**transfer_specs()[0], "items": []}
+		stop = frappe._dict(name="STOP", customer="UNRELATED", vuna_stop_type="Customer")
+		with self.assertRaisesRegex(ValueError, "Depot-only"):
+			set_stop_location_context([(spec, stop)])
+
+	def test_same_address_can_show_multiple_depots_without_assigning_a_customer(self):
+		specs = [
+			transfer_specs()[0],
+			{**transfer_specs(load="TL-2", demand="TD-2")[0], "warehouse": "Depot Two"},
+		]
+		stops = self.stops(specs)
+		self.assertEqual(len(stops), 1)
+		self.assertEqual(stops[0].vuna_depot_names, "Depot, Depot Two")
+		set_stop_location_context([(spec, stops[0]) for spec in specs])
+		self.assertFalse(stops[0].customer)
+
+	def test_mixed_stop_keeps_authoritative_customer_and_depot_label(self):
+		customer = {
+			"task_type": "Customer Delivery",
+			"delivery_note": "DN-1",
+			"customer": "CUSTOMER-1",
+			"address": "Depot",
+			"transport_load": "TL-CUSTOMER",
+			"task_key": "CUSTOMER",
+		}
+		specs = [customer, transfer_specs()[0]]
+		stops = self.stops(specs)
+		self.assertEqual(len(stops), 1)
+		set_stop_location_context([(spec, stops[0]) for spec in specs])
+		self.assertEqual(stops[0].customer, "CUSTOMER-1")
+		self.assertEqual(stops[0].vuna_stop_type, "Mixed")
+		self.assertEqual(stops[0].vuna_depot_names, "Depot")
+
+	def test_customer_on_mixed_stop_must_match_delivery_note(self):
+		spec = {"task_type": "Customer Delivery", "delivery_note": "DN-1", "customer": "CUSTOMER-1"}
+		with self.assertRaisesRegex(ValueError, "Customer must match"):
+			set_stop_location_context([(spec, frappe._dict(name="STOP", customer="OTHER"))])
+
+	def test_submitted_transfer_tasks_resolve_depot_from_demand(self):
+		spec = {**transfer_specs()[0]}
+		spec.pop("warehouse")
+		self.framework.get_doc.return_value = frappe._dict(destination_warehouse="Receiving Depot")
+		stop = frappe._dict(name="STOP", customer=None)
+		set_stop_location_context([(spec, stop)])
+		self.assertEqual(stop.vuna_depot_names, "Receiving Depot")
 
 	def test_planner_requests_only_destination_address_not_loading_address(self):
 		item = frappe._dict(
@@ -122,7 +177,8 @@ class TestTripTaskPlanning(unittest.TestCase):
 			docstatus=1,
 			movement_type="Warehouse Transfer",
 			company="Company",
-			source_warehouse="Main",
+			source_warehouse="Preferred Main",
+			source_document_type="Material Request",
 			destination_warehouse="Depot",
 			items=[item],
 		)

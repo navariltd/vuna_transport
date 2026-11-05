@@ -1,5 +1,7 @@
 {
  "custom_fields": [
+  {"dt":"Delivery Stop","fieldname":"vuna_stop_type","fieldtype":"Select","label":"Stop Type","options":"\nCustomer\nDepot\nMixed","read_only":1,"allow_on_submit":1,"insert_after":"customer","module":"Vuna Transport","name":"Delivery Stop-vuna_stop_type"},
+  {"dt":"Delivery Stop","fieldname":"vuna_depot_names","fieldtype":"Small Text","label":"Depot / Warehouse","read_only":1,"allow_on_submit":1,"in_list_view":1,"columns":3,"depends_on":"eval:doc.vuna_stop_type == 'Depot' || doc.vuna_stop_type == 'Mixed'","insert_after":"vuna_stop_type","module":"Vuna Transport","name":"Delivery Stop-vuna_depot_names"},
   {"dt":"Delivery Stop","fieldname":"vuna_record_collection","fieldtype":"Button","label":"Record Unplanned Collection","depends_on":"eval:doc.docstatus == 1","insert_after":"address","module":"Vuna Transport","name":"Delivery Stop-vuna_record_collection","allow_on_submit":1},
   {"dt":"Delivery Stop","fieldname":"vuna_task_keys","fieldtype":"Small Text","label":"Transport Task Keys","hidden":1,"read_only":1,"insert_after":"address","module":"Vuna Transport","name":"Delivery Stop-vuna_task_keys"},
   {
@@ -696,6 +698,8 @@
  "custom_perms": [],
  "doctype": "Delivery Stop",
  "links": [],
- "property_setters": [],
+ "property_setters": [
+  {"doctype_or_field":"DocField","doc_type":"Delivery Stop","field_name":"customer","property":"read_only_depends_on","property_type":"Data","value":"eval:doc.vuna_stop_type == 'Depot'","name":"Delivery Stop-customer-read_only_depends_on"}
+ ],
  "sync_on_migrate": 1
 }
