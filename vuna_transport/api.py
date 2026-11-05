@@ -101,12 +101,16 @@ def submit_mobile_transport_proof(
 
 @frappe.whitelist()
 def prepare_mobile_transport_proof(
-	installation_id: str, task_name: str, device_identifier: str | None = None
+	installation_id: str,
+	task_name: str,
+	device_identifier: str | None = None,
+	save_draft: bool = False,
 ):
 	from vuna_transport.services.execution.transfer_execution_service import _lock_task
 	from vuna_transport.services.execution.transfer_proof_service import prepare_proof
 	from vuna_transport.services.mobile.mobile_device_service import (
 		_get_assigned_trip,
+		_get_rejection_reasons,
 		_require_mobile_driver,
 	)
 
@@ -114,17 +118,40 @@ def prepare_mobile_transport_proof(
 	task = _lock_task(task_name)
 	_get_assigned_trip(task.delivery_trip, driver.name)
 	proof = prepare_proof(task)
+	# Only the evidence-upload path needs a persisted draft. Browsing/warming
+	# a task must not create a document or post stock.
+	if save_draft and proof.is_new():
+		proof.flags.ignore_permissions = True
+		proof.insert(ignore_permissions=True)
+	request_name = task.get("return_request") or proof.return_request
 	return {
 		"name": proof.name if not proof.is_new() else None,
 		"docstatus": proof.docstatus,
 		"task": task.name,
 		"task_type": task.task_type,
-		"return_request": task.get("return_request") or proof.return_request,
-		"return_context": frappe.db.get_value("Return Request", task.return_request, "return_context")
-		if task.get("return_request")
+		"return_request": request_name,
+		"return_context": frappe.db.get_value("Return Request", request_name, "return_context")
+		if request_name
 		else None,
+		"reference_doctype": "Return Request" if task.task_type == "Return Pickup" else "Stock Entry",
+		"reference_name": request_name if task.task_type == "Return Pickup" else proof.dispatch_stock_entry,
+		"received_by": proof.received_by,
+		"receiver_phone": proof.receiver_phone,
+		"signature": proof.signature,
+		"delivery_photo": proof.delivery_photo,
+		"delivery_datetime": proof.delivery_datetime,
+		"remarks": proof.remarks,
+		"outcome": proof.outcome,
+		"status": proof.status,
+		"rejection_reasons": _get_rejection_reasons(),
 		"items": [
-			{**row.as_dict(), "qty": row.delivered_qty, "planned_qty": row.ordered_qty} for row in proof.items
+			{
+				**row.as_dict(),
+				"item_name": row.item_name or frappe.get_cached_value("Item", row.item_code, "item_name"),
+				"qty": row.delivered_qty,
+				"planned_qty": row.ordered_qty,
+			}
+			for row in proof.items
 		],
 	}
 

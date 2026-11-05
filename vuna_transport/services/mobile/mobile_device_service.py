@@ -396,6 +396,7 @@ def get_delivery_note_details(installation_id, trip_name, stop_name, device_iden
 		frappe.throw(_("Delivery Note {0} is not submitted.").format(delivery_note.name))
 	_enrich_stops([stop])
 	_set_mobile_stop_actions(trip, [stop])
+	_attach_transport_tasks(trip, [stop])
 	submitted_pod = None
 	pod_name = getattr(stop, "vuna_proof_of_delivery", None)
 	if pod_name:
@@ -666,6 +667,8 @@ def _delivery_stop_fields(*, include_parent):
 		fields.append("parent")
 	meta = frappe.get_meta("Delivery Stop")
 	for fieldname in (
+		"vuna_depot_names",
+		"vuna_stop_type",
 		"vuna_delivery_status",
 		"vuna_actual_arrival",
 		"vuna_actual_departure",
@@ -953,6 +956,8 @@ def _attach_transport_tasks(trip, stops):
 			"transport_load",
 			"delivery_note",
 			"return_request",
+			"transport_demand",
+			"dispatch_stock_entry",
 		],
 		order_by="sequence asc, creation asc",
 	)
@@ -967,6 +972,7 @@ def _attach_transport_tasks(trip, stops):
 		if stop.name not in loading_stops or stop.name in actual_stops or stop.get("delivery_note")
 	]
 	tasks = [task for task in tasks if task.task_type != "Transfer Dispatch"]
+	_attach_task_presentation(tasks)
 	for task in tasks:
 		task["operation_label"] = {
 			"Return Pickup": "Return pickup",
@@ -981,6 +987,7 @@ def _attach_transport_tasks(trip, stops):
 			and task.status == "Ready"
 			and not getattr(trip, "vuna_actual_completion", None)
 			and bool(getattr(trip, "vuna_actual_start", None))
+			and not task.get("blocked_reason")
 		)
 		by_stop.setdefault(task.delivery_stop, []).append(task)
 	for index, stop in enumerate(stops, start=1):
@@ -989,14 +996,98 @@ def _attach_transport_tasks(trip, stops):
 		stop["tasks"] = by_stop.get(stop.name, [])
 		stop["location_label"] = (
 			stop.get("customer")
+			or stop.get("vuna_depot_names")
+			or next((task.get("party_name") for task in stop["tasks"] if task.get("party_name")), None)
 			or (stop.get("address_details") or {}).get("address_title")
 			or stop.get("address")
 			or "Depot"
 		)
-		stop["can_complete_delivery"] = bool(getattr(trip, "vuna_actual_start", None)) and any(
-			task.task_type == "Customer Delivery" and task.status not in TERMINAL_TASK_STATUSES
-			for task in stop["tasks"]
+		customer_tasks = [task for task in stop["tasks"] if task.task_type == "Customer Delivery"]
+		if customer_tasks:
+			stop["can_complete_delivery"] = bool(getattr(trip, "vuna_actual_start", None)) and any(
+				task.status not in TERMINAL_TASK_STATUSES for task in customer_tasks
+			)
+
+
+def _attach_task_presentation(tasks):
+	"""Read-only task cards; no new proof, route stop or stock authority."""
+	if not tasks:
+		return
+	demand_names = sorted({task.transport_demand for task in tasks if task.transport_demand})
+	demands = (
+		{
+			row.name: row
+			for row in frappe.get_all(
+				"Transport Demand",
+				filters={"name": ["in", demand_names]},
+				fields=[
+					"name",
+					"source_document_type",
+					"source_document",
+					"source_warehouse",
+					"destination_warehouse",
+				],
+			)
+		}
+		if demand_names
+		else {}
+	)
+	request_names = {task.return_request for task in tasks if task.return_request}
+	request_names.update(
+		row.source_document for row in demands.values() if row.source_document_type == "Return Request"
+	)
+	requests = (
+		{
+			row.name: row
+			for row in frappe.get_all(
+				"Return Request",
+				filters={"name": ["in", sorted(request_names)]},
+				fields=["name", "return_context", "customer", "source_warehouse"],
+			)
+		}
+		if request_names
+		else {}
+	)
+	by_task = {}
+	for item in frappe.get_all(
+		"Transport Trip Task Item",
+		filters={"parent": ["in", [task.name for task in tasks]]},
+		fields=["parent", "item_code", "qty", "uom"],
+		order_by="idx asc",
+	):
+		by_task.setdefault(item.parent, []).append(
+			{
+				"item_code": item.item_code,
+				"item_name": frappe.get_cached_value("Item", item.item_code, "item_name"),
+				"qty": item.qty,
+				"uom": item.uom,
+			}
 		)
+	for task in tasks:
+		demand = demands.get(task.transport_demand)
+		request_name = task.return_request or (
+			demand.source_document if demand and demand.source_document_type == "Return Request" else None
+		)
+		request = requests.get(request_name)
+		task["items"] = by_task.get(task.name, [])
+		if task.task_type == "Return Pickup":
+			task["reference_doctype"], task["reference_name"] = "Return Request", request_name
+			task["party_name"] = (
+				request.customer
+				if request and request.return_context == "Customer"
+				else demand.source_warehouse
+				if demand
+				else request.source_warehouse
+				if request
+				else None
+			)
+		elif task.task_type == "Customer Delivery":
+			task["reference_doctype"], task["reference_name"] = "Delivery Note", task.delivery_note
+		else:
+			task["reference_doctype"], task["reference_name"] = "Stock Entry", task.dispatch_stock_entry
+			task["party_name"] = demand.destination_warehouse if demand else None
+		if task.task_type == "Transfer Receipt" and request_name and not task.dispatch_stock_entry:
+			task["blocked_reason"] = _("Complete the return pickup before receiving these goods.")
 
 
 def _set_mobile_stop_actions(trip, stops):

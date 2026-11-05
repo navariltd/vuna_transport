@@ -38,7 +38,7 @@ class TestAllocationTransferDefaults(unittest.TestCase):
 		task = frappe._dict(
 			name="TASK-1", delivery_stop="STOP-1", task_type="Transfer Receipt", status="Ready"
 		)
-		with patch.object(mobile_device_service.frappe, "get_all", return_value=[task]):
+		with patch.object(mobile_device_service.frappe, "get_all", side_effect=[[task], []]):
 			mobile_device_service._attach_transport_tasks(trip, [stop])
 		self.assertEqual(stop.tasks[0].operation_label, "Depot delivery")
 		self.assertEqual(stop.location_label, "Depot")
@@ -55,7 +55,7 @@ class TestAllocationTransferDefaults(unittest.TestCase):
 			frappe._dict(name="OLD", delivery_stop="LOAD", task_type="Transfer Dispatch", status="Ready"),
 			frappe._dict(name="NEW", delivery_stop="DROP", task_type="Transfer Receipt", status="Ready"),
 		]
-		with patch.object(mobile_device_service.frappe, "get_all", return_value=tasks):
+		with patch.object(mobile_device_service.frappe, "get_all", side_effect=[tasks, []]):
 			mobile_device_service._attach_transport_tasks(trip, stops)
 		self.assertEqual([stop.name for stop in stops], ["DROP"])
 
