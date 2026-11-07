@@ -3,7 +3,7 @@
 import frappe
 from frappe import _
 
-SUPPORTED_SOURCES = ("Sales Order", "Material Request", "Return Request")
+SUPPORTED_SOURCES = ("Sales Order", "Material Request", "Return Request", "Purchase Order")
 
 
 @frappe.whitelist()
@@ -93,14 +93,22 @@ def automatically_create_from_source(doc, method=None):
 		return []
 	if doc.doctype == "Return Request" and doc.get("return_context") != "Depot":
 		return []
-	if doc.doctype not in ("Delivery Order", "Material Request", "Return Request"):
+	if doc.doctype == "Purchase Order" and not doc.get("vuna_company_pickup"):
+		return []
+	if doc.doctype not in ("Delivery Order", "Material Request", "Return Request", "Purchase Order"):
 		return []
 	from vuna_transport.services.demand.transport_demand_service import (
 		_create_transport_demands,
 		build_source_legs,
 	)
 
-	if doc.get("status") in ("Stopped", "Closed", "Cancelled") or not build_source_legs(doc):
+	if doc.get("status") in (
+		"Stopped",
+		"Closed",
+		"Cancelled",
+		"On Hold",
+		"Completed",
+	) or not build_source_legs(doc):
 		return []
 
 	return _create_transport_demands(doc.doctype, doc.name, automated=True)

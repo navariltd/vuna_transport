@@ -13,7 +13,7 @@ from vuna_transport.services.shared.security_service import (
 	require_doctype_permission,
 )
 
-SUPPORTED_SOURCES = {"Delivery Order", "Material Request", "Return Request"}
+SUPPORTED_SOURCES = {"Delivery Order", "Material Request", "Return Request", "Purchase Order"}
 
 
 def build_source_legs(source):
@@ -22,6 +22,10 @@ def build_source_legs(source):
 		frappe.throw(_("Transport demand requires a supported, submitted source document."))
 	if source.status in ("Stopped", "Closed", "Cancelled"):
 		frappe.throw(_("The source document is no longer available for transport planning."))
+	if source.doctype == "Purchase Order":
+		from vuna_transport.services.demand.supplier_pickup_demand_service import build_supplier_pickup_legs
+
+		return build_supplier_pickup_legs(source)
 	if source.doctype == "Return Request":
 		from vuna_transport.services.demand.depot_return_demand_service import build_depot_return_legs
 
@@ -170,6 +174,9 @@ def validate_transport_demand(demand):
 	leg = next((leg for leg in build_source_legs(source) if leg["source_key"] == demand.source_key), None)
 	if not leg:
 		frappe.throw(_("This movement leg no longer has outstanding source quantity."))
+	if source.doctype == "Purchase Order" and not demand.flags.ignore_permissions:
+		frappe.get_doc("Address", leg["source_address"]).check_permission("read")
+		frappe.get_doc("Supplier", leg["supplier"]).check_permission("read")
 	# A requester may know the depot but not the fulfilment warehouse. Preserve
 	# the original source-leg key while the transport planner resolves its origin.
 	if not leg["source_warehouse"] and leg["movement_type"] == "Warehouse Transfer":

@@ -8,6 +8,12 @@ class TransportDemand(Document):
 	@frappe.whitelist()
 	def create_load(self, source_warehouse: str | None = None):
 		self.check_permission("read")
+		if self.movement_type == "Supplier Pickup":
+			frappe.throw(
+				frappe._(
+					"Supplier pickup demand is recorded. Supplier load and task execution is not available in this implementation slice."
+				)
+			)
 		from vuna_transport.services.planning.transport_load_service import (
 			create_transport_load_from_demands,
 			get_committed_quantities,
