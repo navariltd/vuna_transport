@@ -1,0 +1,8 @@
+{
+  "doctype": "Purchase Receipt Item",
+  "custom_fields": [
+    {"dt":"Purchase Receipt Item","name":"Purchase Receipt Item-vuna_pickup_destination_warehouse","fieldname":"vuna_pickup_destination_warehouse","fieldtype":"Link","label":"Planned Receiving Warehouse","options":"Warehouse","read_only":1,"no_copy":1,"insert_after":"warehouse","module":"Vuna Transport"}
+  ],
+  "property_setters": [],
+  "sync_on_migrate": 1
+}
