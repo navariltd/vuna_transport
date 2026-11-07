@@ -1112,7 +1112,7 @@ Submitted Return Request
 ### 11.4 Supplier pickup
 
 ```text
-Submitted Purchase Order with Company Pickup enabled
+Submitted Purchase Order with a company-arranged Delivery Method with Buying enabled
 → Transport Demand
 → Supplier Pickup task
 → Driver Proof of Pickup

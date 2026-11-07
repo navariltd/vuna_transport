@@ -92,7 +92,9 @@ Vuna Transport uses standard ERPNext configuration wherever practical.
 * **Vehicle Category** defines physical capacity, payload limits, UOMs, and vehicle requirements.
 * **Vehicle** identifies the physical resource and may link to an ERPNext Asset and Transport Cost Structure.
 * **Driver** remains the standard ERPNext/HRMS Driver record.
-* **Delivery Method** describes the business fulfilment method, while Vehicle Allocation describes the transport source.
+* **Delivery Method** defines applicability with **Buying**, **Selling** and **Internal** checkboxes (enable multiple to share a method), and who arranges transport (`Company` or `Counterparty`). Material Transfers use Internal methods; customer Return Requests use Selling and depot returns Internal. Return Requests use the same master, not a separate Return Method select. Custody and stock/quality decisions remain separate. Vehicle Allocation separately selects owned or subcontracted transport.
+* **Transport Demand** retains the movement purpose and derives **Demand Type** using ERPNext terminology: customer deliveries are **Selling**, supplier pickups **Buying**, and depot transfers/returns **Internal**. A trip can serve multiple demand types; delivery methods do not determine inventory ownership or stock posting.
+* **Delivery Method workflow** requires planning before a new allocation and allocation before a new trip. Company-arranged methods may leave all three options off for explicit manual demand creation; automatic source generation then stays off. Submitted manual supplier demands can use **Assign to Trip** to reuse an active trip's allocation, vehicle and driver without creating another load/allocation. The warehouse team confirms collection through the task's **Purchase Receipt (Vehicle)** action; drivers are not granted inventory-posting authority. Counterparty-arranged methods bypass the company transport workflow.
 * **Delivery Group** controls how Item demand is split into Delivery Orders.
 * **Transport Compatibility Group** controls which demand can share a Delivery Load.
 * **Cost Components** define reusable cost types as Fixed or Variable.
