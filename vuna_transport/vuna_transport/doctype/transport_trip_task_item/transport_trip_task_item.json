@@ -5,6 +5,7 @@
   "engine": "InnoDB",
   "istable": 1,
   "fields": [
+    {"fieldname":"transport_demand_item","fieldtype":"Link","options":"Transport Demand Item","label":"Transport Demand Item","read_only":1},
     {
       "fieldname": "return_request_item",
       "fieldtype": "Link",
@@ -65,6 +66,7 @@
     }
   ],
   "field_order": [
+    "transport_demand_item",
     "return_request_item",
     "qty",
     "uom",

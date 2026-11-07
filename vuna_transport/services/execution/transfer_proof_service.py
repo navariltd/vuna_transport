@@ -111,6 +111,8 @@ def make_transfer_proof(source_name: str):
 
 
 def prepare_proof(task):
+	if task.task_type == "Supplier Pickup":
+		frappe.throw(_("Supplier collection is confirmed through the warehouse team's Purchase Receipt."))
 	if task.task_type == "Return Pickup":
 		from vuna_transport.services.execution.return_pickup_service import prepare_pickup_proof
 

@@ -344,7 +344,7 @@ def validate_task_trip(doc, loads):
 	stored = (
 		frappe.get_all(
 			"Transport Trip Task",
-			filters={"delivery_trip": doc.name, "return_request": ["is", "not set"]},
+			filters={"delivery_trip": doc.name, "return_request": ["is", "not set"], "direct_assignment": 0},
 			fields=[
 				"task_key",
 				"task_type",
@@ -359,14 +359,35 @@ def validate_task_trip(doc, loads):
 		if doc.docstatus == 1
 		else []
 	)
-	assignments = map_tasks_to_stops(stored or plan_tasks(loads), doc.delivery_stops)
+	# Direct pickups may append stops after submission without rewriting the
+	# frozen load manifest. Only those extra stops are excluded from load validation.
+	direct_stops = (
+		set(
+			frappe.get_all(
+				"Transport Trip Task",
+				filters={"delivery_trip": doc.name, "direct_assignment": 1},
+				pluck="delivery_stop",
+			)
+		)
+		if doc.docstatus == 1
+		else set()
+	)
+	planned_stops = {row.delivery_stop for row in stored}
+	stops = [
+		stop for stop in doc.delivery_stops if stop.name not in direct_stops or stop.name in planned_stops
+	]
+	assignments = map_tasks_to_stops(stored or plan_tasks(loads), stops)
 	set_stop_location_context(assignments)
 	if doc.docstatus == 1 and frappe.db.exists("Transport Trip Task", {"delivery_trip": doc.name}):
 		existing = {
 			(row.task_key, row.delivery_stop, row.sequence)
 			for row in frappe.get_all(
 				"Transport Trip Task",
-				filters={"delivery_trip": doc.name, "return_request": ["is", "not set"]},
+				filters={
+					"delivery_trip": doc.name,
+					"return_request": ["is", "not set"],
+					"direct_assignment": 0,
+				},
 				fields=["task_key", "delivery_stop", "sequence"],
 			)
 		}
@@ -454,7 +475,7 @@ def sync_task_execution(doc, method=None):
 	if trip.docstatus != 1:
 		return
 	if not is_task_trip(trip) and not frappe.db.exists(
-		"Transport Trip Task", {"delivery_trip": trip_name, "return_request": ["is", "set"]}
+		"Transport Trip Task", {"delivery_trip": trip_name, "status": ["!=", "Cancelled"]}
 	):
 		return
 	tasks = frappe.get_all(
@@ -465,6 +486,13 @@ def sync_task_execution(doc, method=None):
 	if not tasks and is_task_trip(trip):
 		return
 	for task in tasks:
+		if task.task_type == "Supplier Pickup":
+			from vuna_transport.services.execution.direct_supplier_pickup_service import supplier_task_status
+
+			task.status = supplier_task_status(frappe.get_doc("Transport Trip Task", task.name))
+			frappe.db.set_value(
+				"Transport Trip Task", task.name, "status", task.status, update_modified=False
+			)
 		if task.task_type == "Return Pickup":
 			from vuna_transport.services.execution.return_pickup_service import pickup_status
 
@@ -568,11 +596,18 @@ def sync_task_execution(doc, method=None):
 
 
 def cancel_tasks(doc, method=None):
-	if is_task_trip(doc) or frappe.db.exists(
-		"Transport Trip Task", {"delivery_trip": doc.name, "return_request": ["is", "set"]}
-	):
+	if is_task_trip(doc) or frappe.db.exists("Transport Trip Task", {"delivery_trip": doc.name}):
 		frappe.db.set_value(
 			"Transport Trip Task", {"delivery_trip": doc.name}, "status", "Cancelled", update_modified=False
+		)
+		from vuna_transport.services.planning.demand_lifecycle_service import sync_demand_allocations
+
+		sync_demand_allocations(
+			frappe.get_all(
+				"Transport Trip Task",
+				filters={"delivery_trip": doc.name, "direct_assignment": 1},
+				pluck="transport_demand",
+			)
 		)
 
 

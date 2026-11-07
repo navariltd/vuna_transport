@@ -262,6 +262,7 @@ doc_events = {
 	},
 	"Delivery Trip": {
 		"before_cancel": [
+			"vuna_transport.services.execution.direct_supplier_pickup_service.guard_trip_cancellation",
 			"vuna_transport.services.execution.transfer_execution_service.guard_trip_stock_cancellation",
 			"vuna_transport.services.execution.lineage_service.prepare_delivery_trip_cancellation",
 		],
@@ -323,6 +324,10 @@ doc_events = {
 		"before_cancel": "vuna_transport.services.planning.demand_lifecycle_service.guard_source_cancellation",
 	},
 	"Purchase Receipt": {
+		"after_delete": "vuna_transport.services.execution.direct_supplier_pickup_service.sync_supplier_receipt",
+		"on_update": "vuna_transport.services.execution.direct_supplier_pickup_service.sync_supplier_receipt",
+		"on_submit": "vuna_transport.services.execution.direct_supplier_pickup_service.sync_supplier_receipt",
+		"on_cancel": "vuna_transport.services.execution.direct_supplier_pickup_service.sync_supplier_receipt",
 		"validate": "vuna_transport.services.execution.supplier_vehicle_receipt_service.validate_vehicle_purchase_receipt",
 		"before_update_after_submit": "vuna_transport.services.execution.supplier_vehicle_receipt_service.validate_vehicle_purchase_receipt",
 		"before_cancel": "vuna_transport.services.execution.supplier_vehicle_receipt_service.guard_vehicle_receipt_cancellation",
