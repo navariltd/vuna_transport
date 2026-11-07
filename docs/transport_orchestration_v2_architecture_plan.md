@@ -116,6 +116,10 @@ Return Request
 - The company pays the transport cost.
 - Purchase Order is the provisional source document.
 - The design must allow that trigger to be changed later without replacing the transport model.
+- Ownership transfers to the company at supplier collection. Submit the Purchase
+  Receipt into the allocated vehicle's Transit Warehouse at collection; arrival
+  is a normal Material Transfer into a company receiving warehouse. No company
+  source stock, fake supplier warehouse, Add-to-Transit or End Transit is invented.
 
 ### 2.7 Capacity and compatibility
 
@@ -631,7 +635,7 @@ Actual batch and serial details remain authoritative in ERPNext stock documents 
 | Main to depot transfer | Submitted Material Request (Material Transfer) | Submitted Stock Entry with Add to Transit | Transfer Receipt Confirmation | End Transit Stock Entry | Stock Entry |
 | Depot to main return | Submitted Return Request | Submitted Stock Entry with Add to Transit | Proof of Pickup + Transfer Receipt | End Transit Stock Entry | Stock Entry |
 | Customer return pickup | Submitted Return Request | None at pickup | Proof of Pickup | Draft Sales Return at receiving checkpoint | Sales Return |
-| Supplier pickup | Submitted Purchase Order | None at pickup | Proof of Pickup | Draft Purchase Receipt | Purchase Receipt |
+| Supplier pickup | Submitted Purchase Order | Purchase Receipt into vehicle Transit Warehouse at collection | Proof of Pickup | Normal Material Transfer from vehicle stock on arrival | Purchase Receipt + Stock Entry |
 
 ### 5.1 Demand synchronization rules
 
@@ -1112,11 +1116,18 @@ Submitted Purchase Order with Company Pickup enabled
 → Transport Demand
 → Supplier Pickup task
 → Driver Proof of Pickup
-→ In Driver Custody
-→ Company Warehouse confirms receipt
-→ Draft Purchase Receipt generated
-→ Procurement/Warehouse review and submission
+→ Authorized Purchase Receipt submitted into vehicle Transit Warehouse
+→ Company-owned inventory in vehicle custody
+→ Company Warehouse confirms arrival
+→ Normal Material Transfer from vehicle warehouse to receiving warehouse
+→ Authorized review and submission (not End Transit)
 ```
+
+The company owns collected goods at supplier pickup, not only after arrival.
+Receipt posting and required QI remain authorized purchasing/warehouse actions.
+A draft Purchase Receipt alone does not update inventory. The warehouse-side
+creation/transfer actions are implemented; connecting them to supplier trip tasks
+and mobile proof is still Phase 7 follow-up work.
 
 ---
 
@@ -1448,6 +1459,13 @@ Deliverables:
 - tests for partial pickup, partial receipt, and inspection lineage.
 
 ### Phase 7 — Customer return pickup and supplier pickup
+
+Implementation update (2026-11-05): approved customer return assignment and pickup
+already exist. Supplier PO opt-in, policy-controlled demand generation, requested
+UOM preservation and source/endpoint validation are implemented as slice 7A.
+The warehouse-side PO-to-vehicle Purchase Receipt and normal arrival transfer
+actions are implemented. Supplier loads/tasks and mobile proof integration remain
+pending; Phase 7 is not complete. See `transport_orchestration_phase_7_progress.md`.
 
 Deliverables:
 

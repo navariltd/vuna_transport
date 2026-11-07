@@ -8,8 +8,26 @@ Transport Settings now uses a `Transport Demand Sources` child table rather than
 | --- | --- | --- |
 | Sales Order | Sales Order → Delivery Order → Transport Demand | Customer deliveries |
 | Material Request | Material Request → Transport Demand | Material Transfer only |
+| Return Request | Approved depot Return Request → Transport Demand | Depot pickup; direct assignment remains available |
+| Purchase Order | Opted-in submitted Purchase Order → Transport Demand | Supplier-demand foundation; load/task execution is the next Phase 7 slice |
 
-Purchase Order and Return Request are deliberately unavailable until their transport adapters and execution flows are implemented. Arbitrary DocTypes cannot be selected.
+Arbitrary DocTypes cannot be selected. Purchase Order is opt-in at both levels:
+add an enabled source-policy row in Transport Settings, then enable **Company
+Pickup** and choose a linked **Supplier Pickup Address** on the Purchase Order.
+No source-policy row is added or enabled automatically by this implementation.
+Target warehouses and required dates come from PO item rows (standard header
+defaults are respected). Quantities remain in PO transaction UOM; `received_qty`
+is subtracted in that UOM before converting to Stock UOM.
+
+Supplier demand currently stops at the reviewable/submittable demand document.
+It cannot yet enter warehouse-transfer loads or generate supplier driver tasks.
+The separate warehouse-side **Purchase Receipt (Vehicle)** action receives owned
+supplier goods into the allocated vehicle's Transit Warehouse. Authorized users
+review actual quantities, batch/serial identity and QI before submitting. From
+that submitted Purchase Receipt, **Stock Entry (Material Transfer)** creates the
+normal transfer to a receiving warehouse. Neither action submits stock automatically.
+See
+`transport_orchestration_phase_7_progress.md`.
 
 ## Per-source controls
 
