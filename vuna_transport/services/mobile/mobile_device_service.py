@@ -936,7 +936,7 @@ def _enrich_trip_execution(trip, stops):
 def _attach_transport_tasks(trip, stops):
 	if not getattr(trip, "vuna_task_based", 0) and not frappe.db.exists(
 		"Transport Trip Task",
-		{"delivery_trip": trip.name, "return_request": ["is", "set"], "status": ["!=", "Cancelled"]},
+		{"delivery_trip": trip.name, "status": ["!=", "Cancelled"]},
 	):
 		return
 	from vuna_transport.services.execution.trip_task_service import TERMINAL_TASK_STATUSES
@@ -1083,6 +1083,19 @@ def _attach_task_presentation(tasks):
 			)
 		elif task.task_type == "Customer Delivery":
 			task["reference_doctype"], task["reference_name"] = "Delivery Note", task.delivery_note
+		elif task.task_type == "Supplier Pickup":
+			task["reference_doctype"], task["reference_name"] = (
+				"Purchase Order",
+				demand.source_document if demand else None,
+			)
+			task["party_name"] = (
+				frappe.db.get_value("Purchase Order", demand.source_document, "supplier_name")
+				if demand
+				else None
+			)
+			task["blocked_reason"] = _(
+				"Collection is confirmed through the warehouse team's Purchase Receipt."
+			)
 		else:
 			task["reference_doctype"], task["reference_name"] = "Stock Entry", task.dispatch_stock_entry
 			task["party_name"] = demand.destination_warehouse if demand else None

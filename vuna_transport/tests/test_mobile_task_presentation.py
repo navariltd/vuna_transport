@@ -51,6 +51,21 @@ class TestMobileTaskPresentation(TestCase):
 			("Return Request", "RR", "Customer"),
 		)
 
+	def test_supplier_pickup_exposes_po_without_granting_driver_stock_posting(self):
+		self.demand(source_document_type="Purchase Order", source_document="PO")
+		task = frappe._dict(name="TASK", task_type="Supplier Pickup", transport_demand="TD", status="Ready")
+		with patch.object(service.frappe.db, "get_value", return_value="Supplier"):
+			service._attach_task_presentation([task])
+		self.assertEqual(
+			(task.reference_doctype, task.reference_name, task.party_name),
+			("Purchase Order", "PO", "Supplier"),
+		)
+		self.assertIn("Purchase Receipt", task.blocked_reason)
+		task.status = "Completed"
+		with patch.object(service.frappe.db, "get_value", return_value="Supplier"):
+			service._attach_task_presentation([task])
+		self.assertIn("Purchase Receipt", task.blocked_reason)
+
 	def test_return_receiving_is_blocked_until_pickup_posts_dispatch_stock(self):
 		self.demand(source_document_type="Return Request", source_document="RR")
 		task = self.task()

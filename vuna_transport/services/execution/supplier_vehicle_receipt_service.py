@@ -15,7 +15,12 @@ from vuna_transport.services.shared.security_service import (
 	require_document_permission,
 )
 
-CONTEXT_FIELDS = ("vuna_pickup_purchase_order", "vuna_pickup_allocation", "vuna_pickup_transit_warehouse")
+CONTEXT_FIELDS = (
+	"vuna_pickup_purchase_order",
+	"vuna_pickup_allocation",
+	"vuna_pickup_transit_warehouse",
+	"vuna_pickup_task",
+)
 
 
 def receipt_context(source_name, allocation_name):
@@ -67,25 +72,47 @@ def reserved_purchase_quantities(order_name, exclude_receipt=None):
 
 
 @frappe.whitelist()
-def create_vehicle_purchase_receipt(source_name: str, allocation_name: str) -> str:
+def create_vehicle_purchase_receipt(
+	source_name: str, allocation_name: str, task_name: str | None = None
+) -> str:
 	"""Map PO -> reviewable PR into vehicle stock. Never submits inventory."""
 	from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt
 
 	from vuna_transport.services.execution.allocation_transfer_service import set_allocation_stock_defaults
 
 	require_doctype_permission("Purchase Receipt", "create")
+	task = None
+	if task_name:
+		from vuna_transport.services.execution.transfer_execution_service import _lock_task
+
+		task = _lock_task(task_name)
+		require_document_permission(task, "read")
 	order, allocation, transit, legs = receipt_context(source_name, allocation_name)
+	limits = None
+	if task:
+		from vuna_transport.services.execution.direct_supplier_pickup_service import receipt_task_limits
+
+		limits = receipt_task_limits(task, order, allocation)
 	if existing := frappe.db.get_value(
 		"Purchase Receipt",
 		{
 			"vuna_pickup_purchase_order": order.name,
 			"vuna_pickup_allocation": allocation.name,
+			"vuna_pickup_task": task.name if task else ["is", "not set"],
 			"docstatus": 0,
 		},
 		"name",
 	):
 		require_document_permission(frappe.get_doc("Purchase Receipt", existing), "read")
 		return existing
+	if task is None and frappe.db.sql(
+		"""select t.name from `tabTransport Trip Task` t
+		join `tabTransport Demand` d on d.name=t.transport_demand
+		where d.source_document_type='Purchase Order' and d.source_document=%s
+		and t.direct_assignment=1 and t.status not in ('Cancelled', 'Completed', 'Completed with Variance') limit 1""",
+		order.name,
+	):
+		frappe.throw(_("Create this collection's Purchase Receipt from its assigned supplier pickup task."))
 	reserved = reserved_purchase_quantities(order.name)
 	remaining = {
 		item["source_item"]: max(item["transaction_qty"] - flt(reserved.get(item["source_item"])), 0)
@@ -93,6 +120,8 @@ def create_vehicle_purchase_receipt(source_name: str, allocation_name: str) -> s
 		for item in leg["items"]
 	}
 	remaining = {key: value for key, value in remaining.items() if value > 0}
+	if limits is not None:
+		remaining = {key: min(value, limits[key]) for key, value in remaining.items() if key in limits}
 	if not remaining:
 		frappe.throw(
 			_(
@@ -102,6 +131,7 @@ def create_vehicle_purchase_receipt(source_name: str, allocation_name: str) -> s
 	receipt = make_purchase_receipt(order.name, args={"filtered_children": list(remaining)})
 	receipt.set("items", [row for row in receipt.items if row.purchase_order_item in remaining])
 	receipt.vuna_pickup_purchase_order = order.name
+	receipt.vuna_pickup_task = task.name if task else None
 	receipt.vuna_pickup_allocation = allocation.name
 	receipt.vuna_pickup_transit_warehouse = transit
 	receipt.set_warehouse = transit
@@ -124,11 +154,19 @@ def validate_vehicle_purchase_receipt(doc, method=None):
 		frappe.throw(
 			_("Supplier vehicle receipt lineage cannot be changed. Cancel and recreate the receipt.")
 		)
+	if doc.get("vuna_pickup_task") and not doc.get("vuna_pickup_purchase_order"):
+		frappe.throw(
+			_("A supplier pickup task requires its collection Purchase Order and vehicle allocation.")
+		)
 	if not doc.get("vuna_pickup_purchase_order"):
 		return
 	if previous and previous.docstatus == 1:
 		return  # Submitted stock cannot be rewritten through update-after-submit.
-	order, _allocation, transit, legs = receipt_context(
+	if doc.get("vuna_pickup_task"):
+		from vuna_transport.services.execution.transfer_execution_service import _lock_task
+
+		_lock_task(doc.vuna_pickup_task)
+	order, allocation, transit, legs = receipt_context(
 		doc.vuna_pickup_purchase_order, doc.vuna_pickup_allocation
 	)
 	if (
@@ -144,9 +182,20 @@ def validate_vehicle_purchase_receipt(doc, method=None):
 			)
 		)
 	available = {item["source_item"]: item for leg in legs for item in leg["items"]}
+	limits = None
+	if doc.get("vuna_pickup_task"):
+		from vuna_transport.services.execution.direct_supplier_pickup_service import receipt_task_limits
+
+		limits = receipt_task_limits(
+			frappe.get_doc("Transport Trip Task", doc.vuna_pickup_task), order, allocation
+		)
 	reserved = reserved_purchase_quantities(order.name, doc.name)
 	seen = set()
 	for row in doc.items:
+		if limits is not None and (
+			row.purchase_order_item not in limits or flt(row.qty) > limits[row.purchase_order_item]
+		):
+			frappe.throw(_("Purchase Receipt quantities must not exceed this supplier pickup task."))
 		source = available.get(row.purchase_order_item)
 		qty = flt(row.qty)
 		if (

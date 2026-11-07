@@ -50,10 +50,20 @@ def sync_demand_allocations(names):
 			as_dict=True,
 		)
 		by_item = {row.transport_demand_item: row for row in commitments}
+		direct = dict(
+			frappe.db.sql(
+				"""select i.transport_demand_item, sum(i.stock_qty)
+			from `tabTransport Trip Task Item` i join `tabTransport Trip Task` t on t.name=i.parent
+			where t.transport_demand=%s and t.direct_assignment=1 and t.status!='Cancelled'
+			group by i.transport_demand_item""",
+				name,
+			)
+		)
 		states = []
 		for item in demand.items:
 			values = by_item.get(item.name, frappe._dict(reserved=0, allocated=0))
 			values.allocated = max(flt(values.allocated) - flt(releases.get(item.name)), 0)
+			values.allocated += flt(direct.get(item.name))
 			frappe.db.set_value(
 				"Transport Demand Item",
 				item.name,

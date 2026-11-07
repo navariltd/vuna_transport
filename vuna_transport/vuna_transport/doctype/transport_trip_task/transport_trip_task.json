@@ -6,6 +6,7 @@
   "istable": 0,
   "autoname": "hash",
   "fields": [
+    {"fieldname":"direct_assignment","fieldtype":"Check","label":"Direct Assignment","read_only":1,"default":"0"},
     {
       "fieldname": "return_request",
       "fieldtype": "Link",
@@ -63,7 +64,7 @@
     {
       "fieldname": "task_type",
       "fieldtype": "Select",
-      "options": "Customer Delivery\nTransfer Dispatch\nTransfer Receipt\nReturn Pickup",
+      "options": "Customer Delivery\nTransfer Dispatch\nTransfer Receipt\nReturn Pickup\nSupplier Pickup",
       "label": "Task",
       "reqd": 1,
       "read_only": 1,
@@ -117,6 +118,7 @@
     }
   ],
   "field_order": [
+    "direct_assignment",
     "return_request",
     "dispatch_stock_entry",
     "company",
@@ -152,6 +154,7 @@
       "read": 1
     }
   ],
+  "links": [{"link_doctype":"Purchase Receipt","link_fieldname":"vuna_pickup_task"}],
   "sort_field": "sequence",
   "sort_order": "ASC"
 }
