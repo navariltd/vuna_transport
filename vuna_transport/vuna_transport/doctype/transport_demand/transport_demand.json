@@ -27,7 +27,7 @@
    "fieldname": "movement_type",
    "fieldtype": "Select",
    "label": "Movement Type",
-   "options": "Customer Delivery\nWarehouse Transfer",
+   "options": "Customer Delivery\nWarehouse Transfer\nSupplier Pickup",
    "reqd": 1,
    "read_only": 1,
    "in_list_view": 1
@@ -63,6 +63,22 @@
    "label": "Source Warehouse",
    "options": "Warehouse",
    "read_only_depends_on": "eval:doc.movement_type != 'Warehouse Transfer'"
+  },
+  {
+   "fieldname": "source_address",
+   "fieldtype": "Link",
+   "label": "Pickup Address",
+   "options": "Address",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Supplier Pickup'"
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Supplier",
+   "options": "Supplier",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Supplier Pickup'"
   },
   {
    "fieldname": "destination_warehouse",
@@ -116,6 +132,8 @@
   "source_document",
   "source_key",
   "source_warehouse",
+  "source_address",
+  "supplier",
   "destination_warehouse",
   "customer",
   "destination_address",

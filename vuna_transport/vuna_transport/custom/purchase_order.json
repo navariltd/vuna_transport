@@ -1,0 +1,33 @@
+{
+  "doctype": "Purchase Order",
+  "custom_fields": [
+    {
+      "dt": "Purchase Order",
+      "name": "Purchase Order-vuna_company_pickup",
+      "fieldname": "vuna_company_pickup",
+      "label": "Company Pickup",
+      "fieldtype": "Check",
+      "default": "0",
+      "allow_on_submit": 1,
+      "insert_after": "supplier_address",
+      "description": "The company arranges collection from this supplier. Transport demand also requires Purchase Order to be enabled in Transport Settings.",
+      "module": "Vuna Transport"
+    },
+    {
+      "dt": "Purchase Order",
+      "name": "Purchase Order-vuna_pickup_address",
+      "fieldname": "vuna_pickup_address",
+      "label": "Supplier Pickup Address",
+      "fieldtype": "Link",
+      "options": "Address",
+      "allow_on_submit": 1,
+      "depends_on": "eval:doc.vuna_company_pickup",
+      "mandatory_depends_on": "eval:doc.vuna_company_pickup",
+      "insert_after": "vuna_company_pickup",
+      "module": "Vuna Transport"
+    }
+  ],
+  "property_setters": [],
+  "custom_perms": [],
+  "sync_on_migrate": 1
+}

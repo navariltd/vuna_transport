@@ -47,6 +47,32 @@ class TestSourcePolicy(unittest.TestCase):
 	def test_unconfigured_source_is_disabled(self):
 		self.configure()
 		self.assertFalse(get_source_policy("Sales Order").enabled)
+		self.assertFalse(get_source_policy("Purchase Order").enabled)
+
+	def test_supplier_pickup_is_not_enabled_by_legacy_defaults(self):
+		self.settings.demand_sources = []
+		self.assertFalse(get_source_policy("Purchase Order").enabled)
+
+	@patch("vuna_transport.services.demand.transport_demand_service.build_source_legs", return_value=[{}])
+	@patch(
+		"vuna_transport.services.demand.transport_demand_service._create_transport_demands",
+		return_value=["TD-PO"],
+	)
+	def test_automatic_purchase_demand_requires_both_opt_in_and_source_policy(self, generate, legs):
+		self.configure()
+		row = self.settings.demand_sources[0]
+		row.source_document_type, row.creation_mode = "Purchase Order", "Automatic"
+		doc = frappe._dict(doctype="Purchase Order", name="PO", docstatus=1, vuna_company_pickup=0)
+		self.assertEqual(automatically_create_from_source(doc), [])
+		generate.assert_not_called()
+		doc.vuna_company_pickup = 1
+		self.assertEqual(automatically_create_from_source(doc), ["TD-PO"])
+		generate.assert_called_once_with("Purchase Order", "PO", automated=True)
+		generate.reset_mock()
+		for status in ("On Hold", "Closed", "Completed"):
+			doc.status = status
+			self.assertEqual(automatically_create_from_source(doc), [])
+		generate.assert_not_called()
 
 	def test_global_disable_takes_precedence(self):
 		self.configure()
@@ -63,7 +89,7 @@ class TestSourcePolicy(unittest.TestCase):
 	)
 	def test_settings_reject_unsupported_and_duplicate_sources(self, throw, translate):
 		for rows in (
-			[frappe._dict(source_document_type="Purchase Order")],
+			[frappe._dict(source_document_type="Purchase Invoice")],
 			[
 				frappe._dict(source_document_type="Material Request", creation_mode="Manual"),
 				frappe._dict(source_document_type="Material Request", creation_mode="Manual"),
