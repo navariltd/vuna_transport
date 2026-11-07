@@ -5,4 +5,7 @@ from frappe.model.document import Document
 
 
 class DeliveryMethod(Document):
-	pass
+	def validate(self):
+		from vuna_transport.services.demand.delivery_method_service import validate_method_configuration
+
+		validate_method_configuration(self)

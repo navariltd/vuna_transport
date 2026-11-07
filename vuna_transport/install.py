@@ -23,6 +23,34 @@ def after_install():
 	ensure_transport_uoms()
 	normalize_transport_cost_natures()
 	ensure_dispatch_scan_roles()
+	ensure_delivery_methods()
+
+
+def ensure_delivery_methods():
+	"""Seed standard policies. Custom names never determine workflow behavior."""
+	for name, buying, selling, internal, required, arranger in (
+		("Company Delivery", 0, 1, 0, 1, "Company"),
+		("Customer Pickup", 0, 1, 0, 0, "Counterparty"),
+		("Company Collection", 1, 0, 0, 1, "Company"),
+		("Supplier Delivery", 1, 0, 0, 0, "Counterparty"),
+		("Internal Transfer", 0, 0, 1, 1, "Company"),
+		("Return Collection", 0, 1, 1, 0, "Company"),
+		("Customer Return Drop-off", 0, 1, 0, 0, "Counterparty"),
+	):
+		if not frappe.db.exists("Delivery Method", name):
+			frappe.get_doc(
+				{
+					"doctype": "Delivery Method",
+					"delivery_method_name": name,
+					"buying": buying,
+					"selling": selling,
+					"internal": internal,
+					"transport_arranged_by": arranger,
+					"requires_transport_planning": required,
+					"requires_vehicle_allocation": required,
+					"requires_delivery_trip": required,
+				}
+			).insert(ignore_permissions=True)
 
 
 def ensure_transport_uoms():

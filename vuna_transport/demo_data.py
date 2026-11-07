@@ -113,7 +113,8 @@ def _ensure_delivery_method():
 		else frappe.new_doc("Delivery Method")
 	)
 	doc.delivery_method_name = name
-	doc.fulfilment_type = "Company Delivery"
+	doc.buying, doc.selling = 0, 1
+	doc.transport_arranged_by = "Company"
 	doc.requires_transport_planning = 1
 	doc.requires_vehicle_allocation = 1
 	doc.requires_delivery_trip = 1

@@ -24,6 +24,11 @@ class ReturnRequest(Document):
 	def validate(self):
 		validate_return_request(self)
 
+	def before_update_after_submit(self):
+		from vuna_transport.services.demand.delivery_method_service import validate_source_delivery_method
+
+		validate_source_delivery_method(self)
+
 	def before_submit(self):
 		for row in self.items:
 			if not row.return_reason:

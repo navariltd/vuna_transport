@@ -38,7 +38,7 @@ def create_depot_return_from_pod(pod):
 			"delivery_trip": pod.delivery_trip,
 			"return_source": "Depot Rejection",
 			"initiated_by": "Driver",
-			"return_method": "Driver Return" if warehouses == {stock.to_warehouse} else "Company Pickup",
+			"delivery_method": "Return Collection",
 			"custody": "Still With Vehicle"
 			if warehouses == {stock.to_warehouse}
 			else "Returned To Depot"

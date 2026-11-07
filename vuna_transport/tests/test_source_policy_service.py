@@ -59,13 +59,26 @@ class TestSourcePolicy(unittest.TestCase):
 		return_value=["TD-PO"],
 	)
 	def test_automatic_purchase_demand_requires_both_opt_in_and_source_policy(self, generate, legs):
+		self.enterContext(
+			patch(
+				"vuna_transport.services.demand.delivery_method_service.get_delivery_method_workflow",
+				return_value=frappe._dict(requires_transport_planning=True),
+			)
+		)
+		self.enterContext(
+			patch(
+				"vuna_transport.services.demand.delivery_method_service.is_company_pickup_order",
+				side_effect=lambda doc: doc.get("vuna_delivery_method") == "Company Pickup",
+			)
+		)
 		self.configure()
 		row = self.settings.demand_sources[0]
 		row.source_document_type, row.creation_mode = "Purchase Order", "Automatic"
-		doc = frappe._dict(doctype="Purchase Order", name="PO", docstatus=1, vuna_company_pickup=0)
+		doc = frappe._dict(doctype="Purchase Order", name="PO", docstatus=1, vuna_delivery_method=None)
 		self.assertEqual(automatically_create_from_source(doc), [])
 		generate.assert_not_called()
-		doc.vuna_company_pickup = 1
+
+		doc.vuna_delivery_method = "Company Pickup"
 		self.assertEqual(automatically_create_from_source(doc), ["TD-PO"])
 		generate.assert_called_once_with("Purchase Order", "PO", automated=True)
 		generate.reset_mock()
@@ -74,10 +87,50 @@ class TestSourcePolicy(unittest.TestCase):
 			self.assertEqual(automatically_create_from_source(doc), [])
 		generate.assert_not_called()
 
+	def test_company_manual_method_never_automatically_generates_demands(self):
+		self.configure()
+		for doctype in ("Purchase Order", "Sales Order"):
+			row = self.settings.demand_sources[0]
+			row.source_document_type, row.creation_mode = doctype, "Automatic"
+			with patch(
+				"vuna_transport.services.demand.delivery_method_service.get_delivery_method_workflow",
+				return_value=frappe._dict(requires_transport_planning=False),
+			):
+				self.assertEqual(
+					automatically_create_from_source(
+						frappe._dict(doctype=doctype, docstatus=1, vuna_delivery_method="Manual Company")
+					),
+					[],
+				)
+
 	def test_global_disable_takes_precedence(self):
 		self.configure()
 		self.settings.enabled = 0
 		self.assertFalse(get_source_policy("Material Request").enabled)
+
+	def test_transfer_and_return_manual_methods_do_not_generate_automatically(self):
+		self.configure()
+		for source_type in ("Material Request", "Return Request"):
+			self.settings.demand_sources[0].source_document_type = source_type
+			self.settings.demand_sources[0].creation_mode = "Automatic"
+			with patch(
+				"vuna_transport.services.demand.delivery_method_service.get_source_delivery_method_workflow",
+				return_value=frappe._dict(transport_arranged_by="Company", requires_transport_planning=False),
+			):
+				self.assertEqual(
+					automatically_create_from_source(frappe._dict(doctype=source_type, docstatus=1)), []
+				)
+
+	def test_counterparty_transfer_does_not_generate_company_demand(self):
+		self.configure()
+		with (
+			patch(
+				"vuna_transport.services.demand.delivery_method_service.source_uses_company_transport",
+				return_value=False,
+			),
+			self.assertRaises(ValueError),
+		):
+			require_source_enabled(frappe._dict(doctype="Material Request", name="MR"))
 
 	@patch(
 		"vuna_transport.vuna_transport.doctype.transport_settings.transport_settings._",
@@ -123,6 +176,12 @@ class TestSourcePolicy(unittest.TestCase):
 		return_value=["TD-1"],
 	)
 	def test_automatic_generation_uses_trusted_hook_only(self, generate, legs):
+		self.enterContext(
+			patch(
+				"vuna_transport.services.demand.delivery_method_service.get_source_delivery_method_workflow",
+				return_value=frappe._dict(transport_arranged_by="Company", requires_transport_planning=True),
+			)
+		)
 		self.configure()
 		self.settings.demand_sources[0].creation_mode = "Automatic"
 		self.assertEqual(

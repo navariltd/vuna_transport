@@ -364,6 +364,11 @@ class TestDeliveryOrder(UnitTestCase):
 	def test_customer_pickup_can_skip_transport_planning(self, get_cached_doc):
 		get_cached_doc.return_value = SimpleNamespace(
 			name="Customer Pickup",
+			buying=0,
+			selling=1,
+			transport_arranged_by="Counterparty",
+			requires_vehicle_allocation=0,
+			requires_delivery_trip=0,
 			disabled=0,
 			requires_transport_planning=0,
 		)

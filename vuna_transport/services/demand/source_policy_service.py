@@ -68,6 +68,11 @@ def require_source_enabled(source):
 		and approval_source.get("workflow_state") != policy.required_workflow_state
 	):
 		frappe.throw(_("The source has not reached the configured transport approval state."))
+	if source.doctype in ("Material Request", "Return Request"):
+		from vuna_transport.services.demand.delivery_method_service import source_uses_company_transport
+
+		if not source_uses_company_transport(source):
+			frappe.throw(_("The selected Delivery Method does not use company transport."))
 	return policy
 
 
@@ -75,6 +80,24 @@ def automatically_create_from_source(doc, method=None):
 	policy = get_source_policy(policy_source(doc))
 	if not policy.enabled or policy.creation_mode != "Automatic" or doc.docstatus != 1:
 		return []
+	if doc.doctype in ("Material Request", "Return Request"):
+		from vuna_transport.services.demand.delivery_method_service import get_source_delivery_method_workflow
+
+		workflow = get_source_delivery_method_workflow(doc)
+		if (
+			not workflow
+			or workflow.transport_arranged_by != "Company"
+			or not workflow.requires_transport_planning
+		):
+			return []
+	method_name = (
+		doc.get("delivery_method") if doc.doctype == "Delivery Order" else doc.get("vuna_delivery_method")
+	)
+	if doc.doctype in ("Sales Order", "Purchase Order", "Delivery Order") and method_name:
+		from vuna_transport.services.demand.delivery_method_service import get_delivery_method_workflow
+
+		if not get_delivery_method_workflow(method_name).requires_transport_planning:
+			return []  # Manual transport is explicit, even when the source policy is automatic.
 	approval_source = (
 		frappe.get_doc("Sales Order", doc.sales_order) if doc.doctype == "Delivery Order" else doc
 	)
@@ -93,8 +116,11 @@ def automatically_create_from_source(doc, method=None):
 		return []
 	if doc.doctype == "Return Request" and doc.get("return_context") != "Depot":
 		return []
-	if doc.doctype == "Purchase Order" and not doc.get("vuna_company_pickup"):
-		return []
+	if doc.doctype == "Purchase Order":
+		from vuna_transport.services.demand.delivery_method_service import is_company_pickup_order
+
+		if not is_company_pickup_order(doc):
+			return []
 	if doc.doctype not in ("Delivery Order", "Material Request", "Return Request", "Purchase Order"):
 		return []
 	from vuna_transport.services.demand.transport_demand_service import (
@@ -115,10 +141,32 @@ def automatically_create_from_source(doc, method=None):
 
 
 @frappe.whitelist()
-def get_transport_source_policy(source_type: str) -> dict:
+def get_transport_source_policy(
+	source_type: str, delivery_method: str | None = None, return_context: str | None = None
+) -> dict:
 	from vuna_transport.services.shared.security_service import require_doctype_permission
 
 	if source_type not in SUPPORTED_SOURCES:
 		frappe.throw(_("This transport source is not supported."))
 	require_doctype_permission(source_type, "read")
-	return dict(get_source_policy(source_type))
+	result = dict(get_source_policy(source_type))
+	if source_type == "Purchase Order":
+		from vuna_transport.services.demand.delivery_method_service import (
+			get_purchase_delivery_method_workflow,
+		)
+
+		result["company_pickup"] = get_purchase_delivery_method_workflow(delivery_method).company_pickup
+	if source_type in ("Material Request", "Return Request"):
+		from vuna_transport.services.demand.delivery_method_service import get_source_delivery_method_workflow
+
+		workflow = get_source_delivery_method_workflow(
+			frappe._dict(
+				doctype=source_type,
+				material_request_type="Material Transfer",
+				vuna_delivery_method=delivery_method,
+				delivery_method=delivery_method,
+				return_context=return_context,
+			)
+		)
+		result["company_transport"] = bool(workflow and workflow.transport_arranged_by == "Company")
+	return result

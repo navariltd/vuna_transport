@@ -197,6 +197,12 @@ frappe.ui.form.on("Return Request", {
 		frm.set_query("return_warehouse", () => ({
 			filters: { company: frm.doc.company, is_group: 0, disabled: 0 },
 		}));
+		frm.set_query("delivery_method", () => ({
+			filters: {
+				disabled: 0,
+				[frm.doc.return_context === "Depot" ? "internal" : "selling"]: 1,
+			},
+		}));
 		frm.set_query("resolution_type", "items", () => ({
 			filters: { disabled: 0 },
 		}));
@@ -249,6 +255,7 @@ frappe.ui.form.on("Return Request", {
 		if (
 			frm.doc.docstatus === 1 &&
 			frm.perm?.[0]?.write &&
+			frm.doc.transport_arranged_by === "Company" &&
 			!["Closed", "Cancelled", "Resolved"].includes(frm.doc.status)
 		) {
 			frm.add_custom_button(
@@ -330,28 +337,29 @@ frappe.ui.form.on("Return Request", {
 						__("Create")
 					);
 				}
-				frm.add_custom_button(
-					__("Transport Demand"),
-					() =>
-						frappe
-							.call({
-								method: "vuna_transport.services.demand.transport_demand_service.create_transport_demands",
-								args: {
-									source_doctype: "Return Request",
-									source_name: frm.doc.name,
-								},
-								freeze: true,
-							})
-							.then(({ message }) => {
-								if (message?.length === 1)
-									frappe.set_route("Form", "Transport Demand", message[0]);
-								else if (message?.length)
-									frappe.set_route("List", "Transport Demand", {
-										name: ["in", message],
-									});
-							}),
-					__("Create")
-				);
+				if (frm.doc.transport_arranged_by === "Company")
+					frm.add_custom_button(
+						__("Transport Demand"),
+						() =>
+							frappe
+								.call({
+									method: "vuna_transport.services.demand.transport_demand_service.create_transport_demands",
+									args: {
+										source_doctype: "Return Request",
+										source_name: frm.doc.name,
+									},
+									freeze: true,
+								})
+								.then(({ message }) => {
+									if (message?.length === 1)
+										frappe.set_route("Form", "Transport Demand", message[0]);
+									else if (message?.length)
+										frappe.set_route("List", "Transport Demand", {
+											name: ["in", message],
+										});
+								}),
+						__("Create")
+					);
 				frm.page.set_inner_btn_group_as_primary(__("Create"));
 			}
 			return;
@@ -405,6 +413,11 @@ frappe.ui.form.on("Return Request", {
 		add_get_delivered_items_button(frm);
 	},
 
+	delivery_method(frm) {
+		frm.remove_custom_button(__("Assign Pickup to Delivery Trip"), __("Actions"));
+		frm.remove_custom_button(__("Transport Demand"), __("Create"));
+	},
+
 	return_context(frm) {
 		if (frm.doc.docstatus !== 0 || frm.doc.proof_of_delivery) return;
 		frm.clear_table("items");
@@ -414,6 +427,7 @@ frappe.ui.form.on("Return Request", {
 			"sales_invoice",
 			"source_stock_entry",
 			"source_warehouse",
+			"delivery_method",
 		])
 			frm.set_value(field, null);
 		frm.refresh();

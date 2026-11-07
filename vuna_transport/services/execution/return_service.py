@@ -64,6 +64,9 @@ RETURN_SALES_ITEM_COMMERCIAL_FIELDS = (
 
 def validate_return_request(request):
 	"""Validate the return against the submitted delivery and live return balance."""
+	from vuna_transport.services.demand.delivery_method_service import validate_source_delivery_method
+
+	validate_source_delivery_method(request)
 	if request.get("source_stock_entry") or request.get("return_context") == "Depot":
 		from vuna_transport.services.execution.depot_return_service import validate_depot_return
 
@@ -1575,7 +1578,7 @@ def create_return_request_from_pod(proof_of_delivery):
 			"return_warehouse": _default_return_warehouse(pod.delivery_note),
 			"return_source": "Failed Delivery" if pod.status == "Failed" else "Delivery Rejection",
 			"initiated_by": "Dispatcher",
-			"return_method": "Driver Return",
+			"delivery_method": "Return Collection",
 			"return_remarks": pod.remarks or pod.notes,
 		}
 	)
@@ -1645,11 +1648,3 @@ def _get_pod_item_return_reason(pod, item):
 	if getattr(item, "rejection_reason_remarks", None):
 		return item.rejection_reason_remarks
 	return ", ".join(_get_pod_rejection_reasons(pod)) or pod.remarks or pod.notes
-
-
-def _return_method_from_custody(custody):
-	return {
-		"Still With Vehicle": "Driver Return",
-		"Held By Transporter": "Third-party Return",
-		"Left With Customer": "Customer Drop-off",
-	}.get(custody, "Company Pickup")

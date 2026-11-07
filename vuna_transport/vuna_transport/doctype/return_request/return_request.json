@@ -33,6 +33,8 @@
     "proof_of_delivery",
     "delivery_address",
     "section_break_zzrn",
+    "delivery_method",
+    "transport_arranged_by",
     "return_warehouse",
     "return_reasons",
     "column_break_sxsa",
@@ -246,12 +248,23 @@
       "label": "Return Movement"
     },
     {
-      "fieldname": "return_method",
-      "fieldtype": "Select",
-      "hidden": 1,
+      "fieldname": "delivery_method",
+      "fieldtype": "Link",
+      "options": "Delivery Method",
+      "default": "Return Collection",
+      "reqd": 1,
+      "allow_on_submit": 1,
       "in_list_view": 1,
-      "label": "Return Method",
-      "options": "Company Pickup\nCustomer Drop-off\nDriver Return\nThird-party Return"
+      "label": "Delivery Method"
+    },
+    {
+      "fieldname": "transport_arranged_by",
+      "fieldtype": "Data",
+      "label": "Transport Arranged By",
+      "fetch_from": "delivery_method.transport_arranged_by",
+      "hidden": 1,
+      "read_only": 1,
+      "allow_on_submit": 1
     },
     {
       "fieldname": "return_warehouse",

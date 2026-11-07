@@ -21,7 +21,7 @@ function fixture({
       docstatus: 1,
       supplier: "SUP-1",
       company: "Company",
-      vuna_company_pickup: optedIn,
+      vuna_delivery_method: optedIn ? "Our Collection" : null,
       status,
     },
     is_dirty: () => false,
@@ -50,7 +50,7 @@ function fixture({
           calls.push(options);
           return {
             message: options.args.source_type
-              ? { enabled }
+              ? { enabled, company_pickup: optedIn }
               : options.args.allocation_name
               ? "PR-1"
               : ["TD-1"],
@@ -91,6 +91,16 @@ test("pickup address search is filtered to the purchase supplier", () => {
   assert.equal(query.filters.link_doctype, "Supplier");
   assert.equal(query.filters.link_name, "SUP-1");
   assert.equal(query.filters.disabled, 0);
+});
+
+test("delivery method link filters explicit purchasing applicability, not names", () => {
+  const context = fixture();
+  context.handlers.setup(context.frm);
+  const filter = context.queries.vuna_delivery_method().filters;
+  assert.equal(filter.disabled, 0);
+  assert.equal(filter.buying, 1);
+  assert.equal(filter.selling, undefined);
+  assert.equal(filter.fulfilment_type, undefined);
 });
 
 test("source action generates demand, not a stock or purchase receipt", async () => {
