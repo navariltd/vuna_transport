@@ -222,6 +222,7 @@ doc_events = {
 	},
 	"Stock Entry": {
 		"validate": [
+			"vuna_transport.services.execution.supplier_vehicle_transfer_service.validate_vehicle_material_transfer",
 			"vuna_transport.services.execution.depot_return_receiving_service.validate_vehicle_receipt",
 			"vuna_transport.services.execution.unplanned_pickup_service.validate_collection_stock",
 			"vuna_transport.services.execution.return_pickup_service.validate_pickup_stock",
@@ -310,6 +311,18 @@ doc_events = {
 		"before_cancel": "vuna_transport.services.planning.demand_lifecycle_service.guard_source_cancellation",
 		"on_update": "vuna_transport.services.mobile.mobile_notification_service.notify_material_request",
 	},
+	"Purchase Order": {
+		"validate": "vuna_transport.services.demand.supplier_pickup_demand_service.validate_supplier_pickup_order",
+		"before_update_after_submit": "vuna_transport.services.demand.supplier_pickup_demand_service.validate_supplier_pickup_order",
+		"on_submit": "vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
+		"on_update_after_submit": "vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
+		"before_cancel": "vuna_transport.services.planning.demand_lifecycle_service.guard_source_cancellation",
+	},
+	"Purchase Receipt": {
+		"validate": "vuna_transport.services.execution.supplier_vehicle_receipt_service.validate_vehicle_purchase_receipt",
+		"before_update_after_submit": "vuna_transport.services.execution.supplier_vehicle_receipt_service.validate_vehicle_purchase_receipt",
+		"before_cancel": "vuna_transport.services.execution.supplier_vehicle_receipt_service.guard_vehicle_receipt_cancellation",
+	},
 	"Vehicle": {
 		"validate": "vuna_transport.services.fleet.fleet_service.validate_vehicle",
 		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
@@ -363,6 +376,8 @@ doc_events = {
 }
 
 doctype_js = {
+	"Purchase Receipt": "public/js/supplier_vehicle_purchase_receipt.js",
+	"Purchase Order": "public/js/purchase_order_transport.js",
 	"Stock Entry": "public/js/return_pickup_stock_entry.js",
 	"Material Request": "public/js/material_request_transport.js",
 	"Address": "public/js/address.js",
