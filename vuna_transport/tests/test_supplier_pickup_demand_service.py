@@ -17,7 +17,7 @@ def purchase_order():
 		supplier="Supplier",
 		docstatus=1,
 		status="To Receive and Bill",
-		vuna_company_pickup=1,
+		vuna_delivery_method="Company Pickup",
 		vuna_pickup_address="Supplier Gate",
 		items=[
 			frappe._dict(
@@ -41,6 +41,21 @@ class TestSupplierPickupDemand(TestCase):
 	def setUp(self):
 		self.framework = self.enterContext(patch.object(service, "frappe"))
 		self.framework.throw.side_effect = ValueError
+		self.enterContext(
+			patch(
+				"vuna_transport.services.demand.delivery_method_service.frappe.get_cached_doc",
+				side_effect=lambda doctype, name: frappe._dict(
+					name=name,
+					buying=1,
+					selling=0,
+					transport_arranged_by="Company",
+					disabled=0,
+					requires_transport_planning=1,
+					requires_vehicle_allocation=1,
+					requires_delivery_trip=1,
+				),
+			)
+		)
 		self.enterContext(
 			patch(
 				"vuna_transport.services.demand.transport_demand_service.frappe.throw", side_effect=ValueError
@@ -87,7 +102,7 @@ class TestSupplierPickupDemand(TestCase):
 
 	def test_unopted_draft_closed_on_hold_subcontracted_orders_are_rejected(self):
 		for changes in (
-			{"vuna_company_pickup": 0},
+			{"vuna_delivery_method": None},
 			{"docstatus": 0},
 			{"status": "Closed"},
 			{"status": "On Hold"},
@@ -144,7 +159,7 @@ class TestSupplierPickupDemand(TestCase):
 	def test_editing_pickup_identity_locks_source_and_requires_demand_release(self):
 		previous = purchase_order()
 		self.source.vuna_pickup_address = "New Gate"
-		doc = MagicMock(name="PO-1", vuna_company_pickup=1)
+		doc = MagicMock(name="PO-1", vuna_delivery_method="Company Pickup")
 		doc.name = "PO-1"
 		doc.get.side_effect = self.source.get
 		doc.get_doc_before_save.return_value = previous

@@ -1,5 +1,11 @@
 frappe.ui.form.on("Purchase Order", {
 	setup(frm) {
+		frm.set_query("vuna_delivery_method", () => ({
+			filters: {
+				disabled: 0,
+				buying: 1,
+			},
+		}));
 		frm.set_query("vuna_pickup_address", () => ({
 			query: "frappe.contacts.doctype.address.address.address_query",
 			filters: { link_doctype: "Supplier", link_name: frm.doc.supplier || "", disabled: 0 },
@@ -9,20 +15,23 @@ frappe.ui.form.on("Purchase Order", {
 		if (frm.doc.docstatus === 0) await frm.set_value("vuna_pickup_address", null);
 	},
 	async refresh(frm) {
-		if (frm.doc.docstatus !== 1 || !frm.doc.vuna_company_pickup || frm.is_dirty()) return;
+		if (frm.doc.docstatus !== 1 || !frm.doc.vuna_delivery_method || frm.is_dirty()) return;
 		if (["Closed", "Cancelled", "On Hold", "Stopped", "Completed"].includes(frm.doc.status))
 			return;
 		const name = frm.doc.name;
+		const delivery_method = frm.doc.vuna_delivery_method;
 		const { message: policy } = await frappe.call({
 			method: "vuna_transport.services.demand.source_policy_service.get_transport_source_policy",
-			args: { source_type: "Purchase Order" },
+			args: { source_type: "Purchase Order", delivery_method: frm.doc.vuna_delivery_method },
 		});
 		if (
 			!policy?.enabled ||
+			!policy?.company_pickup ||
+			frm.doc.vuna_delivery_method !== delivery_method ||
 			frm.doc.name !== name ||
 			frm.is_dirty() ||
 			frm.doc.docstatus !== 1 ||
-			!frm.doc.vuna_company_pickup
+			!frm.doc.vuna_delivery_method
 		)
 			return;
 		frm.add_custom_button(

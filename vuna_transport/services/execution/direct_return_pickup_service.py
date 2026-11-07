@@ -16,6 +16,10 @@ def _approval(request, active=True):
 		frappe.throw(_("Select an active, submitted Return Request."))
 	if not active:
 		return
+	from vuna_transport.services.demand.delivery_method_service import source_uses_company_transport
+
+	if not source_uses_company_transport(request):
+		frappe.throw(_("The selected Delivery Method does not require a company pickup."))
 	state = get_source_policy("Return Request").required_workflow_state
 	if state and request.get("workflow_state") != state:
 		frappe.throw(_("The Return Request has not reached the configured approval state."))

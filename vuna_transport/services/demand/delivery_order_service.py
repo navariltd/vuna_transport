@@ -6,7 +6,10 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate
 
-from vuna_transport.services.demand.delivery_method_service import canonical_delivery_method
+from vuna_transport.services.demand.delivery_method_service import (
+	canonical_delivery_method,
+	validate_sales_order_delivery_method,
+)
 from vuna_transport.services.routing.location_service import get_address_planning_data
 from vuna_transport.services.shared.measurement_service import convert_measurement, get_transport_uoms
 from vuna_transport.services.shared.security_service import (
@@ -505,10 +508,8 @@ def _requires_transport_planning(sales_order):
 	delivery_method = getattr(sales_order, "vuna_delivery_method", None)
 	if not delivery_method:
 		return True
-	method = frappe.get_cached_doc("Delivery Method", delivery_method)
-	if method.disabled:
-		frappe.throw(_("Delivery Method {0} is disabled.").format(method.name))
-	return bool(method.requires_transport_planning)
+	workflow = validate_sales_order_delivery_method(sales_order)
+	return bool(workflow.requires_transport_planning or workflow.transport_arranged_by == "Company")
 
 
 def _validate_group_key(delivery_date, source_warehouse):

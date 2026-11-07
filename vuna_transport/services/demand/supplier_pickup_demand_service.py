@@ -5,17 +5,21 @@ from collections import defaultdict
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, getdate
+from frappe.utils import flt, getdate
+
+from vuna_transport.services.demand.delivery_method_service import (
+	get_purchase_delivery_method_workflow,
+	is_company_pickup_order,
+)
 
 
 def validate_supplier_pickup_order(doc, method=None):
 	"""Existing demand snapshots cannot silently change their pickup identity."""
 	previous = doc.get_doc_before_save()
-	if not cint(doc.get("vuna_company_pickup")) and not (
-		previous and cint(previous.get("vuna_company_pickup"))
-	):
+	if not doc.get("vuna_delivery_method") and not (previous and previous.get("vuna_delivery_method")):
+		doc.vuna_transport_arranged_by = None
 		return
-	fields = ("vuna_company_pickup", "vuna_pickup_address", "supplier", "company", "set_warehouse")
+	fields = ("vuna_delivery_method", "vuna_pickup_address", "supplier", "company", "set_warehouse")
 
 	def endpoints(order):
 		return sorted(
@@ -43,7 +47,11 @@ def validate_supplier_pickup_order(doc, method=None):
 					"Cancel linked Transport Demands before changing this Purchase Order's pickup configuration."
 				)
 			)
-	if not cint(doc.get("vuna_company_pickup")):
+	workflow = get_purchase_delivery_method_workflow(doc.get("vuna_delivery_method"))
+	if workflow.disabled or not workflow.allowed:
+		frappe.throw(_("Select an enabled purchasing Delivery Method."))
+	doc.vuna_transport_arranged_by = workflow.transport_arranged_by
+	if not workflow.company_pickup:
 		return
 	if not doc.get("vuna_pickup_address"):
 		frappe.throw(_("Select the Supplier Pickup Address for company collection."))
@@ -73,10 +81,12 @@ def build_supplier_pickup_legs(source):
 	if (
 		source.docstatus != 1
 		or source.status in ("Closed", "Cancelled", "On Hold", "Stopped", "Completed")
-		or not cint(source.get("vuna_company_pickup"))
+		or not is_company_pickup_order(source)
 	):
 		frappe.throw(
-			_("Supplier transport requires an open, submitted Purchase Order with Company Pickup enabled.")
+			_(
+				"Supplier transport requires an open, submitted Purchase Order with an enabled, company-arranged purchasing Delivery Method."
+			)
 		)
 	if (
 		source.get("is_subcontracted")

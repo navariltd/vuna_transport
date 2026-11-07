@@ -29,6 +29,12 @@ class TestDirectReturnPickup(unittest.TestCase):
 			)
 		)
 		self.permission = self.enterContext(patch.object(service, "require_document_permission"))
+		self.transport_method = self.enterContext(
+			patch(
+				"vuna_transport.services.demand.delivery_method_service.source_uses_company_transport",
+				return_value=True,
+			)
+		)
 		self.policy = self.enterContext(
 			patch(
 				"vuna_transport.services.demand.source_policy_service.get_source_policy",
@@ -92,6 +98,7 @@ class TestDirectReturnPickup(unittest.TestCase):
 		self.assertNotIn("transport_load", values)
 		self.assertNotIn("transport_demand", values)
 		self.framework.new_doc.assert_called_once_with("Transport Trip Task")
+
 		self.task.set.assert_called_once_with(
 			"items",
 			[
@@ -106,6 +113,12 @@ class TestDirectReturnPickup(unittest.TestCase):
 				}
 			],
 		)
+
+	def test_counterparty_arranged_return_cannot_be_assigned_to_company_driver(self):
+		self.transport_method.return_value = False
+		with self.assertRaisesRegex(ValueError, "does not require a company pickup"):
+			service.assign_return_pickup("RR-1", "TRIP-1", "STOP-1")
+		self.framework.new_doc.assert_not_called()
 
 	def test_repeat_assignment_is_idempotent(self):
 		self.framework.db.get_value.side_effect = (

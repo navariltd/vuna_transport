@@ -159,6 +159,8 @@ doc_events = {
 		"validate": "vuna_transport.services.routing.location_service.synchronize_address_location",
 	},
 	"Sales Order": {
+		"validate": "vuna_transport.services.demand.delivery_method_service.validate_sales_order_delivery_method",
+		"before_update_after_submit": "vuna_transport.services.demand.delivery_method_service.validate_sales_order_delivery_method",
 		"before_cancel": "vuna_transport.services.planning.demand_lifecycle_service.guard_source_cancellation",
 		"before_submit": "vuna_transport.services.execution.return_service.validate_linked_replacement_sales_order",
 		"on_submit": [
@@ -306,6 +308,8 @@ doc_events = {
 		"on_cancel": "vuna_transport.services.execution.trip_task_service.sync_task_execution",
 	},
 	"Material Request": {
+		"validate": "vuna_transport.services.demand.delivery_method_service.validate_source_delivery_method",
+		"before_update_after_submit": "vuna_transport.services.demand.delivery_method_service.validate_source_delivery_method",
 		"on_submit": "vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
 		"on_update_after_submit": "vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
 		"before_cancel": "vuna_transport.services.planning.demand_lifecycle_service.guard_source_cancellation",
@@ -413,6 +417,7 @@ fixtures = [
 ]
 
 after_migrate = [
+	"vuna_transport.install.ensure_delivery_methods",
 	"vuna_transport.install.ensure_transport_uoms",
 	"vuna_transport.install.normalize_transport_cost_natures",
 	"vuna_transport.install.ensure_dispatch_scan_roles",

@@ -2,6 +2,14 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Sales Order", {
+	setup(frm) {
+		frm.set_query("vuna_delivery_method", () => ({
+			filters: {
+				disabled: 0,
+				selling: 1,
+			},
+		}));
+	},
 	refresh(frm) {
 		if (frm.doc.docstatus !== 1) return;
 
