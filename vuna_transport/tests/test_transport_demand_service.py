@@ -8,6 +8,7 @@ import frappe
 from vuna_transport.services.demand.transport_demand_service import (
 	build_source_legs,
 	create_transport_demands,
+	get_demand_type,
 )
 
 
@@ -39,6 +40,11 @@ def transfer_source():
 
 
 class TestTransportDemandService(unittest.TestCase):
+	def test_demand_type_uses_erpnext_terms_not_arranger_or_vehicle_type(self):
+		self.assertEqual(get_demand_type("Customer Delivery"), "Selling")
+		self.assertEqual(get_demand_type("Supplier Pickup"), "Buying")
+		self.assertEqual(get_demand_type("Warehouse Transfer"), "Internal")
+
 	def setUp(self):
 		translation = patch(
 			"vuna_transport.services.demand.transport_demand_service._", side_effect=lambda text: text

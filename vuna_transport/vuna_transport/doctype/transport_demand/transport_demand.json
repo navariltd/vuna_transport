@@ -33,6 +33,15 @@
    "in_list_view": 1
   },
   {
+   "fieldname": "demand_type",
+   "fieldtype": "Select",
+   "label": "Demand Type",
+   "description": "Derived from the movement: supplier pickups are Buying, customer deliveries Selling, and depot transfers or depot returns Internal.",
+   "options": "Buying\nSelling\nInternal",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
    "fieldname": "source_document_type",
    "fieldtype": "Link",
    "label": "Source Document Type",
@@ -128,6 +137,7 @@
   "company",
   "status",
   "movement_type",
+  "demand_type",
   "source_document_type",
   "source_document",
   "source_key",
@@ -167,6 +177,7 @@
    "cancel": 1
   }
  ],
+ "links": [{"link_doctype":"Transport Trip Task","link_fieldname":"transport_demand"}],
  "sort_field": "modified",
  "sort_order": "DESC",
  "track_changes": 1

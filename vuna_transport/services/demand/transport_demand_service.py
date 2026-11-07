@@ -194,6 +194,7 @@ def validate_transport_demand(demand):
 	for fieldname, value in leg.items():
 		if fieldname != "items":
 			demand.set(fieldname, value)
+	demand.demand_type = get_demand_type(leg["movement_type"])
 	demand.set("items", leg["items"])
 	for row in demand.items:
 		item = frappe.get_cached_doc("Item", row.item_code)
@@ -207,3 +208,12 @@ def validate_transport_demand(demand):
 		row.weight = measurements.weight
 		row.weight_uom = measurements.weight_uom
 	demand.status = "Open" if demand.docstatus == 1 else "Draft"
+
+
+def get_demand_type(movement_type):
+	"""ERPNext business terminology; a trip may serve several demand types."""
+	return {
+		"Customer Delivery": "Selling",
+		"Supplier Pickup": "Buying",
+		"Warehouse Transfer": "Internal",
+	}[movement_type]
