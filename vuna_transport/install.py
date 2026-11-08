@@ -20,11 +20,14 @@ LEGACY_DEFAULT_DISPATCH_SCAN_ROLES = {
 
 
 def after_install():
+	from vuna_transport.services.execution.driver_stock_policy import initialize_driver_stock_policy
+
 	ensure_transport_uoms()
 	normalize_transport_cost_natures()
 	ensure_transport_demand_sources()
 	ensure_dispatch_scan_roles()
 	ensure_delivery_methods()
+	initialize_driver_stock_policy()
 
 
 def ensure_transport_demand_sources():

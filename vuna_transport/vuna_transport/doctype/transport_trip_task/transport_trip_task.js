@@ -20,13 +20,15 @@ frappe.ui.form.on("Transport Trip Task", {
 			);
 		}
 		if (
-			["Transfer Receipt", "Return Pickup"].includes(frm.doc.task_type) &&
+			["Transfer Receipt", "Return Pickup", "Supplier Pickup"].includes(frm.doc.task_type) &&
 			frm.doc.confirmation_method !== "Warehouse Receipt" &&
 			frm.doc.status !== "Cancelled"
 		) {
 			frm.add_custom_button(
 				__(
-					frm.doc.task_type === "Return Pickup" ? "Proof of Pickup" : "Proof of Delivery"
+					["Return Pickup", "Supplier Pickup"].includes(frm.doc.task_type)
+						? "Proof of Collection"
+						: "Proof of Delivery"
 				),
 				() =>
 					frappe.model.open_mapped_doc({

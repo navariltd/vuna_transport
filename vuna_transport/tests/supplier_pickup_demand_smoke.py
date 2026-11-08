@@ -11,12 +11,14 @@ def run(
 	partial_transfer=False,
 	verify_assignment=False,
 	verify_standard_receipt=False,
+	verify_driver_collection=False,
+	driver_receiving_enabled=True,
 ):
 	from vuna_transport.services.demand.transport_demand_service import create_transport_demands
 	from vuna_transport.services.planning.demand_lifecycle_service import guard_source_cancellation
 
 	previous_in_test = frappe.flags.in_test
-	verify_assignment = verify_assignment or verify_standard_receipt
+	verify_assignment = verify_assignment or verify_standard_receipt or verify_driver_collection
 	frappe.flags.in_test = True
 	try:
 		template = None
@@ -32,6 +34,16 @@ def run(
 				if row.warehouse
 				and not row.get("delivered_by_supplier")
 				and frappe.get_cached_value("Item", row.item_code, "is_stock_item")
+				and (
+					not verify_driver_collection
+					or not any(
+						frappe.get_cached_value(
+							"Item",
+							row.item_code,
+							["has_batch_no", "has_serial_no", "inspection_required_before_purchase"],
+						)
+					)
+				)
 				and (not batched or frappe.get_cached_value("Item", row.item_code, "has_batch_no"))
 				and (
 					not verify_vehicle_stock
@@ -111,7 +123,14 @@ def run(
 			demand.submit()
 			if verify_assignment:
 				return exercise_assignment(
-					demand, ledger_counts, source, row, verify_vehicle_stock, verify_standard_receipt
+					demand,
+					ledger_counts,
+					source,
+					row,
+					verify_vehicle_stock,
+					verify_standard_receipt,
+					verify_driver_collection,
+					driver_receiving_enabled,
 				)
 		try:
 			guard_source_cancellation(source)
@@ -139,7 +158,14 @@ def run(
 
 
 def exercise_assignment(
-	demand, ledger_counts, source, source_row, verify_stock=False, verify_standard_receipt=False
+	demand,
+	ledger_counts,
+	source,
+	source_row,
+	verify_stock=False,
+	verify_standard_receipt=False,
+	verify_driver_collection=False,
+	driver_receiving_enabled=True,
 ):
 	from vuna_transport.services.execution.direct_supplier_pickup_service import (
 		assign_supplier_demand,
@@ -228,6 +254,8 @@ def exercise_assignment(
 				}
 				if not frappe.db.exists(ALLOWED_WAREHOUSE_TYPE_DOCTYPE, values):
 					frappe.get_doc({"doctype": ALLOWED_WAREHOUSE_TYPE_DOCTYPE, **values}).db_insert()
+	if verify_driver_collection:
+		return exercise_driver_collection(task, source, source_row, driver_receiving_enabled)
 	name = create_supplier_receipt(task.name)
 	assert name == create_supplier_receipt(task.name)
 	receipt = frappe.get_doc("Purchase Receipt", name)
@@ -267,6 +295,49 @@ def exercise_assignment(
 		"receipt_removal_guard": "passed",
 		"no_new_load_or_allocation": "passed",
 		"no_stock_or_accounting_posting": "passed",
+		"all_changes_rolled_back": True,
+	}
+
+
+def exercise_driver_collection(task, order, source_row, auto_post=True):
+	from vuna_transport.services.execution.supplier_collection_proof_service import prepare_collection
+
+	# Remove the fixture's historical received quantity, which has no real PR.
+	source_row.qty, source_row.received_qty = 15, 0
+	source_row.stock_qty = 15 * source_row.conversion_factor
+	source_row.db_update()
+	proof = prepare_collection(task)
+	proof.items[0].delivered_qty = 7
+	proof.received_by, proof.remarks = "Test supplier clerk", "Only seven units available"
+	proof.flags.ignore_permissions = True
+	with patch(
+		"vuna_transport.services.execution.driver_stock_policy.driver_purchase_receipts_enabled",
+		return_value=auto_post,
+	):
+		proof.insert(ignore_permissions=True)
+		proof.submit()
+	if not auto_post:
+		from vuna_transport.services.execution.direct_supplier_pickup_service import create_supplier_receipt
+
+		assert not frappe.db.exists("Purchase Receipt", {"vuna_pickup_task": task.name})
+		assert frappe.db.get_value("Transport Trip Task", task.name, "status") == "Awaiting Stock Posting"
+		draft = frappe.get_doc("Purchase Receipt", create_supplier_receipt(task.name))
+		assert draft.items[0].qty == 7  # Staff receipt is capped to actual collection.
+		draft.submit()
+	receipt = frappe.get_doc("Purchase Receipt", {"vuna_pickup_task": task.name, "docstatus": 1})
+	assert receipt.items[0].qty == 7 and receipt.items[0].uom == source_row.uom
+	assert receipt.items[0].stock_qty == 7 * source_row.conversion_factor
+	assert receipt.items[0].warehouse == receipt.vuna_pickup_transit_warehouse
+	assert frappe.db.count("Stock Ledger Entry", {"voucher_no": receipt.name}) > 0
+	assert frappe.db.get_value("Transport Trip Task", task.name, "status") == "Completed with Variance"
+	assert prepare_collection(task).name == proof.name
+	return {
+		"driver_receiving_enabled": auto_post,
+		"driver_collection": "passed",
+		"vehicle_purchase_receipt_submitted": "passed",
+		"requested_uom_preserved": "passed",
+		"partial_collection_variance": "passed",
+		"stock_ledger_posted": "passed",
 		"all_changes_rolled_back": True,
 	}
 

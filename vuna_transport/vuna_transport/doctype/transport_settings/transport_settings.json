@@ -35,12 +35,34 @@
   "enable_route_optimization",
   "require_quality_inspection_for_return_inspection",
   "allow_unplanned_return_pickups",
+  "driver_stock_posting_section",
+  "allow_driver_purchase_receipt",
+  "allow_driver_end_transit",
   "scan_permissions_section",
   "allowed_loaded_scan_roles",
   "allowed_dispatched_scan_roles",
   "delivery_order_retirement_manifest"
  ],
  "fields": [
+  {
+   "fieldname": "driver_stock_posting_section",
+   "fieldtype": "Section Break",
+   "label": "Driver Stock Posting"
+  },
+  {
+   "fieldname": "allow_driver_purchase_receipt",
+   "fieldtype": "Check",
+   "label": "Allow Driver to Receive Supplier Collections",
+   "default": "0",
+   "description": "Submitting collection proof posts a Purchase Receipt into the vehicle's Transit Warehouse."
+  },
+  {
+   "fieldname": "allow_driver_end_transit",
+   "fieldtype": "Check",
+   "label": "Allow Driver to Complete Depot Transfers",
+   "default": "1",
+   "description": "Submitting delivery proof posts the End Transit Stock Entry; otherwise warehouse staff post it."
+  },
   {
    "fieldname": "allow_unplanned_return_pickups",
    "fieldtype": "Check",
@@ -255,7 +277,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-03 14:20:27.995961",
+ "modified": "2026-11-08 15:42:59.636745",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Settings",

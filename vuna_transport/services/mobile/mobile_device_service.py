@@ -988,7 +988,7 @@ def _attach_transport_tasks(trip, stops):
 		if task.return_request:
 			task["operation_label"] = _("Return pickup: {0}").format(task.return_request)
 		task["can_record_proof"] = (
-			task.task_type in ("Transfer Receipt", "Return Pickup")
+			task.task_type in ("Transfer Receipt", "Return Pickup", "Supplier Pickup")
 			and task.status == "Ready"
 			and not getattr(trip, "vuna_actual_completion", None)
 			and bool(getattr(trip, "vuna_actual_start", None))
@@ -1097,9 +1097,6 @@ def _attach_task_presentation(tasks):
 				frappe.db.get_value("Purchase Order", demand.source_document, "supplier_name")
 				if demand
 				else None
-			)
-			task["blocked_reason"] = _(
-				"Collection is confirmed through the warehouse team's Purchase Receipt."
 			)
 		else:
 			task["reference_doctype"], task["reference_name"] = "Stock Entry", task.dispatch_stock_entry

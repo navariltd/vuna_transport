@@ -23,7 +23,7 @@ CONTEXT_FIELDS = (
 )
 
 
-def receipt_context(source_name, allocation_name):
+def receipt_context(source_name, allocation_name, *, check_permissions=True):
 	from vuna_transport.services.demand.source_policy_service import require_source_enabled
 	from vuna_transport.services.demand.supplier_pickup_demand_service import build_supplier_pickup_legs
 	from vuna_transport.services.execution.allocation_transfer_service import (
@@ -33,7 +33,8 @@ def receipt_context(source_name, allocation_name):
 	order = frappe.get_doc("Purchase Order", source_name)
 	allocation = frappe.get_doc("Vehicle Allocation", allocation_name)
 	for doc in (order, allocation):
-		require_document_permission(doc, "read")
+		if check_permissions:
+			require_document_permission(doc, "read")
 	frappe.db.get_value("Purchase Order", order.name, "name", for_update=True)
 	frappe.db.get_value("Vehicle Allocation", allocation.name, "name", for_update=True)
 	order.reload()
@@ -172,7 +173,9 @@ def validate_vehicle_purchase_receipt(doc, method=None):
 
 		_lock_task(doc.vuna_pickup_task)
 	order, allocation, transit, legs = receipt_context(
-		doc.vuna_pickup_purchase_order, doc.vuna_pickup_allocation
+		doc.vuna_pickup_purchase_order,
+		doc.vuna_pickup_allocation,
+		check_permissions=not getattr(doc, "flags", {}).get("ignore_permissions"),
 	)
 	if (
 		doc.company != order.company

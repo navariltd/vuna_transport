@@ -124,6 +124,12 @@ def prepare_mobile_transport_proof(
 		proof.flags.ignore_permissions = True
 		proof.insert(ignore_permissions=True)
 	request_name = task.get("return_request") or proof.return_request
+	supplier_pickup = task.task_type == "Supplier Pickup"
+	order = (
+		frappe.db.get_value("Transport Demand", task.transport_demand, "source_document")
+		if supplier_pickup
+		else None
+	)
 	return {
 		"name": proof.name if not proof.is_new() else None,
 		"docstatus": proof.docstatus,
@@ -133,8 +139,17 @@ def prepare_mobile_transport_proof(
 		"return_context": frappe.db.get_value("Return Request", request_name, "return_context")
 		if request_name
 		else None,
-		"reference_doctype": "Return Request" if task.task_type == "Return Pickup" else "Stock Entry",
-		"reference_name": request_name if task.task_type == "Return Pickup" else proof.dispatch_stock_entry,
+		"reference_doctype": "Purchase Order"
+		if supplier_pickup
+		else "Return Request"
+		if task.task_type == "Return Pickup"
+		else "Stock Entry",
+		"reference_name": order
+		if supplier_pickup
+		else request_name
+		if task.task_type == "Return Pickup"
+		else proof.dispatch_stock_entry,
+		"capture_identity": supplier_pickup,
 		"received_by": proof.received_by,
 		"receiver_phone": proof.receiver_phone,
 		"signature": proof.signature,
@@ -150,6 +165,12 @@ def prepare_mobile_transport_proof(
 				"item_name": row.item_name or frappe.get_cached_value("Item", row.item_code, "item_name"),
 				"qty": row.delivered_qty,
 				"planned_qty": row.ordered_qty,
+				"has_batch_no": bool(
+					supplier_pickup and frappe.get_cached_value("Item", row.item_code, "has_batch_no")
+				),
+				"has_serial_no": bool(
+					supplier_pickup and frappe.get_cached_value("Item", row.item_code, "has_serial_no")
+				),
 			}
 			for row in proof.items
 		],

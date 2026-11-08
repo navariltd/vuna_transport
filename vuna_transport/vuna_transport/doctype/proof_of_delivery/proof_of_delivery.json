@@ -186,7 +186,7 @@
       "fieldname": "proof_type",
       "label": "Handover Type",
       "fieldtype": "Select",
-      "options": "Customer Delivery\nTransfer Dispatch\nTransfer Receipt\nReturn Pickup\nUnplanned Collection",
+      "options": "Customer Delivery\nTransfer Dispatch\nTransfer Receipt\nReturn Pickup\nSupplier Pickup\nUnplanned Collection",
       "default": "Customer Delivery",
       "read_only": 1
     },
@@ -462,7 +462,7 @@
       "link_fieldname": "proof_of_delivery"
     }
   ],
-  "modified": "2026-10-17 00:18:01.223808",
+  "modified": "2026-11-08 15:42:59.636745",
   "modified_by": "Administrator",
   "module": "Vuna Transport",
   "name": "Proof of Delivery",

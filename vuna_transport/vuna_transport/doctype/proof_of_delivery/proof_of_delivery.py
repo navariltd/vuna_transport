@@ -26,6 +26,13 @@ class ProofofDelivery(Document):
 			validate_collection(self)
 			return
 		if self.get("transport_trip_task"):
+			if self.proof_type == "Supplier Pickup":
+				from vuna_transport.services.execution.supplier_collection_proof_service import (
+					validate_collection,
+				)
+
+				validate_collection(self)
+				return
 			if self.proof_type == "Return Pickup":
 				from vuna_transport.services.execution.return_pickup_service import validate_pickup_proof
 
@@ -158,6 +165,15 @@ class ProofofDelivery(Document):
 		if self.proof_type == "Unplanned Collection":
 			return
 		if self.get("transport_trip_task"):
+			if self.proof_type == "Supplier Pickup":
+				from vuna_transport.services.execution.supplier_collection_proof_service import (
+					post_collection_receipt,
+				)
+				from vuna_transport.services.execution.transfer_proof_service import sync_proof
+
+				post_collection_receipt(self)
+				sync_proof(self)
+				return
 			if self.proof_type == "Return Pickup":
 				from vuna_transport.services.execution.return_pickup_service import (
 					post_pickup_stock,
@@ -202,6 +218,13 @@ class ProofofDelivery(Document):
 
 		prepare_pod_cancellation(self)
 		if self.get("transport_trip_task"):
+			if self.proof_type == "Supplier Pickup":
+				from vuna_transport.services.execution.supplier_collection_proof_service import (
+					guard_collection_cancellation,
+				)
+
+				guard_collection_cancellation(self)
+				return
 			if self.proof_type == "Return Pickup":
 				from vuna_transport.services.execution.return_pickup_service import (
 					guard_pickup_proof_cancellation,
@@ -223,6 +246,11 @@ class ProofofDelivery(Document):
 
 	def on_cancel(self):
 		if self.proof_type == "Unplanned Collection":
+			return
+		if self.proof_type == "Supplier Pickup":
+			from vuna_transport.services.execution.transfer_proof_service import sync_proof
+
+			sync_proof(self)
 			return
 		if self.proof_type == "Return Pickup":
 			from vuna_transport.services.execution.return_pickup_service import sync_pickup_proof
