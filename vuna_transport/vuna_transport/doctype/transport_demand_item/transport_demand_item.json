@@ -6,11 +6,40 @@
  "istable": 1,
  "is_submittable": 0,
  "fields": [
-  {"fieldname":"reserved_stock_qty","fieldtype":"Float","label":"Reserved Stock Quantity","read_only":1,"allow_on_submit":1},
-  {"fieldname":"allocated_stock_qty","fieldtype":"Float","label":"Allocated Stock Quantity","read_only":1,"allow_on_submit":1},
-  {"fieldname":"remaining_stock_qty","fieldtype":"Float","label":"Remaining Stock Quantity","read_only":1,"allow_on_submit":1},
-  {"fieldname":"weight","fieldtype":"Float","label":"Weight","read_only":1},
-  {"fieldname":"weight_uom","fieldtype":"Link","label":"Weight UOM","options":"UOM","read_only":1},
+  {
+   "fieldname": "reserved_stock_qty",
+   "fieldtype": "Float",
+   "label": "Reserved Stock Quantity",
+   "read_only": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "allocated_stock_qty",
+   "fieldtype": "Float",
+   "label": "Allocated Stock Quantity",
+   "read_only": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "remaining_stock_qty",
+   "fieldtype": "Float",
+   "label": "Remaining Stock Quantity",
+   "read_only": 1,
+   "allow_on_submit": 1
+  },
+  {
+   "fieldname": "weight",
+   "fieldtype": "Float",
+   "label": "Weight",
+   "read_only": 1
+  },
+  {
+   "fieldname": "weight_uom",
+   "fieldtype": "Link",
+   "label": "Weight UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
   {
    "fieldname": "source_item",
    "fieldtype": "Data",
@@ -81,23 +110,147 @@
    "label": "Transport Compatibility Group",
    "options": "Transport Compatibility Group",
    "read_only": 1
+  },
+  {
+   "fieldname": "sales_order_item",
+   "fieldtype": "Link",
+   "label": "Sales Order Item",
+   "options": "Sales Order Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "ordered_qty",
+   "fieldtype": "Float",
+   "label": "Ordered Qty",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "s_warehouse",
+   "fieldtype": "Link",
+   "label": "Source Warehouse",
+   "options": "Warehouse",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_date",
+   "fieldtype": "Date",
+   "label": "Delivery Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "transport_handling_profile",
+   "fieldtype": "Data",
+   "label": "Transport Handling Profile",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "volume",
+   "fieldtype": "Float",
+   "label": "Volume",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "volume_uom",
+   "fieldtype": "Link",
+   "label": "Volume UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "pallets",
+   "fieldtype": "Float",
+   "label": "Pallets",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "cases",
+   "fieldtype": "Float",
+   "label": "Cases",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "crates",
+   "fieldtype": "Float",
+   "label": "Crates",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "identity_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "quantity_section",
+   "fieldtype": "Section Break",
+   "label": "Quantities & UOM"
+  },
+  {
+   "fieldname": "quantity_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "allocation_section",
+   "fieldtype": "Section Break",
+   "label": "Allocation (Stock UOM)"
+  },
+  {
+   "fieldname": "handling_section",
+   "fieldtype": "Section Break",
+   "label": "Handling & Dimensions"
+  },
+  {
+   "fieldname": "handling_column",
+   "fieldtype": "Column Break"
   }
  ],
  "field_order": [
-  "reserved_stock_qty",
-  "allocated_stock_qty",
-  "remaining_stock_qty",
-  "source_item",
   "item_code",
+  "item_name",
+  "identity_column",
+  "source_item",
+  "sales_order_item",
+  "s_warehouse",
+  "delivery_date",
+  "quantity_section",
+  "ordered_qty",
   "transaction_qty",
   "transaction_uom",
+  "quantity_column",
   "conversion_factor",
   "stock_qty",
   "stock_uom",
+  "allocation_section",
+  "reserved_stock_qty",
+  "allocated_stock_qty",
+  "remaining_stock_qty",
+  "handling_section",
+  "weight",
+  "weight_uom",
+  "volume",
+  "volume_uom",
+  "handling_column",
+  "transport_handling_profile",
   "delivery_group",
   "transport_compatibility_group",
-  "weight",
-  "weight_uom"
+  "pallets",
+  "cases",
+  "crates"
  ],
  "permissions": [],
  "sort_field": "modified",

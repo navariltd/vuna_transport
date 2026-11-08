@@ -80,6 +80,8 @@ def automatically_create_from_source(doc, method=None):
 	policy = get_source_policy(policy_source(doc))
 	if not policy.enabled or policy.creation_mode != "Automatic" or doc.docstatus != 1:
 		return []
+	if doc.get("status") in ("Stopped", "Closed", "Cancelled", "On Hold", "Completed"):
+		return []
 	if doc.doctype in ("Material Request", "Return Request"):
 		from vuna_transport.services.demand.delivery_method_service import get_source_delivery_method_workflow
 
@@ -107,6 +109,13 @@ def automatically_create_from_source(doc, method=None):
 	):
 		return []
 	if doc.doctype == "Sales Order":
+		from vuna_transport.services.demand.sales_transport_demand_service import (
+			create_sales_demands,
+			native_customer_demand_enabled,
+		)
+
+		if native_customer_demand_enabled():
+			return create_sales_demands(doc, automated=True)
 		from vuna_transport.services.demand.delivery_order_service import (
 			create_delivery_orders_for_sales_order,
 		)

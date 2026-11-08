@@ -4,6 +4,8 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
+from vuna_transport.services.demand.customer_demand_fields import CUSTOMER_EXECUTION_STATUSES
+
 
 def allocation_status(items):
 	"""Compare each row independently; quantities in unlike UOMs are never summed."""
@@ -35,6 +37,8 @@ def sync_demand_allocations(names):
 	for name in names:
 		demand = frappe.get_doc("Transport Demand", name)
 		if demand.docstatus != 1:
+			continue
+		if demand.get("migration_archived"):
 			continue
 		commitments = frappe.db.sql(
 			"""
@@ -79,9 +83,34 @@ def sync_demand_allocations(names):
 			states.append(
 				frappe._dict(stock_qty=item.stock_qty, reserved=values.reserved, allocated=values.allocated)
 			)
-		frappe.db.set_value(
-			"Transport Demand", name, "status", allocation_status(states), update_modified=False
-		)
+		status = allocation_status(states)
+		if (
+			demand.get("movement_type") == "Customer Delivery"
+			and demand.get("source_document_type") == "Delivery Order"
+		):
+			source_status = frappe.db.get_value("Delivery Order", demand.source_document, "status")
+			if source_status in CUSTOMER_EXECUTION_STATUSES:
+				status = source_status
+		elif (
+			demand.get("movement_type") == "Customer Delivery"
+			and demand.get("source_document_type") == "Sales Order"
+		):
+			if frappe.db.get_value("Sales Order", demand.source_document, "status") in (
+				"Closed",
+				"Cancelled",
+			):
+				status = "Closed"
+		frappe.db.set_value("Transport Demand", name, "status", status, update_modified=False)
+		if (
+			demand.get("movement_type") == "Customer Delivery"
+			and demand.get("source_document_type") == "Sales Order"
+			and status != "Closed"
+		):
+			from vuna_transport.services.execution.customer_reference_service import recompute_native_demand
+
+			# Allocation counters are not the execution outcome. Re-read persisted
+			# counters and proofs so later refreshes cannot erase delivery progress.
+			recompute_native_demand(name)
 
 
 def guard_source_cancellation(doc, method=None):
@@ -98,7 +127,7 @@ def guard_source_cancellation(doc, method=None):
 		},
 		pluck="name",
 	)
-	if doc.doctype == "Sales Order":
+	if doc.doctype == "Sales Order" and frappe.db.exists("DocType", "Delivery Order"):
 		orders = frappe.get_all("Delivery Order", filters={"sales_order": doc.name}, pluck="name")
 		if orders:
 			demands.extend(
