@@ -38,12 +38,7 @@ frappe.ui.form.on("Transport Trip Task", {
 				__("Create")
 			);
 		}
-		if (
-			!frm.doc.direct_assignment ||
-			frm.doc.task_type !== "Supplier Pickup" ||
-			frm.doc.status === "Cancelled"
-		)
-			return;
+		if (frm.doc.task_type !== "Supplier Pickup" || frm.doc.status === "Cancelled") return;
 		if (
 			frappe.model.can_create("Purchase Receipt") &&
 			!["Completed", "Completed with Variance"].includes(frm.doc.status)
@@ -61,6 +56,7 @@ frappe.ui.form.on("Transport Trip Task", {
 				__("Create")
 			);
 		}
+		if (!frm.doc.direct_assignment) return;
 		frm.add_custom_button(__("Remove Assignment"), () => {
 			frappe.confirm(__("Remove this pickup from the trip?"), async () => {
 				await frappe.call({

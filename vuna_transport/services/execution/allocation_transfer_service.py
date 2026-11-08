@@ -82,6 +82,12 @@ def set_allocation_stock_defaults(entry, allocation):
 def make_allocation_stock_entry(source_name: str, load_name: str):
 	require_doctype_permission("Stock Entry", "create")
 	allocation, load = _context(source_name, load_name)
+	if load.movement_type == "Supplier Pickup":
+		frappe.throw(
+			_(
+				"Supplier collections enter vehicle stock through Purchase Receipt after pickup, not a pre-trip Stock Entry."
+			)
+		)
 	from vuna_transport.services.demand.depot_return_demand_service import is_return_load
 
 	if is_return_load(load):

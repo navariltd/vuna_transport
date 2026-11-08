@@ -31,6 +31,25 @@ def collection_context(task):
 	)
 	if allocation.vehicle != (trip.get("vuna_current_vehicle") or trip.vehicle):
 		frappe.throw(_("The collection vehicle must match the trip's current allocation."))
+	if task.get("transport_load"):
+		load = frappe.get_doc("Transport Load", task.transport_load)
+		allowed = {row.name: row for row in load.delivery_orders}
+		if (
+			load.docstatus != 1
+			or load.active_vehicle_allocation != allocation.name
+			or load.delivery_trip != trip.name
+			or load.source_address != demand.source_address
+		):
+			frappe.throw(_("The supplier pickup must retain its submitted load and allocation."))
+		for cargo in task.items:
+			row = allowed.get(cargo.load_item)
+			if (
+				not row
+				or row.transport_demand != demand.name
+				or row.transport_demand_item != cargo.transport_demand_item
+				or flt(cargo.qty) != flt(row.allocated_quantity)
+			):
+				frappe.throw(_("Supplier pickup quantities must match their allocated load rows."))
 	return trip, demand, order, allocation, transit, legs
 
 

@@ -34,6 +34,11 @@ def plan_tasks(loads):
 	customers = []
 	for load in loads:
 		require_document_permission(load, "read")
+		if load.get("movement_type") == "Supplier Pickup":
+			from vuna_transport.services.planning.supplier_load_service import supplier_tasks
+
+			specs.extend(supplier_tasks(load))
+			continue
 		if not is_demand_load(load):
 			customers.append(load)
 			continue
@@ -207,10 +212,17 @@ def group_stops(specs):
 def _stop_location_fields(specs):
 	warehouses = sorted({spec["warehouse"] for spec in specs if spec.get("warehouse")})
 	has_customer = any(spec.get("delivery_note") for spec in specs)
-	has_depot = any(spec["task_type"] != "Customer Delivery" for spec in specs)
+	has_supplier = any(spec["task_type"] == "Supplier Pickup" for spec in specs)
+	has_depot = any(spec["task_type"] not in ("Customer Delivery", "Supplier Pickup") for spec in specs)
 	return {
 		"vuna_depot_names": ", ".join(warehouses),
-		"vuna_stop_type": "Mixed" if has_customer and has_depot else "Depot" if has_depot else "Customer",
+		"vuna_stop_type": "Mixed"
+		if sum((has_customer, has_depot, has_supplier)) > 1
+		else "Supplier"
+		if has_supplier
+		else "Depot"
+		if has_depot
+		else "Customer",
 	}
 
 
@@ -220,7 +232,7 @@ def set_stop_location_context(assignments):
 	demands = {}
 	for spec, stop in assignments:
 		value = dict(spec)
-		if value["task_type"] != "Customer Delivery" and not value.get("warehouse"):
+		if value["task_type"] not in ("Customer Delivery", "Supplier Pickup") and not value.get("warehouse"):
 			if value["task_type"] == "Transfer Receipt":
 				name = value.get("transport_demand")
 				if name not in demands:
@@ -242,7 +254,7 @@ def set_stop_location_context(assignments):
 				frappe.throw(_("The stop Customer must match its planned Delivery Note."))
 		elif stop.customer:
 			frappe.throw(
-				_("Depot-only stops cannot have a Customer. Use the planned depot/warehouse instead.")
+				_("Non-customer stops cannot have a Customer. Use the planned supplier or depot instead.")
 			)
 		for field, value in _stop_location_fields(specs).items():
 			setattr(stop, field, value)
@@ -263,7 +275,7 @@ def make_task_trip(allocation, loads):
 		if is_demand_load(load):
 			from vuna_transport.services.demand.depot_return_demand_service import is_return_load
 
-			if is_return_load(load):
+			if is_return_load(load) or load.get("movement_type") == "Supplier Pickup":
 				continue
 			stock = allocation_stock_entry(allocation.name, load.name)
 			if not stock or frappe.db.get_value("Stock Entry", stock, "docstatus") != 1:

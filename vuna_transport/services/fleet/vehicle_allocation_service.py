@@ -554,7 +554,7 @@ def _validate_initial_allocation_sequence(load, allocation=None):
 	if status["missing_delivery_orders"]:
 		frappe.throw(
 			_(
-				"Generate Delivery Notes for every Delivery Order before allocating a vehicle. Missing: {0}."
+				"Generate Delivery Notes for every customer Transport Demand before allocating a vehicle. Missing: {0}."
 			).format(", ".join(status["missing_delivery_orders"]))
 		)
 	if status["draft_delivery_notes"]:
@@ -650,7 +650,7 @@ def _get_allocation_execution_state(allocation):
 		if is_demand_load(load):
 			from vuna_transport.services.demand.depot_return_demand_service import is_return_load
 
-			if is_return_load(load):
+			if is_return_load(load) or load.get("movement_type") == "Supplier Pickup":
 				continue
 			stock = allocation_stock_entry(allocation.name, load.name)
 			transfer_stock.append(
@@ -864,7 +864,11 @@ def activate_allocation(allocation):
 			has_delivery_notes = frappe.db.exists(
 				"Delivery Note", {"vuna_delivery_load": load.name, "docstatus": ["!=", 2]}
 			)
-			target_status = "Ready for Dispatch" if has_delivery_notes else "Allocated"
+			target_status = (
+				"Ready for Dispatch"
+				if has_delivery_notes or load.get("movement_type") == "Supplier Pickup"
+				else "Allocated"
+			)
 			set_delivery_load_status(
 				load, target_status, _("Vehicle Allocation {0} submitted").format(allocation.name)
 			)
@@ -901,7 +905,11 @@ def restore_previous_allocation(allocation, active_link_cleared=False):
 			has_delivery_notes = frappe.db.exists(
 				"Delivery Note", {"vuna_delivery_load": load.name, "docstatus": ["!=", 2]}
 			)
-			target_status = "Awaiting Vehicle" if has_delivery_notes else "Approved"
+			target_status = (
+				"Awaiting Vehicle"
+				if has_delivery_notes or load.get("movement_type") == "Supplier Pickup"
+				else "Approved"
+			)
 			if load.status not in ("Completed", "Completed with Exceptions", "Dispatched"):
 				set_delivery_load_status(
 					load, target_status, _("Vehicle Allocation {0} cancelled").format(allocation.name)

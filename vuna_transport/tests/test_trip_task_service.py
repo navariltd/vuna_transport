@@ -125,8 +125,50 @@ class TestTripTaskPlanning(unittest.TestCase):
 	def test_depot_stop_rejects_customer_even_if_client_changes_stop_type(self):
 		spec = {**transfer_specs()[0], "items": []}
 		stop = frappe._dict(name="STOP", customer="UNRELATED", vuna_stop_type="Customer")
-		with self.assertRaisesRegex(ValueError, "Depot-only"):
+		with self.assertRaisesRegex(ValueError, "Non-customer"):
 			set_stop_location_context([(spec, stop)])
+
+	def test_supplier_pickup_keeps_external_address_without_depot_or_customer(self):
+		spec = {
+			"task_type": "Supplier Pickup",
+			"task_key": "PICKUP",
+			"transport_load": "TL",
+			"address": "Supplier Address",
+			"delivery_note": None,
+		}
+		stop = self.stops([spec])[0]
+		self.assertEqual(stop.vuna_stop_type, "Supplier")
+		set_stop_location_context([(spec, stop)])
+		self.assertFalse(stop.customer)
+		self.assertFalse(stop.vuna_depot_names)
+		self.framework.db.get_value.assert_not_called()
+		stop.customer = "UNRELATED"
+		with self.assertRaisesRegex(ValueError, "Non-customer"):
+			set_stop_location_context([(spec, stop)])
+
+	def test_customer_delivery_and_supplier_pickup_share_a_mixed_visit(self):
+		specs = [
+			{
+				"task_type": "Customer Delivery",
+				"task_key": "DELIVERY",
+				"transport_load": "CUSTOMER-LOAD",
+				"delivery_note": "DN",
+				"customer": "CUSTOMER",
+				"address": "Shared Address",
+			},
+			{
+				"task_type": "Supplier Pickup",
+				"task_key": "PICKUP",
+				"transport_load": "TL",
+				"delivery_note": None,
+				"address": "Shared Address",
+			},
+		]
+		stops = self.stops(specs)
+		self.assertEqual(len(stops), 1)
+		set_stop_location_context([(spec, stops[0]) for spec in specs])
+		self.assertEqual(stops[0].vuna_stop_type, "Mixed")
+		self.assertEqual(stops[0].customer, "CUSTOMER")
 
 	def test_same_address_can_show_multiple_depots_without_assigning_a_customer(self):
 		specs = [
