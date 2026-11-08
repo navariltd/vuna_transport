@@ -21,6 +21,7 @@ frappe.ui.form.on("Transport Trip Task", {
 		}
 		if (
 			["Transfer Receipt", "Return Pickup"].includes(frm.doc.task_type) &&
+			frm.doc.confirmation_method !== "Warehouse Receipt" &&
 			frm.doc.status !== "Cancelled"
 		) {
 			frm.add_custom_button(

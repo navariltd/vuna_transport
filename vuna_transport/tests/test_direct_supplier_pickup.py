@@ -24,6 +24,12 @@ class TestDirectSupplierPickup(TestCase):
 		self.framework._dict.side_effect = frappe._dict
 		self.enterContext(patch.object(service, "_", side_effect=lambda value: value))
 		self.enterContext(patch.object(service, "require_document_permission"))
+		self.progress = self.enterContext(
+			patch(
+				"vuna_transport.services.execution.supplier_receipt_confirmation_service.task_progress",
+				return_value={"status": "Ready", "received": {}, "evidence": None},
+			)
+		)
 		self.item = frappe._dict(
 			name="DI",
 			source_item="POI",
@@ -221,7 +227,31 @@ class TestDirectSupplierPickup(TestCase):
 		self.framework.db.get_value.return_value = frappe._dict(name="PR", docstatus=0)
 		self.assertEqual(service.supplier_task_status(task), "Awaiting Stock Posting")
 		self.framework.db.get_value.return_value.docstatus = 1
-		self.documents["Purchase Receipt"] = document(items=[frappe._dict(purchase_order_item="POI", qty=2)])
+		self.progress.return_value = {"status": "Completed", "received": {"POI": 20}, "evidence": "PR"}
 		self.assertEqual(service.supplier_task_status(task), "Completed")
-		self.documents["Purchase Receipt"].items[0].qty = 1
-		self.assertEqual(service.supplier_task_status(task), "Completed with Variance")
+		self.progress.return_value = {
+			"status": "Partially Received",
+			"received": {"POI": 10},
+			"evidence": "PR",
+		}
+		self.assertEqual(service.supplier_task_status(task), "Partially Received")
+
+	def test_partial_purchase_receipt_reduces_remaining_task_limit(self):
+		task = document(
+			direct_assignment=1,
+			task_type="Supplier Pickup",
+			status="Partially Received",
+			delivery_trip="DT",
+			transport_demand="TD",
+			items=[
+				frappe._dict(
+					transport_demand_item="DI", item_code="PACK", qty=2, uom="Carton", conversion_factor=10
+				)
+			],
+		)
+		self.progress.return_value = {
+			"status": "Partially Received",
+			"received": {"POI": 10},
+			"evidence": "PR",
+		}
+		self.assertEqual(service.receipt_task_limits(task, self.order, self.allocation), {"POI": 1})

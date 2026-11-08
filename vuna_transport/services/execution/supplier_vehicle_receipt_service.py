@@ -158,6 +158,11 @@ def validate_vehicle_purchase_receipt(doc, method=None):
 		frappe.throw(
 			_("A supplier pickup task requires its collection Purchase Order and vehicle allocation.")
 		)
+	if not any(doc.get(field) for field in CONTEXT_FIELDS[1:]):
+		# The standard PO mapper auto-fills Link fields targeting Purchase Order;
+		# this alone must not opt an ordinary receipt into the vehicle workflow.
+		doc.vuna_pickup_purchase_order = None
+		return
 	if not doc.get("vuna_pickup_purchase_order"):
 		return
 	if previous and previous.docstatus == 1:

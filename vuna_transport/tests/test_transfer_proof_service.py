@@ -13,6 +13,10 @@ from vuna_transport.services.execution import transfer_proof_service as service
 
 class TestTransferProof(unittest.TestCase):
 	def setUp(self):
+		self.enterContext(
+			patch("vuna_transport.services.execution.warehouse_receipt_service.assert_no_manual_receipt")
+		)
+
 		def raise_validation(message):
 			raise ValueError(message)
 

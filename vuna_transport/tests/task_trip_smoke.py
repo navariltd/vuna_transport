@@ -21,6 +21,7 @@ def run(
 	verify_return_pickup=False,
 	override_source=False,
 	use_depot_fallback=False,
+	verify_warehouse_receipt=False,
 ):
 	frappe.db.savepoint("task_trip_smoke")
 	try:
@@ -164,6 +165,11 @@ def run(
 			assert not trip.delivery_stops[0].customer
 			trip.save()
 			assert frappe.db.count("Transport Trip Task", {"delivery_trip": trip.name}) == 1
+			if verify_warehouse_receipt:
+				from vuna_transport.tests.warehouse_receipt_smoke import exercise
+
+				trip.db_set("docstatus", 1, update_modified=False)
+				return exercise(trip, frappe.get_doc("Transport Trip Task", tasks[0].name), pretrip_stock)
 			if verify_cancel:
 				trip.db_set("docstatus", 1, update_modified=False)
 				trip.cancel()
