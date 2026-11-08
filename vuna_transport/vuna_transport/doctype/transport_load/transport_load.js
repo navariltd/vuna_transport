@@ -7,8 +7,7 @@ frappe.ui.form.on("Transport Load", {
 			filters: {
 				docstatus: 1,
 				company: frm.doc.company,
-				source_warehouse: frm.doc.source_warehouse,
-				movement_type: "Warehouse Transfer",
+				movement_type: frm.doc.movement_type || "Warehouse Transfer",
 			},
 		}));
 		frm.set_query("transport_demand_item", "delivery_orders", (doc, cdt, cdn) => ({
@@ -33,6 +32,9 @@ frappe.ui.form.on("Transport Load", {
 				special_equipment_required: frm.doc.special_equipment_required || null,
 				delivery_order_names: (frm.doc.delivery_orders || [])
 					.map((row) => row.delivery_order)
+					.filter(Boolean),
+				transport_demand_names: (frm.doc.delivery_orders || [])
+					.map((row) => row.transport_demand)
 					.filter(Boolean),
 			},
 		}));
@@ -70,7 +72,34 @@ frappe.ui.form.on("Transport Load", {
 		render_capacity_summary(frm);
 	},
 
-	refresh(frm) {
+	async refresh(frm) {
+		const { message: customer_context } = await frappe.call({
+			method: "vuna_transport.services.planning.dispatch_planning_service.get_customer_planning_context",
+		});
+		const legacy_rows = (frm.doc.delivery_orders || []).some((row) => row.delivery_order);
+		for (const field of ["delivery_order", "delivery_order_item"]) {
+			frm.fields_dict.delivery_orders.grid.update_docfield_property(
+				field,
+				"hidden",
+				!legacy_rows &&
+					(customer_context.doctype === "Transport Demand" ||
+						frm.doc.movement_type === "Customer Delivery")
+					? 1
+					: 0
+			);
+		}
+		if (
+			frm.doc.docstatus === 0 &&
+			!legacy_rows &&
+			(customer_context.doctype === "Transport Demand" ||
+				frm.doc.movement_type === "Customer Delivery")
+		) {
+			frm.add_custom_button(
+				__("Get Customer Items"),
+				() => show_customer_demand_items(frm),
+				__("Planning")
+			);
+		}
 		// Downstream documents retain their audit lineage. The server-side
 		// cancellation guard still blocks cancellation when submitted stock or
 		// execution documents make it unsafe.
@@ -80,7 +109,11 @@ frappe.ui.form.on("Transport Load", {
 			"Delivery Note",
 			"Delivery Trip",
 		];
-		if (frm.doc.docstatus === 0) {
+		if (
+			frm.doc.docstatus === 0 &&
+			(legacy_rows || customer_context.doctype === "Delivery Order") &&
+			frm.doc.movement_type !== "Customer Delivery"
+		) {
 			frm.add_custom_button(
 				__("Get Items"),
 				() => {
@@ -316,7 +349,7 @@ function open_delivery_notes(names) {
 function render_new_load_progress(frm) {
 	frm.get_field("execution_overview")?.$wrapper.html(
 		`<div class="text-muted">${__(
-			"Add Delivery Orders, review capacity, save and submit the load to begin execution."
+			"Add Transport Demands, review capacity, save and submit the load to begin execution."
 		)}</div>`
 	);
 }
@@ -354,17 +387,14 @@ function render_execution_progress(frm, summary) {
 	};
 	const delivery_notes_step = {
 		label: __("Delivery Notes"),
-		value: __("{0} of {1} submitted", [
-			summary.delivery_notes.submitted,
-			summary.delivery_notes.expected,
-		]),
-		state:
-			summary.delivery_notes.expected &&
-			summary.delivery_notes.submitted >= summary.delivery_notes.expected
-				? "complete"
-				: summary.delivery_notes.total
-				? "current"
-				: "pending",
+		value: summary.delivery_notes.ready_for_vehicle_allocation
+			? __("All quantities covered")
+			: __("{0} submitted", [summary.delivery_notes.submitted]),
+		state: summary.delivery_notes.ready_for_vehicle_allocation
+			? "complete"
+			: summary.delivery_notes.total
+			? "current"
+			: "pending",
 	};
 	const trip_step = {
 		label: __("Delivery Trip"),
@@ -564,6 +594,143 @@ function recalculate_load_totals(frm) {
 	});
 	frm.refresh_fields(Object.keys(values));
 	render_capacity_summary(frm);
+}
+
+function show_customer_demand_items(frm) {
+	if (!frm.doc.company) {
+		frappe.msgprint(__("Select Company first."));
+		frm.scroll_to_field("company");
+		return;
+	}
+	if (
+		(frm.doc.delivery_orders || []).some((row) => row.transport_demand) &&
+		frm.doc.movement_type !== "Customer Delivery"
+	) {
+		frappe.msgprint(
+			__("Keep customer and warehouse-transfer demand in separate Transport Loads.")
+		);
+		return;
+	}
+	let request_id = 0;
+	let loaded_demand = null;
+	const dialog = new frappe.ui.Dialog({
+		title: __("Get Customer Items"),
+		size: "large",
+		fields: [
+			{
+				fieldname: "transport_demand",
+				label: __("Transport Demand"),
+				fieldtype: "Link",
+				options: "Transport Demand",
+				reqd: 1,
+				get_query: () => ({
+					filters: {
+						company: frm.doc.company,
+						docstatus: 1,
+						movement_type: "Customer Delivery",
+						source_document_type: "Sales Order",
+						status: ["not in", ["Closed", "Cancelled", "Delivered"]],
+					},
+				}),
+				async onchange() {
+					const demand = dialog.get_value("transport_demand");
+					const current = ++request_id;
+					loaded_demand = null;
+					dialog.fields_dict.items.df.data = [];
+					dialog.fields_dict.items.grid.refresh();
+					if (!demand) return;
+					const { message: items } = await frappe.call({
+						method: "vuna_transport.services.planning.customer_demand_load_service.get_load_items",
+						args: { transport_demand: demand },
+					});
+					if (current !== request_id) return;
+					const existing = new Set(
+						(frm.doc.delivery_orders || []).map((row) => row.transport_demand_item)
+					);
+					dialog.fields_dict.items.df.data = (items || []).filter(
+						(row) => !existing.has(row.transport_demand_item)
+					);
+					loaded_demand = demand;
+					dialog.fields_dict.items.grid.refresh();
+				},
+			},
+			{
+				fieldname: "items",
+				label: __("Items"),
+				fieldtype: "Table",
+				cannot_add_rows: true,
+				in_place_edit: true,
+				fields: [
+					{ fieldname: "transport_demand_item", fieldtype: "Data", hidden: 1 },
+					{
+						fieldname: "item_code",
+						label: __("Item"),
+						fieldtype: "Link",
+						options: "Item",
+						read_only: 1,
+						in_list_view: 1,
+						columns: 4,
+					},
+					{
+						fieldname: "available_quantity",
+						label: __("Available"),
+						fieldtype: "Float",
+						read_only: 1,
+						in_list_view: 1,
+						columns: 2,
+					},
+					{
+						fieldname: "uom",
+						label: __("UOM"),
+						fieldtype: "Link",
+						options: "UOM",
+						read_only: 1,
+						in_list_view: 1,
+						columns: 2,
+					},
+					{
+						fieldname: "allocated_quantity",
+						label: __("Quantity"),
+						fieldtype: "Float",
+						reqd: 1,
+						in_list_view: 1,
+						columns: 2,
+					},
+				],
+			},
+		],
+		primary_action_label: __("Add Items"),
+		async primary_action(values) {
+			if (!loaded_demand || loaded_demand !== values.transport_demand) return;
+			const items = values.items || [];
+			if (
+				!items.length ||
+				items.some(
+					(row) =>
+						!(row.allocated_quantity > 0) ||
+						row.allocated_quantity > row.available_quantity
+				)
+			) {
+				frappe.msgprint(
+					__("Select items with positive quantities within the available balances.")
+				);
+				return;
+			}
+			await frm.set_value("movement_type", "Customer Delivery");
+			for (const row of items)
+				frm.add_child("delivery_orders", {
+					transport_demand: loaded_demand,
+					transport_demand_item: row.transport_demand_item,
+					allocated_quantity: row.allocated_quantity,
+					item_code: row.item_code,
+					uom: row.uom,
+				});
+			frm.refresh_field("delivery_orders");
+			frm.dirty();
+			dialog.hide();
+		},
+	});
+	dialog.show();
 }
 
 function show_item_selection_dialog(frm, result) {

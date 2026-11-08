@@ -17,7 +17,6 @@ def get_data():
 			"Sales Invoice": "credit_note",
 			"Sales Order": "replacement_sales_order",
 			"Payment Entry": "refund_payment_entry",
-			"Delivery Order": "replacement_delivery_reference",
 		},
 		"non_standard_fieldnames": {
 			"Transport Trip Task": "return_request",
@@ -41,7 +40,7 @@ def get_data():
 			},
 			{
 				"label": _("Commercial Resolution"),
-				"items": ["Sales Invoice", "Sales Order", "Payment Entry", "Delivery Order"],
+				"items": ["Sales Invoice", "Sales Order", "Payment Entry"],
 			},
 		],
 	}

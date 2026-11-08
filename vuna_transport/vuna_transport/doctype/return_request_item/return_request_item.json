@@ -32,7 +32,8 @@
     "return_reason",
     "quality_inspection",
     "resolution_type",
-    "resolution_qty"
+    "resolution_qty",
+    "transport_demand_item"
   ],
   "fields": [
     {
@@ -100,10 +101,11 @@
     },
     {
       "fieldname": "delivery_order_item",
-      "fieldtype": "Link",
-      "label": "Delivery Order Item",
-      "options": "Delivery Order Item",
-      "read_only": 1
+      "fieldtype": "Data",
+      "label": "Legacy Delivery Order Item",
+      "read_only": 1,
+      "hidden": 1,
+      "in_list_view": 0
     },
     {
       "fieldname": "quantity_section",
@@ -231,6 +233,15 @@
       "hidden": 1,
       "label": "Resolution Quantity",
       "non_negative": 1
+    },
+    {
+      "fieldname": "transport_demand_item",
+      "fieldtype": "Link",
+      "label": "Transport Demand Item",
+      "options": "Transport Demand Item",
+      "hidden": 1,
+      "read_only": 1,
+      "no_copy": 1
     }
   ],
   "grid_page_length": 50,

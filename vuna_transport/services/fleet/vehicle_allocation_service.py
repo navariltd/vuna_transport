@@ -567,6 +567,13 @@ def _validate_initial_allocation_sequence(load, allocation=None):
 
 def get_delivery_note_submission_status(load):
 	"""Return whether a load's active Delivery Notes are submitted and complete."""
+	from vuna_transport.services.execution.customer_reference_service import (
+		native_load,
+		note_submission_status,
+	)
+
+	if native_load(load):
+		return note_submission_status(load)
 	from vuna_transport.services.execution.lineage_service import get_delivery_notes_for_loads
 
 	expected_orders = {row.delivery_order for row in load.delivery_orders if row.delivery_order}

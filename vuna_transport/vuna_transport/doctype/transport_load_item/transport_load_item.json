@@ -41,27 +41,70 @@
   "crates"
  ],
  "fields": [
-  {"fieldname":"uom","fieldtype":"Link","options":"UOM","label":"UOM","read_only":1,"in_list_view":1},
-  {"fieldname":"conversion_factor","fieldtype":"Float","label":"Conversion Factor","read_only":1},
-  {"fieldname":"allocated_stock_qty","fieldtype":"Float","label":"Allocated Stock Quantity","read_only":1},
-  {"fieldname":"transport_demand","fieldtype":"Link","label":"Transport Demand","options":"Transport Demand","in_list_view":1},
-  {"fieldname":"transport_demand_item","fieldtype":"Link","label":"Transport Demand Item","options":"Transport Demand Item"},
-  {"fieldname":"destination_warehouse","fieldtype":"Link","label":"Destination Warehouse","options":"Warehouse","read_only":1},
-  {"fieldname":"stock_uom","fieldtype":"Link","label":"Stock UOM","options":"UOM","read_only":1},
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "options": "UOM",
+   "label": "UOM",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "conversion_factor",
+   "fieldtype": "Float",
+   "label": "Conversion Factor",
+   "read_only": 1
+  },
+  {
+   "fieldname": "allocated_stock_qty",
+   "fieldtype": "Float",
+   "label": "Allocated Stock Quantity",
+   "read_only": 1
+  },
+  {
+   "fieldname": "transport_demand",
+   "fieldtype": "Link",
+   "label": "Transport Demand",
+   "options": "Transport Demand",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "transport_demand_item",
+   "fieldtype": "Link",
+   "label": "Transport Demand Item",
+   "options": "Transport Demand Item"
+  },
+  {
+   "fieldname": "destination_warehouse",
+   "fieldtype": "Link",
+   "label": "Destination Warehouse",
+   "options": "Warehouse",
+   "read_only": 1
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "label": "Stock UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
   {
    "fieldname": "delivery_order",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Delivery Order",
-   "options": "Delivery Order",
-   "reqd": 0
+   "fieldtype": "Data",
+   "in_list_view": 0,
+   "label": "Legacy Delivery Order",
+   "reqd": 0,
+   "hidden": 1,
+   "read_only": 1
   },
   {
    "fieldname": "delivery_order_item",
-   "fieldtype": "Link",
-   "label": "Delivery Order Item",
-   "options": "Delivery Order Item",
-   "reqd": 0
+   "fieldtype": "Data",
+   "label": "Legacy Delivery Order Item",
+   "reqd": 0,
+   "hidden": 1,
+   "read_only": 1,
+   "in_list_view": 0
   },
   {
    "fieldname": "item_code",

@@ -10,6 +10,7 @@
   "load_tab",
   "load_identity_section",
   "company",
+  "movement_type",
   "required_vehicle_category",
   "naming_series",
   "column_break_npju",
@@ -434,6 +435,13 @@
   {
    "fieldname": "column_break_uqgt",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "movement_type",
+   "fieldtype": "Select",
+   "label": "Movement Type",
+   "options": "\nCustomer Delivery\nWarehouse Transfer\nSupplier Pickup",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,

@@ -35,7 +35,8 @@
     "remarks",
     "batch_no",
     "stock_uom",
-    "conversion_factor"
+    "conversion_factor",
+    "transport_demand_item"
   ],
   "fields": [
     {
@@ -73,7 +74,11 @@
       "read_only": 1,
       "depends_on": "eval:doc.rejected_qty > 0 && doc.rejected_goods_handling == 'Split between depot and vehicle'"
     },
-    { "fieldname": "remarks", "label": "Remarks", "fieldtype": "Small Text" },
+    {
+      "fieldname": "remarks",
+      "label": "Remarks",
+      "fieldtype": "Small Text"
+    },
     {
       "fieldname": "source_row",
       "label": "Source Stock / Return Row",
@@ -132,10 +137,11 @@
     },
     {
       "fieldname": "delivery_order_item",
-      "fieldtype": "Link",
-      "label": "Delivery Order Item",
-      "options": "Delivery Order Item",
-      "read_only": 1
+      "fieldtype": "Data",
+      "label": "Legacy Delivery Order Item",
+      "read_only": 1,
+      "hidden": 1,
+      "in_list_view": 0
     },
     {
       "fieldname": "delivery_note_item",
@@ -220,6 +226,15 @@
       "hidden": 1,
       "label": "Conversion Factor",
       "read_only": 1
+    },
+    {
+      "fieldname": "transport_demand_item",
+      "fieldtype": "Link",
+      "label": "Transport Demand Item",
+      "options": "Transport Demand Item",
+      "hidden": 1,
+      "read_only": 1,
+      "no_copy": 1
     }
   ],
   "grid_page_length": 50,

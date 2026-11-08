@@ -188,6 +188,22 @@ def _validate_items(request, source, source_type):
 		row.stock_uom = source_item.stock_uom
 		row.conversion_factor = flt(source_item.conversion_factor) or 1
 		if source_type == "Delivery Note":
+			allocation = (
+				frappe.db.get_value(
+					"Transport Load Item",
+					source_item.get("vuna_delivery_load_order"),
+					["transport_demand_item", "delivery_order_item", "transport_demand"],
+					as_dict=True,
+				)
+				if source_item.get("vuna_delivery_load_order")
+				else None
+			)
+			expected = allocation.transport_demand_item if allocation else None
+			if row.get("transport_demand_item") and row.transport_demand_item != expected:
+				frappe.throw(_("Return item Transport Demand Item does not match its delivered allocation."))
+			row.transport_demand_item = expected
+			if allocation:
+				row.delivery_order_item = allocation.delivery_order_item
 			source_batches = get_delivery_note_item_batches(source_item)
 			if row.batch_no and row.batch_no not in source_batches:
 				frappe.throw(
@@ -241,6 +257,18 @@ def _validate_items(request, source, source_type):
 				)
 			)
 		_validate_quality_inspection(row, request, source)
+	if source_type == "Delivery Note":
+		names = [
+			row.get("transport_demand_item") for row in request.items if row.get("transport_demand_item")
+		]
+		parents = (
+			set(frappe.get_all("Transport Demand Item", filters={"name": ["in", names]}, pluck="parent"))
+			if names
+			else set()
+		)
+		if request.get("transport_demand") and request.transport_demand not in parents:
+			frappe.throw(_("Return Request Transport Demand must own its returned item rows."))
+		request.transport_demand = next(iter(parents)) if len(parents) == 1 else None
 
 
 def _validate_quality_inspection(row, request, source):
@@ -294,13 +322,13 @@ def _validate_follow_up_documents(request, source, source_type):
 		if payment.docstatus == 2 or payment.company != request.company:
 			frappe.throw(_("Refund Payment Entry must belong to the same Company."))
 	if request.replacement_delivery_reference:
-		follow_up = frappe.get_doc("Delivery Order", request.replacement_delivery_reference)
+		follow_up = frappe.get_doc("Transport Demand", request.replacement_delivery_reference)
 		if (
 			follow_up.docstatus == 2
 			or follow_up.company != request.company
 			or follow_up.customer != request.customer
 		):
-			frappe.throw(_("Replacement Delivery Order must belong to the same Company and Customer."))
+			frappe.throw(_("Replacement Transport Demand must belong to the same Company and Customer."))
 		if request.delivery_note and follow_up.name == request.delivery_note:
 			frappe.throw(_("The original Delivery Note cannot be its own replacement reference."))
 
@@ -490,7 +518,7 @@ def _has_completed_commercial_resolution(request):
 		("Sales Invoice", "credit_note"),
 		("Sales Order", "replacement_sales_order"),
 		("Payment Entry", "refund_payment_entry"),
-		("Delivery Order", "replacement_delivery_reference"),
+		("Transport Demand", "replacement_delivery_reference"),
 	):
 		name = request.get(fieldname)
 		if name and frappe.db.get_value(doctype, name, "docstatus") == 1:
@@ -650,7 +678,19 @@ def get_returnable_items(delivery_note, exclude_request=None):
 		if remaining <= 0:
 			continue
 		delivery_order_item = row.get("delivery_order_item")
-		if not delivery_order_item and row.get("so_detail"):
+		allocation = (
+			frappe.db.get_value(
+				"Transport Load Item",
+				row.get("vuna_delivery_load_order"),
+				["transport_demand_item", "delivery_order_item"],
+				as_dict=True,
+			)
+			if row.get("vuna_delivery_load_order")
+			else None
+		)
+		if allocation:
+			delivery_order_item = allocation.delivery_order_item
+		if not allocation and not delivery_order_item and row.get("so_detail"):
 			delivery_order_item = frappe.db.get_value(
 				"Delivery Order Item",
 				{"sales_order_item": row.so_detail, "item_code": row.item_code},
@@ -662,6 +702,7 @@ def get_returnable_items(delivery_note, exclude_request=None):
 				"item_name": row.item_name,
 				"delivery_note_item": row.name,
 				"delivery_order_item": delivery_order_item,
+				"transport_demand_item": allocation.transport_demand_item if allocation else None,
 				"delivered_qty": abs(flt(row.qty)),
 				"requested_return_qty": remaining,
 				"uom": row.uom,
@@ -1129,6 +1170,7 @@ def validate_sales_return_request_link(doc, method=None):
 		return
 	doc.vuna_delivery_load = None
 	doc.vuna_delivery_order = None
+	doc.vuna_transport_demand = None
 	doc.vuna_dispatch_status = None
 	doc.vuna_dispatch_scan_count = 0
 	if not doc.vuna_return_request:
@@ -1550,6 +1592,7 @@ def create_return_request_from_pod(proof_of_delivery):
 				"item_name": row.item_name,
 				"delivery_note_item": row.delivery_note_item,
 				"delivery_order_item": row.delivery_order_item,
+				"transport_demand_item": row.get("transport_demand_item"),
 				"delivered_qty": get_pod_quantity_in_sales_uom(row, delivery_note_item, "delivered_qty"),
 				"requested_return_qty": quantity,
 				"uom": delivery_note_item.uom,
@@ -1571,6 +1614,7 @@ def create_return_request_from_pod(proof_of_delivery):
 				(row.against_sales_order for row in delivery_note.items if row.against_sales_order), None
 			),
 			"delivery_order": pod.delivery_order,
+			"transport_demand": pod.get("transport_demand"),
 			"delivery_note": pod.delivery_note,
 			"delivery_trip": pod.delivery_trip,
 			"proof_of_delivery": pod.name,

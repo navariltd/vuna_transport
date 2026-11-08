@@ -43,7 +43,11 @@ def get_load_execution_summary(load):
 			"transfer_stock_entry": stock,
 			"delivery_trip": load.delivery_trip,
 		}
-	delivery_orders = {row.delivery_order for row in load.delivery_orders if row.delivery_order}
+	from vuna_transport.services.execution.customer_reference_service import native_load, order_name
+	from vuna_transport.services.execution.lineage_service import get_delivery_notes_for_loads
+
+	delivery_orders = {order_name(row) for row in load.delivery_orders if order_name(row)}
+	is_native = native_load(load)
 
 	pick_list = _get_pick_list(load)
 	vehicle_allocation = _get_vehicle_allocation(load)
@@ -68,8 +72,12 @@ def get_load_execution_summary(load):
 	)
 	delivery_notes = frappe.get_all(
 		"Delivery Note",
-		filters={"vuna_delivery_load": load.name},
-		fields=["name", "docstatus", "status", "customer", "vuna_delivery_order"],
+		filters=(
+			{"name": ["in", get_delivery_notes_for_loads([load.name])]}
+			if getattr(load, "movement_type", None) == "Customer Delivery"
+			else {"vuna_delivery_load": load.name}
+		),
+		fields=["name", "docstatus", "status", "customer", "vuna_delivery_order", "vuna_transport_demand"],
 		order_by="creation asc",
 	)
 	active_notes = [note for note in delivery_notes if note.docstatus != 2]
@@ -96,7 +104,14 @@ def get_load_execution_summary(load):
 
 	pods = frappe.get_all(
 		"Proof of Delivery",
-		filters={"delivery_load": load.name, "docstatus": ["!=", 2]},
+		filters={
+			**(
+				{"delivery_note": ["in", [note.name for note in active_notes]]}
+				if is_native
+				else {"delivery_load": load.name}
+			),
+			"docstatus": ["!=", 2],
+		},
 		fields=["name", "docstatus", "status", "delivery_stop"],
 		order_by="creation asc",
 	)
@@ -288,7 +303,7 @@ def _get_next_action(
 		action = _get_vehicle_allocation_action(load, vehicle_allocation)
 		if action:
 			return action
-	if len(active_notes) < len(delivery_orders):
+	if not delivery_notes_ready and len(active_notes) < len(delivery_orders):
 		return _action(
 			"create_delivery_notes",
 			_("Create Delivery Notes"),
@@ -298,11 +313,11 @@ def _get_next_action(
 		return _action(
 			"review_delivery_notes", _("Review Delivery Notes"), _("Review and submit every Delivery Note.")
 		)
-	if len(submitted_notes) < len(delivery_orders):
+	if not delivery_notes_ready:
 		return _action(
 			"create_delivery_notes",
 			_("Replace Missing Delivery Notes"),
-			_("Create Delivery Notes for unresolved Delivery Orders."),
+			_("Create Delivery Notes for unresolved customer demand quantities."),
 		)
 	if not _requires_delivery_trip(load):
 		return _action(

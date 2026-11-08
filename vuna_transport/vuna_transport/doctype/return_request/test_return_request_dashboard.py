@@ -16,4 +16,5 @@ class TestReturnRequestDashboard(UnitTestCase):
 		self.assertEqual(data["internal_links"]["Sales Invoice"], "credit_note")
 		self.assertEqual(data["internal_links"]["Sales Order"], "replacement_sales_order")
 		self.assertEqual(data["internal_links"]["Payment Entry"], "refund_payment_entry")
-		self.assertEqual(data["internal_links"]["Delivery Order"], "replacement_delivery_reference")
+		self.assertNotIn("Delivery Order", data["internal_links"])
+		self.assertEqual(data["non_standard_fieldnames"]["Transport Demand"], "source_document")
