@@ -79,7 +79,9 @@ def project_groups(plan, sales_order, group_keys, archived_items=()):
 			target["total_" + dimension] = sum(flt(r.get(dimension)) for r in items)
 		for unit in ("weight_uom", "volume_uom"):
 			target[unit] = next((r.get(unit) for r in items if r.get(unit)), None)
-		result.append({"demand": target, "items": items})
+		result.append(
+			{"demand": target, "items": items, "legacy_item_names": [row["source_item"] for row in rows]}
+		)
 	return result
 
 
@@ -161,9 +163,17 @@ def _projections(plans):
 
 
 def _obsolete_loads(targets):
-	"""Only close wholly historical planning with no active stock/proof/trip."""
+	"""Close only wholly archived, unexecuted and independently allocated loads.
+
+	A disabled item cannot invalidate an already executed delivery. Mixed loads
+	retain their state and exact row links; archived rows cannot become new demand.
+	"""
 	archived_sources = {p["legacy_source"] for p in targets if p["demand"]["migration_archived"]}
-	live_sources = {p["legacy_source"] for p in targets if not p["demand"]["migration_archived"]}
+	archived_rows = {
+		(p["legacy_source"], name): bool(p["demand"]["migration_archived"])
+		for p in targets
+		for name in p["legacy_item_names"]
+	}
 	closures = []
 	if not archived_sources:
 		return closures
@@ -172,22 +182,23 @@ def _obsolete_loads(targets):
 	join `tabTransport Load` l on l.name=i.parent where i.delivery_order in %(names)s and l.docstatus in (0,1)""",
 		{"names": tuple(archived_sources)},
 	)
-	for name in loads:
+	for name in sorted(loads):
 		load = frappe.get_doc("Transport Load", name)
-		if any(row.delivery_order in live_sources or not row.delivery_order for row in load.delivery_orders):
-			raise preparation.MigrationConflict(
-				f"{name}: historical-only and active demand share a pending load; review before retirement"
+		if not load.delivery_orders or not all(
+			archived_rows.get((row.delivery_order, row.delivery_order_item), False)
+			for row in load.delivery_orders
+		):
+			continue
+		if load.delivery_trip or any(
+			_existing_execution(dt, filters)
+			for dt, filters in (
+				("Proof of Delivery", {"delivery_load": name, "docstatus": ["!=", 2]}),
+				("Transport Trip Task", {"transport_load": name, "status": ["!=", "Cancelled"]}),
+				("Delivery Note", {"vuna_delivery_load": name, "docstatus": ["!=", 2]}),
+				("Stock Entry", {"vuna_transport_load": name, "docstatus": ["!=", 2]}),
 			)
-		preparation._conflict(
-			bool(load.delivery_trip)
-			or frappe.db.exists("Proof of Delivery", {"delivery_load": name, "docstatus": ["!=", 2]})
-			or frappe.db.exists(
-				"Transport Trip Task", {"transport_load": name, "status": ["!=", "Cancelled"]}
-			)
-			or frappe.db.exists("Delivery Note", {"vuna_delivery_load": name, "docstatus": ["!=", 2]})
-			or frappe.db.exists("Stock Entry", {"vuna_transport_load": name, "docstatus": ["!=", 2]}),
-			f"{name}: historical source still has stock/trip execution; cannot close planning automatically",
-		)
+		):
+			continue
 		allocation = (
 			frappe.get_doc("Vehicle Allocation", load.active_vehicle_allocation)
 			if load.active_vehicle_allocation
@@ -196,21 +207,22 @@ def _obsolete_loads(targets):
 		if allocation and allocation.docstatus != 2:
 			from vuna_transport.services.fleet.vehicle_allocation_service import get_allocation_load_names
 
-			preparation._conflict(
-				any(other != name for other in get_allocation_load_names(allocation)),
-				f"{allocation.name}: shared allocation requires explicit historical-load resolution",
-			)
-			preparation._conflict(
-				frappe.db.exists(
-					"Delivery Trip", {"vuna_vehicle_allocation": allocation.name, "docstatus": ["!=", 2]}
-				)
-				or frappe.db.exists(
-					"Stock Entry", {"vuna_vehicle_allocation": allocation.name, "docstatus": ["!=", 2]}
-				),
-				f"{allocation.name}: execution exists; cannot close historical planning",
-			)
+			if any(other != name for other in get_allocation_load_names(allocation)) or any(
+				_existing_execution(dt, {"vuna_vehicle_allocation": allocation.name, "docstatus": ["!=", 2]})
+				for dt in ("Delivery Trip", "Stock Entry")
+			):
+				continue
 		closures.append({"load": load.as_dict(), "allocation": allocation.as_dict() if allocation else None})
 	return closures
+
+
+def _existing_execution(doctype, filters):
+	"""Optional new execution schema may not yet exist on a legacy site."""
+	return (
+		frappe.db.exists("DocType", doctype)
+		and all(frappe.db.has_column(doctype, field) for field in filters)
+		and frappe.db.exists(doctype, filters)
+	)
 
 
 def _reconcile_headers(targets):
@@ -786,11 +798,14 @@ def install_schema(backup_confirmed: bool = False, workers_paused: bool = False)
 	"""Explicit pre-upgrade schema preparation; DDL is outside data savepoints."""
 	preparation._authorize(False, backup_confirmed, workers_paused)
 	for name in (
+		"delivery_method",
 		"transport_demand_source",
 		"transport_demand_item",
 		"transport_demand",
 		"transport_load_item",
 		"transport_load",
+		"transport_trip_task_item",
+		"transport_trip_task",
 		"proof_of_delivery_item",
 		"proof_of_delivery",
 		"return_request_item",
