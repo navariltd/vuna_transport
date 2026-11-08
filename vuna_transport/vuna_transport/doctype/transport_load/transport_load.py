@@ -63,7 +63,7 @@ class TransportLoad(Document):
 		validate_capacity(self)
 
 	def before_submit(self):
-		if not self.source_warehouse:
+		if not self.source_warehouse and self.movement_type != "Supplier Pickup":
 			frappe.throw(_("Select a Source Warehouse before submitting this Transport Load."))
 		from vuna_transport.services.planning.customer_demand_load_service import is_customer_demand_load
 
@@ -86,7 +86,7 @@ class TransportLoad(Document):
 			self.status = "Approved"
 			return
 		if not self.delivery_orders:
-			frappe.throw(_("Add at least one Delivery Order using Get Items before submitting the load."))
+			frappe.throw(_("Add at least one Transport Demand item before submitting the load."))
 		validate_load_allocations(self)
 		calculate_load_totals(self)
 		validate_capacity(self)
@@ -170,9 +170,7 @@ class TransportLoad(Document):
 
 	def _require_delivery_execution(self):
 		if is_demand_load(self):
-			frappe.throw(
-				_("Warehouse transfer loads cannot create customer Delivery Notes or delivery-only trips.")
-			)
+			frappe.throw(_("Only customer delivery loads can create Pick Lists and Delivery Notes."))
 
 
 def _validate_source_warehouse_change(load):

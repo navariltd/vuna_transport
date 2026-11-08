@@ -16,6 +16,8 @@
   "column_break_npju",
   "dispatch_date",
   "source_warehouse",
+  "supplier",
+  "source_address",
   "required_vehicle_category",
   "delivery_method",
   "load_items_section",
@@ -69,6 +71,23 @@
   "amended_from"
  ],
  "fields": [
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "options": "Supplier",
+   "label": "Supplier",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Supplier Pickup'"
+  },
+  {
+   "fieldname": "source_address",
+   "fieldtype": "Link",
+   "options": "Address",
+   "label": "Pickup Address",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Supplier Pickup'",
+   "mandatory_depends_on": "eval:doc.docstatus == 1 && doc.movement_type == 'Supplier Pickup'"
+  },
   {
    "fieldname": "load_tab",
    "fieldtype": "Tab Break",
@@ -143,7 +162,8 @@
    "in_standard_filter": 1,
    "label": "Source Warehouse",
    "options": "Warehouse",
-   "mandatory_depends_on": "eval:doc.docstatus == 1"
+   "mandatory_depends_on": "eval:doc.docstatus == 1 && doc.movement_type != 'Supplier Pickup'",
+   "depends_on": "eval:doc.movement_type != 'Supplier Pickup'"
   },
   {
    "fieldname": "delivery_method",
@@ -458,7 +478,7 @@
    "link_fieldname": "delivery_load"
   }
  ],
- "modified": "2026-11-08 14:24:53.966451",
+ "modified": "2026-11-08 16:44:15.058635",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Load",

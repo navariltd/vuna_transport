@@ -54,6 +54,10 @@ def sync_demand_allocations(names):
 			as_dict=True,
 		)
 		by_item = {row.transport_demand_item: row for row in commitments}
+		if demand.get("movement_type") == "Supplier Pickup":
+			from vuna_transport.services.planning.supplier_load_service import uncollected_releases
+
+			releases.update(uncollected_releases())
 		direct = dict(
 			frappe.db.sql(
 				"""select i.transport_demand_item, sum(i.stock_qty)

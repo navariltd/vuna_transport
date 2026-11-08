@@ -79,7 +79,7 @@ def available_stock_quantity(snapshot, live, committed, posted=0):
 
 def validate_demand_allocations(load):
 	"""Lock parent demands first so concurrent loads cannot over-reserve rows."""
-	if not load.source_warehouse and load.docstatus == 1:
+	if not load.source_warehouse and load.docstatus == 1 and load.get("movement_type") != "Supplier Pickup":
 		frappe.throw(_("Select a Source Warehouse before submitting this Transport Load."))
 	if load.source_warehouse:
 		warehouse = frappe.get_doc("Warehouse", load.source_warehouse)
@@ -90,7 +90,7 @@ def validate_demand_allocations(load):
 		{row.get("transport_demand") for row in load.delivery_orders if row.get("transport_demand")}
 	)
 	if not names or any(not row.get("transport_demand") for row in load.delivery_orders):
-		frappe.throw(_("Do not mix legacy Delivery Order rows and Transport Demand rows in one load."))
+		frappe.throw(_("Every load row must reference a Transport Demand item."))
 	# Native customer planning uses SO -> demand lock order, matching source
 	# generation/quantity refresh. Do not take the generic demand lock first.
 	kinds = frappe.get_all(
@@ -98,6 +98,12 @@ def validate_demand_allocations(load):
 		filters={"name": ["in", names]},
 		fields=["name", "movement_type", "source_document_type"],
 	)
+	if load.get("movement_type") == "Supplier Pickup" or any(
+		d.movement_type == "Supplier Pickup" for d in kinds
+	):
+		from vuna_transport.services.planning.supplier_load_service import validate_supplier_allocations
+
+		return validate_supplier_allocations(load)
 	if len(kinds) == len(names) and all(
 		d.movement_type == "Customer Delivery" and d.source_document_type == "Sales Order" for d in kinds
 	):
@@ -157,7 +163,7 @@ def validate_demand_allocations(load):
 			frappe.throw(_("Choose a loading warehouse different from the destination before bundling."))
 		# Phase 2 keeps warehouse transfers isolated from customer execution.
 		if demand.movement_type != "Warehouse Transfer":
-			frappe.throw(_("Customer deliveries currently use the Delivery Order planning path."))
+			frappe.throw(_("Keep different movement types in separate Transport Loads."))
 		source = frappe.get_doc(demand.source_document_type, demand.source_document)
 		source.check_permission("read")
 		leg = next((leg for leg in build_source_legs(source) if leg["source_key"] == demand.source_key), None)
@@ -245,6 +251,8 @@ def create_transport_load_from_demands(allocations: list | str, source_warehouse
 	load.company = first.company
 	load.movement_type = first.movement_type
 	load.source_warehouse = source_warehouse or first.source_warehouse
+	if first.movement_type == "Supplier Pickup":
+		load.source_warehouse = None
 	load.dispatch_date = first.required_date
 	load.status = "Proposed"
 	for row in rows:
@@ -271,6 +279,11 @@ def bundle_transport_demands(demand_names: list | str, source_warehouse: str | N
 		demand = frappe.get_doc("Transport Demand", name)
 		demand.check_permission("read")
 		require_company_access(demand.company)
+		if demand.movement_type == "Supplier Pickup":
+			from vuna_transport.services.planning.supplier_load_service import available_items
+
+			allocations.extend(available_items(demand))
+			continue
 		if demand.movement_type == "Customer Delivery":
 			from vuna_transport.services.planning.customer_demand_load_service import get_load_items
 

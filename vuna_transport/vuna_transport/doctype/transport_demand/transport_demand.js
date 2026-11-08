@@ -26,34 +26,41 @@ frappe.ui.form.on("Transport Demand", {
 			);
 		}
 		if (frm.doc.docstatus === 1 && frm.doc.movement_type === "Supplier Pickup") {
-			frm.add_custom_button(__("Assign to Trip"), () => {
-				frappe.prompt(
-					{
-						fieldname: "delivery_trip",
-						fieldtype: "Link",
-						options: "Delivery Trip",
-						label: __("Delivery Trip"),
-						reqd: 1,
-						get_query: () => ({
-							filters: {
-								company: frm.doc.company,
-								docstatus: 1,
-								status: ["not in", ["Completed", "Cancelled"]],
-							},
-						}),
-					},
-					async ({ delivery_trip }) => {
-						const { message } = await frappe.call({
-							method: "vuna_transport.services.execution.direct_supplier_pickup_service.assign_supplier_demand",
-							args: { transport_demand: frm.doc.name, delivery_trip },
-							freeze: true,
-						});
-						if (message) frappe.set_route("Form", "Transport Trip Task", message);
-					},
-					__("Assign Supplier Pickup"),
-					__("Assign")
+			if (frm.doc.__onload?.supplier_requires_planning) {
+				frm.add_custom_button(
+					__("Transport Load"),
+					() => open_customer_load_dialog(frm),
+					__("Create")
 				);
-			});
+			} else
+				frm.add_custom_button(__("Assign to Trip"), () => {
+					frappe.prompt(
+						{
+							fieldname: "delivery_trip",
+							fieldtype: "Link",
+							options: "Delivery Trip",
+							label: __("Delivery Trip"),
+							reqd: 1,
+							get_query: () => ({
+								filters: {
+									company: frm.doc.company,
+									docstatus: 1,
+									status: ["not in", ["Completed", "Cancelled"]],
+								},
+							}),
+						},
+						async ({ delivery_trip }) => {
+							const { message } = await frappe.call({
+								method: "vuna_transport.services.execution.direct_supplier_pickup_service.assign_supplier_demand",
+								args: { transport_demand: frm.doc.name, delivery_trip },
+								freeze: true,
+							});
+							if (message) frappe.set_route("Form", "Transport Trip Task", message);
+						},
+						__("Assign Supplier Pickup"),
+						__("Assign")
+					);
+				});
 		}
 		if (frm.doc.docstatus === 1 && frm.doc.movement_type === "Warehouse Transfer") {
 			frm.add_custom_button(
@@ -71,7 +78,10 @@ frappe.ui.form.on("Transport Demand", {
 
 async function open_customer_load_dialog(frm) {
 	const { message: items } = await frappe.call({
-		method: "vuna_transport.services.planning.customer_demand_load_service.get_load_items",
+		method:
+			frm.doc.movement_type === "Supplier Pickup"
+				? "vuna_transport.services.planning.supplier_load_service.get_load_items"
+				: "vuna_transport.services.planning.customer_demand_load_service.get_load_items",
 		args: { transport_demand: frm.doc.name },
 		freeze: true,
 	});
