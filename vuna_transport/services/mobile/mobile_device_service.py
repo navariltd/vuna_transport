@@ -321,6 +321,7 @@ def register_mobile_push_token(
 	provider="expo",
 ):
 	"""Register the push token belonging to the authenticated active device."""
+	_lock_mobile_user(frappe.session.user)
 	device_error = _get_active_device(installation_id, device_identifier)
 	if device_error:
 		frappe.throw(device_error["message"], frappe.PermissionError)
