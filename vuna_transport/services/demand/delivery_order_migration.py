@@ -626,11 +626,11 @@ def _orphan_links(errors):
 def _lock_sources(names):
 	# Maintenance mode is necessary but not sufficient: pause workers/integrations too.
 	sales_orders = sorted(
-		set(
-			filter(
-				None, frappe.get_all("Delivery Order", filters={"name": ["in", names]}, pluck="sales_order")
-			)
-		)
+		{
+			name
+			for name in frappe.get_all("Delivery Order", filters={"name": ["in", names]}, pluck="sales_order")
+			if name
+		}
 	)
 	for dt, field in (("Sales Order", "name"), ("Sales Order Item", "parent")):
 		if sales_orders:

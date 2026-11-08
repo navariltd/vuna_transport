@@ -27,7 +27,7 @@ def lock_demands(names):
 
 
 def sync_demand_allocations(names):
-	names = sorted(set(filter(None, names)))
+	names = sorted({name for name in names if name})
 	if not names:
 		return
 	lock_demands(names)

@@ -147,7 +147,7 @@ def get_allocation_names_for_load(delivery_load, *, docstatus=None):
 
 
 @frappe.whitelist()
-def make_vehicle_allocation_from_load(source_name):
+def make_vehicle_allocation_from_load(source_name: str):
 	require_doctype_permission("Vehicle Allocation", "create")
 	lock_document("Transport Load", source_name)
 	load = frappe.get_doc("Transport Load", source_name)
@@ -175,7 +175,7 @@ def make_replacement_allocation_from_load(source_name):
 
 
 @frappe.whitelist()
-def make_delivery_trip_from_allocation(source_name):
+def make_delivery_trip_from_allocation(source_name: str):
 	"""Return a prepared, unsaved Delivery Trip for all loads in an allocation."""
 	allocation = frappe.get_doc("Vehicle Allocation", source_name)
 	require_document_permission(allocation, "read")
@@ -191,7 +191,7 @@ def make_delivery_trip_from_allocation(source_name):
 
 
 @frappe.whitelist()
-def make_replacement_allocation_from_trip(source_name):
+def make_replacement_allocation_from_trip(source_name: str):
 	trip = frappe.get_doc("Delivery Trip", source_name)
 	require_document_permission(trip, "read")
 	from vuna_transport.services.execution.lineage_service import get_delivery_trip_load_names

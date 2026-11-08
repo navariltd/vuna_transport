@@ -351,19 +351,15 @@ def get_delivery_notes_for_loads(load_names, *, docstatus=None):
 	"""Return Delivery Notes linked through parent or item-level load lineage."""
 	if not load_names:
 		return []
-	status_condition = ""
-	values = {"load_names": tuple(load_names)}
-	if docstatus is not None:
-		status_condition = "and dn.docstatus = %(docstatus)s"
-		values["docstatus"] = docstatus
+	values = {"load_names": tuple(load_names), "docstatus": docstatus}
 	return frappe.db.sql(
-		f"""
+		"""
 		select distinct dn.name
 		from `tabDelivery Note` dn
 		left join `tabDelivery Note Item` dni on dni.parent = dn.name
 		left join `tabTransport Load Item` dlo on dlo.name = dni.vuna_delivery_load_order
 		where (dn.vuna_delivery_load in %(load_names)s or dlo.parent in %(load_names)s)
-		{status_condition}
+		and (%(docstatus)s is null or dn.docstatus = %(docstatus)s)
 		and dn.docstatus != 2
 		order by dn.creation asc
 		""",

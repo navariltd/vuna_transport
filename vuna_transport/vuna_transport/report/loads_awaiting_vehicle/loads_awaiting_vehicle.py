@@ -7,19 +7,29 @@ from frappe import _
 
 def execute(filters=None):
 	filters = frappe._dict(filters or {})
-	conditions = ["docstatus = 1", "status = 'Awaiting Vehicle'"]
-	values = {}
+	conditions = {"docstatus": 1, "status": "Awaiting Vehicle"}
 	for field in ("company", "source_warehouse", "required_vehicle_category"):
 		if filters.get(field):
-			conditions.append(f"{field} = %({field})s")
-			values[field] = filters[field]
-	rows = frappe.db.sql(
-		f"""select name, company, source_warehouse, dispatch_date, dispatch_wave,
-			required_vehicle_category, total_weight, weight_uom, total_volume, volume_uom,
-			total_stops, status from `tabTransport Load`
-			where {" and ".join(conditions)} order by dispatch_date, creation limit 500""",
-		values,
-		as_dict=True,
+			conditions[field] = filters[field]
+	rows = frappe.get_all(
+		"Transport Load",
+		filters=conditions,
+		fields=[
+			"name",
+			"company",
+			"source_warehouse",
+			"dispatch_date",
+			"dispatch_wave",
+			"required_vehicle_category",
+			"total_weight",
+			"weight_uom",
+			"total_volume",
+			"volume_uom",
+			"total_stops",
+			"status",
+		],
+		order_by="dispatch_date, creation",
+		limit_page_length=500,
 	)
 	columns = [
 		{"label": _("Transport Load"), "fieldname": "name", "fieldtype": "Link", "options": "Transport Load"},

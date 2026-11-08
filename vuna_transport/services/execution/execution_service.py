@@ -2,6 +2,7 @@
 
 import frappe
 from frappe import _
+from frappe.model.document import Document
 
 from vuna_transport.services.fleet.vehicle_allocation_service import (
 	get_allocation_names_for_load,
@@ -17,7 +18,7 @@ DOCSTATUS_LABELS = {0: "Draft", 1: "Submitted", 2: "Cancelled"}
 
 
 @frappe.whitelist()
-def get_load_execution_summary(load):
+def get_load_execution_summary(load: str | Document):
 	"""Return downstream execution progress and the single recommended next action."""
 	load = frappe.get_doc("Transport Load", load) if isinstance(load, str) else load
 	require_document_permission(load, "read")

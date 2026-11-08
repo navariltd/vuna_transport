@@ -655,7 +655,7 @@ def get_remaining_returnable_sales_invoice_quantity(sales_invoice_item, exclude_
 
 
 @frappe.whitelist()
-def get_returnable_items(delivery_note, exclude_request=None):
+def get_returnable_items(delivery_note: str, exclude_request: str | None = None):
 	"""Return submitted Delivery Note items with remaining returnable quantities."""
 	require_doctype_permission("Delivery Note", "read")
 	source = frappe.get_doc("Delivery Note", delivery_note)
@@ -715,7 +715,7 @@ def get_returnable_items(delivery_note, exclude_request=None):
 
 
 @frappe.whitelist()
-def get_sales_invoice_return_context(sales_invoice, exclude_request=None):
+def get_sales_invoice_return_context(sales_invoice: str, exclude_request: str | None = None):
 	"""Resolve a Sales Invoice into its Delivery Note or stock-return item context."""
 	require_doctype_permission("Sales Invoice", "read")
 	source = frappe.get_doc("Sales Invoice", sales_invoice)
@@ -833,7 +833,7 @@ def record_custody_transfer(return_request, to_custody, responsible_party=None, 
 
 
 @frappe.whitelist()
-def create_return_stock_document(return_request):
+def create_return_stock_document(return_request: str):
 	"""Prepare the appropriate ERPNext stock return for the request source."""
 	frappe.db.sql("select name from `tabReturn Request` where name = %s for update", return_request)
 	request = frappe.get_doc("Return Request", return_request)
@@ -1552,7 +1552,7 @@ def _get_return_request_from_sales_return_credit_note(credit_note):
 
 
 @frappe.whitelist()
-def create_return_request_from_pod(proof_of_delivery):
+def create_return_request_from_pod(proof_of_delivery: str):
 	"""Create one draft physical-return case for a non-accepted submitted POD.
 
 	The request remains a draft. Users still review quantities and explicitly

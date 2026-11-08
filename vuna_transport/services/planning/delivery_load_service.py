@@ -2,6 +2,7 @@
 
 import frappe
 from frappe import _
+from frappe.model.document import Document
 from frappe.utils import cint, flt
 
 from vuna_transport.services.demand.delivery_method_service import (
@@ -87,7 +88,9 @@ def get_available_delivery_orders(
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def get_compatible_vehicle_categories(doctype, txt, searchfield, start, page_len, filters, **kwargs):
+def get_compatible_vehicle_categories(
+	doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict | str | None, **kwargs
+):
 	"""Filter Vehicle Category choices using the current load requirements.
 
 	This query improves the form experience only; Transport Load validation remains
@@ -174,7 +177,7 @@ def get_vehicle_category_capacity_summary(vehicle_category, totals=None, weight_
 
 
 @frappe.whitelist()
-def create_delivery_load(delivery_order_names):
+def create_delivery_load(delivery_order_names: list[str] | str):
 	"""Create a proposed load from one or more open Delivery Orders."""
 	require_doctype_permission("Transport Load", "create")
 	if isinstance(delivery_order_names, str):
@@ -314,7 +317,7 @@ def build_delivery_load_from_allocations(allocations, vehicle_category=None, sou
 
 
 @frappe.whitelist()
-def add_delivery_orders_to_load(load, delivery_order_names):
+def add_delivery_orders_to_load(load: str | Document, delivery_order_names: list[str] | str):
 	"""Append all still-unallocated items from selected Delivery Orders to a draft load."""
 	if isinstance(delivery_order_names, str):
 		delivery_order_names = frappe.parse_json(delivery_order_names)
@@ -423,7 +426,11 @@ def add_delivery_orders_to_load(load, delivery_order_names):
 
 
 @frappe.whitelist()
-def get_delivery_order_items(delivery_order_names, delivery_order_item_names=None, source_warehouse=None):
+def get_delivery_order_items(
+	delivery_order_names: list[str] | str,
+	delivery_order_item_names: list[str] | str | None = None,
+	source_warehouse: str | None = None,
+):
 	"""Return validated, still-unallocated load rows for a client-side draft Load."""
 	require_doctype_permission("Transport Load", "create")
 	if isinstance(delivery_order_names, str):

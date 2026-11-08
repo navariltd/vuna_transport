@@ -159,7 +159,7 @@ class TransportLoad(Document):
 		return create_delivery_trip_for_load(self)
 
 	@frappe.whitelist()
-	def get_items(self, delivery_order_names):
+	def get_items(self, delivery_order_names: list[str] | str):
 		self.check_permission("write")
 		return add_delivery_orders_to_load(self, delivery_order_names)
 

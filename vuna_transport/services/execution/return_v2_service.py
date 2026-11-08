@@ -86,8 +86,8 @@ def _validate_return_inspection_sales_return(inspection) -> None:
 				_validate_rejected_warehouse(row.target_warehouse)
 		if require_quality_inspection:
 			_validate_result_quality_inspection(row, source, sales_return, quality_inspections)
-		serials = set(filter(None, (source.serial_no or "").splitlines()))
-		row_serials = list(filter(None, (row.serial_no or "").splitlines()))
+		serials = {serial for serial in (source.serial_no or "").splitlines() if serial}
+		row_serials = [serial for serial in (row.serial_no or "").splitlines() if serial]
 		if serials:
 			if len(row_serials) != int(flt(row.inspection_qty)) or not set(row_serials).issubset(serials):
 				frappe.throw(_("Row #{0}: Serial numbers must match the Sales Return.").format(row.idx))
@@ -217,9 +217,11 @@ def validate_return_stock_entry(doc, method=None) -> None:
 				if entry.serial_no:
 					allowed_serials[result.item_code].add(entry.serial_no)
 		else:
-			for batch_no in filter(None, [(result.batch_no or "")]):
-				allowed_batches[result.item_code][batch_no] += flt(result.inspection_qty)
-			allowed_serials[result.item_code].update(filter(None, (result.serial_no or "").splitlines()))
+			if result.batch_no:
+				allowed_batches[result.item_code][result.batch_no] += flt(result.inspection_qty)
+			allowed_serials[result.item_code].update(
+				serial for serial in (result.serial_no or "").splitlines() if serial
+			)
 
 	actual_qty = defaultdict(float)
 	actual_batches = defaultdict(lambda: defaultdict(float))
@@ -250,7 +252,9 @@ def validate_return_stock_entry(doc, method=None) -> None:
 		else:
 			if row.batch_no:
 				actual_batches[row.item_code][row.batch_no] += abs(flt(row.transfer_qty or row.qty))
-			actual_serials[row.item_code].update(filter(None, (row.serial_no or "").splitlines()))
+			actual_serials[row.item_code].update(
+				serial for serial in (row.serial_no or "").splitlines() if serial
+			)
 
 	if set(actual_qty) != set(expected_qty) or any(
 		abs(actual_qty[key] - quantity) > 1e-6 for key, quantity in expected_qty.items()
@@ -391,19 +395,19 @@ def get_sales_return_inspection_batch_query(
 		return []
 	target = frappe.get_doc("Delivery Note", filters["sales_return"])
 	require_document_permission(target, "read")
-	item_filter = "and item_code = %(item_code)s" if filters.get("item_code") else ""
 	return frappe.db.sql(
-		f"""
+		"""
 		select distinct batch_no as value, batch_no as description
 		from `tabDelivery Note Item`
 		where parent = %(parent)s and parenttype = 'Delivery Note'
 			and stock_qty < 0 and batch_no is not null and batch_no != ''
-			and batch_no like %(txt)s {item_filter}
+			and batch_no like %(txt)s
+			and (%(item_code)s is null or item_code = %(item_code)s)
 		order by batch_no limit %(start)s, %(page_len)s
 		""",
 		{
 			"parent": target.name,
-			"item_code": filters.get("item_code"),
+			"item_code": filters.get("item_code") or None,
 			"txt": f"%{txt}%",
 			"start": int(start),
 			"page_len": int(page_len),
@@ -589,7 +593,7 @@ def _validate_stock_identity(row) -> None:
 	if item.has_batch_no and not row.batch_no:
 		frappe.throw(_("Row #{0}: Batch No is required for {1}.").format(row.idx, row.item_code))
 	if item.has_serial_no:
-		serials = list(filter(None, (row.serial_no or "").splitlines()))
+		serials = [serial for serial in (row.serial_no or "").splitlines() if serial]
 		if len(serials) != int(flt(row.received_stock_qty)):
 			frappe.throw(
 				_("Row #{0}: Enter one serial number for each received unit of {1}.").format(

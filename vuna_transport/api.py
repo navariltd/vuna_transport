@@ -400,7 +400,9 @@ def create_mobile_trip_material_request(
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
+def get_vehicles_for_load(
+	doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict | str | None
+):
 	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
 	load_name = filters.get("delivery_load")
 	if not load_name:
@@ -447,7 +449,9 @@ def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def get_drivers_for_load(doctype, txt, searchfield, start, page_len, filters):
+def get_drivers_for_load(
+	doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict | str | None
+):
 	load_name = filters.get("delivery_load")
 	if not load_name:
 		return []
@@ -487,7 +491,14 @@ def get_drivers_for_load(doctype, txt, searchfield, start, page_len, filters):
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def get_delivery_loads_for_allocation(
-	doctype, txt, searchfield, start, page_len, filters, as_dict=False, **kwargs
+	doctype: str,
+	txt: str,
+	searchfield: str,
+	start: int,
+	page_len: int,
+	filters: dict | str | None,
+	as_dict: bool = False,
+	**kwargs,
 ):
 	"""Offer only operational loads compatible with the current allocation composition."""
 	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})

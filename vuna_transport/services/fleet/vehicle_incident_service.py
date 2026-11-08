@@ -158,7 +158,7 @@ def validate_incident_submission(incident):
 
 
 @frappe.whitelist()
-def make_replacement_allocation_from_incident(source_name):
+def make_replacement_allocation_from_incident(source_name: str):
 	incident = frappe.get_doc("Vehicle Incident", source_name)
 	require_document_permission(incident, "write")
 	if incident.resolution_status in RESOLVED_STATUSES:

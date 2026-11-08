@@ -322,7 +322,7 @@ def create_stock_entry(inspection):
 			},
 		)
 		if result.batch_no or result.serial_no:
-			serials = list(filter(None, (result.serial_no or "").splitlines()))
+			serials = [serial for serial in (result.serial_no or "").splitlines() if serial]
 			bundle = frappe.get_doc(
 				{
 					"doctype": "Serial and Batch Bundle",
@@ -349,7 +349,7 @@ def validate_stock_entry(entry, inspection):
 	expected_serials, actual_serials = set(), set()
 	for row in inspection.results:
 		expected[(row.item_code, row.target_warehouse, row.batch_no or "")] += flt(row.inspection_qty)
-		for serial in filter(None, (row.serial_no or "").splitlines()):
+		for serial in (serial for serial in (row.serial_no or "").splitlines() if serial):
 			expected_serials.add((row.item_code, row.target_warehouse, serial))
 	if entry.company != inspection.company or entry.purpose != "Material Transfer" or entry.add_to_transit:
 		frappe.throw(_("Inspection stock must remain a same-company Material Transfer."))

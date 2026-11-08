@@ -78,7 +78,7 @@ def create_vehicle_receipt(return_request: str) -> str:
 		if result.batch_no or result.serial_no:
 			# Warehouse staff may trim serials/quantities for a partial arrival using
 			# ERPNext's standard picker. Final validation enforces the approved set.
-			serials = list(filter(None, (result.serial_no or "").splitlines()))
+			serials = [serial for serial in (result.serial_no or "").splitlines() if serial]
 			used = set()
 			for received in frappe.get_all(
 				"Stock Entry Detail",

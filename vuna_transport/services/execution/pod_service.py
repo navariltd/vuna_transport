@@ -16,7 +16,7 @@ from vuna_transport.services.shared.security_service import (
 
 
 @frappe.whitelist()
-def create_proof_of_delivery(delivery_trip, delivery_stop):
+def create_proof_of_delivery(delivery_trip: str, delivery_stop: str):
 	"""Create or repair a draft POD from an ERPNext Delivery Stop."""
 	require_doctype_permission("Proof of Delivery", "create")
 	trip = frappe.get_doc("Delivery Trip", delivery_trip)

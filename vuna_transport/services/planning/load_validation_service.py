@@ -326,22 +326,16 @@ def get_available_quantities(delivery_order_item_names, exclude_load=None):
 		for row in item_rows:
 			if row.sales_order_item in sales_order_quantities:
 				requested[row.name] = sales_order_quantities[row.sales_order_item]
-	conditions = [
-		"dlo.delivery_order_item in %(item_names)s",
-		"dlo.parenttype = 'Transport Load'",
-		"dl.docstatus in (0, 1)",
-	]
-	values = {"item_names": tuple(item_names)}
-	if exclude_load:
-		conditions.append("dlo.parent != %(exclude_load)s")
-		values["exclude_load"] = exclude_load
+	values = {"item_names": tuple(item_names), "exclude_load": exclude_load or None}
 	allocated = dict(
 		frappe.db.sql(
-			f"""
+			"""
 				select dlo.delivery_order_item, coalesce(sum(dlo.allocated_quantity), 0)
 				from `tabTransport Load Item` dlo
 				join `tabTransport Load` dl on dl.name = dlo.parent
-				where {" and ".join(conditions)}
+				where dlo.delivery_order_item in %(item_names)s
+				and dlo.parenttype = 'Transport Load' and dl.docstatus in (0, 1)
+				and (%(exclude_load)s is null or dlo.parent != %(exclude_load)s)
 				group by dlo.delivery_order_item
 			""",
 			values,
@@ -354,27 +348,21 @@ def get_available_quantities(delivery_order_item_names, exclude_load=None):
 
 
 def _get_existing_allocations(delivery_order_name, delivery_order_item_name=None, exclude_load=None):
-	conditions = [
-		"dlo.delivery_order = %s",
-		"dlo.parenttype = 'Transport Load'",
-		"dl.docstatus in (0, 1)",
-	]
-	values = [delivery_order_name]
-	if delivery_order_item_name:
-		conditions.append("dlo.delivery_order_item = %s")
-		values.append(delivery_order_item_name)
-	if exclude_load:
-		conditions.append("dlo.parent != %s")
-		values.append(exclude_load)
-
 	return frappe.db.sql(
-		f"""
+		"""
 			select dlo.allocated_quantity, dlo.parent, dl.docstatus
 			from `tabTransport Load Item` dlo
 			join `tabTransport Load` dl on dl.name = dlo.parent
-			where {" and ".join(conditions)}
+			where dlo.delivery_order = %(delivery_order)s
+			and dlo.parenttype = 'Transport Load' and dl.docstatus in (0, 1)
+			and (%(item)s is null or dlo.delivery_order_item = %(item)s)
+			and (%(exclude_load)s is null or dlo.parent != %(exclude_load)s)
 		""",
-		tuple(values),
+		{
+			"delivery_order": delivery_order_name,
+			"item": delivery_order_item_name or None,
+			"exclude_load": exclude_load or None,
+		},
 		as_dict=True,
 	)
 

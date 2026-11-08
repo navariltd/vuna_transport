@@ -1,9 +1,11 @@
 """Read-only transport cost estimates based on configured profiles and rates."""
 
 from dataclasses import dataclass
+from datetime import date
 
 import frappe
 from frappe import _
+from frappe.model.document import Document
 from frappe.utils import flt, getdate, nowdate
 
 from vuna_transport.services.routing.distance_estimation_service import estimate_delivery_load_distance
@@ -32,12 +34,12 @@ class CostContext:
 
 @frappe.whitelist()
 def estimate_transport_cost(
-	delivery_load,
-	vehicle,
+	delivery_load: str | Document,
+	vehicle: str | Document,
 	*,
-	as_of_date=None,
-	distance=None,
-	distance_source=None,
+	as_of_date: str | date | None = None,
+	distance: float | str | None = None,
+	distance_source: str | None = None,
 ):
 	"""Estimate a load's cost for a vehicle without changing any documents."""
 	load = _resolve_document("Transport Load", delivery_load)
