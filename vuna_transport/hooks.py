@@ -345,10 +345,6 @@ doc_events = {
 		"before_cancel": "vuna_transport.services.execution.trip_task_service.guard_task_source_cancellation",
 		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
-	"Delivery Order": {
-		"on_submit": "vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
-		"before_cancel": "vuna_transport.services.planning.demand_lifecycle_service.guard_source_cancellation",
-	},
 	"Transport Demand": {
 		"before_cancel": "vuna_transport.services.execution.trip_task_service.guard_task_source_cancellation",
 	},
@@ -420,6 +416,8 @@ fixtures = [
 		},
 	}
 ]
+
+before_migrate = ["vuna_transport.services.demand.delivery_order_retirement.guard_upgrade"]
 
 after_migrate = [
 	"vuna_transport.install.ensure_delivery_methods",

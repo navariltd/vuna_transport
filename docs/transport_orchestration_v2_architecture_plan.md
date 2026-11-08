@@ -1491,11 +1491,17 @@ Automatic optimization remains a separate future project.
 
 ### Phase 9 — Cleanup and deprecation
 
-After production confidence:
+Decision (2026-11-07): consolidate the customer-sales cockpit into Transport
+Demand, but staging already uses Delivery Orders. Migration preparation is pulled
+forward; actual cutover and removal remain gated on staging verification. This
+does not mark Phase 7, Phase 8 or Phase 9 complete.
+
+After migration and operational confidence:
 
 - remove temporary Delivery Load and Delivery Load Order compatibility aliases;
 - remove delivery-only assumptions from execution summaries;
-- decide whether Delivery Order remains a sales cockpit;
+- move Delivery Order sales-planning functionality into Transport Demand before
+  retiring the original cockpit;
 - consolidate proof dashboards and reports;
 - update consultant, user, and mobile documentation.
 
@@ -1544,7 +1550,527 @@ ERPNext completion document
 
 Where cancellation is not allowed, show the exact blocking document and connection.
 
+### 17.5 Delivery Order migration preparation (2026-11-07)
+
+This is an explicit administrator operation, not an automatic patch. Deploying
+this preparation release does **not** retire Delivery Order or switch the live
+sales workflow. Existing forms, APIs, source policies and original links remain.
+No mobile change is required for this preparation step.
+
+`vuna_transport.services.demand.delivery_order_migration` provides:
+
+- `prepare()` — read-only preflight by default, with conflicts and a name map;
+- `prepare(dry_run=False, ...)` — transactional copies and additive shadow links;
+- `verify()` — read-only source/snapshot/row/link checks after preparation.
+
+Preparation includes draft, submitted, completed and cancelled orders, not just
+active orders. It keeps historical quantities (including zero-outstanding rows),
+requested UOMs, factors and Stock UOM quantities. Missing/inconsistent UOM data is
+a blocker, not permission to infer a conversion from today's Item master.
+
+An existing single Transport Demand wrapper is reused with its current name,
+child IDs, document state and live quantities unchanged. New copies retain the
+original Delivery Order and item names in the *different* target DocTypes, along
+with source metadata and docstatus. Sales Order/row references, routing/handling
+and location snapshots, capability/access requirements and dimensions now have
+real Transport Demand/Item columns as well as the recovery snapshot. Original
+business state, custom columns and custom child tables remain in that snapshot.
+Existing root/row quantities or lineage must match before reuse; conflicting
+nonblank customer-planning values also require review.
+
+Normal `insert`, `save`, `submit` and source-generation hooks are deliberately not
+replayed during historical import. Stock Ledger, GL, the original Delivery Orders
+and their items are fingerprinted before/after apply; any change rolls back the
+operation. The service never commits internally. `bench execute` commits only on
+successful completion. A failed preflight applies nothing; a failed verification
+rolls back the preparation savepoint.
+
+Shadow demand links are populated on Transport Load Item, Delivery Note, Delivery
+Stop, POD/POD Item and Return Request/Return Request Item, across document states.
+Existing nonblank conflicting links, orphan legacy references or mismatched load
+parent/item lineage block the whole requested operation. The existing links stay
+authoritative. Original comments, communications, attachment records, assignments,
+versions and shares stay attached to Delivery Order; their metadata is also
+snapshotted. Binary attachments still require the normal files backup.
+
+Staging sequence (replace `STAGING_SITE`; these are operator steps, not automatic
+deployment instructions):
+
+1. Take and retain a database **and files** backup before deploying this additive
+   release. Deploy and run the normal site migration to add the hidden fields.
+2. Run the preflight while Delivery Orders are still in use:
+
+   ```sh
+   bench --site STAGING_SITE execute vuna_transport.services.demand.delivery_order_migration.prepare
+   ```
+
+   Review every blocker and the mapping. Resolve data issues explicitly; the
+   script never edits source quantities, overwrites mismatches or skips failures
+   during a full-site apply. Do not use a subset to claim a complete migration.
+3. Rehearse on a restored staging copy. For an approved preparation window, put
+   the site in maintenance mode and pause its workers, scheduler and integrations
+   through the hosting platform. Maintenance mode alone does not stop background
+   writers. Take a fresh full backup, then rerun preflight against frozen data.
+4. Apply and retain its report, especially the map and ledger fingerprints:
+
+   ```sh
+   bench --site STAGING_SITE execute vuna_transport.services.demand.delivery_order_migration.prepare --kwargs '{"dry_run": False, "backup_confirmed": True, "workers_paused": True}'
+   bench --site STAGING_SITE execute vuna_transport.services.demand.delivery_order_migration.verify
+   ```
+
+   The capitalized Python booleans are intentional for `bench execute`. Optional
+   `source_names=["DO-..."]` limits an explicitly reviewed pilot; omitted means all
+   Delivery Orders. Retry against unchanged data is idempotent. Verification is
+   read-only; it does not re-assert historical ledger checksums after normal
+   operations have resumed.
+5. Retain Delivery Order and all old fields. If legacy operations resume and
+   change prepared source data, the next run blocks on the changed checksum;
+   automatic refresh of already-used historical mappings is intentionally not
+   implemented. Therefore copying is a controlled preparation/rehearsal step,
+   **not continuous synchronization or the final cutover**. Before resuming after
+   an unsuccessful rehearsal, roll back the preparation transaction or restore
+   its full backup; there is no broad “delete migrated demands” command.
+
+Every report deliberately returns `ready_for_retirement=False`. Before removal we
+still must port Sales Order generation/grouping and outstanding-quantity sync,
+item/quantity load dialogs, dispatch planning/suggestions, load validation,
+allocation previews, note/stop/proof/return execution, cancellation, settings,
+connections, dashboards and native audit links. Then switch source lineage to
+Sales Order, review site customizations/dynamic references and run a final
+maintenance-window reconciliation. Do not delete the original DocType, its child
+DocType or old fields based on a successful preparation report.
+
+Local verification: `test_delivery_order_migration` plus rollback-only
+`vuna_transport.tests.delivery_order_migration_smoke.run`. The latter rehearses
+valid local history, verifies a retry, compares ledgers/source records, and rolls
+back all target/shadow-link changes. Its report separates invalid legacy records;
+the real whole-site apply never silently excludes them.
+
+### 17.6 Customer cockpit field transfer — first cutover slice
+
+Transport Demand now has Demand, Delivery & Planning and Connections tabs.
+Customer-only routing, service windows, access/capability requirements, geographic
+snapshots and transport totals appear only for Customer Delivery. Item rows retain
+Sales Order Item identity, ordered quantity, source warehouse, delivery date,
+handling, weight/volume and pallet/case/crate measures. No new customer fields are
+mandatory for Buying or Internal demands; float quantities use system precision.
+
+Equivalent columns are not duplicated:
+
+| Delivery Order / Item | Transport Demand / Item |
+| --- | --- |
+| `delivery_address` | `destination_address` |
+| `required_delivery_date` | `required_date` |
+| item `transport_qty` | `transaction_qty` |
+| item `uom` | `transaction_uom` |
+
+The existing stock-UOM allocation columns remain canonical. Legacy aggregate
+transaction-quantity counters are retained in the recovery snapshot rather than
+added as competing totals for rows with potentially different requested UOMs.
+Original amendment identity also remains in the recovery snapshot pending the
+actual link cutover; no Amended From Link is populated with a Delivery Order name
+and falsely presented as an existing Transport Demand.
+
+New/refreshed DO-backed demands populate these real columns from the verified
+source. Existing wrappers gain them through explicit migration preparation;
+deployment does not silently rewrite historical submitted records. The migration
+fills new columns without replacing live target quantities, lifecycle state or
+row identity. Draft/Cancel state remains standard; dispatched/delivered/closed
+customer snapshots are not reopened by allocation reconciliation. List indicators
+support these statuses and the existing generic allocation statuses.
+
+Rebuilding a source snapshot now retains persisted child IDs and stock allocation
+caches instead of deleting/recreating linked rows on every save. Client-supplied
+names/counters are not used as an authority. Migration smoke coverage includes an
+ordinary customer draft save, in addition to import, verification and retry.
+
+This first slice is additive. The subsequent source/planning preview is described
+below. Do not remove Delivery Order yet. Unresolved records remain untouched for
+a separate review. Staging has not been changed, and local data rehearsals are
+rolled back.
+
+### 17.7 Direct sales demand generation and draft bundling — second cutover slice
+
+Implemented behind a temporary site opt-in, `customer_demand_cutover=1`:
+
+- Sales Order **Create → Transport Demand** and automatic source policy generate
+  customer Transport Demand directly, without creating a Delivery Order or item.
+- Existing grouping/handling/measurement helpers now build a plain snapshot;
+  native generation does not instantiate the legacy DocType. The group key keeps
+  delivery date, address, origin, zone, route, handling, method and delivery group.
+- Stable native source keys include the selected Sales Order row identities, so
+  newly added source rows can form another demand batch without rewriting prior
+  demand/item IDs. Retries return the same complete active native demand set.
+- Active native and legacy source rows both count as covered, in both generation
+  directions. Ambiguous legacy source-row references require review rather than
+  creating a potential duplicate. Cancelled native keys require planner review.
+- Source workflow, company transport method, permissions and auto-submit policy
+  remain enforced. Native demand uses **Auto Submit Transport Demand**, not the
+  older Delivery Order auto-submit option.
+- Canonical native quantities refresh after submitted Sales Order updates and
+  standard direct Delivery Note submission/cancellation. Source-row identities
+  remain stable. Reducing below still-reserved quantities or changing an active
+  demand's UOM/group lineage requires releasing that planning first. Posted
+  customer quantities are distinguished from pending reservations.
+- Native demand **Create → Transport Load** presents the standard editable grid:
+  choose items, change requested-UOM quantities and uncheck rows. The list action
+  can bundle multiple compatible native customer demands into one draft load.
+- Draft load rows use `transport_demand` / `transport_demand_item`, not invented
+  legacy links. Server validation rechecks company, source lineage, live Sales
+  Order balance, requested/stock UOM conversion, duplicate rows, method, zone,
+  handling profile, compatibility, dimensions and vehicle/site requirements.
+  Loading warehouse may be deferred or changed to another active warehouse in
+  the company; it becomes mandatory at submission. Native reservation writes use
+  Sales Order → demand lock order, matching source generation/refresh.
+- Native customer draft loads are kept separate from warehouse-transfer and
+  legacy customer load rows. Route defaults, distance estimates, physical
+  capability/access limits and capacity calculations reuse shared services.
+- Sales Order Connections includes Transport Demand while retaining legacy
+  Delivery Orders for historical navigation.
+
+**Execution boundary at the end of this slice (superseded by 17.8):** these native customer loads are planning drafts in this
+slice. They cannot submit through either save/insert validation or the submit
+action until native customer warehouse/delivery execution is ported. The execution
+overview explicitly identifies that boundary; they are never mislabelled as
+depot transfers or offered an Add-to-Transit posting. Legacy loads and warehouse
+transfers retain their existing execution. The dispatch workbench/suggestions,
+Pick Lists/Delivery Notes, allocation/trip readiness, stops, POD/returns, reports
+and final historical link cutover are still to be switched before retirement.
+
+**Staging safety:** the opt-in is off by default. Without it, the Sales Order UI,
+automatic generation and saved generation actions retain the legacy source path.
+The explicit Transport Demand source adapter can still be rehearsed in rollback
+tests. This is development preview code, not permission to enable the switch on
+an operational staging site or delete its Delivery Order DocTypes.
+
+For a local/restored-copy preview only:
+
+```sh
+bench --site meru-dairy.localhost set-config customer_demand_cutover 1
+bench --site meru-dairy.localhost clear-cache
+```
+
+Refresh a submitted Sales Order with eligible stock rows **not already covered
+by Delivery Orders**. Check its source policy is enabled; use a fresh test order
+if necessary. Generate/review/submit native demand, open the item/quantity dialog
+and save a draft load. No physical stock or accounting entry is expected. Load
+submission intentionally reports the execution boundary; it is not a warehouse
+transfer. Reset the opt-in to `0` to restore legacy UI/automatic generation; keep
+any explicit preview records for deliberate review rather than auto-deleting
+them. Neither local nor staging activation is performed by deployment or tests.
+
+Verification: `test_sales_transport_demand`, source-policy/dashboard regressions,
+and rollback-only `sales_transport_demand_smoke.run`. The rehearsal exercises
+Cartons with a real conversion factor, optional origin, demand retry/save/submit,
+partial load reservation, source quantity refresh/reduction protection and the
+execution guard. It compares source/planning/stock/GL fingerprints after rollback
+and verifies no Delivery Order was created. No existing historical records are
+rewritten, deleted or force-cancelled by this slice.
+
 ---
+
+### 17.8 Native customer execution — third cutover slice (2026-11-08)
+
+Native Sales Order → Transport Demand → Transport Load now reuses the existing
+customer execution services rather than the depot-transfer task engine. Native
+loads can submit with a valid loading warehouse, then create standard Pick Lists
+and Delivery Notes, allocate a vehicle and create a Delivery Trip. Requested UOM,
+conversion factor and exact Sales Order child-row references are preserved.
+
+`customer_reference_service` selects explicit native or legacy Link columns.
+Prepared historical records carrying both links remain on the legacy path; no
+Transport Demand ID is ever put in a Delivery Order Link. Delivery Note item →
+Transport Load Item → Transport Demand Item is the authoritative execution chain.
+Single-value parent links are navigation aids, not the source of quantity truth.
+
+Server-side checks cover company/customer/destination, exact Sales Order row,
+requested UOM/factor, same-company stock warehouses and cumulative non-cancelled
+draft/submitted Delivery Note quantities against each load-row allocation. Multiple
+loads may consolidate notes only under one active allocation and the existing
+commercial/warehouse compatibility key. Allocation/trip readiness requires exact
+submitted item quantities and no draft notes, not merely a note header.
+
+Standard customer PODs populate canonical demand-item links from delivered rows.
+Partial/rejected delivery creates the existing Return Request, preserving requested
+UOM and batch/bundle identity through existing return services. Demand completion
+compares individual stock-UOM item balances, never sums unlike quantities. Each
+load's outcome is reconciled independently even when one consolidated proof covers
+multiple loads. Later allocation refreshes retain proof-derived delivery outcomes.
+Methods without a required trip complete from submitted note quantities instead.
+
+Cancelling a native Delivery Note before an active trip reopens readiness and
+returns affected loads to Allocated/Approved, with an audit reason. Cancelling an
+accepted POD reopens its load/trip/demand progress. Existing ERPNext downstream
+stock/return cancellation safeguards still apply; no blanket link bypass is added.
+
+Verification: `test_native_customer_execution` plus the existing planning,
+returns, allocation, lineage and mobile trip execution regressions. Rollback-only
+`sales_transport_demand_smoke.run(verify_execution=True)` exercises real batched
+stock, requested Cartons (factor 12), Pick List, Delivery Notes, cancellation,
+trip, partial/rejected POD, automatic RR and POD cancellation. Set
+`consolidated=True` to exercise one note/proof spanning two loads with different
+outcomes. Stock/accounting posting and validation are real; driver notifications
+are suppressed. Source/planning/Stock Ledger/GL fingerprints must match after
+rollback. No existing historical records are rewritten.
+
+`without_trip=True` separately verifies Delivery Methods that finish from the
+submitted notes, including reopening after note cancellation. Local verification
+passed 431 regression tests, all three native execution rehearsals, the depot
+POD/End Transit rehearsal, pre-commit checks and the application asset build.
+
+**Pending at the end of this slice (screens are completed in 17.9):** dispatch workbench/suggestions
+and remaining reports/navigation consumers, historical reference cutover and
+review of unresolved migration records, followed by a restored-staging rehearsal
+and explicit activation. The customer-demand opt-in remains off by default and
+has not been enabled on the local or staging site. Delivery Order/Item DocTypes
+and original data are retained. No deletes, remote migrations, commits or pushes
+are performed by this slice.
+
+---
+
+### 17.9 Customer planning screens and navigation — fourth cutover slice (2026-11-08)
+
+The Dispatch Planning customer tab, detail picker, native FilterGroup, manual
+load evaluation/creation, cost previews, ranked suggestions and suggestion
+acceptance now follow the server-selected customer source. With the opt-in on,
+they use Sales Order-backed customer Transport Demands; prepared Delivery Order
+wrappers, warehouse transfers, returns and supplier collections cannot leak into
+that customer pool. The existing depot/supplier planning paths are unchanged.
+
+The source dialect maps date/address fields for read-only presentation, while
+all native writes use `transport_demand` / `transport_demand_item` Links. Site
+mode, company, submitted state, movement/source type and current source eligibility
+are server-controlled. FilterGroup cannot override those boundaries. Live source
+quantities/UOM/grouping and draft/submitted reservations use the same checks as
+native load creation; accepting a stale/over-allocated suggestion is rejected.
+
+Source-free demands remain visible when a loading warehouse is selected. That
+warehouse is preserved by manual plans and suggestions, validated for company,
+warehouse permissions and operational status, and used for stock warnings.
+Draft loads may still defer it; submission may not. Native Transport Load forms
+offer **Planning → Get Customer Items** with editable quantities in requested UOM,
+and hide empty legacy Link columns. Existing legacy loads retain their picker.
+
+New **Open Transport Demand** and **Unallocated Transport Demands** reports cover
+outstanding customer delivery demand by item/UOM with live balances and normal
+document/company permissions. Unlike-UOM quantities are not given a misleading
+grand total. Legacy reports remain available for history. Pending Delivery Notes
+show the canonical demand link and exclude return notes; Dispatch Readiness uses
+the load's active allocation rather than a single-load allocation backlink.
+Dispatch sidebars/workspaces and the main workspace place Transport Demand before
+the retained **Delivery Orders (Legacy)** link, and point active report navigation
+to the new reports. Delivery Method and Transport Demand connections now expose
+the canonical demand/load relationship. Consolidated-note progress uses quantity
+coverage rather than assuming one Delivery Note per source; POD progress follows
+the delivered item lineage even when another load owns the note header.
+
+Verification includes `test_customer_planning_screens`, the existing planner and
+execution regression suites, and `node vuna_transport/tests/test_customer_planning_ui.cjs`.
+`sales_transport_demand_smoke.run(verify_planning=True, verify_execution=True)`
+rehearses real source-free planning, a manual draft reservation, requested-UOM
+details/reports, suggestion acceptance/stale retry, and batched delivery/POD/return
+execution. Its fixture and stock/accounting changes are always rolled back.
+
+Local verification passed 449 regression tests and three client-side selection
+tests, both ordinary and consolidated planning/execution rehearsals, pre-commit
+checks and the asset build. Reports/navigation and canonical source-field
+visibility were synchronized to `meru-dairy.localhost`; the customer cutover
+setting and historical transaction records were not changed.
+
+**Activation boundary:** this slice prepares screens; it does not toggle the site
+setting or migrate/delete historical records. Next is the restored-staging
+migration rehearsal and unresolved-record review, then explicit activation and
+later Delivery Order retirement. The legacy paths are deliberately retained for
+that interval, not a second native execution engine.
+
+---
+
+### 17.10 Historical cutover review — local rehearsal (2026-11-08)
+
+`delivery_order_cutover_audit.audit()` is a read-only Administrator/System Manager
+CLI inventory, not a patch, promotion command or switch activation. `summary()`
+returns the review cases and a deterministic review checksum. The audit compares
+exact Sales Order child rows, historical/source UOM arithmetic, current source
+group keys, duplicate native keys/source rows and existing downstream load links.
+Protected-table fingerprints must remain unchanged; no hooks, repairs, cancellations,
+deletions or stock/accounting postings are performed.
+
+```sh
+bench --site meru-dairy.localhost execute vuna_transport.services.demand.delivery_order_cutover_audit.summary
+```
+
+Local findings: 92 Delivery Orders, 83 preparation candidates and nine orders
+blocked by missing UOM/conversion data (11 item rows). The exact Sales Order rows
+provide UOM/conversion evidence for all 11, but proposals require approval and do
+not mutate originals. Six blocked orders already have load references; these are
+not safe to discard merely because their old quantities are incomplete.
+
+Additional cutover review identifies two multi-group source orders
+(`DO-16-09-2026-00001`, `DO-27-08-2026-00001`) and six inactive Sales Order sources.
+Categories overlap, giving 16 review cases in total. One inactive-source case
+still has a submitted/allocated load; no new planning or historical regeneration
+may be inferred from its current source balance. Preserve history and review its
+existing work explicitly. Passing preparation is not permission to promote all
+83 copies as native demand with a one-to-one source mapping.
+
+The rollback-only preparation rehearsal passed for the 83 candidates, reusing
+21 existing demands and creating 62 temporary copies. Retry is idempotent, normal
+draft save preserves child identities/counters, and all fixture, source, ledger
+and downstream-link changes are rolled back. This is local-clone evidence, not
+a rehearsal against the user's staging site and not a committed migration.
+
+Next decisions: approve source-backed UOM recovery in migration targets, define
+row-preserving splits for the two mixed source groups, and resolve inactive-source
+history/attached loads. Originals and audit snapshots remain intact. Only then
+implement/rehearse reviewed historical promotion, take/confirm backups and pause
+writers before an explicit apply. Keep the switch off and retain Delivery Order
+until that verification is complete. Tests: `test_delivery_order_cutover_audit`
+and the migration/native-demand suites; 72 targeted tests pass.
+
+---
+
+### 17.11 Source-backed UOM recovery on every site (2026-11-08)
+
+The operator-approved recovery is part of
+`vuna_transport.services.demand.delivery_order_migration.prepare`, not a local-only
+fixture or a list of hard-coded record IDs. Dry-run, apply and verify all use the
+same logic on local, restored staging, staging and production sites.
+
+Only missing UOM/conversion data is recovered. The exact `sales_order_item` must
+belong to the original Sales Order and match company, customer and Item. The
+source transaction/stock UOMs, positive finite conversion factor and original
+quantity arithmetic must agree. Known conflicting units, factors or quantities,
+missing/ambiguous source rows, invalid numbers and quantities exceeding the
+original source row remain blockers. Today's Item conversion table is not used.
+Cancelled source documents may supply historical unit evidence; they are never
+reactivated by recovery.
+
+The original Delivery Order and item rows are not edited. The migration copy
+retains the requested transaction quantity, receives the recovered UOM/factor and
+derived stock quantity, and converts its reservation/allocation caches consistently.
+The recovery snapshot retains the unmodified original source/checksum plus each
+row's before/resolved values and exact Sales Order evidence. Retry/verification
+blocks if that evidence changes or an existing target contradicts it. Apply locks
+the relevant Sales Orders/items before legacy sources and targets; no stock or GL
+business hooks are replayed.
+
+Normal saves of recovered prepared drafts reconstruct a verified in-memory
+source projection, preserving target child IDs, recovered quantities and persisted
+provenance even if the client supplies different recovery metadata. Ordinary
+stock-item/disabled-item validation remains in force; historical non-stock rows
+are not made executable merely because their units were recovered.
+
+Operator procedure for staging/production (replace `YOUR_SITE`; no remote site
+is changed by development tests):
+
+1. Deploy the code and its required schema through the normal release process.
+2. Run the default read-only preparation and inspect `blockers`,
+   `uom_recovered_rows` and per-row `uom_recoveries`:
+
+   ```sh
+   bench --site YOUR_SITE execute vuna_transport.services.demand.delivery_order_migration.prepare
+   bench --site YOUR_SITE execute vuna_transport.services.demand.delivery_order_cutover_audit.summary
+   ```
+
+3. Rehearse on a disposable restored copy first. For a live apply, take and verify
+   a full database/files backup, enable maintenance mode, pause queue workers and
+   integrations, and keep other writers stopped. Only then confirm these safeguards:
+
+   ```sh
+   bench --site YOUR_SITE execute vuna_transport.services.demand.delivery_order_migration.prepare --kwargs '{"dry_run": False, "backup_confirmed": True, "workers_paused": True}'
+   bench --site YOUR_SITE execute vuna_transport.services.demand.delivery_order_migration.verify
+   ```
+
+   The kwargs use Python booleans as required by `bench execute`. Maintenance mode
+   is checked independently; flags are operator attestations, not commands that
+   pause workers or create a backup. A failed apply rolls back; the module does
+   not commit internally. Bench commits only a successful command.
+
+4. Review the apply report and remaining cutover cases before resuming operations.
+   Preparation/recovery does not enable `customer_demand_cutover`, split mixed
+   planning groups, resolve inactive-source loads, retire DocTypes or delete data.
+
+Local full-site rollback rehearsal now covers all 92 Delivery Orders, with 11 UOM
+recoveries across nine orders (71 temporary new copies, 21 reused targets). Four
+recovered stock-item drafts save correctly; two historical non-stock cases still
+hit the normal stock-item guard. Repeated apply/verify is idempotent, all original
+Delivery Orders/Sales Orders and stock/accounting fingerprints remain unchanged,
+and the rehearsal is rolled back. Remaining grouping/inactive-source review is
+separate from these now-resolved preparation UOM blockers.
+
+Verification after this change: 472 transport/migration regression tests and
+pre-commit checks pass, along with the full 92-record rollback rehearsal.
+
+---
+
+### 17.12 Final Delivery Order retirement (2026-11-08)
+
+This supersedes the staged cutover limitations in sections 17.5–17.11. Customer
+planning now runs on Sales Order → Transport Demand → Transport Load, including
+requested UOM, planning, picking, delivery, proof, returns and reporting. Once the
+legacy DocType is absent, native customer demand is mandatory even if an old
+`customer_demand_cutover` site setting is zero. Historical names may retain their
+`DO-…` prefix; they are Transport Demand records, not Delivery Orders.
+
+`delivery_order_retirement` promotes exact item identities, splits mixed source
+groups, preserves original source/audit snapshots, recovers missing UOMs from
+exact Sales Order rows, and reconciles downstream item/header links. Inactive or
+non-stock history is marked Historical Only and excluded from new planning.
+Wholly obsolete unexecuted loads/allocations are closed only after checking for
+active stock, trip and proof dependencies. No stock or accounting hooks are
+replayed. Unknown dynamic links or site-specific automations block retirement
+rather than being silently reassigned. Existing shares follow their target(s).
+
+Local apply on `meru-dairy.localhost`: **92 sources → 94 native Transport Demands**,
+11 recovered demand UOM rows, nine historical-only targets, two obsolete loads closed.
+Twelve historical POD rows also have their missing units recovered from exact
+Delivery Note evidence. Their recorded quantities remain unchanged: a proof that
+recorded pieces stays in pieces, rather than being misinterpreted as cartons.
+The manifest retains complete before/resolved proof evidence. The recovery is
+included in future retirement applies; already-retired sites can run the guarded,
+idempotent `recover_historical_proof_units` companion under the same safeguards.
+Delivery Order and Delivery Order Item metadata and their obsolete forms/reports
+are removed. Original business tables remain as a forensic archive, not usable
+DocTypes; source snapshots and the retirement manifest are also retained. There
+is deliberately no destructive SQL table drop. Recovery requires the verified
+database/files backup and matching pre-retirement app revision; there is no
+automatic reverse migration.
+
+For staging/production, rehearse on a restored copy and **do not run `bench migrate`
+before retirement**. A pre-migration hook and first pre-model-sync guard stop an
+upgrade while legacy metadata remains. Keep maintenance mode on and workers,
+integrations and other writers paused throughout schema preparation and apply:
+
+```sh
+bench --site YOUR_SITE backup --with-files
+bench --site YOUR_SITE set-maintenance-mode on
+# Verify the backup and pause workers/integrations before confirming these flags.
+bench --site YOUR_SITE execute vuna_transport.services.demand.delivery_order_retirement.install_schema --kwargs '{"backup_confirmed": True, "workers_paused": True}'
+bench --site YOUR_SITE execute vuna_transport.services.demand.delivery_order_retirement.inspect
+# Review blockers, historical-only targets, closures and the projection checksum.
+bench --site YOUR_SITE execute vuna_transport.services.demand.delivery_order_retirement.retire --kwargs '{"dry_run": False, "backup_confirmed": True, "workers_paused": True, "expected_checksum": "REVIEWED_CHECKSUM"}'
+bench --site YOUR_SITE execute vuna_transport.services.demand.delivery_order_retirement.verify
+bench --site YOUR_SITE migrate
+bench build --app vuna_transport
+bench --site YOUR_SITE set-maintenance-mode off
+# Resume workers/integrations only after verification.
+```
+
+Schema preparation installs the customer-planning fields and canonical links
+before data conversion, without recreating either retired DocType. Schema
+preflight reports any remaining missing columns explicitly.
+Never bypass blockers with force deletion. A successful apply is transactional;
+normal `bench execute` commits on success. Rollback-only retirement and native
+execution smoke tests are available for restored development sites. Ordinary
+post-retirement verification checks source snapshots and item lineage without
+expecting ledgers to remain frozen after legitimate new business transactions.
+
+Verification: 458 remaining transport/migration regressions, planning UI tests,
+pre-commit checks and the asset build pass. The removed legacy DocType tests no
+longer belong to the live suite; migration tests use archived source fixtures.
+A real-data rollback rehearsal deletes metadata, exercises native planning and
+batched stock/picking/POD/returns, then verifies protected source/ledger recovery.
+No staging or production site was modified by this local implementation.
 
 ## 18. Testing Strategy
 

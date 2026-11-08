@@ -11,6 +11,8 @@ from vuna_transport.services.planning.demand_lifecycle_service import sync_deman
 
 
 def execute():
+	if not frappe.db.exists("DocType", "Delivery Order"):
+		return
 	result = {
 		"linked_rows": 0,
 		"skipped_loads_with_execution": 0,

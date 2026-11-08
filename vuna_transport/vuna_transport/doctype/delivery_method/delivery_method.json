@@ -106,13 +106,25 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [
-  {"link_doctype":"Material Request","link_fieldname":"vuna_delivery_method"},
-  {"link_doctype":"Return Request","link_fieldname":"delivery_method"},
-  {"link_doctype":"Purchase Order","link_fieldname":"vuna_delivery_method"},
-  {"link_doctype":"Sales Order","link_fieldname":"vuna_delivery_method"},
   {
-   "link_doctype": "Delivery Order",
+   "link_doctype": "Transport Demand",
    "link_fieldname": "delivery_method"
+  },
+  {
+   "link_doctype": "Material Request",
+   "link_fieldname": "vuna_delivery_method"
+  },
+  {
+   "link_doctype": "Return Request",
+   "link_fieldname": "delivery_method"
+  },
+  {
+   "link_doctype": "Purchase Order",
+   "link_fieldname": "vuna_delivery_method"
+  },
+  {
+   "link_doctype": "Sales Order",
+   "link_fieldname": "vuna_delivery_method"
   },
   {
    "link_doctype": "Transport Load",
@@ -126,10 +138,26 @@
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
-  {"role":"Purchase User","read":1,"select":1},
-  {"role":"Purchase Manager","read":1,"select":1},
-  {"role":"Stock User","read":1,"select":1},
-  {"role":"Stock Manager","read":1,"select":1},
+  {
+   "role": "Purchase User",
+   "read": 1,
+   "select": 1
+  },
+  {
+   "role": "Purchase Manager",
+   "read": 1,
+   "select": 1
+  },
+  {
+   "role": "Stock User",
+   "read": 1,
+   "select": 1
+  },
+  {
+   "role": "Stock Manager",
+   "read": 1,
+   "select": 1
+  },
   {
    "create": 1,
    "delete": 1,

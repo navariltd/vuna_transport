@@ -37,7 +37,8 @@
   "allow_unplanned_return_pickups",
   "scan_permissions_section",
   "allowed_loaded_scan_roles",
-  "allowed_dispatched_scan_roles"
+  "allowed_dispatched_scan_roles",
+  "delivery_order_retirement_manifest"
  ],
  "fields": [
   {
@@ -240,6 +241,14 @@
   {
    "fieldname": "section_break_hbkq",
    "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "delivery_order_retirement_manifest",
+   "fieldtype": "Long Text",
+   "label": "Delivery Order Retirement Manifest",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
   }
  ],
  "grid_page_length": 50,
