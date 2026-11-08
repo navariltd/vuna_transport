@@ -7,7 +7,12 @@ from frappe import _
 
 def execute(filters=None):
 	filters = frappe._dict(filters or {})
-	conditions = ["dn.docstatus = 0", "dn.vuna_delivery_load is not null", "dn.vuna_delivery_load != ''"]
+	conditions = [
+		"dn.docstatus = 0",
+		"dn.is_return = 0",
+		"dn.vuna_delivery_load is not null",
+		"dn.vuna_delivery_load != ''",
+	]
 	values = {}
 	if filters.company:
 		conditions.append("dn.company = %(company)s")
@@ -17,7 +22,7 @@ def execute(filters=None):
 		values.delivery_load = filters.delivery_load
 	rows = frappe.db.sql(
 		f"""select dn.name, dn.company, dn.customer, dn.posting_date,
-			dn.vuna_delivery_load, dn.vuna_delivery_order, dl.status as load_status
+			dn.vuna_delivery_load, dn.vuna_delivery_order, dn.vuna_transport_demand, dl.status as load_status
 			from `tabDelivery Note` dn left join `tabTransport Load` dl
 			on dl.name = dn.vuna_delivery_load where {" and ".join(conditions)}
 			order by dn.posting_date, dn.creation limit 500""",
@@ -25,6 +30,12 @@ def execute(filters=None):
 		as_dict=True,
 	)
 	columns = [
+		{
+			"label": _("Transport Demand"),
+			"fieldname": "vuna_transport_demand",
+			"fieldtype": "Link",
+			"options": "Transport Demand",
+		},
 		{"label": _("Delivery Note"), "fieldname": "name", "fieldtype": "Link", "options": "Delivery Note"},
 		{"label": _("Company"), "fieldname": "company", "fieldtype": "Link", "options": "Company"},
 		{"label": _("Customer"), "fieldname": "customer", "fieldtype": "Link", "options": "Customer"},

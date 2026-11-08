@@ -24,6 +24,7 @@ from vuna_transport.services.fleet.vehicle_category_service import (
 	get_vehicle_categories,
 	validate_vehicle_access_limit,
 )
+from vuna_transport.services.planning import customer_planning_source as source
 from vuna_transport.services.planning.delivery_load_service import (
 	build_delivery_load_from_allocations,
 	calculate_load_totals,
@@ -56,31 +57,39 @@ CAPACITY_DIMENSIONS = ("weight", "volume", "pallets", "cases", "crates")
 
 
 @frappe.whitelist()
+def get_customer_planning_context() -> dict:
+	"""Use server-selected DocType metadata and canonical allocation fields."""
+	require_doctype_permission("Transport Load", "read")
+	parent, item = source.allocation_fields()
+	return {"doctype": source.doctype(), "order_field": parent, "item_field": item}
+
+
+@frappe.whitelist()
 def get_planning_demand(
-	company,
-	required_delivery_date_from=None,
-	required_delivery_date_to=None,
-	source_warehouse=None,
-	transport_zone=None,
-	delivery_method=None,
-	priority=None,
-	customer=None,
-	delivery_address=None,
-	territory=None,
-	county=None,
-	town=None,
-	constituency=None,
-	allocation_state=None,
-	planning_filters=None,
-	additional_filters=None,
-	required_vehicle_category=None,
-	selected_delivery_order_names=None,
-	start=0,
-	page_length=50,
-	required_delivery_date=None,
+	company: str,
+	required_delivery_date_from: str | None = None,
+	required_delivery_date_to: str | None = None,
+	source_warehouse: str | None = None,
+	transport_zone: str | None = None,
+	delivery_method: str | None = None,
+	priority: str | None = None,
+	customer: str | None = None,
+	delivery_address: str | None = None,
+	territory: str | None = None,
+	county: str | None = None,
+	town: str | None = None,
+	constituency: str | None = None,
+	allocation_state: str | None = None,
+	planning_filters: dict | str | None = None,
+	additional_filters: list | str | None = None,
+	required_vehicle_category: str | None = None,
+	selected_delivery_order_names: list | str | None = None,
+	start: int = 0,
+	page_length: int = 50,
+	required_delivery_date: str | None = None,
 ):
 	"""Return a paginated demand list and bounded warehouse summaries."""
-	require_doctype_permission("Delivery Order", "read")
+	require_doctype_permission(source.doctype(), "read")
 	require_company_access(company)
 	if required_vehicle_category:
 		require_doctype_permission("Vehicle Category", "read")
@@ -124,16 +133,24 @@ def get_planning_demand(
 	):
 		if configured_filters.get(fieldname):
 			filters[fieldname] = configured_filters[fieldname]
+	warehouse_options = {}
+	if source.doctype() == "Transport Demand" and source_warehouse:
+		filters.pop("source_warehouse", None)
+		warehouse_options["or_filters"] = [
+			["source_warehouse", "=", source_warehouse],
+			["source_warehouse", "is", "not set"],
+		]
 	orders = frappe.get_list(
-		"Delivery Order",
+		source.doctype(),
 		filters=as_filter_conditions(filters, additional_filter_conditions),
-		fields=_delivery_order_fields(),
-		order_by="required_delivery_date asc, priority desc, creation asc",
+		fields=source.fields(_delivery_order_fields()),
+		order_by=f"{source.field('required_delivery_date')} asc, priority desc, creation asc",
 		limit_page_length=MAX_SUMMARY_ORDERS + 1,
+		**warehouse_options,
 	)
 	pool_truncated = len(orders) > MAX_SUMMARY_ORDERS
 	orders = orders[:MAX_SUMMARY_ORDERS]
-	metrics = _get_order_metrics([row.name for row in orders])
+	metrics = _get_order_metrics([row.name for row in orders], source_warehouse=source_warehouse)
 	all_rows = [_format_demand_row(order, metrics.get(order.name)) for order in orders]
 	all_rows = _filter_allocation_state(all_rows, allocation_state)
 	filtered_rows = _filter_vehicle_category(all_rows, required_vehicle_category)
@@ -159,23 +176,23 @@ def get_planning_demand(
 
 
 @frappe.whitelist()
-def get_dispatch_planning_filter_definitions(company=None):
+def get_dispatch_planning_filter_definitions(company: str | None = None):
 	"""Return administrator-configured additional filters for the planner."""
-	require_doctype_permission("Delivery Order", "read")
+	require_doctype_permission(source.doctype(), "read")
 	if company:
 		require_company_access(company)
 	return get_filter_definitions()
 
 
 @frappe.whitelist()
-def get_delivery_order_details(delivery_order_names):
+def get_delivery_order_details(delivery_order_names: list | str, source_warehouse: str | None = None):
 	"""Return item-level balances for a bounded set of readable Delivery Orders."""
-	require_doctype_permission("Delivery Order", "read")
+	require_doctype_permission(source.doctype(), "read")
 	names = _parse_names(delivery_order_names, MAX_DETAIL_ORDERS)
 	orders = frappe.get_list(
-		"Delivery Order",
-		filters={"name": ["in", names]},
-		fields=_delivery_order_fields(),
+		source.doctype(),
+		filters=source.filters({"name": ["in", names], "docstatus": 1}),
+		fields=source.fields(_delivery_order_fields()),
 		limit_page_length=MAX_DETAIL_ORDERS,
 	)
 	if len(orders) != len(names):
@@ -185,7 +202,7 @@ def get_delivery_order_details(delivery_order_names):
 		)
 	for company in {order.company for order in orders}:
 		require_company_access(company)
-	metrics = _get_order_metrics(names, include_items=True)
+	metrics = _get_order_metrics(names, include_items=True, source_warehouse=source_warehouse)
 	return [
 		{
 			**_format_demand_row(order, metrics.get(order.name)),
@@ -196,10 +213,14 @@ def get_delivery_order_details(delivery_order_names):
 
 
 @frappe.whitelist()
-def evaluate_manual_load_plan(allocations, vehicle_category=None):
+def evaluate_manual_load_plan(
+	allocations: list | str, vehicle_category: str | None = None, source_warehouse: str | None = None
+):
 	"""Recalculate a proposed manual load without reserving or saving anything."""
 	require_doctype_permission("Transport Load", "create")
-	load = build_delivery_load_from_allocations(allocations, vehicle_category)
+	load = build_delivery_load_from_allocations(
+		allocations, vehicle_category, source_warehouse=source_warehouse
+	)
 	validate_load_allocations(load, lock=False)
 	calculate_load_totals(load)
 	compatible_names = get_compatible_vehicle_category_names(load)
@@ -245,8 +266,8 @@ def evaluate_manual_load_plan(allocations, vehicle_category=None):
 		),
 		"allocations": [
 			{
-				"delivery_order": row.delivery_order,
-				"delivery_order_item": row.delivery_order_item,
+				source.allocation_fields()[0]: row.get(source.allocation_fields()[0]),
+				source.allocation_fields()[1]: row.get(source.allocation_fields()[1]),
 				"allocated_quantity": row.allocated_quantity,
 				"available_quantity": row.available_quantity,
 				"weight": row.weight,
@@ -261,8 +282,10 @@ def evaluate_manual_load_plan(allocations, vehicle_category=None):
 
 
 @frappe.whitelist()
-def create_delivery_load_from_plan(allocations, vehicle_category=None):
-	return _create_delivery_load_from_plan(allocations, vehicle_category)
+def create_delivery_load_from_plan(
+	allocations: list | str, vehicle_category: str | None = None, source_warehouse: str | None = None
+):
+	return _create_delivery_load_from_plan(allocations, vehicle_category, source_warehouse=source_warehouse)
 
 
 @frappe.whitelist()
@@ -287,11 +310,15 @@ def get_vehicle_availability_details(company, vehicle_category, from_time, to_ti
 
 
 @frappe.whitelist()
-def get_costed_vehicle_candidates(allocations, vehicle_category=None):
+def get_costed_vehicle_candidates(
+	allocations: list | str, vehicle_category: str | None = None, source_warehouse: str | None = None
+):
 	"""Return eligible physical vehicles ranked by estimated marginal cost."""
 	require_doctype_permission("Transport Load", "read")
 	require_doctype_permission("Vehicle", "read")
-	load = build_delivery_load_from_allocations(allocations, vehicle_category)
+	load = build_delivery_load_from_allocations(
+		allocations, vehicle_category, source_warehouse=source_warehouse
+	)
 	validate_load_allocations(load, lock=False)
 	calculate_load_totals(load)
 	category = vehicle_category or recommend_vehicle_category(load)
@@ -345,11 +372,15 @@ def get_costed_vehicle_candidates(allocations, vehicle_category=None):
 
 
 @frappe.whitelist()
-def get_cost_structure_estimates(allocations, vehicle_category=None):
+def get_cost_structure_estimates(
+	allocations: list | str, vehicle_category: str | None = None, source_warehouse: str | None = None
+):
 	"""Compare applicable Cost Structures before a physical Vehicle is selected."""
 	require_doctype_permission("Transport Load", "read")
 	require_doctype_permission("Transport Cost Structure", "read")
-	load = build_delivery_load_from_allocations(allocations, vehicle_category)
+	load = build_delivery_load_from_allocations(
+		allocations, vehicle_category, source_warehouse=source_warehouse
+	)
 	validate_load_allocations(load, lock=False)
 	calculate_load_totals(load)
 	structures = frappe.get_all(
@@ -533,10 +564,12 @@ def _delivery_order_fields():
 	]
 
 
-def _get_order_metrics(order_names, include_items=False):
+def _get_order_metrics(order_names, include_items=False, source_warehouse=None):
 	order_names = list(dict.fromkeys(order_names or []))
 	if not order_names:
 		return {}
+	if source.doctype() == "Transport Demand":
+		return source.metrics(order_names, include_items=include_items, source_warehouse=source_warehouse)
 	items = frappe.get_all(
 		"Delivery Order Item",
 		filters={"parent": ["in", order_names]},

@@ -23,10 +23,7 @@ def execute(filters=None):
 		f"""
 		SELECT dl.name, dl.company, dl.status, dl.planned_departure, dl.planned_arrival,
 			dl.required_vehicle_category, dl.total_weight, dl.total_volume,
-			dl.total_stops,
-			(SELECT va.name FROM `tabVehicle Allocation` va
-			 WHERE va.delivery_load = dl.name AND va.docstatus < 2
-			 ORDER BY va.creation DESC LIMIT 1) AS vehicle_allocation
+			dl.total_stops, dl.active_vehicle_allocation AS vehicle_allocation
 		FROM `tabTransport Load` dl
 		WHERE {" AND ".join(conditions)}
 		ORDER BY dl.planned_departure ASC

@@ -53,6 +53,11 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	constructor(wrapper) {
 		this.wrapper = wrapper;
 		this.page = wrapper.page;
+		this.customer_context = wrapper.customer_context || {
+			doctype: "Transport Demand",
+			order_field: "transport_demand",
+			item_field: "transport_demand_item",
+		};
 		this.start = 0;
 		this.transfer_start = 0;
 		this.transfer_items = [];
@@ -153,7 +158,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 							)} <span class="text-muted">→</span></label><select class="form-control dp-category-select"><option value="">${__(
 				"Select"
 			)}</option></select></div>
-							<div class="dp-plan-content dp-empty">${__("Select Delivery Orders to begin planning.")}</div>
+							<div class="dp-plan-content dp-empty">${__("Select customer demand to begin planning.")}</div>
 							<div class="dp-costed-vehicles"></div>
 							<div class="dp-plan-actions">
 								<button class="btn btn-default btn-sm btn-evaluate" disabled>${__("Evaluate")}</button>
@@ -213,11 +218,11 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		const $button = this.$root.find(".btn-native-filter");
 		$button.prop("disabled", true);
 		try {
-			await frappe.model.with_doctype("Delivery Order");
+			await frappe.model.with_doctype(this.customer_context.doctype);
 		} catch (error) {
 			$button.prop("disabled", false);
 			frappe.show_alert({
-				message: error?.message || __("Unable to load Delivery Order fields."),
+				message: error?.message || __("Unable to load customer demand fields."),
 				indicator: "red",
 			});
 			return;
@@ -225,7 +230,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		if (this.destroyed) return;
 		this.filter_group = new frappe.ui.FilterGroup({
 			parent: this.$root.find(".dp-toolbar-actions"),
-			doctype: "Delivery Order",
+			doctype: this.customer_context.doctype,
 			filter_button: this.$root.find(".btn-native-filter"),
 			filter_x_button: this.$root.find(".btn-clear-native-filter"),
 			on_change: () => this.filters_changed(),
@@ -670,7 +675,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		if (!this.orders.length) {
 			this.$root
 				.find(".dp-demand")
-				.html(`<div class="dp-empty">${__("No open Delivery Orders found.")}</div>`);
+				.html(`<div class="dp-empty">${__("No open customer demand found.")}</div>`);
 			this.render_pagination();
 			return;
 		}
@@ -693,11 +698,11 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 						: ""
 				)}">
 				<div><input type="checkbox" class="dp-order-select" title="${__(
-					"Load all remaining items from this Delivery Order"
+					"Load all remaining items from this customer demand"
 				)}" aria-label="${__("Load all remaining items")}" ${selected}></div>
-				<div><a href="/app/delivery-order/${encodeURIComponent(order.name)}"><strong>${this.escape(
+				<div><a href="/app/${frappe.router.slug(this.customer_context.doctype)}/${encodeURIComponent(
 					order.name
-				)}</strong></a><small>${this.escape(
+				)}"><strong>${this.escape(order.name)}</strong></a><small>${this.escape(
 					order.customer_name || order.customer
 				)}</small></div>
 				<div><span>${this.escape(order.source_warehouse)}</span><small>${this.escape(
@@ -725,8 +730,8 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			.find(".dp-demand")
 			.html(
 				`<div class="dp-demand-header"><span><input type="checkbox" class="dp-select-all-orders" title="${__(
-					"Select all visible Delivery Orders"
-				)}" aria-label="${__("Select all visible Delivery Orders")}"></span><span>${__(
+					"Select all visible customer demand"
+				)}" aria-label="${__("Select all visible customer demand")}"></span><span>${__(
 					"Order / Customer"
 				)}</span><span>${__("Warehouse / Territory")}</span><span>${__(
 					"Date / Priority"
@@ -938,7 +943,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				.end()
 				.find(".dp-plan-content")
 				.addClass("dp-empty")
-				.html(__("Select Delivery Orders to begin planning."));
+				.html(__("Select customer demand to begin planning."));
 		if (!this.plan)
 			return this.$root
 				.find(".dp-costed-vehicles")
@@ -1240,13 +1245,13 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		const order_rows = orders
 			.map((order) => {
 				const allocations = (suggestion.allocations || []).filter(
-					(row) => row.delivery_order === order.name
+					(row) => row[this.customer_context.order_field] === order.name
 				);
 				const partial = allocations.some((row) => row.partial);
 				return `<div class="dp-suggestion-order">
-				<span><a href="/app/delivery-order/${encodeURIComponent(order.name)}"><strong>${this.escape(
+				<span><a href="/app/${frappe.router.slug(this.customer_context.doctype)}/${encodeURIComponent(
 					order.name
-				)}</strong></a><small>${this.escape(
+				)}"><strong>${this.escape(order.name)}</strong></a><small>${this.escape(
 					order.customer_name || order.customer || ""
 				)}</small></span>
 				<span>${this.escape(order.delivery_address || __("No delivery address"))}</span>
@@ -1281,7 +1286,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 						utilization || `<span>${__("Capacity utilization unavailable")}</span>`
 					}</div>
 					<div class="dp-suggestion-orders"><div class="dp-suggestion-order dp-suggestion-order-header"><span>${__(
-						"Delivery Order"
+						this.customer_context.doctype
 					)}</span><span>${__("Destination")}</span><span>${__(
 			"Allocation"
 		)}</span></div>${order_rows}</div>
@@ -1310,9 +1315,9 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		const suggestion = this.suggestions[cint($(event.currentTarget).data("index"))];
 		this.allocations.clear();
 		for (const row of suggestion.allocations || [])
-			this.allocations.set(row.delivery_order_item, {
-				delivery_order: row.delivery_order,
-				delivery_order_item: row.delivery_order_item,
+			this.allocations.set(row[this.customer_context.item_field], {
+				delivery_order: row[this.customer_context.order_field],
+				delivery_order_item: row[this.customer_context.item_field],
 				allocated_quantity: row.allocated_quantity,
 			});
 		this.plan = null;
@@ -1469,6 +1474,24 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	async call(method, args, freeze = false) {
+		// Internal selection keys are presentation-only. Send the server's explicit
+		// Link dialect, never Transport Demand IDs in Delivery Order Link fields.
+		if (args?.allocations) {
+			args = {
+				...args,
+				allocations: args.allocations.map((row) => ({
+					[this.customer_context.order_field]: row.delivery_order,
+					[this.customer_context.item_field]: row.delivery_order_item,
+					allocated_quantity: row.allocated_quantity,
+				})),
+				source_warehouse: this.filters.source_warehouse.get_value() || null,
+			};
+		}
+		if (method === "get_delivery_order_details")
+			args = {
+				...args,
+				source_warehouse: this.filters.source_warehouse.get_value() || null,
+			};
 		const response = await frappe.call({
 			method: `vuna_transport.services.planning.dispatch_planning_service.${method}`,
 			args,

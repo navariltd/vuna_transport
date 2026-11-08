@@ -1,4 +1,4 @@
-frappe.query_reports["Unallocated Delivery Orders"] = {
+frappe.query_reports["Unallocated Transport Demands"] = {
 	filters: [
 		{ fieldname: "company", label: __("Company"), fieldtype: "Link", options: "Company" },
 		{

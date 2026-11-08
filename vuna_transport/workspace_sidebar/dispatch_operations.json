@@ -45,8 +45,8 @@
    "icon": "clipboard-list",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Delivery Orders",
-   "link_to": "Delivery Order",
+   "label": "Transport Demands",
+   "link_to": "Transport Demand",
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
@@ -299,8 +299,8 @@
    "icon": "clipboard-list",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Open Delivery Demand",
-   "link_to": "Open Delivery Demand",
+   "label": "Open Transport Demand",
+   "link_to": "Open Transport Demand",
    "link_type": "Report",
    "show_arrow": 0,
    "type": "Link"
@@ -311,8 +311,8 @@
    "icon": "clipboard-list",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Unallocated Delivery Orders",
-   "link_to": "Unallocated Delivery Orders",
+   "label": "Unallocated Transport Demands",
+   "link_to": "Unallocated Transport Demands",
    "link_type": "Report",
    "show_arrow": 0,
    "type": "Link"
