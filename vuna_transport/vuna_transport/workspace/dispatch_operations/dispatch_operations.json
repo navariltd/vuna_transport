@@ -1,7 +1,7 @@
 {
  "app": "vuna_transport",
  "charts": [],
- "content": "[{\"id\":\"dispatch-header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h3\\\"><b>Dispatch Operations</b></span>\",\"col\":12}},{\"id\":\"dispatch-planning-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Planning\",\"col\":4}},{\"id\":\"dispatch-execution-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Execution\",\"col\":4}},{\"id\":\"dispatch-setup-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Dispatch Setup\",\"col\":4}},{\"id\":\"dispatch-reports-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Reports\",\"col\":4}}]",
+ "content": "[{\"id\":\"dispatch-header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h3\\\"><b>Dispatch Operations</b></span>\",\"col\":12}},{\"id\":\"dispatch-planning-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Planning\",\"col\":4}},{\"id\":\"vuna-warehouse-fulfilment-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Warehouse Fulfilment\",\"col\":4}},{\"id\":\"dispatch-execution-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Execution\",\"col\":4}},{\"id\":\"vuna-supplier-collections-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Supplier Collections\",\"col\":4}},{\"id\":\"vuna-returns-resolution-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Returns & Resolution\",\"col\":4}},{\"id\":\"dispatch-setup-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Dispatch Setup\",\"col\":4}},{\"id\":\"vuna-location-setup-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Location Setup\",\"col\":4}},{\"id\":\"dispatch-reports-card\",\"type\":\"card\",\"data\":{\"card_name\":\"Reports\",\"col\":4}}]",
  "creation": "2026-09-02 19:44:46.358981",
  "custom_blocks": [],
  "docstatus": 0,
@@ -14,8 +14,8 @@
  "links": [
   {
    "label": "Planning",
-   "link_count": 4,
-   "type": "Card Break"
+   "type": "Card Break",
+   "link_count": 4
   },
   {
    "label": "Dispatch Planning",
@@ -42,9 +42,15 @@
    "type": "Link"
   },
   {
-   "label": "Execution",
-   "link_count": 7,
-   "type": "Card Break"
+   "label": "Warehouse Fulfilment",
+   "type": "Card Break",
+   "link_count": 4
+  },
+  {
+   "label": "Material Requests",
+   "link_to": "Material Request",
+   "link_type": "DocType",
+   "type": "Link"
   },
   {
    "label": "Pick List",
@@ -59,8 +65,25 @@
    "type": "Link"
   },
   {
+   "label": "Stock Entries",
+   "link_to": "Stock Entry",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Execution",
+   "type": "Card Break",
+   "link_count": 4
+  },
+  {
    "label": "Delivery Trip",
    "link_to": "Delivery Trip",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Transport Tasks",
+   "link_to": "Transport Trip Task",
    "link_type": "DocType",
    "type": "Link"
   },
@@ -77,8 +100,36 @@
    "type": "Link"
   },
   {
+   "label": "Supplier Collections",
+   "type": "Card Break",
+   "link_count": 2
+  },
+  {
+   "label": "Purchase Orders",
+   "link_to": "Purchase Order",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Purchase Receipts",
+   "link_to": "Purchase Receipt",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Returns & Resolution",
+   "type": "Card Break",
+   "link_count": 3
+  },
+  {
    "label": "Return Requests",
    "link_to": "Return Request",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Return Inspections",
+   "link_to": "Return Inspection",
    "link_type": "DocType",
    "type": "Link"
   },
@@ -90,8 +141,8 @@
   },
   {
    "label": "Dispatch Setup",
-   "link_count": 7,
-   "type": "Card Break"
+   "type": "Card Break",
+   "link_count": 8
   },
   {
    "label": "Delivery Method",
@@ -108,6 +159,12 @@
   {
    "label": "Delivery Group",
    "link_to": "Delivery Group",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Dispatch Planning Filters",
+   "link_to": "Dispatch Planning Filter",
    "link_type": "DocType",
    "type": "Link"
   },
@@ -136,55 +193,77 @@
    "type": "Link"
   },
   {
+   "label": "Location Setup",
+   "type": "Card Break",
+   "link_count": 3
+  },
+  {
+   "label": "Counties",
+   "link_to": "County",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Constituencies",
+   "link_to": "Constituency",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Towns",
+   "link_to": "Town",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
    "label": "Reports",
-   "link_count": 6,
-   "is_query_report": 0,
-   "type": "Card Break"
+   "type": "Card Break",
+   "link_count": 6
   },
   {
    "label": "Open Transport Demand",
    "link_to": "Open Transport Demand",
    "link_type": "Report",
-   "is_query_report": 0,
+   "is_query_report": 1,
    "type": "Link"
   },
   {
    "label": "Unallocated Transport Demands",
    "link_to": "Unallocated Transport Demands",
    "link_type": "Report",
-   "is_query_report": 0,
+   "is_query_report": 1,
    "type": "Link"
   },
   {
    "label": "Loads Awaiting Vehicle",
    "link_to": "Loads Awaiting Vehicle",
    "link_type": "Report",
-   "is_query_report": 0,
+   "is_query_report": 1,
    "type": "Link"
   },
   {
    "label": "Delivery Notes Pending Submission",
    "link_to": "Delivery Notes Pending Submission",
    "link_type": "Report",
-   "is_query_report": 0,
+   "is_query_report": 1,
    "type": "Link"
   },
   {
    "label": "Delivery Trips Pending POD",
    "link_to": "Delivery Trips Pending POD",
    "link_type": "Report",
-   "is_query_report": 0,
+   "is_query_report": 1,
    "type": "Link"
   },
   {
    "label": "Dispatch Readiness",
    "link_to": "Dispatch Readiness",
    "link_type": "Report",
-   "is_query_report": 0,
+   "is_query_report": 1,
    "type": "Link"
   }
  ],
- "modified": "2026-09-17 17:54:58.505372",
+ "modified": "2026-11-08 15:11:21.178957",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Dispatch Operations",
