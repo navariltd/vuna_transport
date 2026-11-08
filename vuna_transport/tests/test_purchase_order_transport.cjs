@@ -84,13 +84,13 @@ test("supplier pickup needs the configured source policy as well as PO opt-in", 
   assert.equal(context.buttons.length, 0);
 });
 
-test("pickup address search is filtered to the purchase supplier", () => {
+test("pickup uses ERPNext address controls without a custom address query", () => {
   const context = fixture();
   context.handlers.setup(context.frm);
-  const query = context.queries.vuna_pickup_address();
-  assert.equal(query.filters.link_doctype, "Supplier");
-  assert.equal(query.filters.link_name, "SUP-1");
-  assert.equal(query.filters.disabled, 0);
+  assert.equal(context.queries.vuna_pickup_address, undefined);
+  assert.equal(context.queries.dispatch_address, undefined);
+  assert.equal(context.queries.supplier_address, undefined);
+  assert.equal(context.handlers.supplier, undefined);
 });
 
 test("delivery method link filters explicit purchasing applicability, not names", () => {

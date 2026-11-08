@@ -80,7 +80,7 @@ test("transport responsibility defaults workflow regardless of method name", asy
   }
 });
 
-test("purchase pickup address depends on responsibility, not retired fulfilment type", () => {
+test("purchase customization reuses standard addresses instead of adding a pickup field", () => {
   const metadata = JSON.parse(
     fs.readFileSync(
       path.join(__dirname, "../vuna_transport/custom/purchase_order.json"),
@@ -98,10 +98,7 @@ test("purchase pickup address depends on responsibility, not retired fulfilment 
     responsibility.fetch_from,
     "vuna_delivery_method.transport_arranged_by"
   );
-  assert.equal(
-    address.mandatory_depends_on,
-    "eval:doc.vuna_transport_arranged_by == 'Company'"
-  );
+  assert.equal(address, undefined);
   assert.equal(
     fields.some((field) => field.fieldname === "vuna_delivery_fulfilment_type"),
     false

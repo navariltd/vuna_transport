@@ -6,13 +6,6 @@ frappe.ui.form.on("Purchase Order", {
 				buying: 1,
 			},
 		}));
-		frm.set_query("vuna_pickup_address", () => ({
-			query: "frappe.contacts.doctype.address.address.address_query",
-			filters: { link_doctype: "Supplier", link_name: frm.doc.supplier || "", disabled: 0 },
-		}));
-	},
-	async supplier(frm) {
-		if (frm.doc.docstatus === 0) await frm.set_value("vuna_pickup_address", null);
 	},
 	async refresh(frm) {
 		if (frm.doc.docstatus !== 1 || !frm.doc.vuna_delivery_method || frm.is_dirty()) return;
