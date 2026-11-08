@@ -118,6 +118,9 @@ def prepare_proof(task):
 
 		return prepare_pickup_proof(task)
 	trip, stock = proof_context(task)
+	from vuna_transport.services.execution.warehouse_receipt_service import assert_no_manual_receipt
+
+	assert_no_manual_receipt(task)
 	if existing := frappe.db.get_value(
 		"Proof of Delivery", {"transport_trip_task": task.name, "docstatus": ["!=", 2]}, "name"
 	):
@@ -227,6 +230,9 @@ def validate_proof(doc):
 	if not doc.flags.ignore_permissions:
 		require_document_permission(task)
 	trip, stock = proof_context(task)
+	from vuna_transport.services.execution.warehouse_receipt_service import assert_no_manual_receipt
+
+	assert_no_manual_receipt(task)
 	duplicate = frappe.db.get_value(
 		"Proof of Delivery",
 		{"transport_trip_task": task.name, "docstatus": ["!=", 2], "name": ["!=", doc.name or ""]},
@@ -290,6 +296,11 @@ def derive_transfer_status(task):
 		as_dict=True,
 	)
 	if not proof:
+		from vuna_transport.services.execution.warehouse_receipt_service import receipt_summary
+
+		received = receipt_summary(task)
+		if received["confirmation_method"]:
+			return received["status"]
 		if (
 			task.task_type == "Transfer Receipt"
 			and frappe.db.get_value("Transport Demand", task.transport_demand, "source_document_type")

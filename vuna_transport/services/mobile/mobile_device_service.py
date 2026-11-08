@@ -958,6 +958,11 @@ def _attach_transport_tasks(trip, stops):
 			"return_request",
 			"transport_demand",
 			"dispatch_stock_entry",
+			"confirmation_method",
+			"receipt_stock_entry",
+			"receipt_purchase_receipt",
+			"receipt_confirmed_by",
+			"receipt_confirmed_on",
 		],
 		order_by="sequence asc, creation asc",
 	)

@@ -82,6 +82,14 @@ class TestSupplierVehicleReceipt(TestCase):
 		receipts.validate_vehicle_purchase_receipt(self.doc)
 		self.assertEqual(self.doc.items[0].uom, "Carton")
 
+	def test_standard_mapper_po_link_does_not_require_vehicle_allocation(self):
+		self.doc.vuna_pickup_allocation = None
+		self.doc.vuna_pickup_transit_warehouse = None
+		self.doc.set_warehouse = self.doc.items[0].warehouse = "Main"
+		receipts.validate_vehicle_purchase_receipt(self.doc)
+		self.context.assert_not_called()
+		self.assertIsNone(self.doc.vuna_pickup_purchase_order)
+
 	def test_wrong_supplier_company_or_vehicle_destination_is_rejected(self):
 		for field, value in (
 			("supplier", "Other"),

@@ -224,6 +224,7 @@ doc_events = {
 	},
 	"Stock Entry": {
 		"validate": [
+			"vuna_transport.services.execution.warehouse_receipt_service.validate_warehouse_receipt",
 			"vuna_transport.services.execution.supplier_vehicle_transfer_service.validate_vehicle_material_transfer",
 			"vuna_transport.services.execution.depot_return_receiving_service.validate_vehicle_receipt",
 			"vuna_transport.services.execution.unplanned_pickup_service.validate_collection_stock",
@@ -241,6 +242,7 @@ doc_events = {
 		],
 		"on_submit": [
 			"vuna_transport.services.execution.depot_return_receiving_service.sync_vehicle_receipt",
+			"vuna_transport.services.execution.warehouse_receipt_service.sync_warehouse_receipt",
 			"vuna_transport.services.execution.unplanned_pickup_service.sync_collection_stock",
 			"vuna_transport.services.execution.return_pickup_service.sync_pickup_stock",
 			"vuna_transport.services.execution.return_v2_service.sync_return_inspection_from_stock_entry",
@@ -250,6 +252,7 @@ doc_events = {
 		],
 		"on_cancel": [
 			"vuna_transport.services.execution.depot_return_receiving_service.sync_vehicle_receipt",
+			"vuna_transport.services.execution.warehouse_receipt_service.sync_warehouse_receipt",
 			"vuna_transport.services.execution.return_pickup_service.guard_pickup_stock_cancellation",
 			"vuna_transport.services.execution.unplanned_pickup_service.sync_collection_stock",
 			"vuna_transport.services.execution.return_pickup_service.sync_pickup_stock",

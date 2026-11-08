@@ -59,6 +59,7 @@ def plan_tasks(loads):
 				cargo.append(
 					{
 						"load_item": row.name,
+						"transport_demand_item": item.name,
 						"item_code": row.item_code,
 						"qty": row.allocated_quantity,
 						"uom": item.transaction_uom,

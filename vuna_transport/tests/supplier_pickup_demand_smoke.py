@@ -5,11 +5,18 @@ from unittest.mock import patch
 import frappe
 
 
-def run(verify_vehicle_stock=False, batched=False, partial_transfer=False, verify_assignment=False):
+def run(
+	verify_vehicle_stock=False,
+	batched=False,
+	partial_transfer=False,
+	verify_assignment=False,
+	verify_standard_receipt=False,
+):
 	from vuna_transport.services.demand.transport_demand_service import create_transport_demands
 	from vuna_transport.services.planning.demand_lifecycle_service import guard_source_cancellation
 
 	previous_in_test = frappe.flags.in_test
+	verify_assignment = verify_assignment or verify_standard_receipt
 	frappe.flags.in_test = True
 	try:
 		template = None
@@ -103,7 +110,9 @@ def run(verify_vehicle_stock=False, batched=False, partial_transfer=False, verif
 			assert demand.items[0].stock_qty == 15 * row.conversion_factor
 			demand.submit()
 			if verify_assignment:
-				return exercise_assignment(demand, ledger_counts, source, row, verify_vehicle_stock)
+				return exercise_assignment(
+					demand, ledger_counts, source, row, verify_vehicle_stock, verify_standard_receipt
+				)
 		try:
 			guard_source_cancellation(source)
 		except frappe.ValidationError:
@@ -129,7 +138,9 @@ def run(verify_vehicle_stock=False, batched=False, partial_transfer=False, verif
 		frappe.flags.in_test = previous_in_test
 
 
-def exercise_assignment(demand, ledger_counts, source, source_row, verify_stock=False):
+def exercise_assignment(
+	demand, ledger_counts, source, source_row, verify_stock=False, verify_standard_receipt=False
+):
 	from vuna_transport.services.execution.direct_supplier_pickup_service import (
 		assign_supplier_demand,
 		remove_supplier_assignment,
@@ -232,6 +243,8 @@ def exercise_assignment(demand, ledger_counts, source, source_row, verify_stock=
 	frappe.delete_doc("Purchase Receipt", receipt.name)
 	assert frappe.db.get_value("Transport Trip Task", task.name, "status") == "Ready"
 	assert ledger_counts == {doctype: frappe.db.count(doctype) for doctype in ledger_counts}
+	if verify_standard_receipt:
+		return exercise_vehicle_stock(source, source_row, task_name=task.name, manual_receipt=True)
 	if verify_stock:
 		result = exercise_vehicle_stock(source, source_row, partial_transfer=True, task_name=task.name)
 		assert frappe.db.get_value("Transport Trip Task", task.name, "status") == "Ready"
@@ -258,7 +271,7 @@ def exercise_assignment(demand, ledger_counts, source, source_row, verify_stock=
 	}
 
 
-def exercise_vehicle_stock(order, source_row, partial_transfer=False, task_name=None):
+def exercise_vehicle_stock(order, source_row, partial_transfer=False, task_name=None, manual_receipt=False):
 	from vuna_transport.services.execution.supplier_vehicle_receipt_service import (
 		create_vehicle_purchase_receipt,
 	)
@@ -326,12 +339,36 @@ def exercise_vehicle_stock(order, source_row, partial_transfer=False, task_name=
 			}
 			if not frappe.db.exists(ALLOWED_WAREHOUSE_TYPE_DOCTYPE, values):
 				frappe.get_doc({"doctype": ALLOWED_WAREHOUSE_TYPE_DOCTYPE, **values}).db_insert()
-	name = create_vehicle_purchase_receipt(order.name, allocation.name, task_name=task_name)
-	assert name == create_vehicle_purchase_receipt(order.name, allocation.name, task_name=task_name)
-	receipt = frappe.get_doc("Purchase Receipt", name)
+	if manual_receipt:
+		from erpnext.buying.doctype.purchase_order.purchase_order import make_purchase_receipt
+
+		receipt = make_purchase_receipt(order.name)
+		if "nl_vms" in frappe.get_installed_apps():
+			allowed = _effective_warehouse_types_for_item(
+				source_row.item_code, frappe.get_cached_value("Item", source_row.item_code, "item_group")
+			)
+			warehouse = frappe.db.get_value(
+				"Warehouse",
+				{
+					"company": order.company,
+					"warehouse_type": ["in", [value for value in allowed if value != "Transit"]],
+					"is_group": 0,
+					"disabled": 0,
+				},
+				"name",
+			)
+			assert warehouse, "No compatible destination warehouse for the standard receipt fixture"
+			receipt.set_warehouse = warehouse
+			for item in receipt.items:
+				item.warehouse = warehouse
+		receipt.insert()
+	else:
+		name = create_vehicle_purchase_receipt(order.name, allocation.name, task_name=task_name)
+		assert name == create_vehicle_purchase_receipt(order.name, allocation.name, task_name=task_name)
+		receipt = frappe.get_doc("Purchase Receipt", name)
 	assert receipt.docstatus == 0 and receipt.items[0].qty == 15
 	assert receipt.items[0].uom == source_row.uom
-	transit = receipt.vuna_pickup_transit_warehouse
+	transit = receipt.items[0].warehouse
 	before = (
 		frappe.db.get_value("Bin", {"warehouse": transit, "item_code": source_row.item_code}, "actual_qty")
 		or 0
@@ -386,6 +423,31 @@ def exercise_vehicle_stock(order, source_row, partial_transfer=False, task_name=
 	receipt.submit()
 	if task_name:
 		assert frappe.db.get_value("Transport Trip Task", task_name, "status") == "Completed"
+	if manual_receipt:
+		task = frappe.get_doc("Transport Trip Task", task_name)
+		assert not receipt.vuna_pickup_task
+		assert (
+			task.confirmation_method == "Purchase Receipt" and task.receipt_purchase_receipt == receipt.name
+		)
+		assert frappe.db.get_value("Delivery Trip", task.delivery_trip, "status") == "Completed"
+		assert not frappe.db.exists("Proof of Delivery", {"transport_trip_task": task.name})
+		try:
+			create_vehicle_purchase_receipt(order.name, allocation.name, task_name=task.name)
+		except frappe.ValidationError:
+			pass
+		else:
+			raise AssertionError("A completed collection must not generate a duplicate receipt")
+		receipt.cancel()
+		task.reload()
+		assert task.status == "Ready" and not task.receipt_purchase_receipt
+		assert frappe.db.get_value("Delivery Trip", task.delivery_trip, "status") != "Completed"
+		return {
+			"standard_purchase_receipt_confirms_collection": "passed",
+			"receiving_warehouse": transit,
+			"cancellation_reopens_task_and_trip": "passed",
+			"duplicate_receipt_blocked": True,
+			"all_changes_rolled_back": True,
+		}
 	order.reload()
 	assert order.items[0].received_qty == 15
 	assert (

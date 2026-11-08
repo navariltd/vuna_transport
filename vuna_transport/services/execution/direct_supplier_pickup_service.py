@@ -280,6 +280,10 @@ def remove_supplier_assignment(task_name: str) -> str:
 		frappe.get_doc("Delivery Trip", task.delivery_trip),
 	)
 	require_dispatcher(demand, trip)
+	from vuna_transport.services.execution.supplier_receipt_confirmation_service import task_progress
+
+	if task_progress(task)["evidence"]:
+		frappe.throw(_("Cancel the confirming Purchase Receipts before removing this pickup assignment."))
 	if frappe.db.exists("Purchase Receipt", {"vuna_pickup_task": task.name, "docstatus": ["!=", 2]}):
 		frappe.throw(_("Cancel or delete the linked Purchase Receipt before removing this assignment."))
 	task.db_set("status", "Cancelled")
@@ -296,36 +300,24 @@ def remove_supplier_assignment(task_name: str) -> str:
 
 
 def supplier_task_status(task):
+	from vuna_transport.services.execution.supplier_receipt_confirmation_service import task_progress
+
+	state = task_progress(task)
+	if state["evidence"]:
+		return state["status"]
 	receipt = frappe.db.get_value(
 		"Purchase Receipt",
 		{"vuna_pickup_task": task.name, "docstatus": ["!=", 2]},
 		["name", "docstatus"],
 		as_dict=True,
 	)
-	if not receipt:
-		return "Ready"
-	if receipt.docstatus == 0:
-		return "Awaiting Stock Posting"
-	quantities = {
-		row.purchase_order_item: flt(row.qty)
-		for row in frappe.get_doc("Purchase Receipt", receipt.name).items
-	}
-	sources = {
-		row.name: row.source_item for row in frappe.get_doc("Transport Demand", task.transport_demand).items
-	}
-	return (
-		"Completed"
-		if all(quantities.get(sources.get(row.transport_demand_item)) == flt(row.qty) for row in task.items)
-		else "Completed with Variance"
-	)
+	return "Awaiting Stock Posting" if receipt and receipt.docstatus == 0 else "Ready"
 
 
 def sync_supplier_receipt(doc, method=None):
-	if not doc.get("vuna_pickup_task"):
-		return
-	from vuna_transport.services.execution.trip_task_service import sync_task_execution
+	from vuna_transport.services.execution.supplier_receipt_confirmation_service import sync_receipt
 
-	sync_task_execution(frappe.get_doc("Transport Trip Task", doc.vuna_pickup_task))
+	sync_receipt(doc, method)
 
 
 def receipt_task_limits(task, order, allocation):
@@ -352,6 +344,9 @@ def receipt_task_limits(task, order, allocation):
 	if not trip.vuna_actual_start:
 		frappe.throw(_("Start the trip before confirming supplier collection."))
 	sources = {row.name: row for row in demand.items}
+	from vuna_transport.services.execution.supplier_receipt_confirmation_service import task_progress
+
+	received = task_progress(task)["received"]
 	limits = {}
 	for row in task.items:
 		source = sources.get(row.transport_demand_item)
@@ -362,7 +357,9 @@ def receipt_task_limits(task, order, allocation):
 			or flt(row.conversion_factor) != flt(source.conversion_factor)
 		):
 			frappe.throw(_("Pickup task items must retain their demand and Purchase Order references."))
-		limits[source.source_item] = flt(row.qty)
+		limits[source.source_item] = max(
+			flt(row.qty) - flt(received.get(source.source_item)) / flt(row.conversion_factor), 0
+		)
 	return limits
 
 
@@ -385,9 +382,15 @@ def create_supplier_receipt(task_name: str) -> str:
 
 
 def guard_trip_cancellation(doc, method=None):
+	from vuna_transport.services.execution.supplier_receipt_confirmation_service import task_progress
+
 	tasks = frappe.get_all(
-		"Transport Trip Task", filters={"delivery_trip": doc.name, "direct_assignment": 1}, pluck="name"
+		"Transport Trip Task",
+		filters={"delivery_trip": doc.name, "direct_assignment": 1, "task_type": "Supplier Pickup"},
+		pluck="name",
 	)
+	if any(task_progress(frappe.get_doc("Transport Trip Task", name))["evidence"] for name in tasks):
+		frappe.throw(_("Cancel supplier pickup Purchase Receipts before cancelling this trip."))
 	if tasks and frappe.db.exists(
 		"Purchase Receipt", {"vuna_pickup_task": ["in", tasks], "docstatus": ["!=", 2]}
 	):
