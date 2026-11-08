@@ -17,20 +17,30 @@ def get_data():
 			"Sales Invoice": "credit_note",
 			"Sales Order": "replacement_sales_order",
 			"Payment Entry": "refund_payment_entry",
-			"Delivery Order": "replacement_delivery_reference",
+		},
+		"non_standard_fieldnames": {
+			"Transport Trip Task": "return_request",
+			"Transport Demand": "source_document",
+			"Return Inspection": "return_request",
 		},
 		"transactions": [
 			{
 				"label": _("Delivery Context"),
-				"items": ["Proof of Delivery", "Delivery Trip"],
+				"items": ["Proof of Delivery", "Delivery Trip", "Transport Trip Task"],
 			},
 			{
 				"label": _("Physical Return"),
-				"items": ["Delivery Note", "Quality Inspection"],
+				"items": [
+					"Delivery Note",
+					"Stock Entry",
+					"Return Inspection",
+					"Quality Inspection",
+					"Transport Demand",
+				],
 			},
 			{
 				"label": _("Commercial Resolution"),
-				"items": ["Sales Invoice", "Sales Order", "Payment Entry", "Delivery Order"],
+				"items": ["Sales Invoice", "Sales Order", "Payment Entry"],
 			},
 		],
 	}

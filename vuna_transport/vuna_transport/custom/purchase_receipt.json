@@ -1,0 +1,12 @@
+{
+  "doctype": "Purchase Receipt",
+  "custom_fields": [
+    {"dt":"Purchase Receipt","name":"Purchase Receipt-vuna_pickup_task","fieldname":"vuna_pickup_task","fieldtype":"Link","label":"Supplier Pickup Task","options":"Transport Trip Task","read_only":1,"no_copy":1,"insert_after":"vuna_pickup_allocation","module":"Vuna Transport"},
+    {"dt":"Purchase Receipt","name":"Purchase Receipt-vuna_pickup_purchase_order","fieldname":"vuna_pickup_purchase_order","fieldtype":"Link","label":"Supplier Collection Purchase Order","options":"Purchase Order","read_only":1,"no_copy":1,"insert_after":"supplier","module":"Vuna Transport"},
+    {"dt":"Purchase Receipt","name":"Purchase Receipt-vuna_pickup_allocation","fieldname":"vuna_pickup_allocation","fieldtype":"Link","label":"Pickup Vehicle Allocation","options":"Vehicle Allocation","read_only":1,"no_copy":1,"insert_after":"vuna_pickup_purchase_order","module":"Vuna Transport"},
+    {"dt":"Purchase Receipt","name":"Purchase Receipt-vuna_pickup_transit_warehouse","fieldname":"vuna_pickup_transit_warehouse","fieldtype":"Link","label":"Vehicle Transit Warehouse","options":"Warehouse","read_only":1,"no_copy":1,"insert_after":"vuna_pickup_allocation","description":"Company-owned goods enter inventory here when this Purchase Receipt is submitted. Use a normal Material Transfer for arrival at the receiving warehouse.","module":"Vuna Transport"}
+  ],
+  "property_setters": [],
+  "custom_perms": [],
+  "sync_on_migrate": 1
+}

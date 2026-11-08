@@ -24,14 +24,14 @@
    "type": "Link"
   },
   {
-   "label": "Delivery Order",
-   "link_to": "Delivery Order",
+   "label": "Transport Demands",
+   "link_to": "Transport Demand",
    "link_type": "DocType",
    "type": "Link"
   },
   {
-   "label": "Delivery Load",
-   "link_to": "Delivery Load",
+   "label": "Transport Load",
+   "link_to": "Transport Load",
    "link_type": "DocType",
    "type": "Link"
   },
@@ -43,7 +43,7 @@
   },
   {
    "label": "Execution",
-   "link_count": 5,
+   "link_count": 7,
    "type": "Card Break"
   },
   {
@@ -137,20 +137,20 @@
   },
   {
    "label": "Reports",
-   "link_count": 7,
+   "link_count": 6,
    "is_query_report": 0,
    "type": "Card Break"
   },
   {
-   "label": "Open Delivery Demand",
-   "link_to": "Open Delivery Demand",
+   "label": "Open Transport Demand",
+   "link_to": "Open Transport Demand",
    "link_type": "Report",
    "is_query_report": 0,
    "type": "Link"
   },
   {
-   "label": "Unallocated Delivery Orders",
-   "link_to": "Unallocated Delivery Orders",
+   "label": "Unallocated Transport Demands",
+   "link_to": "Unallocated Transport Demands",
    "link_type": "Report",
    "is_query_report": 0,
    "type": "Link"

@@ -7,6 +7,9 @@ from frappe.utils import cint, flt, now_datetime
 from frappe.utils.file_manager import get_content_hash, save_file
 
 from vuna_transport.services.execution.pod_service import create_proof_of_delivery
+from vuna_transport.services.execution.stock_identity_service import (
+	get_single_delivery_note_item_batch,
+)
 
 MOBILE_REQUEST_ID_PATTERN = re.compile(r"^[a-f0-9-]{16,64}$", re.IGNORECASE)
 
@@ -181,6 +184,7 @@ def get_assigned_delivery_trips(installation_id, device_identifier=None):
 			"uom",
 			"vuna_actual_start",
 			"vuna_actual_completion",
+			"vuna_task_based",
 		],
 		order_by="departure_time asc, creation asc",
 		limit_page_length=100,
@@ -203,10 +207,10 @@ def get_assigned_delivery_trips(installation_id, device_identifier=None):
 		stops_by_trip.setdefault(stop.parent, []).append(stop)
 	for trip in trips:
 		trip["stops"] = stops_by_trip.get(trip.name, [])
+		_enrich_trip_execution(trip, trip["stops"])
 		trip["stop_count"] = len(trip["stops"])
 		trip["completed_stop_count"] = sum(cint(stop.visited) for stop in trip["stops"])
 		trip["next_stop"] = next((stop.name for stop in trip["stops"] if not cint(stop.visited)), None)
-		_enrich_trip_execution(trip, trip["stops"])
 
 	return {"linked": True, "driver": profile["driver"], "trips": trips}
 
@@ -266,11 +270,13 @@ def get_mobile_offline_manifest(installation_id, device_identifier=None):
 			"stock_qty",
 			"stock_uom",
 			"batch_no",
+			"serial_and_batch_bundle",
 		],
 		order_by="parent asc, idx asc",
 		limit_page_length=10000,
 		ignore_permissions=True,
 	):
+		row.batch_no = get_single_delivery_note_item_batch(row)
 		items_by_note.setdefault(row.parent, []).append(row)
 
 	delivery_notes = []
@@ -351,11 +357,13 @@ def get_delivery_trip_details(installation_id, trip_name, device_identifier=None
 	)
 	_enrich_stops(stops)
 	_set_mobile_stop_actions(trip, stops)
+	_attach_transport_tasks(trip, stops)
 	completed = sum(cint(stop.visited) for stop in stops)
 	next_stop = next((stop.name for stop in stops if not cint(stop.visited)), None)
 	return {
 		"trip": {
 			"name": trip.name,
+			"task_based": bool(getattr(trip, "vuna_task_based", 0)),
 			"status": _mobile_trip_status(trip, stops),
 			"erpnext_status": trip.status,
 			"company": trip.company,
@@ -388,6 +396,7 @@ def get_delivery_note_details(installation_id, trip_name, stop_name, device_iden
 		frappe.throw(_("Delivery Note {0} is not submitted.").format(delivery_note.name))
 	_enrich_stops([stop])
 	_set_mobile_stop_actions(trip, [stop])
+	_attach_transport_tasks(trip, [stop])
 	submitted_pod = None
 	pod_name = getattr(stop, "vuna_proof_of_delivery", None)
 	if pod_name:
@@ -425,7 +434,7 @@ def get_delivery_note_details(installation_id, trip_name, stop_name, device_iden
 					"uom": row.uom,
 					"stock_qty": row.stock_qty,
 					"stock_uom": row.stock_uom,
-					"batch_no": getattr(row, "batch_no", None),
+					"batch_no": get_single_delivery_note_item_batch(row),
 				}
 				for row in delivery_note.items
 			],
@@ -658,6 +667,8 @@ def _delivery_stop_fields(*, include_parent):
 		fields.append("parent")
 	meta = frappe.get_meta("Delivery Stop")
 	for fieldname in (
+		"vuna_depot_names",
+		"vuna_stop_type",
 		"vuna_delivery_status",
 		"vuna_actual_arrival",
 		"vuna_actual_departure",
@@ -913,6 +924,7 @@ def _mobile_trip_actions(trip, stops=None):
 
 
 def _enrich_trip_execution(trip, stops):
+	_attach_transport_tasks(trip, stops)
 	trip["erpnext_status"] = trip.status
 	trip["status"] = _mobile_trip_status(trip, stops)
 	trip["actual_start"] = trip.vuna_actual_start
@@ -921,12 +933,190 @@ def _enrich_trip_execution(trip, stops):
 	_set_mobile_stop_actions(trip, stops)
 
 
+def _attach_transport_tasks(trip, stops):
+	if not getattr(trip, "vuna_task_based", 0) and not frappe.db.exists(
+		"Transport Trip Task",
+		{"delivery_trip": trip.name, "status": ["!=", "Cancelled"]},
+	):
+		return
+	from vuna_transport.services.execution.trip_task_service import TERMINAL_TASK_STATUSES
+
+	# Detail responses use a Document; list responses use frappe._dict rows.
+	if isinstance(trip, dict):
+		trip["task_based"] = bool(getattr(trip, "vuna_task_based", 0))
+	tasks = frappe.get_all(
+		"Transport Trip Task",
+		filters={"delivery_trip": trip.name, "status": ["!=", "Cancelled"]},
+		fields=[
+			"name",
+			"delivery_stop",
+			"task_type",
+			"status",
+			"address",
+			"transport_load",
+			"delivery_note",
+			"return_request",
+			"transport_demand",
+			"dispatch_stock_entry",
+		],
+		order_by="sequence asc, creation asc",
+	)
+	by_stop = {}
+	loading_stops = {task.delivery_stop for task in tasks if task.task_type == "Transfer Dispatch"}
+	actual_stops = {task.delivery_stop for task in tasks if task.task_type != "Transfer Dispatch"}
+	# Preserve old submitted loading records in Desk history, but do not ask
+	# the driver to visit/confirm work completed before departure.
+	stops[:] = [
+		stop
+		for stop in stops
+		if stop.name not in loading_stops or stop.name in actual_stops or stop.get("delivery_note")
+	]
+	tasks = [task for task in tasks if task.task_type != "Transfer Dispatch"]
+	_attach_task_presentation(tasks)
+	for task in tasks:
+		task["operation_label"] = {
+			"Return Pickup": "Return pickup",
+			"Transfer Dispatch": "Loading",
+			"Transfer Receipt": "Depot delivery",
+			"Customer Delivery": "Customer delivery",
+		}.get(task.task_type, task.task_type)
+		if task.return_request:
+			task["operation_label"] = _("Return pickup: {0}").format(task.return_request)
+		task["can_record_proof"] = (
+			task.task_type in ("Transfer Receipt", "Return Pickup")
+			and task.status == "Ready"
+			and not getattr(trip, "vuna_actual_completion", None)
+			and bool(getattr(trip, "vuna_actual_start", None))
+			and not task.get("blocked_reason")
+		)
+		by_stop.setdefault(task.delivery_stop, []).append(task)
+	for index, stop in enumerate(stops, start=1):
+		if loading_stops:
+			stop["idx"] = index
+		stop["tasks"] = by_stop.get(stop.name, [])
+		stop["location_label"] = (
+			stop.get("customer")
+			or stop.get("vuna_depot_names")
+			or next((task.get("party_name") for task in stop["tasks"] if task.get("party_name")), None)
+			or (stop.get("address_details") or {}).get("address_title")
+			or stop.get("address")
+			or "Depot"
+		)
+		customer_tasks = [task for task in stop["tasks"] if task.task_type == "Customer Delivery"]
+		if customer_tasks:
+			stop["can_complete_delivery"] = bool(getattr(trip, "vuna_actual_start", None)) and any(
+				task.status not in TERMINAL_TASK_STATUSES for task in customer_tasks
+			)
+
+
+def _attach_task_presentation(tasks):
+	"""Read-only task cards; no new proof, route stop or stock authority."""
+	if not tasks:
+		return
+	demand_names = sorted({task.transport_demand for task in tasks if task.transport_demand})
+	demands = (
+		{
+			row.name: row
+			for row in frappe.get_all(
+				"Transport Demand",
+				filters={"name": ["in", demand_names]},
+				fields=[
+					"name",
+					"source_document_type",
+					"source_document",
+					"source_warehouse",
+					"destination_warehouse",
+				],
+			)
+		}
+		if demand_names
+		else {}
+	)
+	request_names = {task.return_request for task in tasks if task.return_request}
+	request_names.update(
+		row.source_document for row in demands.values() if row.source_document_type == "Return Request"
+	)
+	requests = (
+		{
+			row.name: row
+			for row in frappe.get_all(
+				"Return Request",
+				filters={"name": ["in", sorted(request_names)]},
+				fields=["name", "return_context", "customer", "source_warehouse"],
+			)
+		}
+		if request_names
+		else {}
+	)
+	by_task = {}
+	for item in frappe.get_all(
+		"Transport Trip Task Item",
+		filters={"parent": ["in", [task.name for task in tasks]]},
+		fields=["parent", "item_code", "qty", "uom"],
+		order_by="idx asc",
+	):
+		by_task.setdefault(item.parent, []).append(
+			{
+				"item_code": item.item_code,
+				"item_name": frappe.get_cached_value("Item", item.item_code, "item_name"),
+				"qty": item.qty,
+				"uom": item.uom,
+			}
+		)
+	for task in tasks:
+		demand = demands.get(task.transport_demand)
+		request_name = task.return_request or (
+			demand.source_document if demand and demand.source_document_type == "Return Request" else None
+		)
+		request = requests.get(request_name)
+		task["items"] = by_task.get(task.name, [])
+		if task.task_type == "Return Pickup":
+			task["reference_doctype"], task["reference_name"] = "Return Request", request_name
+			task["party_name"] = (
+				request.customer
+				if request and request.return_context == "Customer"
+				else demand.source_warehouse
+				if demand
+				else request.source_warehouse
+				if request
+				else None
+			)
+		elif task.task_type == "Customer Delivery":
+			task["reference_doctype"], task["reference_name"] = "Delivery Note", task.delivery_note
+		elif task.task_type == "Supplier Pickup":
+			task["reference_doctype"], task["reference_name"] = (
+				"Purchase Order",
+				demand.source_document if demand else None,
+			)
+			task["party_name"] = (
+				frappe.db.get_value("Purchase Order", demand.source_document, "supplier_name")
+				if demand
+				else None
+			)
+			task["blocked_reason"] = _(
+				"Collection is confirmed through the warehouse team's Purchase Receipt."
+			)
+		else:
+			task["reference_doctype"], task["reference_name"] = "Stock Entry", task.dispatch_stock_entry
+			task["party_name"] = demand.destination_warehouse if demand else None
+		if task.task_type == "Transfer Receipt" and request_name and not task.dispatch_stock_entry:
+			task["blocked_reason"] = _("Complete the return pickup before receiving these goods.")
+
+
 def _set_mobile_stop_actions(trip, stops):
+	from vuna_transport.services.execution.unplanned_pickup_policy import attach_collection_visibility
+
+	attach_collection_visibility(trip.name, stops)
 	trip_started = bool(getattr(trip, "vuna_actual_start", None) or trip.get("actual_start"))
 	trip_completed = bool(getattr(trip, "vuna_actual_completion", None) or trip.get("actual_completion"))
 	for stop in stops:
 		stop["can_arrive"] = False
-		stop["can_complete_delivery"] = trip_started and not trip_completed and not cint(stop.visited)
+		stop["can_complete_delivery"] = (
+			trip_started
+			and not trip_completed
+			and not cint(stop.visited)
+			and (not getattr(trip, "vuna_task_based", 0) or bool(stop.get("delivery_note")))
+		)
 		stop["requires_trip_start"] = not trip_started
 
 

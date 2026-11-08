@@ -1,3 +1,56 @@
+/* global erpnext */
+
+function is_depot_only_stop(frm, stop) {
+	return (
+		stop.vuna_stop_type === "Depot" ||
+		(frm.doc.vuna_task_based &&
+			stop.vuna_task_keys &&
+			!stop.delivery_note &&
+			stop.vuna_stop_type !== "Mixed")
+	);
+}
+
+frappe.ui.form.on("Delivery Stop", {
+	form_render(frm, cdt, cdn) {
+		const stop = frappe.get_doc(cdt, cdn);
+		const row = frm.fields_dict.delivery_stops.grid.grid_rows_by_docname[cdn];
+		if (row) row.toggle_editable("customer", !is_depot_only_stop(frm, stop));
+	},
+	async vuna_record_collection(frm, cdt, cdn) {
+		if (
+			frm.doc.docstatus !== 1 ||
+			!frm.doc.vuna_actual_start ||
+			frm.doc.vuna_actual_completion ||
+			frm.doc.status === "Completed"
+		) {
+			frappe.msgprint(__("Collections require a started, active trip."));
+			return;
+		}
+		const { message } = await frappe.call({
+			method: "vuna_transport.services.execution.unplanned_pickup_policy.get_unplanned_pickup_policy",
+		});
+		if (!message.enabled) {
+			frappe.msgprint(
+				__(
+					"Unplanned return pickups are disabled. Use an approved Return Request pickup task."
+				)
+			);
+			return;
+		}
+		const stop = frappe.get_doc(cdt, cdn);
+		frappe.new_doc("Proof of Delivery", {
+			proof_type: "Unplanned Collection",
+			company: frm.doc.company,
+			delivery_trip: frm.doc.name,
+			collection_stop: stop.name,
+			direction: "Pickup",
+			collection_party_type: stop.customer ? "Customer" : "Depot",
+			collection_location: [stop.customer, stop.address].filter(Boolean).join(" — "),
+			delivery_datetime: frappe.datetime.now_datetime(),
+		});
+	},
+});
+
 frappe.ui.form.on("Delivery Trip", {
 	setup(frm) {
 		frm.set_query("vehicle", () => {
@@ -13,32 +66,79 @@ frappe.ui.form.on("Delivery Trip", {
 	},
 
 	refresh(frm) {
+		const grid = frm.fields_dict?.delivery_stops?.grid;
+		if (grid) {
+			const stops = frm.doc.delivery_stops || [];
+			grid.update_docfield_property(
+				"customer",
+				"hidden",
+				stops.length > 0 && stops.every((stop) => is_depot_only_stop(frm, stop))
+			);
+			grid.update_docfield_property("vuna_record_collection", "hidden", true);
+			if (
+				frm.doc.docstatus === 1 &&
+				frm.doc.vuna_actual_start &&
+				!frm.doc.vuna_actual_completion &&
+				frm.doc.status !== "Completed"
+			) {
+				frappe.call({
+					method: "vuna_transport.services.execution.unplanned_pickup_policy.get_unplanned_pickup_policy",
+					callback: ({ message }) =>
+						grid.update_docfield_property(
+							"vuna_record_collection",
+							"hidden",
+							!message.enabled
+						),
+				});
+			}
+		}
+		// ERPNext resets this list in refresh, so setup is too early.
+		// Stop upstream traversal, but retain POD and its downstream cascade.
+		frm.ignore_doctypes_on_cancel_all = [
+			...new Set([
+				...(frm.ignore_doctypes_on_cancel_all || []),
+				"Vehicle Allocation",
+				"Transport Load",
+				"Transport Trip Task",
+				"Delivery Note",
+				// ERPNext cancels bundles with their stock voucher, not before it.
+				"Serial and Batch Bundle",
+			]),
+		];
+		frm.toggle_display("optimize_route", !frm.doc.vuna_task_based);
 		const loads = (frm.doc.delivery_stops || [])
 			.map((row) => row.vuna_delivery_load)
 			.filter(Boolean);
-		if (loads.length) {
+
+		if (frm.doc.docstatus === 0 && !frm.doc.vuna_task_based) {
+			frm.remove_custom_button(__("Delivery Note"), __("Get stops from"));
 			frm.add_custom_button(
-				loads.length === 1 ? __("Open Delivery Load") : __("Open Delivery Loads"),
+				__("Delivery Note"),
 				() => {
-					frappe.set_route(
-						loads.length === 1 ? "Form" : "List",
-						"Delivery Load",
-						loads.length === 1 ? loads[0] : { name: ["in", loads] }
-					);
-				},
-				__("Vuna Transport")
-			);
-			frm.add_custom_button(
-				__("Allocation History"),
-				() => {
-					frappe.set_route("List", "Vehicle Allocation", {
-						delivery_load: ["in", loads],
+					const get_query_filters = {
+						company: frm.doc.company,
+						docstatus: 1,
+						status: ["!=", "Closed"],
+					};
+					if (loads.length) get_query_filters.vuna_delivery_load = ["in", loads];
+
+					erpnext.utils.map_current_doc({
+						method: "erpnext.stock.doctype.delivery_note.delivery_note.make_delivery_trip",
+						source_doctype: "Delivery Note",
+						target: frm,
+						date_field: "posting_date",
+						setters: {
+							company: frm.doc.company,
+							customer: null,
+						},
+						get_query_filters,
 					});
 				},
-				__("Vuna Transport")
+				__("Get stops from")
 			);
 		}
-
+		if (frm.doc.vuna_task_based)
+			frm.remove_custom_button(__("Delivery Note"), __("Get stops from"));
 		if (
 			loads.length &&
 			frm.doc.docstatus < 2 &&
@@ -54,7 +154,7 @@ frappe.ui.form.on("Delivery Trip", {
 						freeze_message: __("Preparing replacement allocation..."),
 					});
 				},
-				__("Vuna Transport")
+				__("Create")
 			);
 		}
 
@@ -69,7 +169,7 @@ frappe.ui.form.on("Delivery Trip", {
 					};
 					frappe.new_doc("Gate Pass");
 				},
-				__("Vuna Transport")
+				__("Create")
 			);
 			const pending_stops = (frm.doc.delivery_stops || []).filter(
 				(stop) => stop.delivery_note && !stop.vuna_proof_of_delivery
@@ -116,9 +216,10 @@ frappe.ui.form.on("Delivery Trip", {
 						});
 						dialog.show();
 					},
-					__("Vuna Transport")
+					__("Create")
 				);
 			}
 		}
+		frm.page.set_inner_btn_group_as_primary(__("Create"));
 	},
 });

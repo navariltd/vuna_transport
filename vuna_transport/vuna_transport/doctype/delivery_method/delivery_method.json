@@ -9,7 +9,10 @@
  "field_order": [
   "identity_section",
   "delivery_method_name",
-  "fulfilment_type",
+  "buying",
+  "selling",
+  "internal",
+  "transport_arranged_by",
   "column_break_method",
   "disabled",
   "requirements_section",
@@ -33,13 +36,36 @@
    "unique": 1
   },
   {
-   "description": "Describes how the customer order is fulfilled. Owned or subcontracted transport is selected later on Vehicle Allocation.",
-   "fieldname": "fulfilment_type",
+   "default": "0",
+   "fieldname": "buying",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Buying"
+  },
+  {
+   "default": "0",
+   "fieldname": "selling",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Selling"
+  },
+  {
+   "default": "0",
+   "fieldname": "internal",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Internal"
+  },
+  {
+   "fieldname": "transport_arranged_by",
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Fulfilment Type",
-   "options": "Company Delivery\nCustomer Pickup\nCourier\nDirect Supplier Delivery\nOther",
+   "label": "Transport Arranged By",
+   "options": "Company\nCounterparty",
    "reqd": 1
   },
   {
@@ -53,9 +79,10 @@
    "label": "Disabled"
   },
   {
+   "description": "Leave all three off to create demands manually and use an existing trip. Enable the steps needed when using load planning and a new vehicle allocation.",
    "fieldname": "requirements_section",
    "fieldtype": "Section Break",
-   "label": "Required Workflow"
+   "label": "Transport Workflow"
   },
   {
    "default": "1",
@@ -80,11 +107,27 @@
  "index_web_pages_for_search": 1,
  "links": [
   {
-   "link_doctype": "Delivery Order",
+   "link_doctype": "Transport Demand",
    "link_fieldname": "delivery_method"
   },
   {
-   "link_doctype": "Delivery Load",
+   "link_doctype": "Material Request",
+   "link_fieldname": "vuna_delivery_method"
+  },
+  {
+   "link_doctype": "Return Request",
+   "link_fieldname": "delivery_method"
+  },
+  {
+   "link_doctype": "Purchase Order",
+   "link_fieldname": "vuna_delivery_method"
+  },
+  {
+   "link_doctype": "Sales Order",
+   "link_fieldname": "vuna_delivery_method"
+  },
+  {
+   "link_doctype": "Transport Load",
    "link_fieldname": "delivery_method"
   }
  ],
@@ -95,6 +138,26 @@
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
+  {
+   "role": "Purchase User",
+   "read": 1,
+   "select": 1
+  },
+  {
+   "role": "Purchase Manager",
+   "read": 1,
+   "select": 1
+  },
+  {
+   "role": "Stock User",
+   "read": 1,
+   "select": 1
+  },
+  {
+   "role": "Stock Manager",
+   "read": 1,
+   "select": 1
+  },
   {
    "create": 1,
    "delete": 1,

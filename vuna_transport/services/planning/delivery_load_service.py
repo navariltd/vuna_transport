@@ -2,6 +2,7 @@
 
 import frappe
 from frappe import _
+from frappe.model.document import Document
 from frappe.utils import cint, flt
 
 from vuna_transport.services.demand.delivery_method_service import (
@@ -87,10 +88,12 @@ def get_available_delivery_orders(
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def get_compatible_vehicle_categories(doctype, txt, searchfield, start, page_len, filters, **kwargs):
+def get_compatible_vehicle_categories(
+	doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict | str | None, **kwargs
+):
 	"""Filter Vehicle Category choices using the current load requirements.
 
-	This query improves the form experience only; Delivery Load validation remains
+	This query improves the form experience only; Transport Load validation remains
 	the final authority when the document is saved or submitted.
 	"""
 	require_doctype_permission("Vehicle Category", "read")
@@ -112,12 +115,30 @@ def get_compatible_vehicle_categories(doctype, txt, searchfield, start, page_len
 	delivery_order_names = filters.get("delivery_order_names") or []
 	if isinstance(delivery_order_names, str):
 		delivery_order_names = frappe.parse_json(delivery_order_names) or []
+	demand_names = filters.get("transport_demand_names") or []
+	if isinstance(demand_names, str):
+		demand_names = frappe.parse_json(demand_names)
+	if (
+		not isinstance(demand_names, list)
+		or len(demand_names) > 500
+		or any(not isinstance(name, str) for name in demand_names)
+	):
+		frappe.throw(_("Select no more than 500 readable Transport Demands."))
+	access_limits = []
+	for name in sorted(set(demand_names)):
+		demand = frappe.get_doc("Transport Demand", name)
+		require_document_permission(demand, "read")
+		access_limits.append(demand.maximum_vehicle_category)
 
 	compatible = []
 	for category in get_vehicle_categories(load_uoms, get_capacity_buffer_percentage()):
 		result = evaluate_vehicle_category(totals, category, requirements)
 		if not result["compatible"] or not _vehicle_meets_delivery_order_access_limits(
 			category, delivery_order_names
+		):
+			continue
+		if any(
+			not validate_vehicle_access_limit(category, maximum)["compatible"] for maximum in access_limits
 		):
 			continue
 		label = category.vehicle_category_name or category.name
@@ -156,9 +177,9 @@ def get_vehicle_category_capacity_summary(vehicle_category, totals=None, weight_
 
 
 @frappe.whitelist()
-def create_delivery_load(delivery_order_names):
+def create_delivery_load(delivery_order_names: list[str] | str):
 	"""Create a proposed load from one or more open Delivery Orders."""
-	require_doctype_permission("Delivery Load", "create")
+	require_doctype_permission("Transport Load", "create")
 	if isinstance(delivery_order_names, str):
 		delivery_order_names = frappe.parse_json(delivery_order_names)
 
@@ -192,26 +213,61 @@ def create_delivery_load(delivery_order_names):
 
 
 @frappe.whitelist()
-def create_delivery_load_from_plan(allocations, vehicle_category=None):
+def create_delivery_load_from_plan(
+	allocations: list | str, vehicle_category: str | None = None, source_warehouse: str | None = None
+):
 	"""Create a draft load from planner-selected item quantities."""
-	require_doctype_permission("Delivery Load", "create")
-	load = build_delivery_load_from_allocations(allocations, vehicle_category)
+	require_doctype_permission("Transport Load", "create")
+	load = build_delivery_load_from_allocations(
+		allocations, vehicle_category, source_warehouse=source_warehouse
+	)
 	load.insert()
 	load.add_comment("Info", _("Created from the Dispatch Planning workbench."))
 	return load.name
 
 
-def build_delivery_load_from_allocations(allocations, vehicle_category=None):
-	"""Build one unsaved authoritative Delivery Load from item allocations."""
+def build_delivery_load_from_allocations(allocations, vehicle_category=None, source_warehouse=None):
+	"""Build one unsaved authoritative Transport Load from item allocations."""
 	allocations = frappe.parse_json(allocations) if isinstance(allocations, str) else allocations
 	if not isinstance(allocations, list) or not allocations:
 		frappe.throw(_("Select at least one Delivery Order item."))
 	if len(allocations) > MAX_PLANNING_ALLOCATION_ROWS:
 		frappe.throw(
-			_("A Delivery Load cannot contain more than {0} planning rows.").format(
+			_("A Transport Load cannot contain more than {0} planning rows.").format(
 				MAX_PLANNING_ALLOCATION_ROWS
 			)
 		)
+	if any(row.get("transport_demand") or row.get("transport_demand_item") for row in allocations):
+		from vuna_transport.services.planning.customer_demand_load_service import _read_demand
+
+		if any(
+			not row.get("transport_demand")
+			or not row.get("transport_demand_item")
+			or row.get("delivery_order")
+			or row.get("delivery_order_item")
+			for row in allocations
+		):
+			frappe.throw(_("Select only customer Transport Demand items for this plan."))
+		first = _read_demand(allocations[0]["transport_demand"])
+		load = frappe.new_doc("Transport Load")
+		load.company, load.movement_type = first.company, "Customer Delivery"
+		load.source_warehouse = source_warehouse or first.source_warehouse
+		load.delivery_method = canonical_delivery_method(first.delivery_method)
+		load.dispatch_date, load.transport_zone, load.transport_route = (
+			first.required_date,
+			first.transport_zone,
+			first.preferred_route,
+		)
+		load.required_vehicle_category, load.status = vehicle_category, "Proposed"
+		for row in allocations:
+			load.append(
+				"delivery_orders",
+				{
+					key: row.get(key)
+					for key in ("transport_demand", "transport_demand_item", "allocated_quantity")
+				},
+			)
+		return load
 
 	delivery_order_names = sorted(
 		{row.get("delivery_order") for row in allocations if row.get("delivery_order")}
@@ -225,7 +281,7 @@ def build_delivery_load_from_allocations(allocations, vehicle_category=None):
 	first = delivery_orders[delivery_order_names[0]]
 	require_company_access(first.company)
 
-	load = frappe.new_doc("Delivery Load")
+	load = frappe.new_doc("Transport Load")
 	load.company = first.company
 	load.source_warehouse = first.source_warehouse
 	load.delivery_method = canonical_delivery_method(first.delivery_method)
@@ -261,17 +317,17 @@ def build_delivery_load_from_allocations(allocations, vehicle_category=None):
 
 
 @frappe.whitelist()
-def add_delivery_orders_to_load(load, delivery_order_names):
+def add_delivery_orders_to_load(load: str | Document, delivery_order_names: list[str] | str):
 	"""Append all still-unallocated items from selected Delivery Orders to a draft load."""
 	if isinstance(delivery_order_names, str):
 		delivery_order_names = frappe.parse_json(delivery_order_names)
 	if not delivery_order_names:
 		frappe.throw(_("Select at least one Delivery Order."))
 
-	load = frappe.get_doc("Delivery Load", load) if isinstance(load, str) else load
+	load = frappe.get_doc("Transport Load", load) if isinstance(load, str) else load
 	require_document_permission(load, "write")
 	if load.docstatus != 0:
-		frappe.throw(_("Items can only be fetched into a draft Delivery Load."))
+		frappe.throw(_("Items can only be fetched into a draft Transport Load."))
 
 	delivery_orders = [frappe.get_doc("Delivery Order", name) for name in delivery_order_names]
 	for delivery_order in delivery_orders:
@@ -370,9 +426,13 @@ def add_delivery_orders_to_load(load, delivery_order_names):
 
 
 @frappe.whitelist()
-def get_delivery_order_items(delivery_order_names, delivery_order_item_names=None, source_warehouse=None):
+def get_delivery_order_items(
+	delivery_order_names: list[str] | str,
+	delivery_order_item_names: list[str] | str | None = None,
+	source_warehouse: str | None = None,
+):
 	"""Return validated, still-unallocated load rows for a client-side draft Load."""
-	require_doctype_permission("Delivery Load", "create")
+	require_doctype_permission("Transport Load", "create")
 	if isinstance(delivery_order_names, str):
 		delivery_order_names = frappe.parse_json(delivery_order_names)
 	if not delivery_order_names:
@@ -526,7 +586,7 @@ def _validate_delivery_orders(delivery_orders):
 	for delivery_order in delivery_orders:
 		if delivery_order.docstatus != 1:
 			frappe.throw(
-				_("Delivery Order {0} must be submitted before creating a Delivery Load.").format(
+				_("Delivery Order {0} must be submitted before creating a Transport Load.").format(
 					delivery_order.name
 				)
 			)
@@ -548,7 +608,7 @@ def _validate_delivery_orders(delivery_orders):
 
 
 def calculate_load_totals(load):
-	"""Calculate aggregate capacity and stop values on a Delivery Load."""
+	"""Calculate aggregate capacity and stop values on a Transport Load."""
 	uoms = get_transport_uoms()
 	load.weight_uom = uoms.weight_uom or next(
 		(
@@ -715,21 +775,32 @@ def get_compatible_vehicle_category_names(load):
 	return compatible
 
 
+def _load_access_limits(load):
+	sources = set()
+	for row in load.delivery_orders:
+		if getattr(row, "delivery_order", None):
+			sources.add(("Delivery Order", row.delivery_order))
+		elif getattr(row, "transport_demand", None):
+			sources.add(("Transport Demand", row.transport_demand))
+	return [
+		(name, frappe.db.get_value(doctype, name, "maximum_vehicle_category"))
+		for doctype, name in sorted(sources)
+	]
+
+
 def _validate_load_vehicle_access_limits(load, vehicle):
-	for delivery_order in {row.delivery_order for row in load.delivery_orders if row.delivery_order}:
-		maximum_category = frappe.db.get_value("Delivery Order", delivery_order, "maximum_vehicle_category")
+	for delivery_order, maximum_category in _load_access_limits(load):
 		result = validate_vehicle_access_limit(vehicle, maximum_category)
 		if not result["compatible"]:
 			frappe.throw(
-				_("Vehicle Category {0} is incompatible with Delivery Order {1}: {2}").format(
+				_("Vehicle Category {0} is incompatible with delivery location {1}: {2}").format(
 					vehicle.name, delivery_order, result["reason"]
 				)
 			)
 
 
 def _vehicle_meets_load_access_limits(load, vehicle):
-	for delivery_order in {row.delivery_order for row in load.delivery_orders if row.delivery_order}:
-		maximum_category = frappe.db.get_value("Delivery Order", delivery_order, "maximum_vehicle_category")
+	for _source, maximum_category in _load_access_limits(load):
 		if not validate_vehicle_access_limit(vehicle, maximum_category)["compatible"]:
 			return False
 	return True

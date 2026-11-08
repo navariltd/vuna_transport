@@ -6,7 +6,10 @@ import frappe
 from frappe import _
 from frappe.utils import flt, getdate
 
-from vuna_transport.services.demand.delivery_method_service import canonical_delivery_method
+from vuna_transport.services.demand.delivery_method_service import (
+	canonical_delivery_method,
+	validate_sales_order_delivery_method,
+)
 from vuna_transport.services.routing.location_service import get_address_planning_data
 from vuna_transport.services.shared.measurement_service import convert_measurement, get_transport_uoms
 from vuna_transport.services.shared.security_service import (
@@ -38,6 +41,10 @@ def create_delivery_orders_for_sales_order(sales_order):
 	Returns:
 		list[str]: Names of newly-created Delivery Orders.
 	"""
+	if not frappe.db.exists("DocType", "Delivery Order"):
+		from vuna_transport.services.demand.sales_transport_demand_service import create_sales_demands
+
+		return create_sales_demands(sales_order)
 	doc = _get_sales_order(sales_order)
 	_validate_sales_order(doc)
 	if not _requires_transport_planning(doc):
@@ -70,8 +77,19 @@ def create_delivery_orders_for_sales_order(sales_order):
 
 def sync_delivery_orders_for_sales_order(sales_order):
 	"""Refresh existing Delivery Orders after a submitted Sales Order changes."""
+	from vuna_transport.services.demand.source_policy_service import get_source_policy
+
+	if not get_source_policy("Sales Order").enabled:
+		return []
 	doc = _get_sales_order(sales_order)
-	_validate_sales_order(doc)
+	_validate_sales_order(doc, check_generation_policy=False)
+	from vuna_transport.services.demand.sales_transport_demand_service import refresh_sales_demands
+
+	refresh_sales_demands(doc)
+	if not frappe.db.exists("DocType", "Delivery Order"):
+		from vuna_transport.services.demand.source_policy_service import automatically_create_from_source
+
+		return automatically_create_from_source(doc)
 
 	delivery_order_names = frappe.get_all("Delivery Order", filters={"sales_order": doc.name}, pluck="name")
 	for delivery_order_name in delivery_order_names:
@@ -80,7 +98,9 @@ def sync_delivery_orders_for_sales_order(sales_order):
 		sync_delivery_order_status_from_sales_order(delivery_order, doc)
 
 	# The existing generator remains responsible for newly-added Sales Order Items.
-	return create_delivery_orders_for_sales_order(doc)
+	from vuna_transport.services.demand.source_policy_service import automatically_create_from_source
+
+	return automatically_create_from_source(doc)
 
 
 def sync_delivery_order_status_from_sales_order(delivery_order, sales_order=None):
@@ -97,13 +117,24 @@ def sync_delivery_order_status_from_sales_order(delivery_order, sales_order=None
 
 
 @frappe.whitelist()
-def get_delivery_order_generation_status(sales_order):
+def get_delivery_order_generation_status(sales_order: str):
 	"""Return whether the Sales Order currently has demand to generate."""
+	if not frappe.db.exists("DocType", "Delivery Order"):
+		from vuna_transport.services.demand.sales_transport_demand_service import get_generation_status
+
+		return get_generation_status(sales_order)
 	doc = _get_sales_order(sales_order)
 	require_document_permission(doc, "read")
 
 	if doc.docstatus != 1:
 		return {"can_generate": False, "reason": _("The Sales Order must be submitted first.")}
+	from vuna_transport.services.demand.source_policy_service import get_source_policy
+
+	policy = get_source_policy("Sales Order")
+	if not policy.enabled or (
+		policy.required_workflow_state and doc.get("workflow_state") != policy.required_workflow_state
+	):
+		return {"can_generate": False, "reason": _("The source is disabled or awaiting transport approval.")}
 	if not _requires_transport_planning(doc):
 		return {
 			"can_generate": False,
@@ -122,8 +153,15 @@ def get_delivery_order_generation_status(sales_order):
 
 
 @frappe.whitelist()
-def generate_delivery_orders_for_sales_order(sales_order):
-	"""Generate missing Delivery Orders from an explicitly requested Sales Order action."""
+def generate_delivery_orders_for_sales_order(sales_order: str):
+	"""Saved actions follow the site's explicit customer cutover mode."""
+	from vuna_transport.services.demand.sales_transport_demand_service import (
+		create_sales_demands,
+		native_customer_demand_enabled,
+	)
+
+	if native_customer_demand_enabled():
+		return create_sales_demands(sales_order)
 	doc = _get_sales_order(sales_order)
 	require_document_permission(doc, "read")
 	require_doctype_permission("Delivery Order", "create")
@@ -149,7 +187,7 @@ def sync_delivery_order_quantities(delivery_order, persist=False):
 			frappe.throw(
 				_(
 					"Sales Order quantity for item {0} cannot be reduced to {1}; "
-					"{2} is already reserved/allocated on Delivery Loads."
+					"{2} is already reserved/allocated on Transport Loads."
 				).format(row.item_code, transport_qty, reserved + allocated)
 			)
 
@@ -192,11 +230,18 @@ def sync_delivery_orders_after_direct_delivery_note(doc, method=None):
 		return
 	sales_orders = {row.against_sales_order for row in doc.items if getattr(row, "against_sales_order", None)}
 	for sales_order in sales_orders:
-		delivery_orders = frappe.get_all("Delivery Order", filters={"sales_order": sales_order}, pluck="name")
+		delivery_orders = (
+			frappe.get_all("Delivery Order", filters={"sales_order": sales_order}, pluck="name")
+			if frappe.db.exists("DocType", "Delivery Order")
+			else []
+		)
 		for delivery_order_name in delivery_orders:
 			sync_delivery_order_quantities(
 				frappe.get_doc("Delivery Order", delivery_order_name), persist=True
 			)
+		from vuna_transport.services.demand.sales_transport_demand_service import refresh_sales_demands
+
+		refresh_sales_demands(frappe.get_doc("Sales Order", sales_order))
 
 
 def get_sales_order_item_quantities(sales_order_item):
@@ -220,10 +265,10 @@ def _get_delivery_order_item_commitments(delivery_order_item):
 		select
 			coalesce(sum(case when dl.docstatus = 0 then dlo.allocated_quantity else 0 end), 0) as reserved,
 			coalesce(sum(case when dl.docstatus = 1 then dlo.allocated_quantity else 0 end), 0) as allocated
-		from `tabDelivery Load Order` dlo
-		join `tabDelivery Load` dl on dl.name = dlo.parent
+		from `tabTransport Load Item` dlo
+		join `tabTransport Load` dl on dl.name = dlo.parent
 		where dlo.delivery_order_item = %s
-		and dlo.parenttype = 'Delivery Load'
+		and dlo.parenttype = 'Transport Load'
 		and dl.docstatus in (0, 1)
 		""",
 		delivery_order_item,
@@ -238,13 +283,13 @@ def _get_sales_order(sales_order):
 	return sales_order
 
 
-def _validate_sales_order(sales_order):
+def _validate_sales_order(sales_order, check_generation_policy=True):
 	if sales_order.doctype != "Sales Order":
 		frappe.throw(_("Delivery Orders can only be generated from a Sales Order."))
 
 	if sales_order.docstatus != 1:
 		frappe.throw(_("The Sales Order must be submitted before Delivery Orders are generated."))
-	if getattr(sales_order, "status", None) in ("Closed", "Cancelled"):
+	if check_generation_policy and getattr(sales_order, "status", None) in ("Closed", "Cancelled"):
 		frappe.throw(
 			_("Sales Order {0} is {1} and cannot generate new Delivery Orders.").format(
 				sales_order.name, sales_order.status
@@ -254,6 +299,10 @@ def _validate_sales_order(sales_order):
 	settings = frappe.get_single("Transport Settings")
 	if not settings.enabled:
 		frappe.throw(_("Transport Management is disabled in Transport Settings."))
+	from vuna_transport.services.demand.source_policy_service import require_source_enabled
+
+	if check_generation_policy:
+		require_source_enabled(sales_order)
 
 
 def _get_transport_quantity(item):
@@ -314,7 +363,7 @@ def _get_item_delivery_group(sales_order_item, company=None):
 	group = frappe.get_cached_doc("Delivery Group", group_name)
 	if group.disabled:
 		frappe.throw(
-			_("Delivery Group {0} is disabled and cannot be used for new Delivery Orders.").format(group.name)
+			_("Delivery Group {0} is disabled and cannot be used for new customer demand.").format(group.name)
 		)
 	if group.company and company and group.company != company:
 		frappe.throw(
@@ -326,16 +375,36 @@ def _get_item_delivery_group(sales_order_item, company=None):
 
 
 def _is_item_already_linked(sales_order_item):
-	return bool(
+	legacy = bool(
 		frappe.get_all(
 			"Delivery Order Item",
 			filters={"sales_order_item": sales_order_item},
 			limit=1,
 		)
 	)
+	return legacy or bool(
+		frappe.db.sql_list(
+			"""select i.name from `tabTransport Demand Item` i
+		join `tabTransport Demand` d on d.name=i.parent
+		where i.source_item=%s and d.source_document_type='Sales Order'
+		and d.docstatus!=2 and i.parenttype='Transport Demand' limit 1""",
+			sales_order_item,
+		)
+	)
 
 
 def _create_delivery_order(sales_order, group_key, group_items):
+	_validate_group_key(group_key[0], group_key[2])
+	delivery_order = frappe.new_doc("Delivery Order")
+	delivery_order.update(build_sales_planning_snapshot(sales_order, group_key, group_items))
+	delivery_order.insert(ignore_permissions=True)
+	if _should_auto_submit_delivery_orders():
+		delivery_order.flags.ignore_permissions = True
+		delivery_order.submit()
+	return delivery_order.name
+
+
+def build_sales_planning_snapshot(sales_order, group_key, group_items):
 	(
 		delivery_date,
 		delivery_address,
@@ -346,8 +415,10 @@ def _create_delivery_order(sales_order, group_key, group_items):
 		delivery_method,
 		delivery_group,
 	) = group_key
-	_validate_group_key(delivery_date, source_warehouse)
-	delivery_order = frappe.new_doc("Delivery Order")
+	if not delivery_date:
+		frappe.throw(_("A required delivery date is needed for customer transport demand."))
+	delivery_order = frappe._dict()
+	rows = []
 
 	delivery_order.company = sales_order.company
 	delivery_order.source_document_type = "Sales Order"
@@ -396,7 +467,7 @@ def _create_delivery_order(sales_order, group_key, group_items):
 			requirements.transport_compatibility_group,
 			delivery_group,
 		)
-		delivery_order.append("items", row_values)
+		rows.append(row_values)
 		for field in ("transport_qty", "weight", "volume", "pallets", "cases", "crates"):
 			totals[field] += flt(row_values.get(field))
 
@@ -411,15 +482,14 @@ def _create_delivery_order(sales_order, group_key, group_items):
 	delivery_order.total_cases = totals["cases"]
 	delivery_order.total_crates = totals["crates"]
 
-	delivery_order.insert(ignore_permissions=True)
-	if _should_auto_submit_delivery_orders():
-		delivery_order.flags.ignore_permissions = True
-		delivery_order.submit()
-	return delivery_order.name
+	delivery_order["items"] = rows
+	return delivery_order
 
 
 def _should_auto_submit_delivery_orders():
-	return bool(frappe.db.get_single_value("Transport Settings", "auto_submit_delivery_orders"))
+	from vuna_transport.services.demand.source_policy_service import get_source_policy
+
+	return bool(get_source_policy("Sales Order").auto_submit_delivery_orders)
 
 
 def _get_group_transport_requirements(group_items, handling_profile=None, company=None):
@@ -429,7 +499,7 @@ def _get_group_transport_requirements(group_items, handling_profile=None, compan
 	}
 	if len(body_types) > 1:
 		frappe.throw(
-			_("Items in one Delivery Order require conflicting vehicle body types: {0}.").format(
+			_("Items in one customer demand require conflicting vehicle body types: {0}.").format(
 				", ".join(sorted(body_types))
 			)
 		)
@@ -470,7 +540,7 @@ def _get_transport_compatibility_group(item, company=None):
 	if group.disabled:
 		frappe.throw(
 			_(
-				"Transport Compatibility Group {0} is disabled and cannot be used for new Delivery Orders."
+				"Transport Compatibility Group {0} is disabled and cannot be used for new customer demand."
 			).format(group.name)
 		)
 	if group.company and company and group.company != company:
@@ -486,10 +556,8 @@ def _requires_transport_planning(sales_order):
 	delivery_method = getattr(sales_order, "vuna_delivery_method", None)
 	if not delivery_method:
 		return True
-	method = frappe.get_cached_doc("Delivery Method", delivery_method)
-	if method.disabled:
-		frappe.throw(_("Delivery Method {0} is disabled.").format(method.name))
-	return bool(method.requires_transport_planning)
+	workflow = validate_sales_order_delivery_method(sales_order)
+	return bool(workflow.requires_transport_planning or workflow.transport_arranged_by == "Company")
 
 
 def _validate_group_key(delivery_date, source_warehouse):

@@ -34,7 +34,7 @@ def validate_incident(incident):
 	allocation = _get_optional_doc("Vehicle Allocation", incident.vehicle_allocation)
 	trip = _get_optional_doc("Delivery Trip", incident.delivery_trip)
 	allocation = _load_context_from_references(incident, allocation, trip)
-	load = _get_optional_doc("Delivery Load", incident.delivery_load)
+	load = _get_optional_doc("Transport Load", incident.delivery_load)
 	replacement = _get_optional_doc("Vehicle Allocation", incident.replacement_vehicle_allocation)
 	repair = _get_optional_doc("Asset Repair", incident.asset_repair)
 	_validate_incident_context(
@@ -79,7 +79,7 @@ def _validate_incident_context(
 	repair=None,
 ):
 	for reference, label in (
-		(load, _("Delivery Load")),
+		(load, _("Transport Load")),
 		(trip, _("Delivery Trip")),
 		(allocation, _("Vehicle Allocation")),
 	):
@@ -88,7 +88,7 @@ def _validate_incident_context(
 
 	if trip:
 		if incident.delivery_load and incident.delivery_load not in get_delivery_trip_load_names(trip):
-			frappe.throw(_("The Delivery Trip does not belong to the selected Delivery Load."))
+			frappe.throw(_("The Delivery Trip does not belong to the selected Transport Load."))
 		if allocation and allocation.name not in {
 			getattr(trip, "vuna_vehicle_allocation", None),
 			getattr(trip, "vuna_current_vehicle_allocation", None),
@@ -97,7 +97,7 @@ def _validate_incident_context(
 
 	if allocation:
 		if incident.delivery_load and not allocation_includes_load(allocation, incident.delivery_load):
-			frappe.throw(_("The Vehicle Allocation belongs to a different Delivery Load."))
+			frappe.throw(_("The Vehicle Allocation belongs to a different Transport Load."))
 		if not allocation.vehicle:
 			frappe.throw(_("The Vehicle Allocation does not reference a physical ERPNext Vehicle."))
 		if allocation.vehicle and allocation.vehicle != incident.vehicle:
@@ -113,7 +113,7 @@ def _validate_incident_context(
 			frappe.throw(_("The selected Driver does not match the Delivery Trip."))
 
 	if load and load.company and load.company != incident.company:
-		frappe.throw(_("The Delivery Load belongs to a different Company."))
+		frappe.throw(_("The Transport Load belongs to a different Company."))
 
 	if replacement:
 		_validate_replacement_context(incident, replacement)
@@ -123,7 +123,7 @@ def _validate_incident_context(
 
 def _validate_replacement_context(incident, replacement):
 	if incident.delivery_load and not allocation_includes_load(replacement, incident.delivery_load):
-		frappe.throw(_("The Replacement Allocation belongs to a different Delivery Load."))
+		frappe.throw(_("The Replacement Allocation belongs to a different Transport Load."))
 	if replacement.assignment_event != "Reallocation":
 		frappe.throw(_("The linked Vehicle Allocation is not a replacement allocation."))
 	if incident.vehicle_allocation and replacement.replacement_of != incident.vehicle_allocation:
@@ -158,7 +158,7 @@ def validate_incident_submission(incident):
 
 
 @frappe.whitelist()
-def make_replacement_allocation_from_incident(source_name):
+def make_replacement_allocation_from_incident(source_name: str):
 	incident = frappe.get_doc("Vehicle Incident", source_name)
 	require_document_permission(incident, "write")
 	if incident.resolution_status in RESOLVED_STATUSES:
@@ -166,7 +166,7 @@ def make_replacement_allocation_from_incident(source_name):
 	if not incident.replacement_required:
 		frappe.throw(_("Mark Replacement Required before initiating reallocation."))
 	if not incident.delivery_load or not incident.vehicle_allocation:
-		frappe.throw(_("Link the Delivery Load and affected Vehicle Allocation before reallocation."))
+		frappe.throw(_("Link the Transport Load and affected Vehicle Allocation before reallocation."))
 	if incident.replacement_vehicle_allocation:
 		return frappe.get_doc("Vehicle Allocation", incident.replacement_vehicle_allocation)
 

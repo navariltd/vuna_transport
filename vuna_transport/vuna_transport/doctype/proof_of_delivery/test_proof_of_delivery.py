@@ -14,6 +14,9 @@ from vuna_transport.services.execution.pod_service import (
 	validate_pod_items,
 )
 from vuna_transport.services.execution.return_service import get_pod_quantity_in_stock_uom
+from vuna_transport.services.execution.stock_identity_service import (
+	get_single_delivery_note_item_batch,
+)
 
 # On IntegrationTestCase, the doctype test records and all
 # link-field test record dependencies are recursively loaded
@@ -66,6 +69,18 @@ class TestProofOfDelivery(UnitTestCase):
 	def test_partial_status(self):
 		items = [SimpleNamespace(ordered_qty=10, delivered_qty=7, rejected_qty=0)]
 		self.assertEqual(derive_pod_status(items), "Partially Delivered")
+
+	@patch(
+		"vuna_transport.services.execution.stock_identity_service.get_batches_from_bundle",
+		return_value={"BATCH-1": -180},
+	)
+	def test_batch_is_resolved_from_erpnext_serial_batch_bundle(self, _get_batches):
+		item = SimpleNamespace(
+			batch_no=None,
+			serial_and_batch_bundle="SABB-1",
+		)
+
+		self.assertEqual(get_single_delivery_note_item_batch(item), "BATCH-1")
 
 	def test_rejected_status(self):
 		items = [SimpleNamespace(ordered_qty=10, delivered_qty=0, rejected_qty=10)]

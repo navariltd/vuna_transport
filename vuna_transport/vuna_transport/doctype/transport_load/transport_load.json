@@ -1,0 +1,536 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-08-10 13:16:34.170683",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "load_tab",
+  "load_identity_section",
+  "company",
+  "movement_type",
+  "required_vehicle_category",
+  "naming_series",
+  "column_break_npju",
+  "dispatch_date",
+  "source_warehouse",
+  "section_break_dfkk",
+  "delivery_method",
+  "dispatch_wave",
+  "pick_list",
+  "column_break_cxkp",
+  "transport_zone",
+  "transport_route",
+  "delivery_trip",
+  "capacity_section",
+  "total_weight",
+  "weight_uom",
+  "total_stops",
+  "column_break_bkuo",
+  "total_volume",
+  "volume_uom",
+  "column_break_fymq",
+  "minimum_payload",
+  "minimum_volume",
+  "section_break_sgfs",
+  "active_vehicle_allocation",
+  "planned_departure",
+  "planned_arrival",
+  "column_break_fpwz",
+  "estimated_distance",
+  "estimated_duration",
+  "column_break_fsyc",
+  "refrigeration_required",
+  "tail_lift_required",
+  "required_body_type",
+  "special_equipment_required",
+  "estimates_section",
+  "distance_estimate_method",
+  "distance_estimate_basis",
+  "distance_estimate_confidence",
+  "column_break_uqgt",
+  "distance_estimate_warning",
+  "section_break_mvxd",
+  "capacity_summary",
+  "pallets_section",
+  "total_pallets",
+  "column_break_lonb",
+  "total_cases",
+  "column_break_xplm",
+  "total_crates",
+  "execution_tab",
+  "execution_overview_section",
+  "execution_overview",
+  "section_break_ksai",
+  "delivery_orders",
+  "more_info_section",
+  "status",
+  "section_break_lydc",
+  "amended_from",
+  "connections_tab"
+ ],
+ "fields": [
+  {
+   "fieldname": "load_tab",
+   "fieldtype": "Tab Break",
+   "label": "Load Plan"
+  },
+  {
+   "fieldname": "load_identity_section",
+   "fieldtype": "Section Break",
+   "label": "Load Identity"
+  },
+  {
+   "fieldname": "capacity_section",
+   "fieldtype": "Section Break",
+   "label": "Capacity & Contents"
+  },
+  {
+   "fieldname": "capacity_summary",
+   "fieldtype": "HTML",
+   "label": "Capacity Summary"
+  },
+  {
+   "fieldname": "execution_tab",
+   "fieldtype": "Tab Break",
+   "label": "Execution"
+  },
+  {
+   "fieldname": "execution_overview_section",
+   "fieldtype": "Section Break",
+   "label": "Execution Progress"
+  },
+  {
+   "fieldname": "execution_overview",
+   "fieldtype": "HTML"
+  },
+  {
+   "fieldname": "section_break_lydc",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Transport Load",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "default": "TL-.DD.-.MM.-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "TL-.DD.-.MM.-.YYYY.-\nDL-.DD.-.MM.-.YYYY.-"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_dfkk",
+   "fieldtype": "Section Break",
+   "label": "Dispatch Context"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "source_warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Source Warehouse",
+   "options": "Warehouse",
+   "mandatory_depends_on": "eval:doc.docstatus == 1"
+  },
+  {
+   "fieldname": "delivery_method",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Delivery Method",
+   "options": "Delivery Method",
+   "search_index": 1
+  },
+  {
+   "fieldname": "dispatch_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Dispatch Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "dispatch_wave",
+   "fieldtype": "Data",
+   "label": "Dispatch Wave"
+  },
+  {
+   "fieldname": "column_break_cxkp",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "transport_zone",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Transport Zone",
+   "options": "Transport Zone"
+  },
+  {
+   "fieldname": "transport_route",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Transport Route",
+   "options": "Transport Route"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nProposed\nUnder Review\nApproved\nAwaiting Vehicle\nAllocated\nReleased to Warehouse\nLoading\nReady for Dispatch\nDispatched\nException Resolution\nCompleted\nCompleted with Exceptions\nCancelled",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pick_list",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Pick List",
+   "options": "Pick List",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_trip",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Delivery Trip",
+   "options": "Delivery Trip",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_weight",
+   "fieldtype": "Float",
+   "label": "Total Weight",
+   "read_only": 1
+  },
+  {
+   "fieldname": "weight_uom",
+   "fieldtype": "Link",
+   "label": "Weight UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_volume",
+   "fieldtype": "Float",
+   "label": "Total Volume",
+   "read_only": 1
+  },
+  {
+   "fieldname": "volume_uom",
+   "fieldtype": "Link",
+   "label": "Volume UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_stops",
+   "fieldtype": "Int",
+   "label": "Total Stops",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_bkuo",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_pallets",
+   "fieldtype": "Float",
+   "label": "Total Pallets",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_cases",
+   "fieldtype": "Float",
+   "label": "Total Cases",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_crates",
+   "fieldtype": "Float",
+   "label": "Total Crates",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_fymq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "minimum_volume",
+   "fieldtype": "Float",
+   "label": "Minimum Volume",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_sgfs",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "required_vehicle_category",
+   "fieldtype": "Link",
+   "label": "Recommended Vehicle Category",
+   "description": "Planning recommendation only. Allocation checks the selected vehicle's actual capacity and cargo requirements.",
+   "options": "Vehicle Category"
+  },
+  {
+   "fieldname": "active_vehicle_allocation",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Active Vehicle Allocation",
+   "options": "Vehicle Allocation",
+   "read_only": 1
+  },
+  {
+   "fieldname": "planned_departure",
+   "fieldtype": "Datetime",
+   "label": "Planned Departure"
+  },
+  {
+   "fieldname": "planned_arrival",
+   "fieldtype": "Datetime",
+   "label": "Planned Arrival"
+  },
+  {
+   "fieldname": "column_break_fpwz",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "estimated_distance",
+   "fieldtype": "Float",
+   "label": "Estimated Distance"
+  },
+  {
+   "fieldname": "estimated_duration",
+   "fieldtype": "Float",
+   "label": "Estimated Duration (Hours)"
+  },
+  {
+   "fieldname": "distance_estimate_method",
+   "fieldtype": "Data",
+   "label": "Distance Estimate Method",
+   "read_only": 1
+  },
+  {
+   "fieldname": "distance_estimate_basis",
+   "fieldtype": "Data",
+   "label": "Distance Estimate Basis",
+   "read_only": 1
+  },
+  {
+   "fieldname": "distance_estimate_confidence",
+   "fieldtype": "Select",
+   "label": "Distance Estimate Confidence",
+   "options": "\nHigh\nMedium\nLow\nVery Low\nNone",
+   "read_only": 1
+  },
+  {
+   "fieldname": "distance_estimate_warning",
+   "fieldtype": "Small Text",
+   "label": "Distance Estimate Warning",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_fsyc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "refrigeration_required",
+   "fieldtype": "Check",
+   "label": "Refrigeration Required"
+  },
+  {
+   "default": "0",
+   "fieldname": "tail_lift_required",
+   "fieldtype": "Check",
+   "label": "Tail Lift Required"
+  },
+  {
+   "fieldname": "required_body_type",
+   "fieldtype": "Select",
+   "label": "Required Vehicle Body Type",
+   "options": "\nVan\nRigid Truck\nTrailer\nOther",
+   "read_only": 1
+  },
+  {
+   "fieldname": "special_equipment_required",
+   "fieldtype": "Small Text",
+   "label": "Special Equipment Required",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_ksai",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "delivery_orders",
+   "fieldtype": "Table",
+   "label": "Load Items",
+   "options": "Transport Load Item"
+  },
+  {
+   "fieldname": "minimum_payload",
+   "fieldtype": "Float",
+   "label": "Minimum Payload",
+   "read_only": 1
+  },
+  {
+   "fieldname": "connections_tab",
+   "fieldtype": "Tab Break",
+   "label": "Connections",
+   "show_dashboard": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "pallets_section",
+   "fieldtype": "Section Break",
+   "label": "Pallets"
+  },
+  {
+   "fieldname": "column_break_lonb",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_xplm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_npju",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "more_info_section",
+   "fieldtype": "Section Break",
+   "label": "More Info"
+  },
+  {
+   "fieldname": "section_break_mvxd",
+   "fieldtype": "Section Break"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "estimates_section",
+   "fieldtype": "Section Break",
+   "label": "Estimates"
+  },
+  {
+   "fieldname": "column_break_uqgt",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "movement_type",
+   "fieldtype": "Select",
+   "label": "Movement Type",
+   "options": "\nCustomer Delivery\nWarehouse Transfer\nSupplier Pickup",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [
+  {
+   "group": "Warehouse Execution",
+   "link_doctype": "Pick List",
+   "link_fieldname": "vuna_delivery_load"
+  },
+  {
+   "group": "Dispatch Execution",
+   "link_doctype": "Delivery Note",
+   "link_fieldname": "vuna_delivery_load"
+  },
+  {
+   "group": "Dispatch Execution",
+   "link_doctype": "Delivery Trip",
+   "link_fieldname": "vuna_delivery_load"
+  },
+  {
+   "group": "Dispatch Execution",
+   "link_doctype": "Vehicle Allocation",
+   "link_fieldname": "delivery_load"
+  }
+ ],
+ "modified": "2026-10-17 09:53:42.020286",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Transport Load",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Planner",
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Dispatcher",
+   "write": 1
+  },
+  {
+   "amend": 1,
+   "cancel": 1,
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "dispatch_date"
+}

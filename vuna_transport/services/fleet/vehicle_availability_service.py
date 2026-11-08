@@ -311,7 +311,7 @@ def get_vehicle_availability_map(
 		{
 			row.name: row
 			for row in frappe.get_all(
-				"Delivery Load",
+				"Transport Load",
 				filters={"name": ["in", list(load_names)], "docstatus": ["!=", 2]},
 				fields=[
 					"name",
@@ -574,7 +574,7 @@ def _evaluate_vehicle(
 		reasons.append(
 			_reason(
 				"ACTIVE_ALLOCATION",
-				_("Vehicle is allocated to Delivery Load(s) {0}.").format(", ".join(allocation_load_names)),
+				_("Vehicle is allocated to Transport Load(s) {0}.").format(", ".join(allocation_load_names)),
 				"Vehicle Allocation",
 				allocation.name,
 			)

@@ -6,6 +6,8 @@ from vuna_transport.services.routing.location_service import get_address_plannin
 
 
 def execute():
+	if not frappe.db.exists("DocType", "Delivery Order"):
+		return
 	if not frappe.db.has_column("Delivery Order", "constituency"):
 		return
 

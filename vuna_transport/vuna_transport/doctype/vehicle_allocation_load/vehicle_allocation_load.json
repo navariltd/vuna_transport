@@ -21,8 +21,8 @@
    "fieldname": "delivery_load",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Delivery Load",
-   "options": "Delivery Load",
+   "label": "Transport Load",
+   "options": "Transport Load",
    "reqd": 1
   },
   {
@@ -36,7 +36,7 @@
    "fieldname": "required_vehicle_category",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Required Vehicle Category",
+   "label": "Recommended Vehicle Category",
    "options": "Vehicle Category",
    "read_only": 1
   },

@@ -34,10 +34,10 @@ def execute(filters=None):
 		{"label": _("Vehicle"), "fieldname": "vehicle", "fieldtype": "Link", "options": "Vehicle"},
 		{"label": _("Driver"), "fieldname": "driver", "fieldtype": "Link", "options": "Driver"},
 		{
-			"label": _("Delivery Load"),
+			"label": _("Transport Load"),
 			"fieldname": "vuna_delivery_load",
 			"fieldtype": "Link",
-			"options": "Delivery Load",
+			"options": "Transport Load",
 		},
 		{"label": _("Departure"), "fieldname": "departure_time", "fieldtype": "Datetime"},
 		{"label": _("Status"), "fieldname": "status", "fieldtype": "Data"},

@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
@@ -21,6 +22,10 @@ from vuna_transport.services.fleet.vehicle_allocation_service import (
 class VehicleAllocation(Document):
 	def validate(self):
 		validate_allocation(self)
+		from vuna_transport.services.fleet.allocation_cargo_service import collect_load_items
+		from vuna_transport.services.fleet.vehicle_allocation_service import get_allocation_loads
+
+		self.set("loaded_items", collect_load_items(get_allocation_loads(self)))
 		from vuna_transport.services.fleet.vehicle_incident_service import (
 			validate_replacement_allocation_incident,
 		)
@@ -75,7 +80,7 @@ class VehicleAllocation(Document):
 
 		load_names = get_allocation_load_names(self)
 		if not load_names:
-			frappe.throw("Add at least one Delivery Load before creating a Delivery Trip.")
+			frappe.throw(_("Add at least one Transport Load before creating a Delivery Trip."))
 
 		from vuna_transport.services.integrations.erpnext_integration import create_delivery_trip_for_load
 

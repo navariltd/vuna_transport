@@ -13,10 +13,31 @@ from vuna_transport.services.execution.pod_service import (
 	validate_pod_items,
 )
 from vuna_transport.services.execution.return_service import create_return_request_from_pod
+from vuna_transport.services.execution.stock_identity_service import (
+	get_single_delivery_note_item_batch,
+)
 
 
 class ProofofDelivery(Document):
 	def validate(self):
+		if self.get("proof_type") == "Unplanned Collection":
+			from vuna_transport.services.execution.unplanned_pickup_service import validate_collection
+
+			validate_collection(self)
+			return
+		if self.get("transport_trip_task"):
+			if self.proof_type == "Return Pickup":
+				from vuna_transport.services.execution.return_pickup_service import validate_pickup_proof
+
+				validate_pickup_proof(self)
+				return
+			from vuna_transport.services.execution.transfer_proof_service import validate_proof
+
+			validate_proof(self)
+			return
+		if self.get("proof_type") not in (None, "", "Customer Delivery"):
+			frappe.throw(_("Transfer and pickup PODs require an authoritative transport task."))
+		self.proof_type, self.direction = "Customer Delivery", "Delivery"
 		self.populate_stop_details()
 		self.validate_unique_active_pod()
 		self.populate_item_details()
@@ -36,6 +57,7 @@ class ProofofDelivery(Document):
 				"address",
 				"delivery_note",
 				"vuna_delivery_order",
+				"vuna_transport_demand",
 				"vuna_delivery_load",
 			],
 			as_dict=True,
@@ -43,6 +65,7 @@ class ProofofDelivery(Document):
 		if not stop or stop.parenttype != "Delivery Trip" or stop.parent != self.delivery_trip:
 			frappe.throw(_("The selected Delivery Stop does not belong to the selected Delivery Trip."))
 		self.delivery_order = stop.vuna_delivery_order
+		self.transport_demand = stop.get("vuna_transport_demand")
 		self.customer = stop.customer
 		self.delivery_address = stop.address
 		self.delivery_note = stop.delivery_note
@@ -56,6 +79,7 @@ class ProofofDelivery(Document):
 			{
 				"delivery_trip": self.delivery_trip,
 				"delivery_stop": self.delivery_stop,
+				"transport_trip_task": ["is", "not set"],
 				"docstatus": ["!=", 2],
 				"name": ["!=", self.name or ""],
 			},
@@ -70,6 +94,10 @@ class ProofofDelivery(Document):
 
 	def populate_item_details(self):
 		"""Populate item snapshots with one batched query instead of one query per row."""
+		from vuna_transport.services.execution.customer_reference_service import populate_native_pod
+
+		if populate_native_pod(self):
+			return
 		item_names = {item.delivery_order_item for item in self.items if item.delivery_order_item}
 		requirement_items = {}
 		if item_names:
@@ -97,6 +125,8 @@ class ProofofDelivery(Document):
 						"uom",
 						"stock_uom",
 						"conversion_factor",
+						"batch_no",
+						"serial_and_batch_bundle",
 					],
 				)
 			}
@@ -113,6 +143,7 @@ class ProofofDelivery(Document):
 			item.uom = delivery_note_item.uom
 			item.stock_uom = delivery_note_item.stock_uom
 			item.conversion_factor = flt(delivery_note_item.conversion_factor) or 1
+			item.batch_no = item.batch_no or get_single_delivery_note_item_batch(delivery_note_item)
 			if not flt(item.ordered_qty):
 				item.ordered_qty = flt(delivery_note_item.qty)
 			if not item.delivery_order_item:
@@ -124,6 +155,24 @@ class ProofofDelivery(Document):
 				)
 
 	def on_submit(self):
+		if self.proof_type == "Unplanned Collection":
+			return
+		if self.get("transport_trip_task"):
+			if self.proof_type == "Return Pickup":
+				from vuna_transport.services.execution.return_pickup_service import (
+					post_pickup_stock,
+					sync_pickup_proof,
+				)
+
+				post_pickup_stock(self)
+				sync_pickup_proof(self)
+				return
+			from vuna_transport.services.execution.depot_return_service import create_depot_return_from_pod
+			from vuna_transport.services.execution.transfer_proof_service import submit_receipt_stock_from_pod
+
+			submit_receipt_stock_from_pod(self)
+			create_depot_return_from_pod(self)
+			return
 		update_delivery_stop_from_pod(self, self.status)
 		if self.status in ("Partially Delivered", "Rejected", "Failed"):
 			create_return_request_from_pod(self.name)
@@ -133,19 +182,51 @@ class ProofofDelivery(Document):
 		self.check_permission("read")
 		if self.docstatus != 1:
 			frappe.throw(_("Submit the Proof of Delivery before creating a Return Request."))
+		if self.get("transport_trip_task"):
+			from vuna_transport.services.execution.depot_return_service import create_depot_return_from_pod
+
+			return create_depot_return_from_pod(self)
 		if self.status not in ("Partially Delivered", "Rejected", "Failed"):
 			frappe.throw(_("Accepted Proofs of Delivery do not require a Return Request."))
 		return create_return_request_from_pod(self.name)
 
 	def before_cancel(self):
+		if self.proof_type == "Unplanned Collection":
+			if self.return_request and frappe.db.exists(
+				"Return Request",
+				{"name": self.return_request, "proof_of_delivery": self.name, "docstatus": ["!=", 2]},
+			):
+				frappe.throw(_("Resolve the linked Return Request before cancelling collection evidence."))
+			return
 		from vuna_transport.services.execution.pod_service import prepare_pod_cancellation
 
 		prepare_pod_cancellation(self)
+		if self.get("transport_trip_task"):
+			if self.proof_type == "Return Pickup":
+				from vuna_transport.services.execution.return_pickup_service import (
+					guard_pickup_proof_cancellation,
+				)
+
+				guard_pickup_proof_cancellation(self)
+				return
+			from vuna_transport.services.execution.transfer_proof_service import guard_proof_cancellation
+
+			guard_proof_cancellation(self)
 
 	def on_trash(self):
+		if self.proof_type == "Unplanned Collection":
+			return
 		from vuna_transport.services.execution.pod_service import clear_pod_stop_reference
 
-		clear_pod_stop_reference(self)
+		if not self.get("transport_trip_task"):
+			clear_pod_stop_reference(self)
 
 	def on_cancel(self):
-		reset_delivery_stop_from_pod(self)
+		if self.proof_type == "Unplanned Collection":
+			return
+		if self.proof_type == "Return Pickup":
+			from vuna_transport.services.execution.return_pickup_service import sync_pickup_proof
+
+			sync_pickup_proof(self)
+		if not self.get("transport_trip_task"):
+			reset_delivery_stop_from_pod(self)

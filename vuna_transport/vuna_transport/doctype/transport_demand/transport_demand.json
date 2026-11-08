@@ -1,0 +1,640 @@
+{
+ "doctype": "DocType",
+ "name": "Transport Demand",
+ "module": "Vuna Transport",
+ "modified": "2026-11-08 08:26:48.154395",
+ "engine": "InnoDB",
+ "istable": 0,
+ "is_submittable": 1,
+ "autoname": "format:TD-{YYYY}-{#####}",
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nOpen\nPartially Allocated\nReserved\nAllocated\nCancelled\nDispatched\nPartially Delivered\nDelivered\nClosed",
+   "default": "Draft",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "movement_type",
+   "fieldtype": "Select",
+   "label": "Movement Type",
+   "options": "Customer Delivery\nWarehouse Transfer\nSupplier Pickup",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "demand_type",
+   "fieldtype": "Select",
+   "label": "Demand Type",
+   "description": "Derived from the movement: supplier pickups are Buying, customer deliveries Selling, and depot transfers or depot returns Internal.",
+   "options": "Buying\nSelling\nInternal",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "source_document_type",
+   "fieldtype": "Link",
+   "label": "Source Document Type",
+   "options": "DocType",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "source_document",
+   "fieldtype": "Dynamic Link",
+   "label": "Source Document",
+   "options": "source_document_type",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "source_key",
+   "fieldtype": "Data",
+   "label": "Source Leg Key",
+   "unique": 1,
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "source_warehouse",
+   "fieldtype": "Link",
+   "label": "Source Warehouse",
+   "options": "Warehouse",
+   "read_only_depends_on": "eval:doc.movement_type != 'Warehouse Transfer'",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "source_address",
+   "fieldtype": "Link",
+   "label": "Pickup Address",
+   "options": "Address",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type != 'Warehouse Transfer'"
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Supplier",
+   "options": "Supplier",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Supplier Pickup'"
+  },
+  {
+   "fieldname": "destination_warehouse",
+   "fieldtype": "Link",
+   "label": "Destination Warehouse",
+   "options": "Warehouse",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type != 'Customer Delivery'"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "destination_address",
+   "fieldtype": "Link",
+   "label": "Destination Address",
+   "options": "Address",
+   "read_only": 1
+  },
+  {
+   "fieldname": "required_date",
+   "fieldtype": "Date",
+   "label": "Required Date",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "transport_zone",
+   "fieldtype": "Link",
+   "label": "Transport Zone",
+   "options": "Transport Zone",
+   "read_only": 1
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Transport Demand Item",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "legacy_delivery_order",
+   "fieldtype": "Data",
+   "label": "Legacy Delivery Order",
+   "unique": 0,
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "legacy_delivery_order_checksum",
+   "fieldtype": "Data",
+   "label": "Legacy Delivery Order Checksum",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "legacy_delivery_order_snapshot",
+   "fieldtype": "Long Text",
+   "label": "Legacy Delivery Order Snapshot",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "hidden": 1,
+   "label": "Sales Order",
+   "options": "Sales Order",
+   "read_only": 1,
+   "search_index": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "customer_name",
+   "fieldtype": "Data",
+   "label": "Customer Name",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "territory",
+   "fieldtype": "Link",
+   "label": "Territory",
+   "options": "Territory",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "county",
+   "fieldtype": "Link",
+   "label": "County",
+   "options": "County",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "constituency",
+   "fieldtype": "Link",
+   "label": "Constituency / Sub-county",
+   "options": "Constituency",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "town",
+   "fieldtype": "Link",
+   "label": "Town",
+   "options": "Town",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "delivery_method",
+   "fieldtype": "Link",
+   "label": "Delivery Method",
+   "options": "Delivery Method",
+   "search_index": 1,
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "preferred_route",
+   "fieldtype": "Link",
+   "label": "Preferred Route",
+   "options": "Transport Route",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "priority",
+   "fieldtype": "Select",
+   "label": "Priority",
+   "options": "Low\nMedium\nHigh\nUrgent",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "delivery_from_time",
+   "fieldtype": "Time",
+   "label": "Delivery From (Time)",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "delivery_to_time",
+   "fieldtype": "Time",
+   "label": "Delivery To (Time)",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "transport_handling_profile",
+   "fieldtype": "Data",
+   "label": "Transport Handling Profile",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "transport_compatibility_group",
+   "fieldtype": "Link",
+   "label": "Transport Compatibility Group",
+   "options": "Transport Compatibility Group",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "delivery_group",
+   "fieldtype": "Link",
+   "label": "Delivery Group",
+   "options": "Delivery Group",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "refrigeration_required",
+   "fieldtype": "Check",
+   "label": "Refrigeration Required",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "tail_lift_required",
+   "fieldtype": "Check",
+   "label": "Tail Lift Required",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "required_body_type",
+   "fieldtype": "Select",
+   "label": "Required Vehicle Body Type",
+   "options": "\nVan\nRigid Truck\nTrailer\nOther",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "special_equipment_required",
+   "fieldtype": "Small Text",
+   "label": "Special Equipment Required",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "maximum_vehicle_category",
+   "fieldtype": "Link",
+   "label": "Maximum Vehicle Category",
+   "options": "Vehicle Category",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "restricted_access",
+   "fieldtype": "Check",
+   "label": "Restricted Vehicle Access",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "loading_dock_available",
+   "fieldtype": "Check",
+   "label": "Loading Dock Available",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "average_service_duration",
+   "fieldtype": "Duration",
+   "label": "Average Service Duration",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "access_notes",
+   "fieldtype": "Small Text",
+   "label": "Access Notes",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "source_location",
+   "fieldtype": "Geolocation",
+   "label": "Source Location",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "source_latitude",
+   "fieldtype": "Float",
+   "label": "Source Latitude",
+   "precision": "8",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "source_longitude",
+   "fieldtype": "Float",
+   "label": "Source Longitude",
+   "precision": "8",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "destination_location",
+   "fieldtype": "Geolocation",
+   "label": "Destination Location",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "destination_latitude",
+   "fieldtype": "Float",
+   "label": "Destination Latitude",
+   "precision": "8",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "destination_longitude",
+   "fieldtype": "Float",
+   "label": "Destination Longitude",
+   "precision": "8",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "total_weight",
+   "fieldtype": "Float",
+   "label": "Total Weight",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "weight_uom",
+   "fieldtype": "Link",
+   "label": "Weight UOM",
+   "options": "UOM",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "total_volume",
+   "fieldtype": "Float",
+   "label": "Total Volume",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "volume_uom",
+   "fieldtype": "Link",
+   "label": "Volume UOM",
+   "options": "UOM",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "total_pallets",
+   "fieldtype": "Float",
+   "label": "Total Pallets",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "total_cases",
+   "fieldtype": "Float",
+   "label": "Total Cases",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "total_crates",
+   "fieldtype": "Float",
+   "label": "Total Crates",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "demand_tab",
+   "fieldtype": "Tab Break",
+   "label": "Demand"
+  },
+  {
+   "fieldname": "source_section",
+   "fieldtype": "Section Break",
+   "label": "Source"
+  },
+  {
+   "fieldname": "source_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "movement_section",
+   "fieldtype": "Section Break",
+   "label": "Movement"
+  },
+  {
+   "fieldname": "movement_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "items_section",
+   "fieldtype": "Section Break",
+   "label": "Items"
+  },
+  {
+   "fieldname": "customer_planning_tab",
+   "fieldtype": "Tab Break",
+   "label": "Delivery & Planning",
+   "depends_on": "eval:doc.movement_type == 'Customer Delivery'"
+  },
+  {
+   "fieldname": "routing_section",
+   "fieldtype": "Section Break",
+   "label": "Routing & Service"
+  },
+  {
+   "fieldname": "routing_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "requirements_section",
+   "fieldtype": "Section Break",
+   "label": "Vehicle & Site Requirements"
+  },
+  {
+   "fieldname": "requirements_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "totals_section",
+   "fieldtype": "Section Break",
+   "label": "Transport Totals"
+  },
+  {
+   "fieldname": "totals_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "location_section",
+   "fieldtype": "Section Break",
+   "label": "Location Snapshots"
+  },
+  {
+   "fieldname": "location_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "connections_tab",
+   "fieldtype": "Tab Break",
+   "label": "Connections",
+   "show_dashboard": 1
+  },
+  {
+   "fieldname": "migration_archived",
+   "fieldtype": "Check",
+   "label": "Historical Only",
+   "read_only": 1,
+   "default": "0",
+   "no_copy": 1,
+   "description": "Preserved migration history; excluded from new transport planning."
+  }
+ ],
+ "field_order": [
+  "demand_tab",
+  "source_section",
+  "company",
+  "movement_type",
+  "demand_type",
+  "source_column",
+  "status",
+  "source_document_type",
+  "source_document",
+  "source_key",
+  "movement_section",
+  "customer",
+  "customer_name",
+  "supplier",
+  "sales_order",
+  "destination_address",
+  "destination_warehouse",
+  "movement_column",
+  "source_warehouse",
+  "source_address",
+  "required_date",
+  "transport_zone",
+  "items_section",
+  "items",
+  "customer_planning_tab",
+  "routing_section",
+  "delivery_method",
+  "preferred_route",
+  "priority",
+  "transport_handling_profile",
+  "transport_compatibility_group",
+  "delivery_group",
+  "routing_column",
+  "delivery_from_time",
+  "delivery_to_time",
+  "territory",
+  "county",
+  "constituency",
+  "town",
+  "requirements_section",
+  "refrigeration_required",
+  "tail_lift_required",
+  "required_body_type",
+  "special_equipment_required",
+  "requirements_column",
+  "maximum_vehicle_category",
+  "restricted_access",
+  "loading_dock_available",
+  "average_service_duration",
+  "access_notes",
+  "totals_section",
+  "total_weight",
+  "weight_uom",
+  "total_volume",
+  "volume_uom",
+  "totals_column",
+  "total_pallets",
+  "total_cases",
+  "total_crates",
+  "location_section",
+  "source_location",
+  "source_latitude",
+  "source_longitude",
+  "location_column",
+  "destination_location",
+  "destination_latitude",
+  "destination_longitude",
+  "connections_tab",
+  "legacy_delivery_order",
+  "legacy_delivery_order_checksum",
+  "legacy_delivery_order_snapshot",
+  "migration_archived"
+ ],
+ "permissions": [
+  {
+   "role": "Transport Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "cancel": 1
+  },
+  {
+   "role": "Transport Planner",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "cancel": 1
+  },
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "submit": 1,
+   "cancel": 1
+  }
+ ],
+ "links": [
+  {
+   "link_doctype": "Transport Trip Task",
+   "link_fieldname": "transport_demand"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

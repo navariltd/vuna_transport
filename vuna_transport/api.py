@@ -47,6 +47,116 @@ from vuna_transport.services.shared.workflow_policy_service import (
 
 
 @frappe.whitelist()
+def report_mobile_unplanned_collection(
+	installation_id: str, trip_name: str, payload: dict | str, device_identifier: str | None = None
+):
+	from vuna_transport.services.execution.unplanned_pickup_service import report_collection
+
+	return report_collection(installation_id, trip_name, payload, device_identifier)
+
+
+@frappe.whitelist()
+def get_mobile_unplanned_collections(
+	installation_id: str, trip_name: str, stop_name: str, device_identifier: str | None = None
+):
+	from vuna_transport.services.execution.unplanned_pickup_service import collection_history
+
+	return collection_history(installation_id, trip_name, stop_name, device_identifier)
+
+
+@frappe.whitelist()
+def get_mobile_collection_setup(
+	installation_id: str, trip_name: str, stop_name: str, device_identifier: str | None = None
+):
+	from vuna_transport.services.execution.unplanned_pickup_service import collection_setup
+
+	return collection_setup(installation_id, trip_name, stop_name, device_identifier)
+
+
+@frappe.whitelist()
+def search_mobile_collection_items(
+	installation_id: str,
+	trip_name: str,
+	stop_name: str,
+	reference_doctype: str,
+	reference_name: str,
+	txt: str = "",
+	device_identifier: str | None = None,
+):
+	from vuna_transport.services.execution.unplanned_pickup_service import collection_catalog
+
+	return collection_catalog(
+		installation_id, trip_name, stop_name, reference_doctype, reference_name, txt, device_identifier
+	)
+
+
+@frappe.whitelist()
+def submit_mobile_transport_proof(
+	installation_id: str, task_name: str, payload: dict | str, device_identifier: str | None = None
+):
+	from vuna_transport.services.execution.transfer_proof_service import submit_mobile_transfer_proof
+
+	return submit_mobile_transfer_proof(installation_id, task_name, payload, device_identifier)
+
+
+@frappe.whitelist()
+def prepare_mobile_transport_proof(
+	installation_id: str,
+	task_name: str,
+	device_identifier: str | None = None,
+	save_draft: bool = False,
+):
+	from vuna_transport.services.execution.transfer_execution_service import _lock_task
+	from vuna_transport.services.execution.transfer_proof_service import prepare_proof
+	from vuna_transport.services.mobile.mobile_device_service import (
+		_get_assigned_trip,
+		_get_rejection_reasons,
+		_require_mobile_driver,
+	)
+
+	driver = _require_mobile_driver(installation_id, device_identifier)
+	task = _lock_task(task_name)
+	_get_assigned_trip(task.delivery_trip, driver.name)
+	proof = prepare_proof(task)
+	# Only the evidence-upload path needs a persisted draft. Browsing/warming
+	# a task must not create a document or post stock.
+	if save_draft and proof.is_new():
+		proof.flags.ignore_permissions = True
+		proof.insert(ignore_permissions=True)
+	request_name = task.get("return_request") or proof.return_request
+	return {
+		"name": proof.name if not proof.is_new() else None,
+		"docstatus": proof.docstatus,
+		"task": task.name,
+		"task_type": task.task_type,
+		"return_request": request_name,
+		"return_context": frappe.db.get_value("Return Request", request_name, "return_context")
+		if request_name
+		else None,
+		"reference_doctype": "Return Request" if task.task_type == "Return Pickup" else "Stock Entry",
+		"reference_name": request_name if task.task_type == "Return Pickup" else proof.dispatch_stock_entry,
+		"received_by": proof.received_by,
+		"receiver_phone": proof.receiver_phone,
+		"signature": proof.signature,
+		"delivery_photo": proof.delivery_photo,
+		"delivery_datetime": proof.delivery_datetime,
+		"remarks": proof.remarks,
+		"outcome": proof.outcome,
+		"status": proof.status,
+		"rejection_reasons": _get_rejection_reasons(),
+		"items": [
+			{
+				**row.as_dict(),
+				"item_name": row.item_name or frappe.get_cached_value("Item", row.item_code, "item_name"),
+				"qty": row.delivered_qty,
+				"planned_qty": row.ordered_qty,
+			}
+			for row in proof.items
+		],
+	}
+
+
+@frappe.whitelist()
 def bootstrap_mobile_device(
 	installation_id,
 	device_identifier=None,
@@ -290,19 +400,16 @@ def create_mobile_trip_material_request(
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
+def get_vehicles_for_load(
+	doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict | str | None
+):
 	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
 	load_name = filters.get("delivery_load")
 	if not load_name:
 		return []
-	load = frappe.get_doc("Delivery Load", load_name)
+	load = frappe.get_doc("Transport Load", load_name)
 	require_document_permission(load, "read")
 	if filters.get("company") and filters.get("company") != load.company:
-		return []
-	if (
-		filters.get("required_vehicle_category")
-		and filters.get("required_vehicle_category") != load.required_vehicle_category
-	):
 		return []
 	from_time, to_time = get_load_resource_window(load)
 	vehicle_filters = {"docstatus": ["<", 2], "vuna_transport_enabled": 1}
@@ -311,8 +418,6 @@ def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
 	if load.company:
 		vehicle_filters["company"] = ["in", (load.company, "", None)]
 	compatible_categories = get_compatible_vehicle_category_names(load)
-	if load.required_vehicle_category:
-		compatible_categories = {load.required_vehicle_category}
 	if compatible_categories:
 		vehicle_filters["vuna_vehicle_category"] = ["in", compatible_categories]
 	else:
@@ -344,11 +449,13 @@ def get_vehicles_for_load(doctype, txt, searchfield, start, page_len, filters):
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def get_drivers_for_load(doctype, txt, searchfield, start, page_len, filters):
+def get_drivers_for_load(
+	doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict | str | None
+):
 	load_name = filters.get("delivery_load")
 	if not load_name:
 		return []
-	load = frappe.get_doc("Delivery Load", load_name)
+	load = frappe.get_doc("Transport Load", load_name)
 	require_document_permission(load, "read")
 	from_time, to_time = get_load_resource_window(load)
 	driver_names = frappe.get_list(
@@ -384,7 +491,14 @@ def get_drivers_for_load(doctype, txt, searchfield, start, page_len, filters):
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def get_delivery_loads_for_allocation(
-	doctype, txt, searchfield, start, page_len, filters, as_dict=False, **kwargs
+	doctype: str,
+	txt: str,
+	searchfield: str,
+	start: int,
+	page_len: int,
+	filters: dict | str | None,
+	as_dict: bool = False,
+	**kwargs,
 ):
 	"""Offer only operational loads compatible with the current allocation composition."""
 	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
@@ -407,10 +521,8 @@ def get_delivery_loads_for_allocation(
 	}
 	if company:
 		load_filters["company"] = company
-	if vehicle_category:
-		load_filters["required_vehicle_category"] = vehicle_category
 	candidates = frappe.get_all(
-		"Delivery Load",
+		"Transport Load",
 		filters=load_filters,
 		or_filters={"name": ["like", f"%{txt}%"]},
 		fields=[
@@ -430,12 +542,19 @@ def get_delivery_loads_for_allocation(
 			continue
 		if candidate.active_vehicle_allocation:
 			continue
+		previous_mute = frappe.flags.mute_messages
 		try:
+			# Rejected candidates are normal search results, not form errors.
+			# frappe.throw still raises while muted, but does not append popup
+			# messages to this successful search response's message log.
+			frappe.flags.mute_messages = True
 			loads = validate_allocation_load_set([*selected, candidate.name], vehicle_category)
 			for load in loads:
 				require_document_permission(load, "read")
-		except frappe.ValidationError:
+		except (frappe.ValidationError, frappe.PermissionError):
 			continue
+		finally:
+			frappe.flags.mute_messages = previous_mute
 		if as_dict:
 			results.append(
 				{
@@ -493,7 +612,7 @@ def _loads_at_vehicle_allocation_step(candidates):
 	# In the after-notes flow, the allocation step begins only after every
 	# Delivery Order on the load has a submitted Delivery Note and no draft note.
 	load_order_rows = frappe.get_all(
-		"Delivery Load Order",
+		"Transport Load Item",
 		filters={"parent": ["in", [row.name for row in eligible]]},
 		fields=["parent", "delivery_order"],
 	)

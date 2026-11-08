@@ -1,0 +1,18 @@
+{
+  "doctype": "Warehouse",
+  "custom_fields": [
+    {
+      "dt": "Warehouse",
+      "name": "Warehouse-vuna_returns_warehouse",
+      "fieldname": "vuna_returns_warehouse",
+      "label": "Returns / Quarantine Warehouse",
+      "fieldtype": "Link",
+      "options": "Warehouse",
+      "insert_after": "warehouse_type",
+      "description": "Optional holding warehouse for rejected goods physically unloaded at this depot. If unset, goods are received into this depot warehouse without stock segregation. Do not use an auto-write-off/rejected warehouse; stock must remain available for inspection.",
+      "module": "Vuna Transport"
+    }
+  ],
+  "property_setters": [],
+  "sync_on_migrate": 1
+}

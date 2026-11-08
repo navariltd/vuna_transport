@@ -8,6 +8,7 @@ from frappe import _
 from frappe.contacts.doctype.address.address import get_address_display
 from frappe.utils import flt, get_datetime, now_datetime
 
+from vuna_transport.services.execution import customer_reference_service as customer
 from vuna_transport.services.execution.dispatch_guard_service import (
 	get_locked_delivery_load,
 	set_delivery_load_status,
@@ -27,9 +28,17 @@ from vuna_transport.services.shared.workflow_policy_service import (
 )
 
 
+def _require_customer_load(load):
+	from vuna_transport.services.planning.transport_load_service import is_demand_load
+
+	if is_demand_load(load):
+		frappe.throw(_("Transfer loads require stock-transfer execution, not customer delivery documents."))
+
+
 def create_pick_list_for_load(load):
-	"""Create a draft ERPNext Pick List for a submitted Delivery Load."""
+	"""Create a draft ERPNext Pick List for a submitted Transport Load."""
 	load = get_locked_delivery_load(load)
+	_require_customer_load(load)
 	validate_load_is_operational(load, _("creating a Pick List"))
 	if load.pick_list:
 		existing_pick_list = frappe.get_doc("Pick List", load.pick_list)
@@ -47,8 +56,8 @@ def create_pick_list_for_load(load):
 	pick_list.group_same_items = 1
 
 	for load_row in load.delivery_orders:
-		delivery_order_item = frappe.get_doc("Delivery Order Item", load_row.delivery_order_item)
-		if delivery_order_item.parent != load_row.delivery_order:
+		delivery_order_item = customer.get_item(load_row)
+		if delivery_order_item.parent != customer.order_name(load_row):
 			frappe.throw(_("A load row references an item from a different Delivery Order."))
 		pick_list.append(
 			"locations",
@@ -59,7 +68,9 @@ def create_pick_list_for_load(load):
 				* flt(delivery_order_item.conversion_factor or 1),
 				"picked_qty": flt(load_row.allocated_quantity)
 				* flt(delivery_order_item.conversion_factor or 1),
-				"uom": delivery_order_item.uom or delivery_order_item.stock_uom,
+				"uom": getattr(delivery_order_item, "transaction_uom", None)
+				or getattr(delivery_order_item, "uom", None)
+				or delivery_order_item.stock_uom,
 				"stock_uom": delivery_order_item.stock_uom,
 				"conversion_factor": delivery_order_item.conversion_factor or 1,
 				"warehouse": load.source_warehouse,
@@ -77,8 +88,9 @@ def create_pick_list_for_load(load):
 def create_delivery_notes_for_load(load):
 	"""Create one draft Delivery Note per Delivery Order using direct or picked fulfilment."""
 	if isinstance(load, str):
-		load = frappe.get_doc("Delivery Load", load)
+		load = frappe.get_doc("Transport Load", load)
 	load = get_locked_delivery_load(load)
+	_require_customer_load(load)
 	validate_load_is_operational(load, _("creating Delivery Notes"))
 	_repair_single_item_load_rows(load)
 	# Revalidate against live Sales Order balances. A direct ERPNext Delivery Note
@@ -96,7 +108,9 @@ def create_delivery_notes_for_load(load):
 
 	created = []
 	for delivery_order_name, load_rows in _group_load_rows(load).items():
-		if _delivery_order_has_existing_note(load.name, delivery_order_name):
+		if _delivery_order_has_existing_note(
+			load.name, delivery_order_name, native=customer.native_load(load)
+		):
 			created.extend(name for name in _get_delivery_notes_for_loads([load.name]) if name not in created)
 			continue
 
@@ -115,7 +129,7 @@ def create_delivery_notes_for_load(load):
 		)
 		_set_delivery_note_load_lineage(delivery_note, load_rows)
 		delivery_note.vuna_delivery_load = load.name
-		delivery_note.vuna_delivery_order = delivery_order_name
+		customer.set_note_reference(delivery_note, load, delivery_order_name)
 		delivery_note.save()
 		created.append(delivery_note.name)
 
@@ -133,20 +147,26 @@ def create_delivery_notes_for_load(load):
 def create_delivery_notes_for_allocation(allocation):
 	"""Create consolidated Delivery Notes for all compatible loads on an allocation.
 
-	Items retain their exact Delivery Load Order lineage, so one note can safely
+	Items retain their exact Transport Load Item lineage, so one note can safely
 	serve several Delivery Orders and loads without losing allocation history.
 	"""
 	load_names = get_allocation_load_names(allocation)
 	if not load_names:
-		frappe.throw(_("Add at least one Delivery Load before creating Delivery Notes."))
+		frappe.throw(_("Add at least one Transport Load before creating Delivery Notes."))
 	loads = [get_locked_delivery_load(name) for name in load_names]
+	from vuna_transport.services.planning.transport_load_service import is_demand_load
+
+	loads = [load for load in loads if not is_demand_load(load)]
+	if not loads:
+		frappe.throw(_("This allocation contains only warehouse transfers; Delivery Notes are not required."))
+	load_names = [load.name for load in loads]
 	if len(loads) == 1:
 		return create_delivery_notes_for_load(loads[0])
 	existing_notes = _get_delivery_notes_for_loads(load_names)
 	expected_load_orders = set(
 		frappe.get_all(
-			"Delivery Load Order",
-			filters={"parent": ["in", load_names], "parenttype": "Delivery Load"},
+			"Transport Load Item",
+			filters={"parent": ["in", load_names], "parenttype": "Transport Load"},
 			pluck="name",
 		)
 	)
@@ -182,7 +202,9 @@ def create_delivery_notes_for_allocation(allocation):
 	load_groups = []
 	for load in loads:
 		for delivery_order_name, load_rows in _group_load_rows(load).items():
-			if _delivery_order_has_existing_note(load.name, delivery_order_name):
+			if _delivery_order_has_existing_note(
+				load.name, delivery_order_name, native=customer.native_load(load)
+			):
 				continue
 			delivery_note = _make_delivery_note_direct(delivery_order_name, load_rows, load.source_warehouse)
 			if not delivery_note or not delivery_note.items:
@@ -215,7 +237,7 @@ def create_delivery_notes_for_allocation(allocation):
 					values.pop(field, None)
 				base_note.append("items", values)
 		base_note.vuna_delivery_load = base_load.name
-		base_note.vuna_delivery_order = base_order
+		customer.set_note_reference(base_note, base_load, base_order)
 		base_note.save()
 		created.append(base_note.name)
 
@@ -243,49 +265,48 @@ def _delivery_note_compatibility_key(delivery_note, load):
 	)
 
 
-def _delivery_order_has_existing_note(load_name, delivery_order_name):
+def _delivery_order_has_existing_note(load_name, delivery_order_name, native=False):
 	"""Check parent and item-level lineage before creating another note."""
 	if frappe.db.exists(
 		"Delivery Note",
 		{
 			"vuna_delivery_load": load_name,
-			"vuna_delivery_order": delivery_order_name,
+			customer.note_column(native): delivery_order_name,
 			"docstatus": ["!=", 2],
 		},
 	):
 		return True
+	item = frappe.qb.DocType("Delivery Note Item")
+	note = frappe.qb.DocType("Delivery Note")
+	allocation = frappe.qb.DocType("Transport Load Item")
 	return bool(
-		frappe.db.sql(
-			"""
-			select dni.parent
-			from `tabDelivery Note Item` dni
-			join `tabDelivery Note` dn on dn.name = dni.parent
-			join `tabDelivery Load Order` dlo on dlo.name = dni.vuna_delivery_load_order
-			where dlo.parent = %(load_name)s
-			and dlo.delivery_order = %(delivery_order_name)s
-			and dn.docstatus != 2
-			limit 1
-			""",
-			{"load_name": load_name, "delivery_order_name": delivery_order_name},
+		frappe.qb.from_(item)
+		.join(note)
+		.on(note.name == item.parent)
+		.join(allocation)
+		.on(allocation.name == item.vuna_delivery_load_order)
+		.select(item.parent)
+		.where(
+			(allocation.parent == load_name)
+			& (allocation[customer.order_column(native)] == delivery_order_name)
+			& (note.docstatus != 2)
 		)
+		.limit(1)
+		.run()
 	)
 
 
 def _get_delivery_notes_for_loads(load_names, docstatus=None):
 	"""Find notes through parent or item-level load lineage."""
-	filters = ""
-	values = {"load_names": tuple(load_names)}
-	if docstatus is not None:
-		filters = "and dn.docstatus = %(docstatus)s"
-		values["docstatus"] = docstatus
+	values = {"load_names": tuple(load_names), "docstatus": docstatus}
 	return frappe.db.sql(
-		f"""
+		"""
 		select distinct dn.name
 		from `tabDelivery Note` dn
 		left join `tabDelivery Note Item` dni on dni.parent = dn.name
-		left join `tabDelivery Load Order` dlo on dlo.name = dni.vuna_delivery_load_order
+		left join `tabTransport Load Item` dlo on dlo.name = dni.vuna_delivery_load_order
 		where (dn.vuna_delivery_load in %(load_names)s or dlo.parent in %(load_names)s)
-		{filters}
+		and (%(docstatus)s is null or dn.docstatus = %(docstatus)s)
 		and dn.docstatus != 2
 		order by dn.creation asc
 		""",
@@ -299,9 +320,9 @@ def _set_delivery_note_load_lineage(delivery_note, load_rows):
 	by_sales_order_item = {}
 	by_item_code = {}
 	for load_row in load_rows:
-		if not load_row.delivery_order_item:
+		if not customer.item_name(load_row):
 			continue
-		delivery_order_item = frappe.get_cached_doc("Delivery Order Item", load_row.delivery_order_item)
+		delivery_order_item = customer.get_item(load_row)
 		if delivery_order_item.sales_order_item:
 			by_sales_order_item[delivery_order_item.sales_order_item] = load_row.name
 		by_item_code.setdefault(delivery_order_item.item_code, []).append(load_row.name)
@@ -351,15 +372,15 @@ def _make_delivery_note_direct(delivery_order_name, load_rows, source_warehouse)
 		)
 	allocated_by_item = {}
 	for row in load_rows:
-		if row.delivery_order_item in allocated_by_item:
+		if customer.item_name(row) in allocated_by_item:
 			frappe.throw(
-				_("Delivery Order Item {0} appears more than once on Delivery Load {1}.").format(
+				_("Delivery Order Item {0} appears more than once on Transport Load {1}.").format(
 					row.delivery_order_item, row.parent or _("the selected load")
 				)
 			)
-		allocated_by_item[row.delivery_order_item] = flt(row.allocated_quantity)
+		allocated_by_item[customer.item_name(row)] = flt(row.allocated_quantity)
 	order_items = frappe.get_all(
-		"Delivery Order Item",
+		customer.item_type(load_rows[0]),
 		filters={"name": ["in", list(allocated_by_item)]},
 		fields=["name", "sales_order_item"],
 	)
@@ -387,10 +408,10 @@ def apply_allocated_delivery_quantities(delivery_note, allocated_by_sales_order_
 
 
 @frappe.whitelist()
-def make_delivery_trip_from_load(source_name):
-	"""Return a populated, unsaved Delivery Trip for a Delivery Load."""
+def make_delivery_trip_from_load(source_name: str):
+	"""Return a populated, unsaved Delivery Trip for a Transport Load."""
 	require_doctype_permission("Delivery Trip", "create")
-	load = frappe.get_doc("Delivery Load", source_name)
+	load = frappe.get_doc("Transport Load", source_name)
 	require_document_permission(load, "write")
 	return create_delivery_trip_for_load(source_name)
 
@@ -398,7 +419,7 @@ def make_delivery_trip_from_load(source_name):
 def create_delivery_trip_for_load(load):
 	"""Build the ERPNext Delivery Trip for every Load on the active allocation."""
 	if isinstance(load, str):
-		load = frappe.get_doc("Delivery Load", load)
+		load = frappe.get_doc("Transport Load", load)
 	load = get_locked_delivery_load(load)
 	validate_load_is_operational(load, _("creating a Delivery Trip"))
 
@@ -422,6 +443,14 @@ def create_delivery_trip_for_load(load):
 		)
 
 	loads = get_allocation_loads(allocation) if allocation else [load]
+	from vuna_transport.services.planning.transport_load_service import is_demand_load
+
+	if any(is_demand_load(selected) for selected in loads):
+		if not allocation:
+			frappe.throw(_("Warehouse transfer trips require a submitted Vehicle Allocation."))
+		from vuna_transport.services.execution.trip_task_service import make_task_trip
+
+		return make_task_trip(allocation, loads)
 	load_names = [selected_load.name for selected_load in loads]
 	trip_names = set(
 		frappe.get_all(
@@ -437,7 +466,7 @@ def create_delivery_trip_for_load(load):
 	trip_names.update(selected_load.delivery_trip for selected_load in loads if selected_load.delivery_trip)
 	if len(trip_names) > 1:
 		frappe.throw(
-			_("The selected Delivery Loads are already linked to different Delivery Trips: {0}.").format(
+			_("The selected Transport Loads are already linked to different Delivery Trips: {0}.").format(
 				", ".join(sorted(trip_names))
 			)
 		)
@@ -446,10 +475,10 @@ def create_delivery_trip_for_load(load):
 	if not delivery_notes:
 		frappe.throw(_("Create and submit the Delivery Notes for this load first."))
 	expected_delivery_orders = {
-		row.delivery_order
+		customer.order_name(row)
 		for selected_load in loads
 		for row in selected_load.delivery_orders
-		if row.delivery_order
+		if customer.order_name(row)
 	}
 	note_delivery_orders = set(
 		frappe.get_all(
@@ -461,7 +490,7 @@ def create_delivery_trip_for_load(load):
 	)
 	note_delivery_orders.update(
 		frappe.get_all(
-			"Delivery Load Order",
+			"Transport Load Item",
 			filters={
 				"name": [
 					"in",
@@ -474,6 +503,24 @@ def create_delivery_trip_for_load(load):
 			},
 			fields=["delivery_order"],
 			pluck="delivery_order",
+		)
+	)
+	note_delivery_orders.discard(None)
+	note_delivery_orders.update(
+		frappe.get_all(
+			"Transport Load Item",
+			filters={
+				"delivery_order": ["is", "not set"],
+				"name": [
+					"in",
+					frappe.get_all(
+						"Delivery Note Item",
+						filters={"parent": ["in", delivery_notes]},
+						pluck="vuna_delivery_load_order",
+					),
+				],
+			},
+			pluck="transport_demand",
 		)
 	)
 	note_delivery_orders.discard(None)
@@ -535,7 +582,10 @@ def create_delivery_trip_for_load(load):
 def _populate_delivery_stop_links(delivery_trip, loads):
 	for stop in delivery_trip.delivery_stops:
 		delivery_note = frappe.db.get_value(
-			"Delivery Note", stop.delivery_note, ["vuna_delivery_order", "vuna_delivery_load"], as_dict=True
+			"Delivery Note",
+			stop.delivery_note,
+			["vuna_delivery_order", "vuna_transport_demand", "vuna_delivery_load"],
+			as_dict=True,
 		)
 		if not delivery_note:
 			continue
@@ -548,24 +598,29 @@ def _populate_delivery_stop_links(delivery_trip, loads):
 				"vuna_delivery_load_order",
 			)
 			load_name = (
-				frappe.db.get_value("Delivery Load Order", load_order, "parent") if load_order else None
+				frappe.db.get_value("Transport Load Item", load_order, "parent") if load_order else None
 			)
 			load = next((row for row in loads if row.name == load_name), None)
 			if load and load_order:
-				delivery_order = frappe.db.get_value("Delivery Load Order", load_order, "delivery_order")
+				delivery_order = frappe.db.get_value("Transport Load Item", load_order, "delivery_order")
 		load_rows = [
 			row for row in (load.delivery_orders if load else []) if row.delivery_order == delivery_order
 		]
 		stop.vuna_delivery_order = delivery_order
+		stop.vuna_transport_demand = delivery_note.get("vuna_transport_demand")
 		stop.vuna_delivery_load = delivery_note.vuna_delivery_load
 		if len(load_rows) == 1:
 			stop.vuna_delivery_load_order = load_rows[0].name
 
 
 def _validate_delivery_orders_for_execution(load):
-	for delivery_order_name in {row.delivery_order for row in load.delivery_orders if row.delivery_order}:
+	for doctype, delivery_order_name in {
+		(customer.order_type(row), customer.order_name(row))
+		for row in load.delivery_orders
+		if customer.order_name(row)
+	}:
 		delivery_order = frappe.db.get_value(
-			"Delivery Order",
+			doctype,
 			delivery_order_name,
 			["docstatus", "status", "company", "source_warehouse", "sales_order"],
 			as_dict=True,
@@ -622,12 +677,16 @@ def _set_delivery_note_source_warehouse(delivery_note, source_warehouse):
 def _group_load_rows(load):
 	groups = defaultdict(list)
 	for row in load.delivery_orders:
-		groups[row.delivery_order].append(row)
+		groups[customer.order_name(row)].append(row)
 	return groups
 
 
 def _repair_single_item_load_rows(load):
 	for row in load.delivery_orders:
+		if customer.native_row(row):
+			if not row.transport_demand_item:
+				frappe.throw(_("Native customer load rows require an exact Transport Demand Item."))
+			continue
 		if row.delivery_order_item:
 			continue
 		delivery_order = frappe.get_doc("Delivery Order", row.delivery_order)
@@ -636,7 +695,7 @@ def _repair_single_item_load_rows(load):
 		item = delivery_order.items[0]
 		row.delivery_order_item = item.name
 		frappe.db.set_value(
-			"Delivery Load Order",
+			"Transport Load Item",
 			row.name,
 			"delivery_order_item",
 			item.name,
@@ -647,7 +706,7 @@ def _repair_single_item_load_rows(load):
 def _get_pick_list_locations(load_rows, pick_list):
 	item_keys = set()
 	for row in load_rows:
-		delivery_order_item = frappe.get_doc("Delivery Order Item", row.delivery_order_item)
+		delivery_order_item = customer.get_item(row)
 		item_keys.add((row.sales_order, delivery_order_item.sales_order_item, delivery_order_item.item_code))
 	return [
 		location

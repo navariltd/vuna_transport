@@ -22,7 +22,113 @@ LEGACY_DEFAULT_DISPATCH_SCAN_ROLES = {
 def after_install():
 	ensure_transport_uoms()
 	normalize_transport_cost_natures()
+	ensure_transport_demand_sources()
 	ensure_dispatch_scan_roles()
+	ensure_delivery_methods()
+
+
+def ensure_transport_demand_sources():
+	"""Initialize source policies before other setup helpers save the singleton.
+
+	Keep configured rows intact and preserve legacy sales-generation choices.
+	Returns and purchasing remain explicit opt-ins; new demand stays draft.
+	"""
+	settings = frappe.get_single("Transport Settings")
+	if settings.get("demand_sources"):
+		return
+	settings.append(
+		"demand_sources",
+		{
+			"source_document_type": "Sales Order",
+			"enabled": 1,
+			"creation_mode": "Automatic" if settings.get("auto_create_delivery_orders") else "Manual",
+			"auto_submit_delivery_orders": settings.get("auto_submit_delivery_orders") or 0,
+			"auto_submit_demand": 0,
+		},
+	)
+	settings.append(
+		"demand_sources",
+		{
+			"source_document_type": "Material Request",
+			"enabled": 1,
+			"creation_mode": "Manual",
+			"auto_submit_demand": 0,
+		},
+	)
+	settings.save(ignore_permissions=True)
+
+
+def cleanup_retired_delivery_order_navigation():
+	"""Remove stale retired links without overwriting sidebar customizations.
+
+	Clean archived sidebars as well: subsequent framework conversion must not
+	reintroduce links to removed DocTypes/reports. Never export site navigation
+	back into the app's source files from this upgrade helper.
+	"""
+	if frappe.db.exists("DocType", "Delivery Order"):
+		return 0
+	retired_links = {
+		("DocType", "Delivery Order"),
+		("DocType", "Delivery Order Item"),
+		("Report", "Open Delivery Demand"),
+		("Report", "Unallocated Delivery Orders"),
+	}
+	removed = 0
+	for parent_type, table_field in (
+		("Sidebar", "items"),
+		("Workspace Sidebar", "items"),
+		("Custom Sidebar", "sidebar_items"),
+		("Workspace", "links"),
+	):
+		if not frappe.db.exists("DocType", parent_type):
+			continue
+		meta = frappe.get_meta(parent_type)
+		table = meta.get_field(table_field)
+		if not table:
+			continue
+		scope = {"module": "Vuna Transport"} if parent_type == "Custom Sidebar" else {"app": "vuna_transport"}
+		parents = frappe.get_all(parent_type, filters=scope, pluck="name")
+		if not parents:
+			continue
+		rows = frappe.get_all(
+			table.options,
+			filters={"parent": ["in", parents], "parenttype": parent_type, "parentfield": table_field},
+			fields=["name", "link_type", "link_to"],
+		)
+		obsolete = [row.name for row in rows if (row.link_type, row.link_to) in retired_links]
+		if obsolete:
+			frappe.db.delete(table.options, {"name": ["in", obsolete]})
+			removed += len(obsolete)
+	if removed:
+		frappe.clear_cache()
+	return removed
+
+
+def ensure_delivery_methods():
+	"""Seed standard policies. Custom names never determine workflow behavior."""
+	for name, buying, selling, internal, required, arranger in (
+		("Company Delivery", 0, 1, 0, 1, "Company"),
+		("Customer Pickup", 0, 1, 0, 0, "Counterparty"),
+		("Company Collection", 1, 0, 0, 1, "Company"),
+		("Supplier Delivery", 1, 0, 0, 0, "Counterparty"),
+		("Internal Transfer", 0, 0, 1, 1, "Company"),
+		("Return Collection", 0, 1, 1, 0, "Company"),
+		("Customer Return Drop-off", 0, 1, 0, 0, "Counterparty"),
+	):
+		if not frappe.db.exists("Delivery Method", name):
+			frappe.get_doc(
+				{
+					"doctype": "Delivery Method",
+					"delivery_method_name": name,
+					"buying": buying,
+					"selling": selling,
+					"internal": internal,
+					"transport_arranged_by": arranger,
+					"requires_transport_planning": required,
+					"requires_vehicle_allocation": required,
+					"requires_delivery_trip": required,
+				}
+			).insert(ignore_permissions=True)
 
 
 def ensure_transport_uoms():

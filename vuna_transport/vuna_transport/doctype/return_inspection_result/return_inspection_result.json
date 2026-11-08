@@ -1,0 +1,176 @@
+{
+ "actions": [],
+ "creation": "2026-10-28 08:04:55.941221",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "result",
+  "reason",
+  "column_break_uaca",
+  "target_warehouse",
+  "delivery_note_item",
+  "stock_entry_detail",
+  "return_request_item",
+  "serial_and_batch_bundle",
+  "quality_inspection",
+  "section_break_jmse",
+  "inspection_qty",
+  "received_stock_qty",
+  "column_break_gjzj",
+  "stock_uom",
+  "serial_and_batch_no_section",
+  "batch_no",
+  "column_break_kgwu",
+  "serial_no",
+  "section_break_wyux",
+  "remarks"
+ ],
+ "fields": [
+  {
+   "fieldname": "delivery_note_item",
+   "fieldtype": "Link",
+   "label": "Delivery Note Item",
+   "options": "Delivery Note Item",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "stock_entry_detail",
+   "fieldtype": "Link",
+   "label": "Receiving Stock Entry Item",
+   "options": "Stock Entry Detail",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "return_request_item",
+   "fieldtype": "Link",
+   "label": "Return Request Item",
+   "options": "Return Request Item",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "serial_and_batch_bundle",
+   "fieldtype": "Link",
+   "label": "Source Serial and Batch Bundle",
+   "options": "Serial and Batch Bundle",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "received_stock_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Received Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "inspection_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Quantity",
+   "reqd": 1
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Stock UOM",
+   "options": "UOM",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "result",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Result",
+   "options": "Accepted\nRejected",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.result == 'Rejected'",
+   "fieldname": "reason",
+   "fieldtype": "Link",
+   "label": "Rejection Reason",
+   "mandatory_depends_on": "eval:doc.result == 'Rejected'",
+   "options": "Rejection Reason"
+  },
+  {
+   "fieldname": "target_warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Target Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "batch_no",
+   "fieldtype": "Link",
+   "label": "Batch No",
+   "options": "Batch"
+  },
+  {
+   "fieldname": "serial_no",
+   "fieldtype": "Long Text",
+   "label": "Serial No(s)"
+  },
+  {
+   "fieldname": "quality_inspection",
+   "fieldtype": "Link",
+   "label": "Quality Inspection",
+   "options": "Quality Inspection"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "column_break_uaca",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_jmse",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_gjzj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "serial_and_batch_no_section",
+   "fieldtype": "Section Break",
+   "label": "Serial and Batch No"
+  },
+  {
+   "fieldname": "column_break_kgwu",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_wyux",
+   "fieldtype": "Section Break"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-28 08:31:59.839114",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Return Inspection Result",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

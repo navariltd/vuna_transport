@@ -159,9 +159,12 @@ doc_events = {
 		"validate": "vuna_transport.services.routing.location_service.synchronize_address_location",
 	},
 	"Sales Order": {
+		"validate": "vuna_transport.services.demand.delivery_method_service.validate_sales_order_delivery_method",
+		"before_update_after_submit": "vuna_transport.services.demand.delivery_method_service.validate_sales_order_delivery_method",
+		"before_cancel": "vuna_transport.services.planning.demand_lifecycle_service.guard_source_cancellation",
 		"before_submit": "vuna_transport.services.execution.return_service.validate_linked_replacement_sales_order",
 		"on_submit": [
-			"vuna_transport.services.demand.delivery_order_service.create_delivery_orders_for_sales_order",
+			"vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
 			"vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
 		],
 		"on_update_after_submit": "vuna_transport.services.demand.delivery_order_service.sync_delivery_orders_for_sales_order",
@@ -177,7 +180,10 @@ doc_events = {
 			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_note",
 		],
 		"before_submit": "vuna_transport.services.execution.return_service.validate_linked_sales_return_submission",
-		"before_cancel": "vuna_transport.services.execution.return_service.prepare_sales_return_cancellation",
+		"before_cancel": [
+			"vuna_transport.services.execution.return_service.prepare_sales_return_cancellation",
+			"vuna_transport.services.execution.trip_task_service.guard_task_source_cancellation",
+		],
 		"on_submit": [
 			"vuna_transport.services.demand.delivery_order_service.sync_delivery_orders_after_direct_delivery_note",
 			"vuna_transport.services.execution.lineage_service.complete_load_without_trip",
@@ -192,10 +198,20 @@ doc_events = {
 		"on_trash": "vuna_transport.services.execution.return_service.prepare_sales_return_cancellation",
 	},
 	"Quality Inspection": {
-		"before_cancel": "vuna_transport.services.execution.return_service.prepare_quality_inspection_removal",
-		"on_submit": "vuna_transport.services.execution.return_service.sync_return_request_from_quality_inspection",
+		"on_update": "vuna_transport.services.execution.return_v2_service.sync_return_quality_inspection",
+		"before_cancel": [
+			"vuna_transport.services.execution.return_service.prepare_quality_inspection_removal",
+			"vuna_transport.services.execution.return_v2_service.prepare_return_quality_inspection_removal",
+		],
+		"on_submit": [
+			"vuna_transport.services.execution.return_service.sync_return_request_from_quality_inspection",
+			"vuna_transport.services.execution.return_v2_service.sync_return_quality_inspection",
+		],
 		"on_cancel": "vuna_transport.services.execution.return_service.sync_return_request_from_quality_inspection",
-		"on_trash": "vuna_transport.services.execution.return_service.prepare_quality_inspection_removal",
+		"on_trash": [
+			"vuna_transport.services.execution.return_service.prepare_quality_inspection_removal",
+			"vuna_transport.services.execution.return_v2_service.prepare_return_quality_inspection_removal",
+		],
 	},
 	"Sales Invoice": {
 		"before_submit": "vuna_transport.services.execution.return_service.validate_linked_sales_invoice_credit_note_submission",
@@ -206,26 +222,74 @@ doc_events = {
 		"on_submit": "vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
 		"on_cancel": "vuna_transport.services.execution.return_service.sync_return_request_from_commercial_document",
 	},
+	"Stock Entry": {
+		"validate": [
+			"vuna_transport.services.execution.supplier_vehicle_transfer_service.validate_vehicle_material_transfer",
+			"vuna_transport.services.execution.depot_return_receiving_service.validate_vehicle_receipt",
+			"vuna_transport.services.execution.unplanned_pickup_service.validate_collection_stock",
+			"vuna_transport.services.execution.return_pickup_service.validate_pickup_stock",
+			"vuna_transport.services.execution.allocation_transfer_service.validate_allocation_stock_entry",
+			"vuna_transport.services.execution.transfer_execution_service.validate_dispatch_stock_entry",
+			"vuna_transport.services.execution.transfer_proof_service.validate_receipt_stock_entry",
+		],
+		"before_submit": "vuna_transport.services.execution.return_v2_service.validate_return_stock_entry",
+		"before_cancel": [
+			"vuna_transport.services.execution.return_pickup_service.guard_pickup_stock_cancellation",
+			"vuna_transport.services.execution.allocation_transfer_service.guard_allocation_stock_cancellation",
+			"vuna_transport.services.execution.transfer_execution_service.guard_dispatch_cancellation",
+			"vuna_transport.services.execution.return_v2_service.prepare_return_stock_entry_removal",
+		],
+		"on_submit": [
+			"vuna_transport.services.execution.depot_return_receiving_service.sync_vehicle_receipt",
+			"vuna_transport.services.execution.unplanned_pickup_service.sync_collection_stock",
+			"vuna_transport.services.execution.return_pickup_service.sync_pickup_stock",
+			"vuna_transport.services.execution.return_v2_service.sync_return_inspection_from_stock_entry",
+			"vuna_transport.services.execution.allocation_transfer_service.sync_allocation_stock",
+			"vuna_transport.services.execution.transfer_execution_service.sync_dispatch_load_status",
+			"vuna_transport.services.execution.transfer_proof_service.sync_receipt_stock",
+		],
+		"on_cancel": [
+			"vuna_transport.services.execution.depot_return_receiving_service.sync_vehicle_receipt",
+			"vuna_transport.services.execution.return_pickup_service.guard_pickup_stock_cancellation",
+			"vuna_transport.services.execution.unplanned_pickup_service.sync_collection_stock",
+			"vuna_transport.services.execution.return_pickup_service.sync_pickup_stock",
+			"vuna_transport.services.execution.return_v2_service.sync_return_inspection_from_stock_entry",
+			"vuna_transport.services.execution.allocation_transfer_service.sync_allocation_stock",
+			"vuna_transport.services.execution.transfer_execution_service.sync_dispatch_load_status",
+			"vuna_transport.services.execution.transfer_proof_service.sync_receipt_stock",
+		],
+		"on_trash": "vuna_transport.services.execution.return_v2_service.prepare_return_stock_entry_removal",
+	},
 	"Delivery Trip": {
-		"before_cancel": "vuna_transport.services.execution.lineage_service.prepare_delivery_trip_cancellation",
+		"before_cancel": [
+			"vuna_transport.services.execution.direct_supplier_pickup_service.guard_trip_cancellation",
+			"vuna_transport.services.execution.transfer_execution_service.guard_trip_stock_cancellation",
+			"vuna_transport.services.execution.lineage_service.prepare_delivery_trip_cancellation",
+		],
 		"validate": "vuna_transport.services.execution.lineage_service.validate_delivery_trip",
 		"on_update": [
+			"vuna_transport.services.execution.trip_task_service.sync_task_plan",
+			"vuna_transport.services.execution.trip_task_service.sync_task_execution",
 			"vuna_transport.services.execution.lineage_service.link_delivery_trip",
 			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_trip",
 			"vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 		],
 		"on_submit": [
+			"vuna_transport.services.execution.trip_task_service.sync_task_plan",
+			"vuna_transport.services.execution.trip_task_service.sync_task_execution",
 			"vuna_transport.services.execution.lineage_service.submit_delivery_trip",
 			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_trip",
 			"vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 			"vuna_transport.services.mobile.mobile_notification_service.notify_delivery_trip",
 		],
 		"on_update_after_submit": [
+			"vuna_transport.services.execution.trip_task_service.sync_task_execution",
 			"vuna_transport.services.mobile.mobile_trip_execution_service.synchronize_mobile_trip_execution_status",
 			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_trip",
 			"vuna_transport.services.mobile.mobile_notification_service.notify_delivery_trip",
 		],
 		"on_cancel": [
+			"vuna_transport.services.execution.trip_task_service.cancel_tasks",
 			"vuna_transport.services.execution.lineage_service.cancel_delivery_trip",
 			"vuna_transport.services.execution.lineage_service.unlink_delivery_trip",
 			"vuna_transport.services.fleet.vehicle_allocation_service.sync_allocation_execution_status_for_delivery_trip",
@@ -233,14 +297,40 @@ doc_events = {
 		],
 		"on_trash": [
 			"vuna_transport.services.execution.lineage_service.unlink_delivery_trip",
+			"vuna_transport.services.execution.trip_task_service.remove_draft_tasks",
 		],
 		"after_delete": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
 	"Expense Claim": {
 		"on_update": "vuna_transport.services.mobile.mobile_notification_service.notify_expense_claim",
 	},
+	"Proof of Delivery": {
+		"on_submit": "vuna_transport.services.execution.trip_task_service.sync_task_execution",
+		"on_cancel": "vuna_transport.services.execution.trip_task_service.sync_task_execution",
+	},
 	"Material Request": {
+		"validate": "vuna_transport.services.demand.delivery_method_service.validate_source_delivery_method",
+		"before_update_after_submit": "vuna_transport.services.demand.delivery_method_service.validate_source_delivery_method",
+		"on_submit": "vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
+		"on_update_after_submit": "vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
+		"before_cancel": "vuna_transport.services.planning.demand_lifecycle_service.guard_source_cancellation",
 		"on_update": "vuna_transport.services.mobile.mobile_notification_service.notify_material_request",
+	},
+	"Purchase Order": {
+		"validate": "vuna_transport.services.demand.supplier_pickup_demand_service.validate_supplier_pickup_order",
+		"before_update_after_submit": "vuna_transport.services.demand.supplier_pickup_demand_service.validate_supplier_pickup_order",
+		"on_submit": "vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
+		"on_update_after_submit": "vuna_transport.services.demand.source_policy_service.automatically_create_from_source",
+		"before_cancel": "vuna_transport.services.planning.demand_lifecycle_service.guard_source_cancellation",
+	},
+	"Purchase Receipt": {
+		"after_delete": "vuna_transport.services.execution.direct_supplier_pickup_service.sync_supplier_receipt",
+		"on_update": "vuna_transport.services.execution.direct_supplier_pickup_service.sync_supplier_receipt",
+		"on_submit": "vuna_transport.services.execution.direct_supplier_pickup_service.sync_supplier_receipt",
+		"on_cancel": "vuna_transport.services.execution.direct_supplier_pickup_service.sync_supplier_receipt",
+		"validate": "vuna_transport.services.execution.supplier_vehicle_receipt_service.validate_vehicle_purchase_receipt",
+		"before_update_after_submit": "vuna_transport.services.execution.supplier_vehicle_receipt_service.validate_vehicle_purchase_receipt",
+		"before_cancel": "vuna_transport.services.execution.supplier_vehicle_receipt_service.guard_vehicle_receipt_cancellation",
 	},
 	"Vehicle": {
 		"validate": "vuna_transport.services.fleet.fleet_service.validate_vehicle",
@@ -251,8 +341,12 @@ doc_events = {
 		"on_submit": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 		"on_cancel": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
 	},
-	"Delivery Load": {
+	"Transport Load": {
+		"before_cancel": "vuna_transport.services.execution.trip_task_service.guard_task_source_cancellation",
 		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
+	},
+	"Transport Demand": {
+		"before_cancel": "vuna_transport.services.execution.trip_task_service.guard_task_source_cancellation",
 	},
 	"Asset": {
 		"on_update": "vuna_transport.services.fleet.fleet_service.sync_related_vehicle_snapshots",
@@ -287,6 +381,10 @@ doc_events = {
 }
 
 doctype_js = {
+	"Purchase Receipt": "public/js/supplier_vehicle_purchase_receipt.js",
+	"Purchase Order": "public/js/purchase_order_transport.js",
+	"Stock Entry": "public/js/return_pickup_stock_entry.js",
+	"Material Request": "public/js/material_request_transport.js",
 	"Address": "public/js/address.js",
 	"Delivery Note": "public/js/delivery_note.js",
 	"Delivery Trip": "public/js/delivery_trip.js",
@@ -302,6 +400,7 @@ doctype_list_js = {
 
 override_doctype_dashboards = {
 	"Delivery Note": "vuna_transport.overrides.delivery_note_dashboard.get_data",
+	"Delivery Trip": "vuna_transport.overrides.delivery_trip_dashboard.get_data",
 	"Sales Order": "vuna_transport.overrides.sales_order_dashboard.get_data",
 	"Vehicle": "vuna_transport.overrides.vehicle_dashboard.get_data",
 }
@@ -318,10 +417,15 @@ fixtures = [
 	}
 ]
 
+before_migrate = ["vuna_transport.services.demand.delivery_order_retirement.guard_upgrade"]
+
 after_migrate = [
+	"vuna_transport.install.ensure_delivery_methods",
 	"vuna_transport.install.ensure_transport_uoms",
 	"vuna_transport.install.normalize_transport_cost_natures",
+	"vuna_transport.install.ensure_transport_demand_sources",
 	"vuna_transport.install.ensure_dispatch_scan_roles",
+	"vuna_transport.install.cleanup_retired_delivery_order_navigation",
 	"vuna_transport.services.routing.location_service.backfill_address_coordinates",
 	"vuna_transport.services.fleet.fleet_service.sync_vehicle_operational_snapshots",
 ]

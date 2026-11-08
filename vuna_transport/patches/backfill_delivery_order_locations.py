@@ -21,6 +21,8 @@ SNAPSHOT_FIELDS = (
 
 
 def execute():
+	if not frappe.db.exists("DocType", "Delivery Order"):
+		return
 	for name in frappe.get_all("Delivery Order", pluck="name"):
 		delivery_order = frappe.get_doc("Delivery Order", name)
 		set_delivery_order_location_snapshots(delivery_order)

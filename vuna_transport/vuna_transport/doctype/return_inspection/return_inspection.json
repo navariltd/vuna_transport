@@ -1,0 +1,291 @@
+{
+ "actions": [],
+ "autoname": "naming_series:",
+ "creation": "2026-10-28 05:37:24.584050",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "inspection_tab",
+  "identity_section",
+  "naming_series",
+  "sales_return",
+  "receiving_stock_entry",
+  "return_request",
+  "company",
+  "customer",
+  "column_break_identity",
+  "status",
+  "inspected_on",
+  "inspected_by",
+  "source_warehouse",
+  "warehouse_defaults_section",
+  "accepted_warehouse",
+  "column_break_sxch",
+  "rejected_warehouse",
+  "results_section",
+  "results",
+  "summary_section",
+  "total_received_stock_qty",
+  "total_inspected_stock_qty",
+  "stock_entry",
+  "column_break_wpno",
+  "accepted_stock_qty",
+  "rejected_stock_qty",
+  "pending_stock_qty",
+  "section_break_npzq",
+  "remarks",
+  "connections_tab",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "inspection_tab",
+   "fieldtype": "Tab Break",
+   "label": "Return Inspection"
+  },
+  {
+   "fieldname": "identity_section",
+   "fieldtype": "Section Break",
+   "label": "Inspection Details"
+  },
+  {
+   "default": "RIN-.YYYY.-",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "RIN-.YYYY.-",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sales_return",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Sales Return",
+   "options": "Delivery Note",
+   "mandatory_depends_on": "eval:!doc.receiving_stock_entry"
+  },
+  {
+   "fieldname": "receiving_stock_entry",
+   "fieldtype": "Link",
+   "label": "Receiving Stock Entry",
+   "options": "Stock Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "return_request",
+   "fieldtype": "Link",
+   "label": "Return Request",
+   "options": "Return Request",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1,
+   "mandatory_depends_on": "eval:!doc.receiving_stock_entry",
+   "depends_on": "eval:!doc.receiving_stock_entry"
+  },
+  {
+   "fieldname": "column_break_identity",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nSubmitted\nCancelled",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Now",
+   "fieldname": "inspected_on",
+   "fieldtype": "Datetime",
+   "label": "Inspected On",
+   "reqd": 1
+  },
+  {
+   "default": "__user",
+   "fieldname": "inspected_by",
+   "fieldtype": "Link",
+   "label": "Inspected By",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fieldname": "source_warehouse",
+   "fieldtype": "Link",
+   "label": "Returns Quarantine Warehouse",
+   "options": "Warehouse",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "warehouse_defaults_section",
+   "fieldtype": "Section Break",
+   "label": "Disposition Defaults"
+  },
+  {
+   "fieldname": "accepted_warehouse",
+   "fieldtype": "Link",
+   "label": "Accepted Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "rejected_warehouse",
+   "fieldtype": "Link",
+   "label": "Rejected Returns Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "results_section",
+   "fieldtype": "Section Break",
+   "label": "Inspection Result Groups"
+  },
+  {
+   "fieldname": "results",
+   "fieldtype": "Table",
+   "label": "Results",
+   "options": "Return Inspection Result",
+   "reqd": 1
+  },
+  {
+   "fieldname": "summary_section",
+   "fieldtype": "Section Break",
+   "label": "Quantity Summary"
+  },
+  {
+   "fieldname": "total_received_stock_qty",
+   "fieldtype": "Float",
+   "label": "Received",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_inspected_stock_qty",
+   "fieldtype": "Float",
+   "label": "Inspected",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "accepted_stock_qty",
+   "fieldtype": "Float",
+   "label": "Accepted",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "rejected_stock_qty",
+   "fieldtype": "Float",
+   "label": "Rejected",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "pending_stock_qty",
+   "fieldtype": "Float",
+   "label": "Pending Inspection",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "stock_entry",
+   "fieldtype": "Link",
+   "label": "Stock Entry",
+   "options": "Stock Entry",
+   "read_only": 1
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Inspection Remarks"
+  },
+  {
+   "fieldname": "connections_tab",
+   "fieldtype": "Tab Break",
+   "label": "Connections",
+   "show_dashboard": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Return Inspection",
+   "print_hide": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_sxch",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_wpno",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_npzq",
+   "fieldtype": "Section Break"
+  }
+ ],
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-10-28 07:57:24.284550",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Return Inspection",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Dispatcher",
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Transport Manager",
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

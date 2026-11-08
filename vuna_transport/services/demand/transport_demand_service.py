@@ -1,0 +1,282 @@
+"""Explicit, permission-checked transport demand generation. No stock posting."""
+
+import hashlib
+from collections import defaultdict
+
+import frappe
+from frappe import _
+from frappe.utils import flt
+
+from vuna_transport.services.demand.customer_demand_fields import (
+	CUSTOMER_EXECUTION_STATUSES,
+	enrich_customer_demand,
+)
+from vuna_transport.services.demand.delivery_order_service import _get_item_transport_measurements
+from vuna_transport.services.shared.security_service import (
+	require_company_access,
+	require_doctype_permission,
+)
+
+SUPPORTED_SOURCES = {"Sales Order", "Delivery Order", "Material Request", "Return Request", "Purchase Order"}
+
+
+def build_source_legs(source):
+	"""Normalize source rows; never sum quantities across different stock UOMs."""
+	if source.doctype not in SUPPORTED_SOURCES or source.docstatus != 1:
+		frappe.throw(_("Transport demand requires a supported, submitted source document."))
+	if source.status in ("Stopped", "Closed", "Cancelled"):
+		frappe.throw(_("The source document is no longer available for transport planning."))
+	if source.doctype == "Sales Order":
+		from vuna_transport.services.demand.sales_transport_demand_service import build_sales_legs
+
+		return build_sales_legs(source)
+	if source.doctype == "Purchase Order":
+		from vuna_transport.services.demand.supplier_pickup_demand_service import build_supplier_pickup_legs
+
+		return build_supplier_pickup_legs(source)
+	if source.doctype == "Return Request":
+		from vuna_transport.services.demand.depot_return_demand_service import build_depot_return_legs
+
+		return build_depot_return_legs(source)
+	is_transfer = source.doctype == "Material Request"
+	if is_transfer and source.material_request_type != "Material Transfer":
+		frappe.throw(_("Only Material Transfer requests can generate transport demand."))
+	legs = defaultdict(list)
+	for row in source.get("items"):
+		factor = flt(row.conversion_factor)
+		if factor <= 0:
+			frappe.throw(_("Source row {0} requires a positive UOM conversion factor.").format(row.idx))
+		if is_transfer:
+			origin = row.from_warehouse or source.get("set_from_warehouse") or None
+			destination = row.warehouse or source.get("set_warehouse")
+			# ERPNext tracks Material Request fulfilment in stock UOM as ordered_qty.
+			quantity = max(flt(row.stock_qty) - flt(row.ordered_qty), 0)
+		else:
+			origin = row.s_warehouse or source.source_warehouse
+			destination = source.delivery_address
+			quantity = flt(row.transport_qty) * factor
+		if quantity <= 0:
+			continue
+		if (
+			(not is_transfer and not origin)
+			or not destination
+			or (origin and is_transfer and origin == destination)
+		):
+			frappe.throw(_("Source row {0} requires distinct, valid movement endpoints.").format(row.idx))
+		legs[(origin, destination)].append(
+			{
+				"source_item": row.name,
+				"item_code": row.item_code,
+				"transaction_qty": quantity / factor,
+				"transaction_uom": row.uom,
+				"conversion_factor": factor,
+				"stock_qty": quantity,
+				"stock_uom": row.stock_uom,
+				"delivery_group": row.get("delivery_group"),
+				"transport_compatibility_group": row.get("transport_compatibility_group"),
+			}
+		)
+	return [
+		{
+			"company": source.company,
+			"movement_type": "Warehouse Transfer" if is_transfer else "Customer Delivery",
+			"source_document_type": source.doctype,
+			"source_document": source.name,
+			"source_key": get_source_key(source.doctype, source.name, origin, destination),
+			"source_warehouse": origin,
+			"destination_warehouse": destination if is_transfer else None,
+			"destination_address": None if is_transfer else destination,
+			"customer": None if is_transfer else source.customer,
+			"required_date": source.schedule_date if is_transfer else source.required_delivery_date,
+			"transport_zone": None if is_transfer else source.transport_zone,
+			"items": items,
+		}
+		for (origin, destination), items in sorted(
+			legs.items(), key=lambda pair: (pair[0][0] or "", pair[0][1] or "")
+		)
+	]
+
+
+def get_source_key(doctype, name, origin, destination):
+	return hashlib.sha256(frappe.as_json([doctype, name, origin, destination]).encode()).hexdigest()
+
+
+@frappe.whitelist()
+def create_transport_demands(source_doctype: str, source_name: str) -> list[str]:
+	"""Create reviewable demand drafts, returning existing drafts on retry."""
+	require_doctype_permission("Transport Demand", "create")
+	return _create_transport_demands(source_doctype, source_name)
+
+
+def _create_transport_demands(source_doctype, source_name, automated=False):
+	from vuna_transport.services.demand.source_policy_service import require_source_enabled
+
+	if source_doctype not in SUPPORTED_SOURCES:
+		frappe.throw(_("Unsupported transport demand source."))
+	if source_doctype == "Sales Order":
+		from vuna_transport.services.demand.sales_transport_demand_service import create_sales_demands
+
+		return create_sales_demands(source_name, automated=automated)
+	source = frappe.get_doc(source_doctype, source_name)
+	if not automated:
+		source.check_permission("read")
+	require_company_access(source.company)
+	policy = require_source_enabled(source)
+	# Serialize generation for this source; source_key also has a unique constraint.
+	frappe.qb.from_(frappe.qb.DocType(source_doctype)).select("name").where(
+		frappe.qb.DocType(source_doctype).name == source_name
+	).for_update().run()
+	source.reload()
+	legs = build_source_legs(source)
+	if not legs:
+		if source_doctype == "Return Request":
+			existing_names = frappe.get_all(
+				"Transport Demand",
+				filters={
+					"source_document_type": source_doctype,
+					"source_document": source_name,
+					"docstatus": ["!=", 2],
+				},
+				pluck="name",
+			)
+			if existing_names:
+				for name in existing_names:
+					if not automated:
+						frappe.get_doc("Transport Demand", name).check_permission("read")
+				return existing_names
+		frappe.throw(_("The source has no outstanding transport quantity."))
+	names = []
+	for leg in legs:
+		existing = frappe.db.get_value("Transport Demand", {"source_key": leg["source_key"]}, "name")
+		if existing:
+			demand = frappe.get_doc("Transport Demand", existing)
+			if not automated:
+				demand.check_permission("read")
+			if demand.docstatus == 2:
+				frappe.throw(
+					_("Cancelled Transport Demand {0} requires planner review before regeneration.").format(
+						existing
+					)
+				)
+			names.append(existing)
+			continue
+		demand = frappe.get_doc({"doctype": "Transport Demand", **leg})
+		demand.flags.ignore_permissions = automated
+		demand.insert()
+		if policy.auto_submit_demand:
+			demand.submit()
+		names.append(demand.name)
+	return names
+
+
+def validate_transport_demand(demand):
+	"""Rebuild draft snapshots from the source, preventing forged rows/endpoints."""
+	from vuna_transport.services.demand.source_policy_service import require_source_enabled
+
+	if demand.source_document_type == "Sales Order":
+		from vuna_transport.services.demand.sales_transport_demand_service import validate_sales_demand
+
+		return validate_sales_demand(demand)
+
+	if demand.source_document_type not in SUPPORTED_SOURCES:
+		frappe.throw(_("Unsupported transport demand source."))
+	source = frappe.get_doc(demand.source_document_type, demand.source_document)
+	require_source_enabled(source)
+	if not demand.flags.ignore_permissions:
+		source.check_permission("read")
+	require_company_access(source.company)
+	previous = demand.get_doc_before_save()
+	if previous and previous.source_key != demand.source_key:
+		frappe.throw(_("Transport demand source lineage cannot be changed."))
+	if source.doctype == "Delivery Order":
+		from vuna_transport.services.demand.delivery_order_migration import (
+			MIGRATION_FIELDS,
+			MigrationConflict,
+			prepared_source_for_validation,
+		)
+
+		try:
+			source = prepared_source_for_validation(source, previous)
+		except MigrationConflict as error:
+			frappe.throw(str(error))
+		if previous and previous.get("legacy_delivery_order_snapshot"):
+			for field in MIGRATION_FIELDS:
+				demand.set(field, previous.get(field))
+	leg = next((leg for leg in build_source_legs(source) if leg["source_key"] == demand.source_key), None)
+	if not leg:
+		frappe.throw(_("This movement leg no longer has outstanding source quantity."))
+	if source.doctype == "Purchase Order" and not demand.flags.ignore_permissions:
+		frappe.get_doc("Address", leg["source_address"]).check_permission("read")
+		frappe.get_doc("Supplier", leg["supplier"]).check_permission("read")
+	# A requester may know the depot but not the fulfilment warehouse. Preserve
+	# the original source-leg key while the transport planner resolves its origin.
+	if not leg["source_warehouse"] and leg["movement_type"] == "Warehouse Transfer":
+		leg["source_warehouse"] = demand.source_warehouse
+	if leg["source_warehouse"] and leg["source_warehouse"] == leg["destination_warehouse"]:
+		frappe.throw(_("Source Warehouse and Destination Warehouse must be different."))
+	for warehouse_name in (leg["source_warehouse"], leg["destination_warehouse"]):
+		if not warehouse_name:
+			continue
+		warehouse = frappe.get_doc("Warehouse", warehouse_name)
+		if not demand.flags.ignore_permissions:
+			warehouse.check_permission("read")
+		if warehouse.company != leg["company"] or warehouse.is_group or warehouse.disabled:
+			frappe.throw(_("Movement warehouses must be active, non-group warehouses in the source company."))
+	for fieldname, value in leg.items():
+		if fieldname != "items":
+			demand.set(fieldname, value)
+	demand.demand_type = get_demand_type(leg["movement_type"])
+	# Existing load/task/stock references point at these child IDs. Only reuse IDs
+	# from the persisted document, never names supplied by an API payload.
+	demand.set("items", preserve_source_row_names(leg["items"], previous))
+	for row in demand.items:
+		item = frappe.get_cached_doc("Item", row.item_code)
+		if not item.is_stock_item or item.disabled:
+			frappe.throw(_("Transport demand items must be active stock items."))
+		row.delivery_group = row.delivery_group or item.get("vuna_delivery_group")
+		row.transport_compatibility_group = row.transport_compatibility_group or item.get(
+			"vuna_transport_compatibility_group"
+		)
+		measurements = _get_item_transport_measurements(row, row.transaction_qty)
+		row.weight = measurements.weight
+		row.weight_uom = measurements.weight_uom
+	if source.doctype == "Delivery Order":
+		enrich_customer_demand(demand, source)
+	demand.status = "Open" if demand.docstatus == 1 else "Draft"
+	if (
+		source.doctype == "Delivery Order"
+		and demand.docstatus == 1
+		and source.status in CUSTOMER_EXECUTION_STATUSES
+	):
+		demand.status = source.status
+
+
+def preserve_source_row_names(items, previous):
+	"""Keep persisted child identity/caches, not client-supplied child metadata."""
+	by_source = {}
+	for row in previous.get("items") if previous else []:
+		if row.source_item in by_source:
+			frappe.throw(_("Existing demand has duplicate source rows; review its lineage before saving."))
+		by_source[row.source_item] = row
+	result = []
+	for item in items:
+		row = {key: value for key, value in item.items() if key != "name"}
+		existing = by_source.get(item["source_item"])
+		if existing:
+			row["name"] = existing.name
+		for field in ("reserved_stock_qty", "allocated_stock_qty"):
+			row[field] = flt(existing.get(field)) if existing else 0
+		row["remaining_stock_qty"] = max(
+			flt(row.get("stock_qty")) - row["reserved_stock_qty"] - row["allocated_stock_qty"], 0
+		)
+		result.append(row)
+	return result
+
+
+def get_demand_type(movement_type):
+	"""ERPNext business terminology; a trip may serve several demand types."""
+	return {
+		"Customer Delivery": "Selling",
+		"Supplier Pickup": "Buying",
+		"Warehouse Transfer": "Internal",
+	}[movement_type]

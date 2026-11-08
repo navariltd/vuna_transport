@@ -36,6 +36,9 @@ def start_mobile_delivery_trip(installation_id, trip_name, device_identifier=Non
 		frappe.throw(_("Delivery Trip {0} is already completed.").format(trip.name))
 	if trip.vuna_actual_start:
 		return _execution_response(trip)
+	from vuna_transport.services.execution.transfer_execution_service import require_dispatch_stock_posted
+
+	require_dispatch_stock_posted(trip)
 
 	started_on = now_datetime()
 	frappe.db.set_value(
@@ -45,6 +48,10 @@ def start_mobile_delivery_trip(installation_id, trip_name, device_identifier=Non
 		update_modified=True,
 	)
 	trip.reload()
+	if getattr(trip, "vuna_task_based", 0):
+		from vuna_transport.services.execution.trip_task_service import sync_task_execution
+
+		sync_task_execution(trip)
 	trip.add_comment("Info", _("Trip started from the driver app by {0}.").format(driver.full_name))
 	return _execution_response(trip)
 
@@ -79,6 +86,9 @@ def complete_mobile_delivery_trip(installation_id, trip_name, device_identifier=
 	if trip.vuna_actual_completion:
 		return _execution_response(trip)
 	_require_started_trip(trip)
+	from vuna_transport.services.execution.trip_task_service import require_tasks_complete
+
+	require_tasks_complete(trip)
 	stops = _trip_stop_rows(trip.name)
 	incomplete = [stop.name for stop in stops if not cint(stop.visited)]
 	if incomplete:

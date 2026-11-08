@@ -7,28 +7,18 @@ from frappe import _
 
 def execute(filters=None):
 	filters = frappe._dict(filters or {})
-	conditions = ["dl.docstatus < 2"]
-	values = {}
-	for field in ("company", "status"):
-		if filters.get(field):
-			conditions.append(f"dl.{field} = %({field})s")
-			values[field] = filters[field]
-	if filters.from_date:
-		conditions.append("DATE(dl.planned_departure) >= %(from_date)s")
-		values.from_date = filters.from_date
-	if filters.to_date:
-		conditions.append("DATE(dl.planned_departure) <= %(to_date)s")
-		values.to_date = filters.to_date
+	values = {field: filters.get(field) or None for field in ("company", "status", "from_date", "to_date")}
 	rows = frappe.db.sql(
-		f"""
+		"""
 		SELECT dl.name, dl.company, dl.status, dl.planned_departure, dl.planned_arrival,
 			dl.required_vehicle_category, dl.total_weight, dl.total_volume,
-			dl.total_stops,
-			(SELECT va.name FROM `tabVehicle Allocation` va
-			 WHERE va.delivery_load = dl.name AND va.docstatus < 2
-			 ORDER BY va.creation DESC LIMIT 1) AS vehicle_allocation
-		FROM `tabDelivery Load` dl
-		WHERE {" AND ".join(conditions)}
+			dl.total_stops, dl.active_vehicle_allocation AS vehicle_allocation
+		FROM `tabTransport Load` dl
+		WHERE dl.docstatus < 2
+		AND (%(company)s IS NULL OR dl.company = %(company)s)
+		AND (%(status)s IS NULL OR dl.status = %(status)s)
+		AND (%(from_date)s IS NULL OR DATE(dl.planned_departure) >= %(from_date)s)
+		AND (%(to_date)s IS NULL OR DATE(dl.planned_departure) <= %(to_date)s)
 		ORDER BY dl.planned_departure ASC
 		LIMIT 500
 	""",
@@ -36,7 +26,7 @@ def execute(filters=None):
 		as_dict=True,
 	)
 	columns = [
-		{"label": _("Delivery Load"), "fieldname": "name", "fieldtype": "Link", "options": "Delivery Load"},
+		{"label": _("Transport Load"), "fieldname": "name", "fieldtype": "Link", "options": "Transport Load"},
 		{"label": _("Company"), "fieldname": "company", "fieldtype": "Link", "options": "Company"},
 		{"label": _("Status"), "fieldname": "status", "fieldtype": "Data"},
 		{"label": _("Dispatch From"), "fieldname": "planned_departure", "fieldtype": "Datetime"},

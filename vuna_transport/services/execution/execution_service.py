@@ -1,7 +1,8 @@
-"""Execution progress and next-action state for Delivery Loads."""
+"""Execution progress and next-action state for Transport Loads."""
 
 import frappe
 from frappe import _
+from frappe.model.document import Document
 
 from vuna_transport.services.fleet.vehicle_allocation_service import (
 	get_allocation_names_for_load,
@@ -17,11 +18,37 @@ DOCSTATUS_LABELS = {0: "Draft", 1: "Submitted", 2: "Cancelled"}
 
 
 @frappe.whitelist()
-def get_load_execution_summary(load):
+def get_load_execution_summary(load: str | Document):
 	"""Return downstream execution progress and the single recommended next action."""
-	load = frappe.get_doc("Delivery Load", load) if isinstance(load, str) else load
+	load = frappe.get_doc("Transport Load", load) if isinstance(load, str) else load
 	require_document_permission(load, "read")
-	delivery_orders = {row.delivery_order for row in load.delivery_orders if row.delivery_order}
+	from vuna_transport.services.planning.transport_load_service import is_demand_load
+
+	if is_demand_load(load):
+		from vuna_transport.services.demand.depot_return_demand_service import is_return_load
+
+		allocation = _get_vehicle_allocation(load)
+		from vuna_transport.services.execution.allocation_transfer_service import allocation_stock_entry
+
+		stock_name = allocation_stock_entry(allocation.name, load.name) if allocation else None
+		stock = (
+			frappe.db.get_value("Stock Entry", stock_name, ["name", "docstatus"], as_dict=True)
+			if stock_name
+			else None
+		)
+		return {
+			"planning_only": True,
+			"return_pickup": is_return_load(load),
+			"load": {"docstatus": load.docstatus, "status": load.status},
+			"vehicle_allocation": _serialize_doc(allocation),
+			"transfer_stock_entry": stock,
+			"delivery_trip": load.delivery_trip,
+		}
+	from vuna_transport.services.execution.customer_reference_service import native_load, order_name
+	from vuna_transport.services.execution.lineage_service import get_delivery_notes_for_loads
+
+	delivery_orders = {order_name(row) for row in load.delivery_orders if order_name(row)}
+	is_native = native_load(load)
 
 	pick_list = _get_pick_list(load)
 	vehicle_allocation = _get_vehicle_allocation(load)
@@ -46,8 +73,12 @@ def get_load_execution_summary(load):
 	)
 	delivery_notes = frappe.get_all(
 		"Delivery Note",
-		filters={"vuna_delivery_load": load.name},
-		fields=["name", "docstatus", "status", "customer", "vuna_delivery_order"],
+		filters=(
+			{"name": ["in", get_delivery_notes_for_loads([load.name])]}
+			if getattr(load, "movement_type", None) == "Customer Delivery"
+			else {"vuna_delivery_load": load.name}
+		),
+		fields=["name", "docstatus", "status", "customer", "vuna_delivery_order", "vuna_transport_demand"],
 		order_by="creation asc",
 	)
 	active_notes = [note for note in delivery_notes if note.docstatus != 2]
@@ -74,7 +105,14 @@ def get_load_execution_summary(load):
 
 	pods = frappe.get_all(
 		"Proof of Delivery",
-		filters={"delivery_load": load.name, "docstatus": ["!=", 2]},
+		filters={
+			**(
+				{"delivery_note": ["in", [note.name for note in active_notes]]}
+				if is_native
+				else {"delivery_load": load.name}
+			),
+			"docstatus": ["!=", 2],
+		},
 		fields=["name", "docstatus", "status", "delivery_stop"],
 		order_by="creation asc",
 	)
@@ -235,11 +273,11 @@ def _get_next_action(
 		}
 		delivery_notes_ready = not draft_notes and delivery_orders.issubset(submitted_orders)
 	if load.docstatus == 0:
-		return _action("submit_load", _("Submit Delivery Load"), _("Review capacity and submit this load."))
+		return _action("submit_load", _("Submit Transport Load"), _("Review capacity and submit this load."))
 	if load.docstatus == 2:
-		return _action("cancelled", _("Delivery Load Cancelled"), _("Amend the load to continue."))
+		return _action("cancelled", _("Transport Load Cancelled"), _("Amend the load to continue."))
 	if load.status in ("Completed", "Completed with Exceptions"):
-		return _action("completed", _("Execution Completed"), _("This Delivery Load is closed."))
+		return _action("completed", _("Execution Completed"), _("This Transport Load is closed."))
 	requires_vehicle_allocation = _requires_vehicle_allocation(load)
 	allocation_after_notes = vehicle_allocation_timing == ALLOCATION_AFTER_DELIVERY_NOTES
 	if requires_vehicle_allocation and not allocation_after_notes:
@@ -266,7 +304,7 @@ def _get_next_action(
 		action = _get_vehicle_allocation_action(load, vehicle_allocation)
 		if action:
 			return action
-	if len(active_notes) < len(delivery_orders):
+	if not delivery_notes_ready and len(active_notes) < len(delivery_orders):
 		return _action(
 			"create_delivery_notes",
 			_("Create Delivery Notes"),
@@ -276,11 +314,11 @@ def _get_next_action(
 		return _action(
 			"review_delivery_notes", _("Review Delivery Notes"), _("Review and submit every Delivery Note.")
 		)
-	if len(submitted_notes) < len(delivery_orders):
+	if not delivery_notes_ready:
 		return _action(
 			"create_delivery_notes",
 			_("Replace Missing Delivery Notes"),
-			_("Create Delivery Notes for unresolved Delivery Orders."),
+			_("Create Delivery Notes for unresolved customer demand quantities."),
 		)
 	if not _requires_delivery_trip(load):
 		return _action(

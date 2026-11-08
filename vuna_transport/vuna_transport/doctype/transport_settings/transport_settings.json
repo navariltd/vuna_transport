@@ -1,7 +1,6 @@
 {
  "actions": [],
  "allow_bulk_edit": 1,
- "allow_rename": 1,
  "creation": "2026-08-10 09:58:45.455707",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -15,7 +14,8 @@
   "auto_create_delivery_orders",
   "auto_submit_delivery_orders",
   "require_sales_order_submission",
-  "planning_section",
+  "section_break_hbkq",
+  "demand_sources",
   "section_break_yskt",
   "allow_capacity_override",
   "vehicle_allocation_timing",
@@ -33,20 +33,53 @@
   "column_break_zhxz",
   "enable_gps_tracking",
   "enable_route_optimization",
+  "require_quality_inspection_for_return_inspection",
+  "allow_unplanned_return_pickups",
   "scan_permissions_section",
   "allowed_loaded_scan_roles",
-  "allowed_dispatched_scan_roles"
+  "allowed_dispatched_scan_roles",
+  "delivery_order_retirement_manifest"
  ],
  "fields": [
-  {"fieldname":"general_tab","fieldtype":"Tab Break","label":"General"},
-  {"fieldname":"general_section","fieldtype":"Section Break","label":"Operating Defaults"},
-  {"fieldname":"planning_section","fieldtype":"Section Break","label":"Planning Controls"},
-  {"fieldname":"units_tab","fieldtype":"Tab Break","label":"Units"},
-  {"fieldname":"features_tab","fieldtype":"Tab Break","label":"Features"},
+  {
+   "fieldname": "allow_unplanned_return_pickups",
+   "fieldtype": "Check",
+   "label": "Allow Unplanned Return Pickups",
+   "default": "0",
+   "description": "Allow drivers to record unplanned collections at delivery stops. Disabled by default: use an approved, submitted Return Request and assigned pickup task. Turning this off does not prevent reviewing or receiving previously recorded collections."
+  },
+  {
+   "fieldname": "demand_sources",
+   "fieldtype": "Table",
+   "label": "Transport Demand Sources",
+   "options": "Transport Demand Source",
+   "reqd": 1
+  },
+  {
+   "fieldname": "general_tab",
+   "fieldtype": "Tab Break",
+   "label": "General"
+  },
+  {
+   "fieldname": "general_section",
+   "fieldtype": "Section Break",
+   "label": "Operating Defaults"
+  },
+  {
+   "fieldname": "units_tab",
+   "fieldtype": "Tab Break",
+   "label": "Units"
+  },
+  {
+   "fieldname": "features_tab",
+   "fieldtype": "Tab Break",
+   "label": "Features"
+  },
   {
    "default": "Sales Order",
    "fieldname": "default_source_document_type",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Default Source Document Type",
    "options": "DocType"
   },
@@ -71,6 +104,7 @@
    "default": "1",
    "fieldname": "auto_create_delivery_orders",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Auto Create Delivery Orders"
   },
   {
@@ -78,12 +112,14 @@
    "description": "Automatically submit newly generated Delivery Orders. Leave disabled if transport demand should be reviewed before submission.",
    "fieldname": "auto_submit_delivery_orders",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Auto Submit Delivery Orders"
   },
   {
    "default": "1",
    "fieldname": "require_sales_order_submission",
    "fieldtype": "Check",
+   "hidden": 1,
    "label": "Require Sales Order Submission"
   },
   {
@@ -101,6 +137,7 @@
    "description": "Controls whether a submitted vehicle allocation is required before Delivery Notes are generated, or whether Delivery Notes must be generated before the initial allocation.",
    "fieldname": "vehicle_allocation_timing",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Vehicle Allocation Timing",
    "options": "Before Delivery Notes\nAfter Delivery Notes",
    "reqd": 1
@@ -129,6 +166,7 @@
   {
    "fieldname": "default_weight_uom",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Default Weight UOM",
    "options": "UOM",
    "reqd": 1
@@ -136,6 +174,7 @@
   {
    "fieldname": "default_volume_uom",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Default Volume UOM",
    "options": "UOM",
    "reqd": 1
@@ -174,6 +213,13 @@
    "label": "Enable Route Optimization"
   },
   {
+   "default": "0",
+   "description": "When enabled, every Return Inspection result group must have its own submitted ERPNext Quality Inspection.",
+   "fieldname": "require_quality_inspection_for_return_inspection",
+   "fieldtype": "Check",
+   "label": "Require Quality Inspection for Returns"
+  },
+  {
    "fieldname": "scan_permissions_section",
    "fieldtype": "Section Break",
    "label": "Dispatch Scan Permissions"
@@ -191,13 +237,25 @@
    "fieldtype": "Table MultiSelect",
    "label": "Roles Allowed to Mark Dispatched",
    "options": "Transport Scan Role"
+  },
+  {
+   "fieldname": "section_break_hbkq",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "delivery_order_retirement_manifest",
+   "fieldtype": "Long Text",
+   "label": "Delivery Order Retirement Manifest",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-08-21 15:52:26.122957",
+ "modified": "2026-11-03 14:20:27.995961",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Settings",

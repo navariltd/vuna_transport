@@ -1,4 +1,4 @@
-"""Authoritative Delivery Load compatibility, reservation, and quantity rules."""
+"""Authoritative Transport Load compatibility, reservation, and quantity rules."""
 
 from collections import defaultdict
 
@@ -16,6 +16,14 @@ PLANNABLE_DELIVERY_ORDER_STATUSES = ("Open", "Partially Allocated")
 
 def validate_load_allocations(load, lock=True, for_execution=False):
 	"""Validate and rebuild every load row from authoritative Delivery Order data."""
+	from vuna_transport.services.execution.customer_reference_service import native_load
+
+	if native_load(load):
+		from vuna_transport.services.planning.customer_demand_load_service import (
+			validate_customer_allocations,
+		)
+
+		return validate_customer_allocations(load, for_execution=for_execution)
 	if not load.delivery_orders:
 		frappe.throw(_("At least one Delivery Order is required."))
 
@@ -35,7 +43,7 @@ def validate_load_allocations(load, lock=True, for_execution=False):
 		item_key = (row.delivery_order, row.delivery_order_item)
 		if item_key in seen_item_rows:
 			frappe.throw(
-				_("Delivery Order Item {0} appears more than once in this Delivery Load.").format(
+				_("Delivery Order Item {0} appears more than once in this Transport Load.").format(
 					row.delivery_order_item
 				)
 			)
@@ -67,6 +75,25 @@ def validate_load_allocations(load, lock=True, for_execution=False):
 			delivery_order_item,
 			available_quantities.get(delivery_order_item.name, 0),
 		)
+		if getattr(row, "transport_demand", None):
+			lineage = frappe.db.get_value(
+				"Transport Demand Item", row.transport_demand_item, ["parent", "source_item"], as_dict=True
+			)
+			demand_source = frappe.db.get_value(
+				"Transport Demand",
+				row.transport_demand,
+				["source_document_type", "source_document"],
+				as_dict=True,
+			)
+			if (
+				not lineage
+				or lineage.parent != row.transport_demand
+				or lineage.source_item != row.delivery_order_item
+				or not demand_source
+				or demand_source.source_document_type != "Delivery Order"
+				or demand_source.source_document != row.delivery_order
+			):
+				frappe.throw(_("Transport Demand lineage must match the selected Delivery Order item."))
 
 	for (_delivery_order_name, delivery_order_item_name), current_quantity in current_allocations.items():
 		available_quantity = available_quantities.get(delivery_order_item_name, 0)
@@ -219,6 +246,8 @@ def _populate_load_row(row, delivery_order, delivery_order_item, available_quant
 	row.item_name = delivery_order_item.item_name
 	row.uom = delivery_order_item.uom
 	row.stock_uom = delivery_order_item.stock_uom
+	row.conversion_factor = flt(delivery_order_item.conversion_factor)
+	row.allocated_stock_qty = flt(row.allocated_quantity) * row.conversion_factor
 	row.sales_order = delivery_order.sales_order
 	row.customer = delivery_order.customer
 	row.delivery_address = delivery_order.delivery_address
@@ -297,22 +326,16 @@ def get_available_quantities(delivery_order_item_names, exclude_load=None):
 		for row in item_rows:
 			if row.sales_order_item in sales_order_quantities:
 				requested[row.name] = sales_order_quantities[row.sales_order_item]
-	conditions = [
-		"dlo.delivery_order_item in %(item_names)s",
-		"dlo.parenttype = 'Delivery Load'",
-		"dl.docstatus in (0, 1)",
-	]
-	values = {"item_names": tuple(item_names)}
-	if exclude_load:
-		conditions.append("dlo.parent != %(exclude_load)s")
-		values["exclude_load"] = exclude_load
+	values = {"item_names": tuple(item_names), "exclude_load": exclude_load or None}
 	allocated = dict(
 		frappe.db.sql(
-			f"""
+			"""
 				select dlo.delivery_order_item, coalesce(sum(dlo.allocated_quantity), 0)
-				from `tabDelivery Load Order` dlo
-				join `tabDelivery Load` dl on dl.name = dlo.parent
-				where {" and ".join(conditions)}
+				from `tabTransport Load Item` dlo
+				join `tabTransport Load` dl on dl.name = dlo.parent
+				where dlo.delivery_order_item in %(item_names)s
+				and dlo.parenttype = 'Transport Load' and dl.docstatus in (0, 1)
+				and (%(exclude_load)s is null or dlo.parent != %(exclude_load)s)
 				group by dlo.delivery_order_item
 			""",
 			values,
@@ -325,27 +348,21 @@ def get_available_quantities(delivery_order_item_names, exclude_load=None):
 
 
 def _get_existing_allocations(delivery_order_name, delivery_order_item_name=None, exclude_load=None):
-	conditions = [
-		"dlo.delivery_order = %s",
-		"dlo.parenttype = 'Delivery Load'",
-		"dl.docstatus in (0, 1)",
-	]
-	values = [delivery_order_name]
-	if delivery_order_item_name:
-		conditions.append("dlo.delivery_order_item = %s")
-		values.append(delivery_order_item_name)
-	if exclude_load:
-		conditions.append("dlo.parent != %s")
-		values.append(exclude_load)
-
 	return frappe.db.sql(
-		f"""
+		"""
 			select dlo.allocated_quantity, dlo.parent, dl.docstatus
-			from `tabDelivery Load Order` dlo
-			join `tabDelivery Load` dl on dl.name = dlo.parent
-			where {" and ".join(conditions)}
+			from `tabTransport Load Item` dlo
+			join `tabTransport Load` dl on dl.name = dlo.parent
+			where dlo.delivery_order = %(delivery_order)s
+			and dlo.parenttype = 'Transport Load' and dl.docstatus in (0, 1)
+			and (%(item)s is null or dlo.delivery_order_item = %(item)s)
+			and (%(exclude_load)s is null or dlo.parent != %(exclude_load)s)
 		""",
-		tuple(values),
+		{
+			"delivery_order": delivery_order_name,
+			"item": delivery_order_item_name or None,
+			"exclude_load": exclude_load or None,
+		},
 		as_dict=True,
 	)
 
@@ -378,10 +395,10 @@ def sync_delivery_order_allocations(delivery_order_names=None):
 					dlo.delivery_order_item,
 					coalesce(sum(case when dl.docstatus = 0 then dlo.allocated_quantity else 0 end), 0) as reserved,
 					coalesce(sum(case when dl.docstatus = 1 then dlo.allocated_quantity else 0 end), 0) as allocated
-				from `tabDelivery Load Order` dlo
-				join `tabDelivery Load` dl on dl.name = dlo.parent
+				from `tabTransport Load Item` dlo
+				join `tabTransport Load` dl on dl.name = dlo.parent
 				where dlo.delivery_order_item in %(item_names)s
-				and dlo.parenttype = 'Delivery Load'
+				and dlo.parenttype = 'Transport Load'
 				and dl.docstatus in (0, 1)
 				group by dlo.delivery_order_item
 			""",
@@ -396,10 +413,10 @@ def sync_delivery_order_allocations(delivery_order_names=None):
 				select
 					coalesce(sum(case when dl.docstatus = 0 then dlo.allocated_quantity else 0 end), 0) as reserved,
 					coalesce(sum(case when dl.docstatus = 1 then dlo.allocated_quantity else 0 end), 0) as allocated
-				from `tabDelivery Load Order` dlo
-				join `tabDelivery Load` dl on dl.name = dlo.parent
+				from `tabTransport Load Item` dlo
+				join `tabTransport Load` dl on dl.name = dlo.parent
 				where dlo.delivery_order = %s
-				and dlo.parenttype = 'Delivery Load'
+				and dlo.parenttype = 'Transport Load'
 				and dl.docstatus in (0, 1)
 			""",
 			delivery_order_name,

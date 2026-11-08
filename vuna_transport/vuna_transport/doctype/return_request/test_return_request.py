@@ -550,7 +550,7 @@ class TestReturnRequest(UnitTestCase):
 	@patch("vuna_transport.services.execution.return_service.frappe.db.set_value")
 	@patch(
 		"vuna_transport.services.execution.return_service.frappe.db.get_value",
-		return_value="DN-RET-1",
+		side_effect=[None, "DN-RET-1"],
 	)
 	@patch(
 		"vuna_transport.services.execution.return_service._get_linked_return_request_name",

@@ -6,6 +6,7 @@ frappe.listview_settings["Vehicle Allocation"] = {
 			Draft: [__("Draft"), "gray"],
 			Allocated: [__("Allocated"), "green"],
 			"Awaiting Delivery Notes": [__("Awaiting Delivery Notes"), "orange"],
+			"Awaiting Transfer Stock Entry": [__("Awaiting Transfer Stock Entry"), "orange"],
 			"Ready for Delivery Trip": [__("Ready for Delivery Trip"), "blue"],
 			"Delivery Trip Draft": [__("Delivery Trip Draft"), "orange"],
 			"Delivery Trip Scheduled": [__("Delivery Trip Scheduled"), "blue"],

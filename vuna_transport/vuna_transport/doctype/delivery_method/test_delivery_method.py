@@ -22,10 +22,9 @@ class IntegrationTestDeliveryMethod(IntegrationTestCase):
 
 
 class TestDeliveryMethodSemantics(UnitTestCase):
-	def test_legacy_transport_sources_normalize_to_company_delivery(self):
-		self.assertEqual(canonical_delivery_method("Company Fleet"), "Company Delivery")
-		self.assertEqual(canonical_delivery_method("Subcontracted Transport"), "Company Delivery")
-		self.assertTrue(delivery_methods_are_compatible("Company Fleet", "Subcontracted Transport"))
+	def test_method_identity_does_not_infer_transport_sourcing(self):
+		self.assertEqual(canonical_delivery_method("Company Fleet"), "Company Fleet")
+		self.assertFalse(delivery_methods_are_compatible("Company Fleet", "Subcontracted Transport"))
 
 	def test_customer_pickup_remains_incompatible_with_company_delivery(self):
 		self.assertFalse(delivery_methods_are_compatible("Customer Pickup", "Company Delivery"))
@@ -34,6 +33,9 @@ class TestDeliveryMethodSemantics(UnitTestCase):
 	def test_company_delivery_allows_owned_or_subcontracted_allocation(self, get_method):
 		get_method.return_value = SimpleNamespace(
 			name="Company Delivery",
+			buying=0,
+			selling=1,
+			transport_arranged_by="Company",
 			disabled=0,
 			requires_transport_planning=1,
 			requires_vehicle_allocation=1,
@@ -47,6 +49,9 @@ class TestDeliveryMethodSemantics(UnitTestCase):
 	def test_customer_pickup_rejects_vehicle_allocation(self, get_method):
 		get_method.return_value = SimpleNamespace(
 			name="Customer Pickup",
+			buying=0,
+			selling=1,
+			transport_arranged_by="Counterparty",
 			disabled=0,
 			requires_transport_planning=0,
 			requires_vehicle_allocation=0,

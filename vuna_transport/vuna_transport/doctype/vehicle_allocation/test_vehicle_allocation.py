@@ -97,7 +97,10 @@ class TestVehicleAllocation(UnitTestCase):
 		get_value.return_value = None
 		allocation = SimpleNamespace(name="VA-1")
 		get_doc.return_value = allocation
-		get_loads.return_value = [SimpleNamespace(name="DL-1"), SimpleNamespace(name="DL-2")]
+		get_loads.return_value = [
+			SimpleNamespace(name="DL-1", delivery_orders=[]),
+			SimpleNamespace(name="DL-2", delivery_orders=[]),
+		]
 		get_note_status.side_effect = [
 			{
 				"ready": True,
@@ -129,7 +132,7 @@ class TestVehicleAllocation(UnitTestCase):
 		allocation = SimpleNamespace(name="VA-1")
 		get_doc.return_value = allocation
 		get_value.return_value = "DT-1"
-		get_loads.return_value = [SimpleNamespace(name="DL-1")]
+		get_loads.return_value = [SimpleNamespace(name="DL-1", delivery_orders=[])]
 		get_note_status.return_value = {
 			"ready": True,
 			"draft_delivery_notes": [],

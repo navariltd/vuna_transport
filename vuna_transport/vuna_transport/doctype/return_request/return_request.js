@@ -1,12 +1,191 @@
 // Copyright (c) 2026, Yovuna Technologies Limited and contributors
 // For license information, please see license.txt
 
+function update_pickup_assignment_action(dialog) {
+	const selected = dialog.get_value("delivery_stop");
+	const ready =
+		!dialog._pickup_stops_loading &&
+		dialog.get_value("delivery_trip") &&
+		(dialog._pickup_stop_options || []).some((stop) => stop.value === selected);
+	if (ready) dialog.enable_primary_action();
+	else dialog.disable_primary_action();
+}
+
+async function load_pickup_assignment_stops(dialog, request_name) {
+	const trip = dialog.get_value("delivery_trip");
+	const version = (dialog._pickup_stop_version || 0) + 1;
+	dialog._pickup_stop_version = version;
+	dialog._pickup_stops_loading = true;
+	dialog._pickup_stop_options = [];
+	dialog.disable_primary_action();
+	const current = () =>
+		dialog._pickup_stop_version === version && dialog.get_value("delivery_trip") === trip;
+	const set_stop = (value) => {
+		// Frappe dialog setters are asynchronous. Serialize writes so an old
+		// field reset cannot erase a newer trip's automatically selected stop.
+		const write = async () => {
+			if (current()) await dialog.set_value("delivery_stop", value);
+		};
+		dialog._pickup_stop_write = (dialog._pickup_stop_write || Promise.resolve()).then(
+			write,
+			write
+		);
+		return dialog._pickup_stop_write;
+	};
+	try {
+		await set_stop("");
+		if (!current()) return;
+		dialog.set_df_property("delivery_stop", "options", [""]);
+		dialog.set_df_property(
+			"delivery_stop",
+			"description",
+			trip ? __("Loading matching pickup stops…") : __("Select a Delivery Trip first.")
+		);
+		if (!trip) return;
+		const { message } = await frappe.call({
+			method: "vuna_transport.services.execution.direct_return_pickup_service.get_assignment_stops",
+			args: { return_request: request_name, delivery_trip: trip },
+		});
+		if (!current()) return;
+		const stops = message || [];
+		dialog._pickup_stop_options = stops;
+		// A blank option prevents an apparent DOM selection with no model value.
+		dialog.set_df_property("delivery_stop", "options", ["", ...stops]);
+		dialog.set_df_property(
+			"delivery_stop",
+			"description",
+			stops.length
+				? __("Choose the matching pickup stop.")
+				: __("This trip has no unfinished stop matching this return's depot or customer.")
+		);
+		if (stops.length === 1) await set_stop(stops[0].value);
+	} catch {
+		if (current())
+			dialog.set_df_property(
+				"delivery_stop",
+				"description",
+				__("Could not load pickup stops. Reselect the Delivery Trip to retry.")
+			);
+	} finally {
+		if (current()) {
+			dialog._pickup_stops_loading = false;
+			update_pickup_assignment_action(dialog);
+		}
+	}
+}
+
+async function select_depot_return_items(frm) {
+	if (!frm.doc.source_stock_entry || !frm.doc.source_warehouse) {
+		frappe.msgprint(__("Select the depot warehouse and its incoming Stock Entry first."));
+		return;
+	}
+	const { message: items } = await frappe.call({
+		method: "vuna_transport.services.execution.manual_depot_return_service.get_depot_return_items",
+		args: {
+			source_stock_entry: frm.doc.source_stock_entry,
+			source_warehouse: frm.doc.source_warehouse,
+		},
+	});
+	const dialog = new frappe.ui.Dialog({
+		title: __("Select Received Items to Return"),
+		size: "extra-large",
+		fields: [
+			{
+				fieldname: "items",
+				fieldtype: "Table",
+				label: __("Received Items"),
+				cannot_add_rows: true,
+				cannot_delete_rows: true,
+				data: (items || []).map((row) => ({ ...row, requested_return_qty: 0 })),
+				fields: [
+					{
+						fieldname: "item_code",
+						fieldtype: "Data",
+						label: __("Item"),
+						in_list_view: 1,
+						read_only: 1,
+					},
+					{
+						fieldname: "batch_no",
+						fieldtype: "Data",
+						label: __("Batch"),
+						in_list_view: 1,
+						read_only: 1,
+					},
+					{
+						fieldname: "delivered_qty",
+						fieldtype: "Float",
+						label: __("Originally Received"),
+						in_list_view: 1,
+						read_only: 1,
+					},
+					{
+						fieldname: "uom",
+						fieldtype: "Data",
+						label: __("UOM"),
+						in_list_view: 1,
+						read_only: 1,
+					},
+					{
+						fieldname: "requested_return_qty",
+						fieldtype: "Float",
+						label: __("Return Quantity"),
+						in_list_view: 1,
+					},
+					{
+						fieldname: "serial_no",
+						fieldtype: "Small Text",
+						label: __("Serial Numbers to Return"),
+					},
+				],
+			},
+		],
+		primary_action_label: __("Use Selected Quantities"),
+		primary_action(values) {
+			const rows = (values.items || []).filter((row) => flt(row.requested_return_qty) > 0);
+			if (!rows.length) {
+				frappe.msgprint(__("Enter at least one return quantity."));
+				return;
+			}
+			frm.clear_table("items");
+			for (const row of rows) {
+				const source = items.find(
+					(item) =>
+						item.stock_entry_detail === row.stock_entry_detail &&
+						item.batch_no === row.batch_no
+				);
+				frm.add_child("items", {
+					...source,
+					requested_return_qty: row.requested_return_qty,
+					serial_no: row.serial_no,
+				});
+			}
+			frm.refresh_field("items");
+			frm.dirty();
+			dialog.hide();
+		},
+	});
+	dialog.show();
+}
+
 frappe.ui.form.on("Return Request", {
 	onload(frm) {
 		frm._return_request_customer = frm.doc.customer;
 	},
 
 	setup(frm) {
+		frm.set_query("source_warehouse", () => ({
+			filters: {
+				company: frm.doc.company,
+				is_group: 0,
+				disabled: 0,
+				warehouse_type: ["!=", "Transit"],
+			},
+		}));
+		frm.set_query("source_stock_entry", () => ({
+			query: "vuna_transport.services.execution.manual_depot_return_service.get_depot_receipt_query",
+			filters: { company: frm.doc.company, warehouse: frm.doc.source_warehouse },
+		}));
 		frm.set_query("delivery_note", () => {
 			if (!require_customer_before_source_selection(frm))
 				return { filters: { name: ["=", ""] } };
@@ -17,6 +196,12 @@ frappe.ui.form.on("Return Request", {
 		});
 		frm.set_query("return_warehouse", () => ({
 			filters: { company: frm.doc.company, is_group: 0, disabled: 0 },
+		}));
+		frm.set_query("delivery_method", () => ({
+			filters: {
+				disabled: 0,
+				[frm.doc.return_context === "Depot" ? "internal" : "selling"]: 1,
+			},
 		}));
 		frm.set_query("resolution_type", "items", () => ({
 			filters: { disabled: 0 },
@@ -47,14 +232,149 @@ frappe.ui.form.on("Return Request", {
 	},
 
 	refresh(frm) {
+		for (const field of [
+			"customer",
+			"delivery_note",
+			"sales_invoice",
+			"sales_order",
+			"credit_note",
+			"return_stock_document",
+		])
+			frm.toggle_display(field, frm.doc.return_context !== "Depot");
+		if (
+			frm.doc.return_context === "Depot" &&
+			!frm.doc.proof_of_delivery &&
+			frm.doc.docstatus === 0
+		) {
+			frm.add_custom_button(
+				__("Get Received Items"),
+				() => select_depot_return_items(frm),
+				__("Actions")
+			);
+		}
+		if (
+			frm.doc.docstatus === 1 &&
+			frm.perm?.[0]?.write &&
+			frm.doc.transport_arranged_by === "Company" &&
+			!["Closed", "Cancelled", "Resolved"].includes(frm.doc.status)
+		) {
+			frm.add_custom_button(
+				__("Assign Pickup to Delivery Trip"),
+				() => {
+					const dialog = new frappe.ui.Dialog({
+						title: __("Assign Approved Return Pickup"),
+						fields: [
+							{
+								fieldname: "delivery_trip",
+								fieldtype: "Link",
+								options: "Delivery Trip",
+								label: __("Delivery Trip"),
+								reqd: 1,
+								get_query: () => ({
+									query: "vuna_transport.services.execution.direct_return_pickup_service.get_assignment_trip_query",
+									filters: { return_request: frm.doc.name },
+								}),
+								onchange: () => load_pickup_assignment_stops(dialog, frm.doc.name),
+							},
+							{
+								fieldname: "delivery_stop",
+								fieldtype: "Select",
+								label: __("Pickup Stop"),
+								reqd: 1,
+								options: [],
+								description: __("Select a Delivery Trip first."),
+								onchange: () => update_pickup_assignment_action(dialog),
+							},
+						],
+						primary_action_label: __("Assign Pickup"),
+						primary_action: (values) =>
+							frappe.call({
+								method: "vuna_transport.services.execution.direct_return_pickup_service.assign_return_pickup",
+								args: { return_request: frm.doc.name, ...values },
+								freeze: true,
+								callback: ({ message }) => {
+									dialog.hide();
+									if (message)
+										frappe.set_route("Form", "Transport Trip Task", message);
+								},
+							}),
+					});
+					dialog.show();
+					dialog.disable_primary_action();
+				},
+				__("Actions")
+			);
+		}
+		if (frm.doc.return_context === "Depot") {
+			[
+				"customer",
+				"delivery_note",
+				"sales_invoice",
+				"sales_order",
+				"credit_note",
+				"return_stock_document",
+			].forEach((field) => frm.toggle_display(field, false));
+			frm.ignore_doctypes_on_cancel_all = ["Proof of Delivery"];
+			if (frm.doc.docstatus === 1) {
+				if (
+					(frm.doc.items || []).some(
+						(row) => row.custody_warehouse && flt(row.remaining_qty) > 0
+					) &&
+					frm.doc.proof_of_delivery &&
+					["Still With Vehicle", "Split Custody"].includes(frm.doc.custody)
+				) {
+					frm.add_custom_button(
+						__("End Transit Stock Entry"),
+						() =>
+							frappe.call({
+								method: "vuna_transport.services.execution.depot_return_receiving_service.create_vehicle_receipt",
+								args: { return_request: frm.doc.name },
+								freeze: true,
+								callback: ({ message }) => {
+									if (message) frappe.set_route("Form", "Stock Entry", message);
+								},
+							}),
+						__("Create")
+					);
+				}
+				if (frm.doc.transport_arranged_by === "Company")
+					frm.add_custom_button(
+						__("Transport Demand"),
+						() =>
+							frappe
+								.call({
+									method: "vuna_transport.services.demand.transport_demand_service.create_transport_demands",
+									args: {
+										source_doctype: "Return Request",
+										source_name: frm.doc.name,
+									},
+									freeze: true,
+								})
+								.then(({ message }) => {
+									if (message?.length === 1)
+										frappe.set_route("Form", "Transport Demand", message[0]);
+									else if (message?.length)
+										frappe.set_route("List", "Transport Demand", {
+											name: ["in", message],
+										});
+								}),
+						__("Create")
+					);
+				frm.page.set_inner_btn_group_as_primary(__("Create"));
+			}
+			return;
+		}
 		// The POD is historical delivery evidence, not a dependent transaction
 		// that should be cancelled together with its Return Request.
 		frm.ignore_doctypes_on_cancel_all = [
 			...new Set([...(frm.ignore_doctypes_on_cancel_all || []), "Proof of Delivery"]),
 		];
-		render_process_summary(frm);
 		add_get_delivered_items_button(frm);
 		if (frm.is_new()) return;
+		if (frm.doc.process_version === "Custody and Inspection") {
+			add_v2_return_actions(frm);
+			return;
+		}
 
 		frm.remove_custom_button(__("Create Sales Return"), __("Next Action"));
 		frm.remove_custom_button(__("Sales Return"), __("Next Action"));
@@ -87,11 +407,45 @@ frappe.ui.form.on("Return Request", {
 				__("Actions")
 			);
 		}
-		add_resolution_actions(frm);
 	},
 
 	delivery_note(frm) {
 		add_get_delivered_items_button(frm);
+	},
+
+	delivery_method(frm) {
+		frm.remove_custom_button(__("Assign Pickup to Delivery Trip"), __("Actions"));
+		frm.remove_custom_button(__("Transport Demand"), __("Create"));
+	},
+
+	return_context(frm) {
+		if (frm.doc.docstatus !== 0 || frm.doc.proof_of_delivery) return;
+		frm.clear_table("items");
+		for (const field of [
+			"customer",
+			"delivery_note",
+			"sales_invoice",
+			"source_stock_entry",
+			"source_warehouse",
+			"delivery_method",
+		])
+			frm.set_value(field, null);
+		frm.refresh();
+	},
+
+	source_warehouse(frm) {
+		if (!frm.doc.proof_of_delivery && frm.doc.docstatus === 0) {
+			frm.set_value("source_stock_entry", null);
+			frm.clear_table("items");
+			frm.refresh_field("items");
+		}
+	},
+
+	source_stock_entry(frm) {
+		if (!frm.doc.proof_of_delivery && frm.doc.docstatus === 0) {
+			frm.clear_table("items");
+			frm.refresh_field("items");
+		}
 	},
 
 	sales_invoice(frm) {
@@ -135,6 +489,48 @@ frappe.ui.form.on("Return Request", {
 		clear_customer_dependent_context(frm);
 	},
 });
+
+function add_v2_return_actions(frm) {
+	if (frm.doc.docstatus !== 1) return;
+	if (["Awaiting Sales Return", "Awaiting Receipt"].includes(frm.doc.status)) {
+		frm.add_custom_button(
+			__("Sales Return"),
+			() => {
+				frappe.call({
+					method: "vuna_transport.services.execution.return_service.create_return_stock_document",
+					args: { return_request: frm.doc.name },
+					freeze: true,
+					callback: ({ message }) => {
+						if (message)
+							frappe.set_route(
+								"Form",
+								message.doctype || "Delivery Note",
+								message.name || message
+							);
+					},
+				});
+			},
+			__("Create")
+		);
+		frm.page.set_inner_btn_group_as_primary(__("Create"));
+	}
+	if (frm.doc.status === "Awaiting Inspection" && frm.doc.return_stock_document) {
+		frm.add_custom_button(
+			__("Return Inspection"),
+			() =>
+				frappe.call({
+					method: "vuna_transport.services.execution.return_v2_service.create_return_inspection_from_sales_return",
+					args: { sales_return: frm.doc.return_stock_document },
+					freeze: true,
+					callback: ({ message }) => {
+						if (message) frappe.set_route("Form", "Return Inspection", message);
+					},
+				}),
+			__("Create")
+		);
+		frm.page.set_inner_btn_group_as_primary(__("Create"));
+	}
+}
 
 function set_delivery_note_from_invoice(frm, delivery_note) {
 	frm.set_value("delivery_note", delivery_note);
@@ -197,6 +593,7 @@ function clear_customer_dependent_context(frm) {
 		"sales_order",
 		"sales_invoice",
 		"delivery_order",
+		"transport_demand",
 		"delivery_trip",
 		"proof_of_delivery",
 		"delivery_address",
@@ -209,32 +606,6 @@ function clear_customer_dependent_context(frm) {
 	frm.set_value("return_source", "Manual");
 	frm.clear_table("items");
 	frm.refresh_field("items");
-}
-
-function render_process_summary(frm) {
-	const field = frm.fields_dict.process_summary;
-	if (!field?.$wrapper) return;
-	const escape = frappe.utils.escape_html;
-	const expected = flt(frm.doc.expected_return_qty);
-	const returned = flt(frm.doc.returned_qty);
-	const difference = flt(frm.doc.return_difference_qty);
-	field.$wrapper.html(`
-		<div class="rounded border p-3 mb-3">
-			<div class="text-muted text-uppercase small">${__("Current Stage")}</div>
-			<div class="font-weight-bold mb-3">${escape(frm.doc.status || __("Draft"))}</div>
-			<div class="d-flex flex-wrap" style="gap: 2rem">
-				<div><div class="text-muted small">${__("Expected")}</div><strong>${format_number(
-		expected
-	)}</strong></div>
-				<div><div class="text-muted small">${__("Returned")}</div><strong>${format_number(
-		returned
-	)}</strong></div>
-				<div><div class="text-muted small">${__("Difference")}</div><strong>${format_number(
-		difference
-	)}</strong></div>
-			</div>
-		</div>
-	`);
 }
 
 frappe.ui.form.on("Return Request Item", {
@@ -288,8 +659,10 @@ function show_returnable_items_dialog(frm, items) {
 			delivery_note_item: item.delivery_note_item,
 			sales_invoice_item: item.sales_invoice_item,
 			delivery_order_item: item.delivery_order_item,
+			transport_demand_item: item.transport_demand_item,
 			stock_uom: item.stock_uom,
 			conversion_factor: item.conversion_factor,
+			batch_no: item.batch_no,
 			item_code: item.item_code,
 			item_name: item.item_name,
 			delivered_qty: item.delivered_qty,
@@ -318,8 +691,17 @@ function show_returnable_items_dialog(frm, items) {
 					{ fieldtype: "Data", fieldname: "delivery_note_item", hidden: true },
 					{ fieldtype: "Data", fieldname: "sales_invoice_item", hidden: true },
 					{ fieldtype: "Data", fieldname: "delivery_order_item", hidden: true },
+					{ fieldtype: "Data", fieldname: "transport_demand_item", hidden: true },
 					{ fieldtype: "Data", fieldname: "stock_uom", hidden: true },
 					{ fieldtype: "Float", fieldname: "conversion_factor", hidden: true },
+					{
+						fieldtype: "Link",
+						fieldname: "batch_no",
+						label: __("Batch No"),
+						options: "Batch",
+						read_only: true,
+						in_list_view: true,
+					},
 					{
 						fieldtype: "Read Only",
 						fieldname: "item_code",
@@ -390,6 +772,7 @@ function show_returnable_items_dialog(frm, items) {
 					delivery_note_item: item.delivery_note_item,
 					sales_invoice_item: item.sales_invoice_item,
 					delivery_order_item: item.delivery_order_item,
+					transport_demand_item: item.transport_demand_item,
 					item_code: item.item_code,
 					item_name: item.item_name,
 					delivered_qty: item.delivered_qty,
@@ -397,6 +780,7 @@ function show_returnable_items_dialog(frm, items) {
 					uom: item.uom,
 					stock_uom: item.stock_uom,
 					conversion_factor: item.conversion_factor,
+					batch_no: item.batch_no,
 				});
 			});
 			frm.refresh_field("items");
@@ -434,57 +818,6 @@ function prepare_return_stock_document(frm) {
 			if (target) {
 				frappe.set_route("Form", target.doctype || "Delivery Note", target.name || target);
 			}
-		},
-	});
-}
-
-function add_resolution_actions(frm) {
-	if (frm.doc.status !== "Awaiting Commercial Resolution") return;
-	if (!frm.doc.delivery_note) return;
-	if (!frm.doc.replacement_sales_order && frm.doc.sales_order) {
-		frm.add_custom_button(
-			__("Create Replacement"),
-			() => create_replacement_sales_order(frm),
-			__("Resolve")
-		);
-	}
-	frm.add_custom_button(
-		__("No Further Action"),
-		() => record_no_further_action(frm),
-		__("Resolve")
-	);
-}
-
-function record_no_further_action(frm) {
-	frappe.prompt(
-		[
-			{
-				fieldname: "remarks",
-				fieldtype: "Small Text",
-				label: __("Decision Remarks"),
-				reqd: 1,
-			},
-		],
-		({ remarks }) => {
-			frappe.call({
-				method: "vuna_transport.services.execution.return_service.record_no_further_action",
-				args: { return_request: frm.doc.name, remarks },
-				freeze: true,
-				callback: () => frm.reload_doc(),
-			});
-		},
-		__("No Further Action"),
-		__("Confirm")
-	);
-}
-
-function create_replacement_sales_order(frm) {
-	frappe.call({
-		method: "vuna_transport.services.execution.return_service.create_replacement_sales_order",
-		args: { return_request: frm.doc.name },
-		freeze: true,
-		callback: ({ message }) => {
-			if (message) frappe.set_route("Form", "Sales Order", message);
 		},
 	});
 }

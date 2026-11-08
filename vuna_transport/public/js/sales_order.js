@@ -2,20 +2,28 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Sales Order", {
+	setup(frm) {
+		frm.set_query("vuna_delivery_method", () => ({
+			filters: {
+				disabled: 0,
+				selling: 1,
+			},
+		}));
+	},
 	refresh(frm) {
 		if (frm.doc.docstatus !== 1) return;
 
 		frappe
 			.call({
-				method: "vuna_transport.services.demand.delivery_order_service.get_delivery_order_generation_status",
+				method: "vuna_transport.services.demand.sales_transport_demand_service.get_generation_status",
 				args: { sales_order: frm.doc.name },
 			})
 			.then(({ message }) => {
 				if (!message?.can_generate || frm.doc.docstatus !== 1) return;
 
 				frm.add_custom_button(
-					__("Delivery Orders"),
-					() => generate_delivery_orders(frm),
+					__("Transport Demand"),
+					() => generate_transport_demand(frm),
 					__("Create")
 				);
 			})
@@ -23,21 +31,21 @@ frappe.ui.form.on("Sales Order", {
 	},
 });
 
-function generate_delivery_orders(frm) {
+function generate_transport_demand(frm) {
 	frappe
 		.call({
-			method: "vuna_transport.services.demand.delivery_order_service.generate_delivery_orders_for_sales_order",
+			method: "vuna_transport.services.demand.sales_transport_demand_service.generate",
 			args: { sales_order: frm.doc.name },
 			freeze: true,
-			freeze_message: __("Generating Delivery Orders..."),
+			freeze_message: __("Generating Transport Demand..."),
 		})
 		.then(({ message }) => {
 			const count = (message || []).length;
 			frappe.show_alert(
 				{
 					message: count
-						? __("Created {0} Delivery Order(s).", [count])
-						: __("No new Delivery Orders were required."),
+						? __("Transport Demand ready: {0} document(s).", [count])
+						: __("No new Transport Demand was required."),
 					indicator: count ? "green" : "blue",
 				},
 				5

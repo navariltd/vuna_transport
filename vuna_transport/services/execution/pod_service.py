@@ -6,6 +6,9 @@ from frappe.utils import cint, flt, now_datetime
 
 from vuna_transport.services.execution.dispatch_guard_service import set_delivery_load_status
 from vuna_transport.services.execution.lineage_service import get_delivery_trip_load_names
+from vuna_transport.services.execution.stock_identity_service import (
+	get_single_delivery_note_item_batch,
+)
 from vuna_transport.services.shared.security_service import (
 	require_doctype_permission,
 	require_document_permission,
@@ -13,7 +16,7 @@ from vuna_transport.services.shared.security_service import (
 
 
 @frappe.whitelist()
-def create_proof_of_delivery(delivery_trip, delivery_stop):
+def create_proof_of_delivery(delivery_trip: str, delivery_stop: str):
 	"""Create or repair a draft POD from an ERPNext Delivery Stop."""
 	require_doctype_permission("Proof of Delivery", "create")
 	trip = frappe.get_doc("Delivery Trip", delivery_trip)
@@ -21,7 +24,7 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 	if trip.docstatus != 1:
 		frappe.throw(_("Submit the Delivery Trip before creating a Proof of Delivery."))
 	if not get_delivery_trip_load_names(trip):
-		frappe.throw(_("Delivery Trip is not linked to a Vehicle Allocation or Delivery Load."))
+		frappe.throw(_("Delivery Trip is not linked to a Vehicle Allocation or Transport Load."))
 
 	stop = next((row for row in trip.delivery_stops if row.name == delivery_stop), None)
 	if not stop:
@@ -35,7 +38,13 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 
 	existing = stop.vuna_proof_of_delivery or frappe.db.get_value(
 		"Proof of Delivery",
-		{"delivery_trip": trip.name, "delivery_stop": stop.name, "docstatus": ["!=", 2]},
+		{
+			"delivery_trip": trip.name,
+			"delivery_stop": stop.name,
+			"delivery_note": delivery_note.name,
+			"transport_trip_task": ["is", "not set"],
+			"docstatus": ["!=", 2],
+		},
 	)
 	pod = frappe.get_doc("Proof of Delivery", existing) if existing else frappe.new_doc("Proof of Delivery")
 	pod.company = trip.company
@@ -43,6 +52,9 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 	pod.delivery_stop = stop.name
 	pod.delivery_load = delivery_note.vuna_delivery_load
 	pod.delivery_order = stop.vuna_delivery_order or delivery_note.vuna_delivery_order
+	pod.transport_demand = getattr(stop, "vuna_transport_demand", None) or delivery_note.get(
+		"vuna_transport_demand"
+	)
 	pod.delivery_note = delivery_note.name
 	pod.customer = stop.customer
 	pod.delivery_address = stop.address
@@ -54,12 +66,28 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 	if rebuild:
 		pod.set("items", [])
 		for delivery_item in delivery_note.items:
-			delivery_order_item = frappe.db.get_value(
-				"Delivery Order Item",
-				{
-					"parent": pod.delivery_order,
-					"sales_order_item": delivery_item.so_detail,
-				},
+			load_item = (
+				frappe.db.get_value(
+					"Transport Load Item",
+					delivery_item.get("vuna_delivery_load_order"),
+					["transport_demand_item", "delivery_order_item"],
+					as_dict=True,
+				)
+				if delivery_item.get("vuna_delivery_load_order")
+				else None
+			)
+			delivery_order_item = (
+				load_item.delivery_order_item
+				if load_item
+				else frappe.db.get_value(
+					"Delivery Order Item",
+					{
+						"parent": pod.delivery_order,
+						"sales_order_item": delivery_item.so_detail,
+					},
+				)
+				if pod.delivery_order
+				else None
 			)
 			ordered_qty = flt(delivery_item.qty)
 			pod.append(
@@ -68,6 +96,9 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 					"item_code": delivery_item.item_code,
 					"item_name": delivery_item.item_name,
 					"delivery_order_item": delivery_order_item,
+					"transport_demand_item": load_item.transport_demand_item
+					if load_item and not load_item.delivery_order_item
+					else None,
 					"delivery_note_item": delivery_item.name,
 					"ordered_qty": ordered_qty,
 					"delivered_qty": ordered_qty,
@@ -75,7 +106,7 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 					"uom": delivery_item.uom,
 					"stock_uom": delivery_item.stock_uom,
 					"conversion_factor": flt(delivery_item.conversion_factor) or 1,
-					"batch_no": getattr(delivery_item, "batch_no", None),
+					"batch_no": get_single_delivery_note_item_batch(delivery_item),
 				},
 			)
 
@@ -160,6 +191,9 @@ def update_delivery_stop_from_pod(pod, status):
 	recompute_delivery_load_completion(pod.delivery_load, pod.delivery_trip)
 	if pod.delivery_order:
 		recompute_delivery_order_status(pod.delivery_order)
+	from vuna_transport.services.execution.customer_reference_service import recompute_pod_demands
+
+	recompute_pod_demands(pod)
 
 
 def reset_delivery_stop_from_pod(pod):
@@ -184,9 +218,16 @@ def reset_delivery_stop_from_pod(pod):
 		pod.delivery_load,
 		"Dispatched",
 		_("Proof of Delivery {0} cancelled").format(pod.name),
+		force=any(
+			getattr(row, "transport_demand_item", None) and not getattr(row, "delivery_order_item", None)
+			for row in pod.items
+		),
 	)
 	if pod.delivery_order:
 		recompute_delivery_order_status(pod.delivery_order)
+	from vuna_transport.services.execution.customer_reference_service import recompute_pod_demands
+
+	recompute_pod_demands(pod)
 
 
 def prepare_pod_cancellation(pod):
@@ -241,10 +282,10 @@ def recompute_delivery_order_status(delivery_order_name):
 	loads = frappe.db.sql(
 		"""
 			select distinct dl.name, dl.status
-			from `tabDelivery Load` dl
-			join `tabDelivery Load Order` dlo on dlo.parent = dl.name
+			from `tabTransport Load` dl
+			join `tabTransport Load Item` dlo on dlo.parent = dl.name
 			where dl.docstatus = 1
-			and dlo.parenttype = 'Delivery Load'
+			and dlo.parenttype = 'Transport Load'
 			and dlo.delivery_order = %s
 		""",
 		delivery_order_name,
@@ -319,7 +360,7 @@ def recompute_delivery_load_completion(delivery_load, delivery_trip=None):
 	Return Requests are follow-up cases and do not keep the trip or vehicle
 	blocked after the delivery event has been recorded.
 	"""
-	if not delivery_load or not frappe.db.exists("Delivery Load", delivery_load):
+	if not delivery_load or not frappe.db.exists("Transport Load", delivery_load):
 		return
 	trip_name = delivery_trip or frappe.db.get_value(
 		"Delivery Stop",

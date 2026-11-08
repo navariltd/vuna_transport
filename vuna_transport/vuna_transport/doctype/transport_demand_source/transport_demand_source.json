@@ -1,0 +1,81 @@
+{
+ "actions": [],
+ "creation": "2026-11-03 14:15:37.524018",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "source_document_type",
+  "creation_mode",
+  "required_workflow_state",
+  "column_break_himw",
+  "enabled",
+  "auto_submit_delivery_orders",
+  "auto_submit_demand"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_document_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Source Document",
+   "options": "DocType",
+   "only_select": 1,
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "default": "Manual",
+   "fieldname": "creation_mode",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Creation Mode",
+   "options": "Manual\nAutomatic",
+   "reqd": 1
+  },
+  {
+   "description": "Optional exact workflow_state required before generation. Sources must always be submitted.",
+   "fieldname": "required_workflow_state",
+   "fieldtype": "Data",
+   "label": "Required Workflow State"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.source_document_type == 'Sales Order'",
+   "fieldname": "auto_submit_delivery_orders",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "read_only": 1,
+   "label": "Auto Submit Delivery Orders"
+  },
+  {
+   "default": "0",
+   "fieldname": "auto_submit_demand",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Auto Submit Transport Demand"
+  },
+  {
+   "fieldname": "column_break_himw",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-03 14:19:43.095443",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Transport Demand Source",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

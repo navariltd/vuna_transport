@@ -10,6 +10,7 @@ class TestSalesOrderDashboard(UnitTestCase):
 	def test_transport_fulfillment_links_are_added(self):
 		data = get_data({"non_standard_fieldnames": {}, "transactions": []})
 
-		self.assertEqual(data["non_standard_fieldnames"]["Delivery Order"], "sales_order")
-		self.assertEqual(data["non_standard_fieldnames"]["Delivery Load"], "sales_order")
-		self.assertEqual(data["transactions"][0]["items"], ["Delivery Order", "Delivery Load"])
+		self.assertNotIn("Delivery Order", data["non_standard_fieldnames"])
+		self.assertEqual(data["non_standard_fieldnames"]["Transport Load"], "sales_order")
+		self.assertEqual(data["non_standard_fieldnames"]["Transport Demand"], "sales_order")
+		self.assertEqual(data["transactions"][0]["items"], ["Transport Demand", "Transport Load"])

@@ -34,9 +34,9 @@ frappe.ui.form.on("Gate Pass", {
 		}
 		if (frm.doc.delivery_load) {
 			frm.add_custom_button(
-				__("Open Delivery Load"),
+				__("Open Transport Load"),
 				() => {
-					frappe.set_route("Form", "Delivery Load", frm.doc.delivery_load);
+					frappe.set_route("Form", "Transport Load", frm.doc.delivery_load);
 				},
 				__("Open")
 			);

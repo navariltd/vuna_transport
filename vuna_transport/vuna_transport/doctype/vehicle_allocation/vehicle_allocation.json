@@ -26,6 +26,8 @@
   "delivery_loads",
   "section_break_garp",
   "allocation_capacity_summary",
+  "loaded_items_section",
+  "loaded_items",
   "replacement_section",
   "assignment_event",
   "replacement_of",
@@ -64,6 +66,8 @@
   "amended_from"
  ],
  "fields": [
+  {"fieldname":"loaded_items_section","fieldtype":"Section Break","label":"Items to Load"},
+  {"fieldname":"loaded_items","fieldtype":"Table","label":"Items","options":"Vehicle Allocation Item","read_only":1,"cannot_add_rows":1,"cannot_delete_rows":1},
   {
    "fieldname": "allocation_tab",
    "fieldtype": "Tab Break",
@@ -85,7 +89,7 @@
   {
    "fieldname": "delivery_loads",
    "fieldtype": "Table",
-   "label": "Delivery Loads",
+   "label": "Transport Loads",
    "options": "Vehicle Allocation Load",
    "reqd": 1
   },
@@ -127,7 +131,7 @@
   {
    "fieldname": "required_vehicle_category",
    "fieldtype": "Link",
-   "label": "Required Vehicle Category",
+   "label": "Vehicle Category",
    "options": "Vehicle Category",
    "reqd": 1
   },
@@ -146,7 +150,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Draft\nAllocated\nAwaiting Delivery Notes\nReady for Delivery Trip\nDelivery Trip Draft\nDelivery Trip Scheduled\nIn Transit\nCompleted\nAccepted\nRejected\nReplaced\nCancelled",
+   "options": "Draft\nAllocated\nAwaiting Delivery Notes\nAwaiting Transfer Stock Entry\nReady for Delivery Trip\nDelivery Trip Draft\nDelivery Trip Scheduled\nIn Transit\nCompleted\nAccepted\nRejected\nReplaced\nCancelled",
    "read_only": 1
   },
   {
@@ -389,7 +393,7 @@
   {
    "fieldname": "delivery_load_section",
    "fieldtype": "Section Break",
-   "label": "Delivery Load"
+   "label": "Transport Load"
   },
   {
    "fieldname": "column_break_spyh",
@@ -434,7 +438,7 @@
    "is_child_table": 1,
    "link_doctype": "Vehicle Allocation Load",
    "link_fieldname": "delivery_load",
-   "parent_doctype": "Delivery Load",
+   "parent_doctype": "Transport Load",
    "table_fieldname": "delivery_loads"
   }
  ],
