@@ -514,7 +514,15 @@ def _authorize(dry_run, backup_confirmed, workers_paused):
 		)
 	if not all(isinstance(value, bool) for value in (dry_run, backup_confirmed, workers_paused)):
 		raise ValueError("dry_run, backup_confirmed and workers_paused must be Python booleans")
-	if not dry_run and (not frappe.conf.maintenance_mode or not backup_confirmed or not workers_paused):
+	# A normal bench/Frappe Cloud deployment owns the maintenance window and
+	# backups. Do not pretend an operator supplied manual confirmations. Outside
+	# the actual migration patch runner retain the explicit CLI safety contract.
+	managed_patch = frappe.flags.in_migrate is True and frappe.flags.in_patch is True
+	if (
+		not dry_run
+		and not managed_patch
+		and (not frappe.conf.maintenance_mode or not backup_confirmed or not workers_paused)
+	):
 		raise MigrationConflict(
 			"Apply requires maintenance mode, paused workers/integrations and a confirmed full backup."
 		)
