@@ -59,7 +59,9 @@ def run(retire_types=False, verify_execution=False):
 			assert verified["verified"]
 			if retire_types:
 				assert verified["retired"]
-				from vuna_transport.services.demand.sales_transport_demand_service import native_customer_demand_enabled
+				from vuna_transport.services.demand.sales_transport_demand_service import (
+					native_customer_demand_enabled,
+				)
 
 				with patch.dict(frappe.conf, {"customer_demand_cutover": 0}):
 					assert native_customer_demand_enabled()

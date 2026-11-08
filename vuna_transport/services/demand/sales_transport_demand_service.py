@@ -23,7 +23,9 @@ def native_customer_demand_enabled():
 	"""Temporary site opt-in while the legacy execution path is still in service."""
 	from frappe.utils import cint
 
-	return not frappe.db.exists("DocType", "Delivery Order") or bool(cint(frappe.conf.get("customer_demand_cutover")))
+	return not frappe.db.exists("DocType", "Delivery Order") or bool(
+		cint(frappe.conf.get("customer_demand_cutover"))
+	)
 
 
 def sales_source_key(source_name, group_key, item_names):
@@ -47,12 +49,16 @@ def covered_source_items(sales_order, exclude=None):
 			(sales_order, exclude or ""),
 		)
 	)
-	legacy = frappe.db.sql_list(
-		"""select i.sales_order_item from `tabDelivery Order Item` i
+	legacy = (
+		frappe.db.sql_list(
+			"""select i.sales_order_item from `tabDelivery Order Item` i
 		join `tabDelivery Order` d on d.name=i.parent
 		where d.sales_order=%s and d.docstatus!=2 and i.parenttype='Delivery Order'""",
-		sales_order,
-	) if frappe.db.exists("DocType", "Delivery Order") else []
+			sales_order,
+		)
+		if frappe.db.exists("DocType", "Delivery Order")
+		else []
+	)
 	if any(not name for name in legacy):
 		frappe.throw(
 			_(

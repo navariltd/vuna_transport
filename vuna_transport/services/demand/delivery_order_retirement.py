@@ -267,8 +267,18 @@ def _port_references(mapping, item_mapping):
 	orphans = []
 	# Schema preparation may already have changed this field's Link target.
 	# Its stored legacy value still needs the same exact target mapping.
-	for row in frappe.get_all("Return Request", filters={"replacement_delivery_reference": ["in", list(mapping)]}, fields=["name", "replacement_delivery_reference"]):
-		frappe.db.set_value("Return Request", row.name, "replacement_delivery_reference", mapping[row.replacement_delivery_reference][0], update_modified=False)
+	for row in frappe.get_all(
+		"Return Request",
+		filters={"replacement_delivery_reference": ["in", list(mapping)]},
+		fields=["name", "replacement_delivery_reference"],
+	):
+		frappe.db.set_value(
+			"Return Request",
+			row.name,
+			"replacement_delivery_reference",
+			mapping[row.replacement_delivery_reference][0],
+			update_modified=False,
+		)
 	for dt, type_field, name_field in preparation.AUDIT_LINKS:
 		for row in frappe.get_all(dt, filters={type_field: "Delivery Order"}, fields=["*"]):
 			if row[name_field] not in mapping:
@@ -776,15 +786,22 @@ def install_schema(backup_confirmed: bool = False, workers_paused: bool = False)
 	"""Explicit pre-upgrade schema preparation; DDL is outside data savepoints."""
 	preparation._authorize(False, backup_confirmed, workers_paused)
 	for name in (
-		"transport_demand_item", "transport_demand", "transport_load_item",
-		"proof_of_delivery_item", "proof_of_delivery", "return_request_item",
-		"return_request", "transport_settings",
+		"transport_demand_item",
+		"transport_demand",
+		"transport_load_item",
+		"proof_of_delivery_item",
+		"proof_of_delivery",
+		"return_request_item",
+		"return_request",
+		"transport_settings",
 	):
 		frappe.reload_doc("vuna_transport", "doctype", name, force=True)
 	from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 	for name in ("delivery_note", "delivery_stop"):
-		data = frappe.get_file_json(frappe.get_app_path("vuna_transport", "vuna_transport", "custom", name + ".json"))
+		data = frappe.get_file_json(
+			frappe.get_app_path("vuna_transport", "vuna_transport", "custom", name + ".json")
+		)
 		fields = [field for field in data["custom_fields"] if field["fieldname"] == "vuna_transport_demand"]
 		if fields:
 			create_custom_fields({data["doctype"]: fields}, update=True)

@@ -27,7 +27,9 @@ def fields(names):
 def filters(values):
 	result = {field(key): value for key, value in values.items()}
 	if native_customer_demand_enabled():
-		result.update(movement_type="Customer Delivery", source_document_type="Sales Order", migration_archived=0)
+		result.update(
+			movement_type="Customer Delivery", source_document_type="Sales Order", migration_archived=0
+		)
 		# Fully delivered/held sources can remain visible in execution, not in
 		# new planning. Keep them out before live-balance validation.
 		from vuna_transport.services.demand.sales_transport_demand_service import INACTIVE_SALES_STATUSES

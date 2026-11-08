@@ -17,24 +17,58 @@ from vuna_transport.tests.test_delivery_order_migration import source_fixture
 class TestDeliveryOrderRetirement(unittest.TestCase):
 	def test_direct_delivery_note_still_refreshes_native_demand_without_legacy_type(self):
 		proof_source = SimpleNamespace(items=[SimpleNamespace(against_sales_order="SO-1")])
-		with patch.object(legacy_sales, "frappe") as framework, patch.object(sales, "refresh_sales_demands") as refresh:
+		with (
+			patch.object(legacy_sales, "frappe") as framework,
+			patch.object(sales, "refresh_sales_demands") as refresh,
+		):
 			framework.db.exists.return_value = False
 			legacy_sales.sync_delivery_orders_after_direct_delivery_note(proof_source)
 			framework.get_all.assert_not_called()
 			refresh.assert_called_once_with(framework.get_doc.return_value)
 
 	def test_historical_stock_unit_proof_does_not_become_cartons(self):
-		proof = {"name": "old-proof-row", "item_code": "Milk", "ordered_qty": 36, "delivered_qty": 30, "rejected_qty": 6}
-		note = {"item_code": "Milk", "qty": 2, "stock_qty": 36, "uom": "Carton", "stock_uom": "Pcs", "conversion_factor": 18}
+		proof = {
+			"name": "old-proof-row",
+			"item_code": "Milk",
+			"ordered_qty": 36,
+			"delivered_qty": 30,
+			"rejected_qty": 6,
+		}
+		note = {
+			"item_code": "Milk",
+			"qty": 2,
+			"stock_qty": 36,
+			"uom": "Carton",
+			"stock_uom": "Pcs",
+			"conversion_factor": 18,
+		}
 		result = retirement.proof_unit_recovery(proof, note)
-		self.assertEqual((result["uom"], result["conversion_factor"], result["stock_qty"], result["rejected_stock_qty"]), ("Pcs", 1, 30, 6))
+		self.assertEqual(
+			(result["uom"], result["conversion_factor"], result["stock_qty"], result["rejected_stock_qty"]),
+			("Pcs", 1, 30, 6),
+		)
 		self.assertEqual(proof["delivered_qty"], 30)
 
 	def test_historical_transaction_unit_proof_keeps_cartons(self):
-		proof = {"name": "old-proof-row", "item_code": "Milk", "ordered_qty": 2, "delivered_qty": 1.5, "rejected_qty": 0.5}
-		note = {"item_code": "Milk", "qty": 2, "stock_qty": 36, "uom": "Carton", "stock_uom": "Pcs", "conversion_factor": 18}
+		proof = {
+			"name": "old-proof-row",
+			"item_code": "Milk",
+			"ordered_qty": 2,
+			"delivered_qty": 1.5,
+			"rejected_qty": 0.5,
+		}
+		note = {
+			"item_code": "Milk",
+			"qty": 2,
+			"stock_qty": 36,
+			"uom": "Carton",
+			"stock_uom": "Pcs",
+			"conversion_factor": 18,
+		}
 		result = retirement.proof_unit_recovery(proof, note)
-		self.assertEqual((result["uom"], result["conversion_factor"], result["stock_qty"]), ("Carton", 18, 27))
+		self.assertEqual(
+			(result["uom"], result["conversion_factor"], result["stock_qty"]), ("Carton", 18, 27)
+		)
 		proof["ordered_qty"] = 7
 		with self.assertRaises(preparation.MigrationConflict):
 			retirement.proof_unit_recovery(proof, note)
