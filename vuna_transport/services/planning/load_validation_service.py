@@ -25,7 +25,7 @@ def validate_load_allocations(load, lock=True, for_execution=False):
 
 		return validate_customer_allocations(load, for_execution=for_execution)
 	if not load.delivery_orders:
-		frappe.throw(_("At least one Delivery Order is required."))
+		frappe.throw(_("At least one Transport Demand item is required."))
 
 	item_names = sorted({row.delivery_order_item for row in load.delivery_orders if row.delivery_order_item})
 	if lock:

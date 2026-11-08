@@ -629,39 +629,17 @@ def _loads_at_vehicle_allocation_step(candidates):
 	eligible = [row for row in eligible if row.name not in draft_loads]
 	if get_vehicle_allocation_timing() != ALLOCATION_AFTER_DELIVERY_NOTES:
 		return eligible
+	from vuna_transport.services.fleet.vehicle_allocation_service import get_delivery_note_submission_status
+	from vuna_transport.services.planning.transport_load_service import is_demand_load
 
-	# In the after-notes flow, the allocation step begins only after every
-	# Delivery Order on the load has a submitted Delivery Note and no draft note.
-	load_order_rows = frappe.get_all(
-		"Transport Load Item",
-		filters={"parent": ["in", [row.name for row in eligible]]},
-		fields=["parent", "delivery_order"],
-	)
-	expected = {}
-	for row in load_order_rows:
-		if row.delivery_order:
-			expected.setdefault(row.parent, set()).add(row.delivery_order)
-
-	notes = frappe.get_all(
-		"Delivery Note",
-		filters={"vuna_delivery_load": ["in", [row.name for row in eligible]]},
-		fields=["vuna_delivery_load", "vuna_delivery_order", "docstatus"],
-	)
-	submitted = {}
-	draft_loads = set()
-	for note in notes:
-		if note.docstatus == 0:
-			draft_loads.add(note.vuna_delivery_load)
-		elif note.docstatus == 1 and note.vuna_delivery_order:
-			submitted.setdefault(note.vuna_delivery_load, set()).add(note.vuna_delivery_order)
-
-	return [
-		row
-		for row in eligible
-		if expected.get(row.name)
-		and expected[row.name].issubset(submitted.get(row.name, set()))
-		and row.name not in draft_loads
-	]
+	# Share the form's authoritative quantity/lineage check. Non-customer loads
+	# do not require Delivery Notes, regardless of customer workflow timing.
+	result = []
+	for row in eligible:
+		load = frappe.get_doc("Transport Load", row.name)
+		if is_demand_load(load) or get_delivery_note_submission_status(load)["ready"]:
+			result.append(row)
+	return result
 
 
 @frappe.whitelist()
