@@ -7,50 +7,74 @@
   "editable_grid": 1,
   "engine": "InnoDB",
   "field_order": [
-    "return_context",
-    "source_stock_entry",
-    "source_warehouse",
-    "rejecting_warehouse",
     "return_tab",
     "identity_section",
     "naming_series",
     "company",
+    "return_context",
     "customer",
+    "source_warehouse",
     "column_break_identity",
     "initiation_date",
     "initiated_by",
     "column_break_oboa",
-    "return_source",
     "status",
-    "process_version",
+    "return_source",
     "source_section",
     "delivery_note",
-    "sales_order",
     "sales_invoice",
+    "source_stock_entry",
+    "rejecting_warehouse",
     "column_break_source",
-    "delivery_order",
+    "sales_order",
+    "delivery_address",
     "transport_demand",
     "delivery_trip",
     "proof_of_delivery",
-    "delivery_address",
     "section_break_zzrn",
     "delivery_method",
-    "transport_arranged_by",
     "return_warehouse",
-    "return_reasons",
-    "column_break_sxsa",
     "inspection_required",
+    "column_break_sxsa",
+    "return_reasons",
     "section_break_lscq",
     "items",
     "section_break_xbot",
     "return_remarks",
+    "notes",
+    "resolution_tab",
     "quantity_summary_section",
     "expected_return_qty",
     "returned_qty",
     "column_break_quantity_summary",
     "return_difference_qty",
-    "notes",
-    "connections_tab"
+    "resolution_section",
+    "commercial_resolution",
+    "return_stock_document",
+    "credit_note",
+    "column_break_dvom",
+    "replacement_sales_order",
+    "replacement_delivery_reference",
+    "refund_payment_entry",
+    "section_break_qxqq",
+    "no_further_action",
+    "no_further_action_remarks",
+    "section_break_mgma",
+    "resolved_by",
+    "resolution_audit_column",
+    "resolved_on",
+    "custody_tab",
+    "return_section",
+    "custody",
+    "responsible_party",
+    "physical_resolution",
+    "custody_events",
+    "connections_tab",
+    "amended_from",
+    "process_version",
+    "process_summary",
+    "delivery_order",
+    "transport_arranged_by"
   ],
   "fields": [
     {
@@ -156,7 +180,8 @@
     {
       "fieldname": "process_summary",
       "fieldtype": "HTML",
-      "label": "Return Progress"
+      "label": "Return Progress",
+      "hidden": 1
     },
     {
       "default": "Salesperson",
@@ -359,7 +384,7 @@
     {
       "fieldname": "resolution_section",
       "fieldtype": "Section Break",
-      "label": "ERPNext Stock & Follow-up"
+      "label": "Commercial Resolution"
     },
     {
       "fieldname": "return_stock_document",
@@ -439,7 +464,8 @@
     },
     {
       "fieldname": "section_break_zzrn",
-      "fieldtype": "Section Break"
+      "fieldtype": "Section Break",
+      "label": "Collection & Inspection"
     },
     {
       "fieldname": "column_break_sxsa",
@@ -447,7 +473,8 @@
     },
     {
       "fieldname": "section_break_lscq",
-      "fieldtype": "Section Break"
+      "fieldtype": "Section Break",
+      "label": "Return Items"
     },
     {
       "fieldname": "resolution_tab",
@@ -482,11 +509,14 @@
     },
     {
       "fieldname": "section_break_qxqq",
-      "fieldtype": "Section Break"
+      "fieldtype": "Section Break",
+      "label": "Resolution Outcome"
     },
     {
       "fieldname": "section_break_mgma",
-      "fieldtype": "Section Break"
+      "fieldtype": "Section Break",
+      "label": "Resolution Audit",
+      "collapsible": 1
     },
     {
       "fieldname": "transport_demand",
@@ -497,12 +527,16 @@
       "read_only": 1,
       "no_copy": 1,
       "depends_on": "eval:doc.transport_demand && !doc.delivery_order"
+    },
+    {
+      "fieldname": "resolution_audit_column",
+      "fieldtype": "Column Break"
     }
   ],
   "grid_page_length": 50,
   "is_submittable": 1,
   "links": [],
-  "modified": "2026-10-27 07:34:43.951479",
+  "modified": "2026-11-08 14:24:53.966451",
   "modified_by": "Administrator",
   "module": "Vuna Transport",
   "name": "Return Request",

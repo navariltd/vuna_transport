@@ -79,7 +79,25 @@ test("draft supplier demands cannot be assigned", () => {
   );
 });
 
-test("supplier collection uses a reviewed receipt, not a driver stock-posting or POD action", async () => {
+test("supplier Delivery Methods requiring planning offer a load instead of direct assignment", () => {
+  const state = fixture("transport_demand/transport_demand.js", {
+    name: "TD",
+    docstatus: 1,
+    movement_type: "Supplier Pickup",
+    __onload: { supplier_requires_planning: true },
+  });
+  assert.ok(
+    state.buttons.some(
+      (button) => button.label === "Transport Load" && button.group === "Create"
+    )
+  );
+  assert.equal(
+    state.buttons.some((button) => button.label === "Assign to Trip"),
+    false
+  );
+});
+
+test("supplier collection offers proof while direct receipt creation remains permission-controlled", async () => {
   const state = fixture("transport_trip_task/transport_trip_task.js", {
     name: "TASK",
     direct_assignment: 1,
@@ -108,6 +126,9 @@ test("supplier collection uses a reviewed receipt, not a driver stock-posting or
     ),
     false
   );
+  assert.ok(
+    driver.buttons.some((button) => button.label === "Proof of Collection")
+  );
 });
 
 test("existing return and transfer proof actions remain available", () => {
@@ -121,7 +142,7 @@ test("existing return and transfer proof actions remain available", () => {
     pickup.buttons.some((button) => button.label === "Remove Pickup Assignment")
   );
   assert.ok(
-    pickup.buttons.some((button) => button.label === "Proof of Pickup")
+    pickup.buttons.some((button) => button.label === "Proof of Collection")
   );
   const receipt = fixture("transport_trip_task/transport_trip_task.js", {
     task_type: "Transfer Receipt",
@@ -129,5 +150,24 @@ test("existing return and transfer proof actions remain available", () => {
   });
   assert.ok(
     receipt.buttons.some((button) => button.label === "Proof of Delivery")
+  );
+});
+
+test("planned supplier tasks allow authorized receipts but cannot be removed as direct assignments", () => {
+  const state = fixture("transport_trip_task/transport_trip_task.js", {
+    name: "TASK",
+    transport_load: "TL",
+    direct_assignment: 0,
+    task_type: "Supplier Pickup",
+    status: "Awaiting Stock Posting",
+  });
+  assert.ok(
+    state.buttons.some(
+      (button) => button.label === "Purchase Receipt (Vehicle)"
+    )
+  );
+  assert.equal(
+    state.buttons.some((button) => button.label === "Remove Assignment"),
+    false
   );
 });

@@ -20,13 +20,15 @@ frappe.ui.form.on("Transport Trip Task", {
 			);
 		}
 		if (
-			["Transfer Receipt", "Return Pickup"].includes(frm.doc.task_type) &&
+			["Transfer Receipt", "Return Pickup", "Supplier Pickup"].includes(frm.doc.task_type) &&
 			frm.doc.confirmation_method !== "Warehouse Receipt" &&
 			frm.doc.status !== "Cancelled"
 		) {
 			frm.add_custom_button(
 				__(
-					frm.doc.task_type === "Return Pickup" ? "Proof of Pickup" : "Proof of Delivery"
+					["Return Pickup", "Supplier Pickup"].includes(frm.doc.task_type)
+						? "Proof of Collection"
+						: "Proof of Delivery"
 				),
 				() =>
 					frappe.model.open_mapped_doc({
@@ -36,12 +38,7 @@ frappe.ui.form.on("Transport Trip Task", {
 				__("Create")
 			);
 		}
-		if (
-			!frm.doc.direct_assignment ||
-			frm.doc.task_type !== "Supplier Pickup" ||
-			frm.doc.status === "Cancelled"
-		)
-			return;
+		if (frm.doc.task_type !== "Supplier Pickup" || frm.doc.status === "Cancelled") return;
 		if (
 			frappe.model.can_create("Purchase Receipt") &&
 			!["Completed", "Completed with Variance"].includes(frm.doc.status)
@@ -59,6 +56,7 @@ frappe.ui.form.on("Transport Trip Task", {
 				__("Create")
 			);
 		}
+		if (!frm.doc.direct_assignment) return;
 		frm.add_custom_button(__("Remove Assignment"), () => {
 			frappe.confirm(__("Remove this pickup from the trip?"), async () => {
 				await frappe.call({

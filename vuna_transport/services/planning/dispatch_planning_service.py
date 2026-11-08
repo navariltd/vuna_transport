@@ -106,7 +106,7 @@ def get_planning_demand(
 		else selected_delivery_order_names
 	)
 	if len(selected_delivery_order_names or []) > MAX_SELECTED_ORDERS:
-		frappe.throw(_("Select no more than {0} Delivery Orders at a time.").format(MAX_SELECTED_ORDERS))
+		frappe.throw(_("Select no more than {0} transport demands at a time.").format(MAX_SELECTED_ORDERS))
 	start = max(cint(start), 0)
 	page_length = max(1, min(cint(page_length or 50), MAX_PAGE_LENGTH))
 	filters = _planning_filters(
@@ -910,8 +910,8 @@ def _load_requirements(load):
 def _parse_names(names, maximum):
 	names = frappe.parse_json(names) if isinstance(names, str) else names
 	if not isinstance(names, list) or not names:
-		frappe.throw(_("Select at least one Delivery Order."))
+		frappe.throw(_("Select at least one transport demand."))
 	names = list(dict.fromkeys(names))
 	if len(names) > maximum:
-		frappe.throw(_("Select no more than {0} Delivery Orders at once.").format(maximum))
+		frappe.throw(_("Select no more than {0} transport demands at once.").format(maximum))
 	return names

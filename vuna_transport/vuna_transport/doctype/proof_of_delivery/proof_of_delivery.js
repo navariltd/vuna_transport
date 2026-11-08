@@ -47,7 +47,8 @@ frappe.ui.form.on("Proof of Delivery", {
 			);
 		}
 		const unplanned = frm.doc.proof_type === "Unplanned Collection";
-		const pickup = unplanned || frm.doc.proof_type === "Return Pickup";
+		const pickup =
+			unplanned || ["Return Pickup", "Supplier Pickup"].includes(frm.doc.proof_type);
 		for (const field of [
 			"delivery_load",
 			"delivery_stop",

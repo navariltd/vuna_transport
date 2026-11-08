@@ -57,6 +57,7 @@ frappe.ui.form.on("Return Inspection", {
 	},
 
 	refresh(frm) {
+		render_inspection_uom_summary(frm);
 		frm.toggle_display("sales_return", !frm.doc.receiving_stock_entry);
 		if (frm.doc.docstatus !== 1 || frm.doc.stock_entry) return;
 		frm.add_custom_button(
@@ -77,6 +78,7 @@ frappe.ui.form.on("Return Inspection", {
 	},
 
 	validate(frm) {
+		render_inspection_uom_summary(frm);
 		// Depot receipts are validated per source row AND batch on the server.
 		if (frm.doc.receiving_stock_entry) return;
 		const totals = {};
@@ -133,6 +135,12 @@ frappe.ui.form.on("Return Inspection", {
 });
 
 frappe.ui.form.on("Return Inspection Result", {
+	inspection_qty: render_inspection_uom_summary,
+	stock_uom: render_inspection_uom_summary,
+	received_stock_qty: render_inspection_uom_summary,
+	results_add: render_inspection_uom_summary,
+	results_remove: render_inspection_uom_summary,
+
 	item_code(frm, cdt, cdn) {
 		if (frappe.get_doc(cdt, cdn).item_code) resolve_receipt_item(frm, cdt, cdn);
 	},
@@ -176,6 +184,7 @@ frappe.ui.form.on("Return Inspection Result", {
 	},
 
 	result(frm, cdt, cdn) {
+		render_inspection_uom_summary(frm);
 		const row = frappe.get_doc(cdt, cdn);
 		frappe.model.set_value(
 			cdt,
@@ -305,5 +314,109 @@ function apply_receipt_item_details(cdt, cdn, item) {
 		cdn,
 		"serial_and_batch_bundle",
 		item.serial_and_batch_bundle || null
+	);
+}
+
+function inspection_quantities_by_uom(results) {
+	const groups = new Map();
+	const number = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
+	for (const row of results || []) {
+		if (!row.stock_uom) continue;
+		if (!groups.has(row.stock_uom)) {
+			groups.set(row.stock_uom, {
+				uom: row.stock_uom,
+				sources: new Map(),
+				accepted: 0,
+				rejected: 0,
+			});
+		}
+		const group = groups.get(row.stock_uom);
+		const source = row.stock_entry_detail || row.delivery_note_item;
+		if (source) {
+			// Split result rows repeat their source/batch received quantity.
+			const key = JSON.stringify([
+				row.stock_entry_detail ? "stock" : "delivery",
+				source,
+				row.stock_entry_detail ? row.batch_no || "" : "",
+			]);
+			group.sources.set(
+				key,
+				Math.max(group.sources.get(key) || 0, number(row.received_stock_qty))
+			);
+		}
+		if (row.result === "Accepted") group.accepted += number(row.inspection_qty);
+		if (row.result === "Rejected") group.rejected += number(row.inspection_qty);
+	}
+	return Array.from(groups.values()).map((group) => {
+		const received = Array.from(group.sources.values()).reduce((total, qty) => total + qty, 0);
+		const inspected = group.accepted + group.rejected;
+		return {
+			uom: group.uom,
+			received,
+			inspected,
+			accepted: group.accepted,
+			rejected: group.rejected,
+			pending: Math.max(received - inspected, 0),
+		};
+	});
+}
+
+function render_inspection_uom_summary(frm) {
+	const groups = inspection_quantities_by_uom(frm.doc.results);
+	const mixed = groups.length > 1;
+	const labels = {
+		total_received_stock_qty: "Received",
+		total_inspected_stock_qty: "Inspected",
+		accepted_stock_qty: "Accepted",
+		rejected_stock_qty: "Rejected",
+		pending_stock_qty: "Pending Inspection",
+	};
+	for (const [field, label] of Object.entries(labels)) {
+		frm.toggle_display(field, !mixed);
+		frm.set_df_property(
+			field,
+			"label",
+			groups.length === 1 ? __("{0} ({1})", [__(label), groups[0].uom]) : __(label)
+		);
+	}
+	frm.toggle_display("uom_summary", mixed);
+	const wrapper = frm.get_field("uom_summary")?.$wrapper;
+	if (!wrapper) return;
+	if (!mixed) {
+		wrapper.empty();
+		return;
+	}
+	const escape = frappe.utils.escape_html;
+	const headers = [
+		"Stock UOM",
+		"Received",
+		"Inspected",
+		"Accepted",
+		"Rejected",
+		"Pending Inspection",
+	];
+	const rows = groups
+		.map(
+			(group) =>
+				`<tr><td>${escape(group.uom)}</td>${[
+					group.received,
+					group.inspected,
+					group.accepted,
+					group.rejected,
+					group.pending,
+				]
+					.map(
+						(qty) =>
+							`<td class="text-right">${frappe.format(qty, {
+								fieldtype: "Float",
+							})}</td>`
+					)
+					.join("")}</tr>`
+		)
+		.join("");
+	wrapper.html(
+		`<div class="table-responsive"><table class="table table-bordered table-condensed"><thead><tr>${headers
+			.map((label) => `<th>${escape(__(label))}</th>`)
+			.join("")}</tr></thead><tbody>${rows}</tbody></table></div>`
 	);
 }

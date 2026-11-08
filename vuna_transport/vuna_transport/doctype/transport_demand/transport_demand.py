@@ -5,21 +5,28 @@ from vuna_transport.services.demand.transport_demand_service import validate_tra
 
 
 class TransportDemand(Document):
+	def onload(self):
+		if self.movement_type == "Supplier Pickup" and self.source_document_type == "Purchase Order":
+			from vuna_transport.services.demand.delivery_method_service import get_delivery_method_workflow
+
+			method = frappe.db.get_value("Purchase Order", self.source_document, "vuna_delivery_method")
+			self.set_onload(
+				"supplier_requires_planning", get_delivery_method_workflow(method).requires_transport_planning
+			)
+
 	@frappe.whitelist()
 	def create_load(self, source_warehouse: str | None = None):
 		self.check_permission("read")
-		if self.movement_type == "Supplier Pickup":
-			frappe.throw(
-				frappe._(
-					"Supplier pickup demand is recorded. Supplier load and task execution is not available in this implementation slice."
-				)
-			)
 		from vuna_transport.services.planning.transport_load_service import (
 			create_transport_load_from_demands,
 			get_committed_quantities,
 		)
 
 		committed = get_committed_quantities([row.name for row in self.items])
+		if self.movement_type == "Supplier Pickup":
+			from vuna_transport.services.planning.supplier_load_service import available_items
+
+			return create_transport_load_from_demands(available_items(self))
 		if self.movement_type == "Customer Delivery":
 			from vuna_transport.services.planning.customer_demand_load_service import get_load_items
 

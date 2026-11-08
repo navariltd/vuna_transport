@@ -98,6 +98,10 @@ def send_push_notification(user, title, body, route):
 	)
 	for device_name in devices:
 		device = frappe.get_doc("Transport Mobile Device", device_name)
+		# A queued worker may have selected this registration before an
+		# administrator reassigned or revoked it. Never send to its new owner.
+		if device.user != user or device.status != "Active" or not device.push_notifications_enabled:
+			continue
 		token = device.get_password("push_token", raise_exception=False)
 		if not token or device.push_provider != "expo":
 			continue

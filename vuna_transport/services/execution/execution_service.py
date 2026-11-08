@@ -39,6 +39,7 @@ def get_load_execution_summary(load: str | Document):
 		return {
 			"planning_only": True,
 			"return_pickup": is_return_load(load),
+			"supplier_pickup": load.get("movement_type") == "Supplier Pickup",
 			"load": {"docstatus": load.docstatus, "status": load.status},
 			"vehicle_allocation": _serialize_doc(allocation),
 			"transfer_stock_entry": stock,

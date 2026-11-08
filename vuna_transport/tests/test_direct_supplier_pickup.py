@@ -10,6 +10,7 @@ from vuna_transport.services.execution import direct_supplier_pickup_service as 
 
 
 def document(**values):
+	values.setdefault("name", "TASK")
 	doc = SimpleNamespace(**values)
 	doc.get = lambda key: getattr(doc, key, None)
 	doc.reload = MagicMock()
@@ -21,6 +22,7 @@ class TestDirectSupplierPickup(TestCase):
 	def setUp(self):
 		self.framework = self.enterContext(patch.object(service, "frappe"))
 		self.framework.throw.side_effect = ValueError
+		self.framework.db.get_value.return_value = None
 		self.framework._dict.side_effect = frappe._dict
 		self.enterContext(patch.object(service, "_", side_effect=lambda value: value))
 		self.enterContext(patch.object(service, "require_document_permission"))

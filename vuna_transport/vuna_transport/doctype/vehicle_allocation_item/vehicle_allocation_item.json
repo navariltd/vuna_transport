@@ -74,5 +74,9 @@
   "weight_uom",
   "transport_load"
  ],
- "permissions": []
+ "permissions": [],
+ "creation": "2026-11-03 14:45:42.000000",
+ "modified": "2026-11-08 14:24:53.966451",
+ "owner": "Administrator",
+ "modified_by": "Administrator"
 }

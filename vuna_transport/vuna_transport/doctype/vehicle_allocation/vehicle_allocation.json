@@ -10,24 +10,20 @@
   "load_section",
   "naming_series",
   "company",
-  "column_break_prku",
-  "required_vehicle_category",
-  "cost_structure",
+  "status",
   "column_break_allocation",
   "allocation_type",
   "vehicle_owner",
   "supplier",
-  "status",
   "owned_fleet_section",
   "vehicle",
-  "column_break_zvtf",
+  "required_vehicle_category",
   "driver",
+  "column_break_zvtf",
+  "cost_structure",
+  "planned_reporting_time",
   "delivery_load_section",
   "delivery_loads",
-  "section_break_garp",
-  "allocation_capacity_summary",
-  "loaded_items_section",
-  "loaded_items",
   "replacement_section",
   "assignment_event",
   "replacement_of",
@@ -36,14 +32,11 @@
   "column_break_replacement",
   "replacement_reason",
   "replacement_details",
-  "planning_section",
-  "allocated_by",
-  "allocated_on",
-  "effective_from",
-  "column_break_planning",
-  "planned_reporting_time",
-  "effective_to",
-  "replaced_by",
+  "section_break_garp",
+  "allocation_capacity_summary",
+  "loaded_items_section",
+  "loaded_items",
+  "costs_tab",
   "cost_estimate_section",
   "cost_structure_assignment",
   "estimated_cost_currency",
@@ -56,18 +49,36 @@
   "estimated_fixed_cost",
   "estimated_full_cost",
   "estimated_marginal_cost",
-  "section_break_ebvx",
-  "cost_breakdown",
-  "column_break_kdyq",
+  "cost_breakdown_preview",
   "cost_warnings",
+  "history_tab",
+  "planning_section",
+  "allocated_by",
+  "allocated_on",
+  "effective_from",
+  "column_break_planning",
+  "effective_to",
+  "replaced_by",
   "section_break_noxp",
   "remarks",
-  "section_break_amendment",
-  "amended_from"
+  "amended_from",
+  "cost_breakdown"
  ],
  "fields": [
-  {"fieldname":"loaded_items_section","fieldtype":"Section Break","label":"Items to Load"},
-  {"fieldname":"loaded_items","fieldtype":"Table","label":"Items","options":"Vehicle Allocation Item","read_only":1,"cannot_add_rows":1,"cannot_delete_rows":1},
+  {
+   "fieldname": "loaded_items_section",
+   "fieldtype": "Section Break",
+   "label": "Items to Load"
+  },
+  {
+   "fieldname": "loaded_items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Vehicle Allocation Item",
+   "read_only": 1,
+   "cannot_add_rows": 1,
+   "cannot_delete_rows": 1
+  },
   {
    "fieldname": "allocation_tab",
    "fieldtype": "Tab Break",
@@ -360,7 +371,8 @@
    "fieldname": "cost_breakdown",
    "fieldtype": "JSON",
    "label": "Cost Breakdown",
-   "read_only": 1
+   "read_only": 1,
+   "hidden": 1
   },
   {
    "fieldname": "cost_warnings",
@@ -372,10 +384,6 @@
    "fieldname": "remarks",
    "fieldtype": "Small Text",
    "label": "Remarks"
-  },
-  {
-   "fieldname": "section_break_amendment",
-   "fieldtype": "Section Break"
   },
   {
    "fieldname": "amended_from",
@@ -404,14 +412,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "section_break_ebvx",
-   "fieldtype": "Section Break"
-  },
-  {
-   "fieldname": "column_break_kdyq",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "section_break_noxp",
    "fieldtype": "Section Break"
   },
@@ -420,8 +420,19 @@
    "fieldtype": "Section Break"
   },
   {
-   "fieldname": "column_break_prku",
-   "fieldtype": "Column Break"
+   "fieldname": "costs_tab",
+   "fieldtype": "Tab Break",
+   "label": "Costs"
+  },
+  {
+   "fieldname": "history_tab",
+   "fieldtype": "Tab Break",
+   "label": "History"
+  },
+  {
+   "fieldname": "cost_breakdown_preview",
+   "fieldtype": "HTML",
+   "label": "Cost Breakdown"
   }
  ],
  "grid_page_length": 50,
@@ -442,7 +453,7 @@
    "table_fieldname": "delivery_loads"
   }
  ],
- "modified": "2026-09-18 09:22:03.495208",
+ "modified": "2026-11-08 18:25:50.554112",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Allocation",

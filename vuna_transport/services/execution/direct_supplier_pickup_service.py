@@ -286,6 +286,8 @@ def remove_supplier_assignment(task_name: str) -> str:
 		frappe.throw(_("Cancel the confirming Purchase Receipts before removing this pickup assignment."))
 	if frappe.db.exists("Purchase Receipt", {"vuna_pickup_task": task.name, "docstatus": ["!=", 2]}):
 		frappe.throw(_("Cancel or delete the linked Purchase Receipt before removing this assignment."))
+	if frappe.db.exists("Proof of Delivery", {"transport_trip_task": task.name, "docstatus": ["!=", 2]}):
+		frappe.throw(_("Cancel or delete the collection proof before removing this assignment."))
 	task.db_set("status", "Cancelled")
 	if not frappe.db.exists(
 		"Transport Trip Task",
@@ -303,6 +305,10 @@ def supplier_task_status(task):
 	from vuna_transport.services.execution.supplier_receipt_confirmation_service import task_progress
 
 	state = task_progress(task)
+	from vuna_transport.services.execution.supplier_collection_proof_service import collection_status
+
+	if status := collection_status(task, state):
+		return status
 	if state["evidence"]:
 		return state["status"]
 	receipt = frappe.db.get_value(
@@ -325,8 +331,7 @@ def receipt_task_limits(task, order, allocation):
 	trip = frappe.get_doc("Delivery Trip", task.delivery_trip)
 	demand = frappe.get_doc("Transport Demand", task.transport_demand)
 	if (
-		not task.direct_assignment
-		or task.task_type != "Supplier Pickup"
+		task.task_type != "Supplier Pickup"
 		or task.status == "Cancelled"
 		or trip.docstatus != 1
 		or trip.status in ("Completed", "Cancelled")
@@ -347,6 +352,19 @@ def receipt_task_limits(task, order, allocation):
 	from vuna_transport.services.execution.supplier_receipt_confirmation_service import task_progress
 
 	received = task_progress(task)["received"]
+	proof_name = frappe.db.get_value(
+		"Proof of Delivery",
+		{"transport_trip_task": task.name, "proof_type": "Supplier Pickup", "docstatus": 1},
+		"name",
+	)
+	collected = (
+		{
+			row.source_row: flt(row.delivered_qty)
+			for row in frappe.get_doc("Proof of Delivery", proof_name).items
+		}
+		if proof_name
+		else None
+	)
 	limits = {}
 	for row in task.items:
 		source = sources.get(row.transport_demand_item)
@@ -358,7 +376,9 @@ def receipt_task_limits(task, order, allocation):
 		):
 			frappe.throw(_("Pickup task items must retain their demand and Purchase Order references."))
 		limits[source.source_item] = max(
-			flt(row.qty) - flt(received.get(source.source_item)) / flt(row.conversion_factor), 0
+			min(flt(row.qty), collected.get(source.source_item, 0) if collected is not None else flt(row.qty))
+			- flt(received.get(source.source_item)) / flt(row.conversion_factor),
+			0,
 		)
 	return limits
 

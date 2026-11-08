@@ -112,7 +112,9 @@ def make_transfer_proof(source_name: str):
 
 def prepare_proof(task):
 	if task.task_type == "Supplier Pickup":
-		frappe.throw(_("Supplier collection is confirmed through the warehouse team's Purchase Receipt."))
+		from vuna_transport.services.execution.supplier_collection_proof_service import prepare_collection
+
+		return prepare_collection(task)
 	if task.task_type == "Return Pickup":
 		from vuna_transport.services.execution.return_pickup_service import prepare_pickup_proof
 
@@ -312,6 +314,10 @@ def derive_transfer_status(task):
 				return "Failed"
 		return "Ready"
 	if not frappe.db.exists("Stock Entry", {"vuna_transport_proof": proof.name, "docstatus": 1}):
+		from vuna_transport.services.execution.warehouse_receipt_service import receipt_summary
+
+		if receipt_summary(task)["status"] == "Completed":
+			return "Completed" if proof.outcome == "Completed" else "Completed with Variance"
 		depot_receipt = proof.outcome == "Failed" and frappe.db.exists(
 			"Proof of Delivery Item",
 			{
@@ -479,6 +485,10 @@ def submit_receipt_stock_from_pod(proof):
 	operation uses trusted proof quantities/destination; ERPNext validations,
 	quality requirements, stock valuation and ledger posting remain enabled.
 	"""
+	from vuna_transport.services.execution.driver_stock_policy import driver_end_transit_enabled
+
+	if not driver_end_transit_enabled():
+		return
 	if (
 		proof.docstatus != 1
 		or proof.proof_type != "Transfer Receipt"

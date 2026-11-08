@@ -6,14 +6,16 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "identity_section",
   "license_plate",
+  "company",
+  "status",
+  "column_break_hzdv",
   "vehicle_owner",
   "supplier",
   "asset",
-  "column_break_hzdv",
-  "company",
   "transport_cost_structure",
-  "section_break_dcie",
+  "specifications_section",
   "vehicle_category",
   "vehicle_model",
   "column_break_ppqr",
@@ -28,8 +30,8 @@
   "documents_section",
   "documents",
   "notes",
+  "approval_section",
   "vehicle",
-  "status",
   "amended_from"
  ],
  "fields": [
@@ -180,10 +182,6 @@
    "search_index": 1
   },
   {
-   "fieldname": "section_break_dcie",
-   "fieldtype": "Section Break"
-  },
-  {
    "fieldname": "column_break_ppqr",
    "fieldtype": "Column Break"
   },
@@ -193,11 +191,27 @@
    "label": "Transport Cost Structure",
    "options": "Transport Cost Structure",
    "reqd": 1
+  },
+  {
+   "fieldname": "identity_section",
+   "fieldtype": "Section Break",
+   "label": "Vehicle Details"
+  },
+  {
+   "fieldname": "specifications_section",
+   "fieldtype": "Section Break",
+   "label": "Specifications"
+  },
+  {
+   "fieldname": "approval_section",
+   "fieldtype": "Section Break",
+   "label": "Approval Details",
+   "collapsible": 1
   }
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-10-27 07:32:38.726750",
+ "modified": "2026-11-08 14:24:53.966451",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Onboarding",

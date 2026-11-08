@@ -2,7 +2,7 @@
  "doctype": "DocType",
  "name": "Transport Demand",
  "module": "Vuna Transport",
- "modified": "2026-11-08 08:26:48.154395",
+ "modified": "2026-11-08 14:24:53.966451",
  "engine": "InnoDB",
  "istable": 0,
  "is_submittable": 1,
@@ -506,7 +506,8 @@
   {
    "fieldname": "location_section",
    "fieldtype": "Section Break",
-   "label": "Location Snapshots"
+   "label": "Location Snapshots",
+   "collapsible": 1
   },
   {
    "fieldname": "location_column",
@@ -636,5 +637,8 @@
  ],
  "sort_field": "modified",
  "sort_order": "DESC",
- "track_changes": 1
+ "track_changes": 1,
+ "creation": "2026-11-03 14:41:31.000000",
+ "owner": "Administrator",
+ "modified_by": "Administrator"
 }

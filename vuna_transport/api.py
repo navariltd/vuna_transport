@@ -124,6 +124,12 @@ def prepare_mobile_transport_proof(
 		proof.flags.ignore_permissions = True
 		proof.insert(ignore_permissions=True)
 	request_name = task.get("return_request") or proof.return_request
+	supplier_pickup = task.task_type == "Supplier Pickup"
+	order = (
+		frappe.db.get_value("Transport Demand", task.transport_demand, "source_document")
+		if supplier_pickup
+		else None
+	)
 	return {
 		"name": proof.name if not proof.is_new() else None,
 		"docstatus": proof.docstatus,
@@ -133,8 +139,17 @@ def prepare_mobile_transport_proof(
 		"return_context": frappe.db.get_value("Return Request", request_name, "return_context")
 		if request_name
 		else None,
-		"reference_doctype": "Return Request" if task.task_type == "Return Pickup" else "Stock Entry",
-		"reference_name": request_name if task.task_type == "Return Pickup" else proof.dispatch_stock_entry,
+		"reference_doctype": "Purchase Order"
+		if supplier_pickup
+		else "Return Request"
+		if task.task_type == "Return Pickup"
+		else "Stock Entry",
+		"reference_name": order
+		if supplier_pickup
+		else request_name
+		if task.task_type == "Return Pickup"
+		else proof.dispatch_stock_entry,
+		"capture_identity": supplier_pickup,
 		"received_by": proof.received_by,
 		"receiver_phone": proof.receiver_phone,
 		"signature": proof.signature,
@@ -150,6 +165,12 @@ def prepare_mobile_transport_proof(
 				"item_name": row.item_name or frappe.get_cached_value("Item", row.item_code, "item_name"),
 				"qty": row.delivered_qty,
 				"planned_qty": row.ordered_qty,
+				"has_batch_no": bool(
+					supplier_pickup and frappe.get_cached_value("Item", row.item_code, "has_batch_no")
+				),
+				"has_serial_no": bool(
+					supplier_pickup and frappe.get_cached_value("Item", row.item_code, "has_serial_no")
+				),
 			}
 			for row in proof.items
 		],
@@ -608,52 +629,35 @@ def _loads_at_vehicle_allocation_step(candidates):
 	eligible = [row for row in eligible if row.name not in draft_loads]
 	if get_vehicle_allocation_timing() != ALLOCATION_AFTER_DELIVERY_NOTES:
 		return eligible
+	from vuna_transport.services.fleet.vehicle_allocation_service import get_delivery_note_submission_status
+	from vuna_transport.services.planning.transport_load_service import is_demand_load
 
-	# In the after-notes flow, the allocation step begins only after every
-	# Delivery Order on the load has a submitted Delivery Note and no draft note.
-	load_order_rows = frappe.get_all(
-		"Transport Load Item",
-		filters={"parent": ["in", [row.name for row in eligible]]},
-		fields=["parent", "delivery_order"],
-	)
-	expected = {}
-	for row in load_order_rows:
-		if row.delivery_order:
-			expected.setdefault(row.parent, set()).add(row.delivery_order)
-
-	notes = frappe.get_all(
-		"Delivery Note",
-		filters={"vuna_delivery_load": ["in", [row.name for row in eligible]]},
-		fields=["vuna_delivery_load", "vuna_delivery_order", "docstatus"],
-	)
-	submitted = {}
-	draft_loads = set()
-	for note in notes:
-		if note.docstatus == 0:
-			draft_loads.add(note.vuna_delivery_load)
-		elif note.docstatus == 1 and note.vuna_delivery_order:
-			submitted.setdefault(note.vuna_delivery_load, set()).add(note.vuna_delivery_order)
-
-	return [
-		row
-		for row in eligible
-		if expected.get(row.name)
-		and expected[row.name].issubset(submitted.get(row.name, set()))
-		and row.name not in draft_loads
-	]
+	# Share the form's authoritative quantity/lineage check. Non-customer loads
+	# do not require Delivery Notes, regardless of customer workflow timing.
+	result = []
+	for row in eligible:
+		load = frappe.get_doc("Transport Load", row.name)
+		if is_demand_load(load) or get_delivery_note_submission_status(load)["ready"]:
+			result.append(row)
+	return result
 
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def get_vehicles_for_allocation(doctype, txt, searchfield, start, page_len, filters):
+def get_vehicles_for_allocation(
+	doctype: str,
+	txt: str,
+	searchfield: str,
+	start: int,
+	page_len: int,
+	filters: dict | str | None,
+) -> list:
 	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
 	load_names = filters.get("delivery_loads") or []
 	if isinstance(load_names, str):
 		load_names = frappe.parse_json(load_names) or []
 	load_names = [name for name in load_names if name]
 	category = filters.get("required_vehicle_category")
-	if not category:
-		return []
 	if load_names:
 		loads = validate_allocation_load_set(load_names, category)
 		for load in loads:

@@ -35,6 +35,9 @@
   "enable_route_optimization",
   "require_quality_inspection_for_return_inspection",
   "allow_unplanned_return_pickups",
+  "driver_stock_posting_section",
+  "allow_driver_purchase_receipt",
+  "allow_driver_end_transit",
   "scan_permissions_section",
   "allowed_loaded_scan_roles",
   "allowed_dispatched_scan_roles",
@@ -42,11 +45,30 @@
  ],
  "fields": [
   {
+   "fieldname": "driver_stock_posting_section",
+   "fieldtype": "Section Break",
+   "label": "Driver Stock Posting"
+  },
+  {
+   "fieldname": "allow_driver_purchase_receipt",
+   "fieldtype": "Check",
+   "label": "Allow Driver to Receive Supplier Collections",
+   "default": "0",
+   "description": "Submitting collection proof posts a Purchase Receipt into the vehicle's Transit Warehouse."
+  },
+  {
+   "fieldname": "allow_driver_end_transit",
+   "fieldtype": "Check",
+   "label": "Allow Driver to Complete Depot Transfers",
+   "default": "1",
+   "description": "Submitting delivery proof posts the End Transit Stock Entry; otherwise warehouse staff post it."
+  },
+  {
    "fieldname": "allow_unplanned_return_pickups",
    "fieldtype": "Check",
    "label": "Allow Unplanned Return Pickups",
    "default": "0",
-   "description": "Allow drivers to record unplanned collections at delivery stops. Disabled by default: use an approved, submitted Return Request and assigned pickup task. Turning this off does not prevent reviewing or receiving previously recorded collections."
+   "description": "Allow drivers to record collections without an approved Return Request."
   },
   {
    "fieldname": "demand_sources",
@@ -85,7 +107,7 @@
   },
   {
    "default": "3",
-   "description": "Number of ranked configurations shown to the planner. The engine may return fewer when distinct valid alternatives do not exist.",
+   "description": "Maximum number of valid load suggestions shown.",
    "fieldname": "load_suggestion_option_count",
    "fieldtype": "Int",
    "label": "Load Suggestion Options"
@@ -134,7 +156,7 @@
   },
   {
    "default": "After Delivery Notes",
-   "description": "Controls whether a submitted vehicle allocation is required before Delivery Notes are generated, or whether Delivery Notes must be generated before the initial allocation.",
+   "description": "Choose whether initial vehicle allocation happens before or after Delivery Notes.",
    "fieldname": "vehicle_allocation_timing",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -150,7 +172,7 @@
    "default": "1",
    "fieldname": "allow_partial_requirement_allocation",
    "fieldtype": "Check",
-   "label": "Allow Partial Requirement Allocation"
+   "label": "Allow Partial Demand Allocation"
   },
   {
    "fieldname": "default_uoms_section",
@@ -188,7 +210,8 @@
    "default": "0",
    "fieldname": "enable_carrier_management",
    "fieldtype": "Check",
-   "label": "Enable Carrier Management"
+   "label": "Enable Carrier Management",
+   "hidden": 1
   },
   {
    "default": "0",
@@ -204,13 +227,15 @@
    "default": "0",
    "fieldname": "enable_gps_tracking",
    "fieldtype": "Check",
-   "label": "Enable GPS Tracking"
+   "label": "Enable GPS Tracking",
+   "hidden": 1
   },
   {
    "default": "0",
    "fieldname": "enable_route_optimization",
    "fieldtype": "Check",
-   "label": "Enable Route Optimization"
+   "label": "Enable Route Optimization",
+   "hidden": 1
   },
   {
    "default": "0",
@@ -255,7 +280,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-03 14:20:27.995961",
+ "modified": "2026-11-08 15:42:59.636745",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Settings",

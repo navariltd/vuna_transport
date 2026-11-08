@@ -91,6 +91,7 @@ frappe.ui.form.on("Transport Load", {
 		if (
 			frm.doc.docstatus === 0 &&
 			!legacy_rows &&
+			frm.doc.movement_type !== "Supplier Pickup" &&
 			(customer_context.doctype === "Transport Demand" ||
 				frm.doc.movement_type === "Customer Delivery")
 		) {
@@ -112,6 +113,7 @@ frappe.ui.form.on("Transport Load", {
 		if (
 			frm.doc.docstatus === 0 &&
 			(legacy_rows || customer_context.doctype === "Delivery Order") &&
+			frm.doc.movement_type !== "Supplier Pickup" &&
 			frm.doc.movement_type !== "Customer Delivery"
 		) {
 			frm.add_custom_button(
@@ -214,6 +216,7 @@ frappe.ui.form.on("Transport Load", {
 						);
 					} else if (
 						!response.message.return_pickup &&
+						!response.message.supplier_pickup &&
 						!response.message.delivery_trip &&
 						response.message.transfer_stock_entry?.docstatus !== 1
 					) {

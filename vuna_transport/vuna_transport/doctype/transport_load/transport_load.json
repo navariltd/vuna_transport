@@ -9,21 +9,19 @@
  "field_order": [
   "load_tab",
   "load_identity_section",
+  "naming_series",
   "company",
   "movement_type",
-  "required_vehicle_category",
-  "naming_series",
+  "status",
   "column_break_npju",
   "dispatch_date",
   "source_warehouse",
-  "section_break_dfkk",
+  "supplier",
+  "source_address",
+  "required_vehicle_category",
   "delivery_method",
-  "dispatch_wave",
-  "pick_list",
-  "column_break_cxkp",
-  "transport_zone",
-  "transport_route",
-  "delivery_trip",
+  "load_items_section",
+  "delivery_orders",
   "capacity_section",
   "total_weight",
   "weight_uom",
@@ -34,14 +32,24 @@
   "column_break_fymq",
   "minimum_payload",
   "minimum_volume",
-  "section_break_sgfs",
-  "active_vehicle_allocation",
+  "capacity_summary",
+  "pallets_section",
+  "total_pallets",
+  "column_break_lonb",
+  "total_cases",
+  "column_break_xplm",
+  "total_crates",
+  "planning_tab",
+  "section_break_dfkk",
+  "transport_zone",
+  "transport_route",
+  "dispatch_wave",
+  "column_break_cxkp",
   "planned_departure",
   "planned_arrival",
-  "column_break_fpwz",
   "estimated_distance",
   "estimated_duration",
-  "column_break_fsyc",
+  "requirements_section",
   "refrigeration_required",
   "tail_lift_required",
   "required_body_type",
@@ -52,26 +60,34 @@
   "distance_estimate_confidence",
   "column_break_uqgt",
   "distance_estimate_warning",
-  "section_break_mvxd",
-  "capacity_summary",
-  "pallets_section",
-  "total_pallets",
-  "column_break_lonb",
-  "total_cases",
-  "column_break_xplm",
-  "total_crates",
   "execution_tab",
   "execution_overview_section",
   "execution_overview",
-  "section_break_ksai",
-  "delivery_orders",
-  "more_info_section",
-  "status",
-  "section_break_lydc",
-  "amended_from",
-  "connections_tab"
+  "execution_documents_section",
+  "pick_list",
+  "delivery_trip",
+  "active_vehicle_allocation",
+  "connections_tab",
+  "amended_from"
  ],
  "fields": [
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "options": "Supplier",
+   "label": "Supplier",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Supplier Pickup'"
+  },
+  {
+   "fieldname": "source_address",
+   "fieldtype": "Link",
+   "options": "Address",
+   "label": "Pickup Address",
+   "read_only": 1,
+   "depends_on": "eval:doc.movement_type == 'Supplier Pickup'",
+   "mandatory_depends_on": "eval:doc.docstatus == 1 && doc.movement_type == 'Supplier Pickup'"
+  },
   {
    "fieldname": "load_tab",
    "fieldtype": "Tab Break",
@@ -105,10 +121,6 @@
   {
    "fieldname": "execution_overview",
    "fieldtype": "HTML"
-  },
-  {
-   "fieldname": "section_break_lydc",
-   "fieldtype": "Section Break"
   },
   {
    "fieldname": "amended_from",
@@ -150,7 +162,8 @@
    "in_standard_filter": 1,
    "label": "Source Warehouse",
    "options": "Warehouse",
-   "mandatory_depends_on": "eval:doc.docstatus == 1"
+   "mandatory_depends_on": "eval:doc.docstatus == 1 && doc.movement_type != 'Supplier Pickup'",
+   "depends_on": "eval:doc.movement_type != 'Supplier Pickup'"
   },
   {
    "fieldname": "delivery_method",
@@ -281,10 +294,6 @@
    "read_only": 1
   },
   {
-   "fieldname": "section_break_sgfs",
-   "fieldtype": "Section Break"
-  },
-  {
    "fieldname": "required_vehicle_category",
    "fieldtype": "Link",
    "label": "Recommended Vehicle Category",
@@ -310,13 +319,10 @@
    "label": "Planned Arrival"
   },
   {
-   "fieldname": "column_break_fpwz",
-   "fieldtype": "Column Break"
-  },
-  {
    "fieldname": "estimated_distance",
    "fieldtype": "Float",
-   "label": "Estimated Distance"
+   "label": "Estimated Distance",
+   "description": "Uses Default Distance UOM from Transport Settings."
   },
   {
    "fieldname": "estimated_duration",
@@ -349,10 +355,6 @@
    "read_only": 1
   },
   {
-   "fieldname": "column_break_fsyc",
-   "fieldtype": "Column Break"
-  },
-  {
    "default": "0",
    "fieldname": "refrigeration_required",
    "fieldtype": "Check",
@@ -376,10 +378,6 @@
    "fieldtype": "Small Text",
    "label": "Special Equipment Required",
    "read_only": 1
-  },
-  {
-   "fieldname": "section_break_ksai",
-   "fieldtype": "Section Break"
   },
   {
    "fieldname": "delivery_orders",
@@ -418,15 +416,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "more_info_section",
-   "fieldtype": "Section Break",
-   "label": "More Info"
-  },
-  {
-   "fieldname": "section_break_mvxd",
-   "fieldtype": "Section Break"
-  },
-  {
    "collapsible": 1,
    "fieldname": "estimates_section",
    "fieldtype": "Section Break",
@@ -442,6 +431,26 @@
    "label": "Movement Type",
    "options": "\nCustomer Delivery\nWarehouse Transfer\nSupplier Pickup",
    "read_only": 1
+  },
+  {
+   "fieldname": "load_items_section",
+   "fieldtype": "Section Break",
+   "label": "Load Items"
+  },
+  {
+   "fieldname": "planning_tab",
+   "fieldtype": "Tab Break",
+   "label": "Routing & Requirements"
+  },
+  {
+   "fieldname": "requirements_section",
+   "fieldtype": "Section Break",
+   "label": "Vehicle Requirements"
+  },
+  {
+   "fieldname": "execution_documents_section",
+   "fieldtype": "Section Break",
+   "label": "Execution Documents"
   }
  ],
  "grid_page_length": 50,
@@ -469,7 +478,7 @@
    "link_fieldname": "delivery_load"
   }
  ],
- "modified": "2026-10-17 09:53:42.020286",
+ "modified": "2026-11-08 16:44:15.058635",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Load",

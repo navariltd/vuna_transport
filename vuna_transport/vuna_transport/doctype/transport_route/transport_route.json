@@ -12,25 +12,38 @@
   "column_break_qepn",
   "disabled",
   "endpoints_section",
-  "section_break_nksm",
   "origin",
   "column_break_yluu",
   "destination",
   "planning_section",
-  "section_break_ikvr",
   "transport_zone",
   "column_break_kbjw",
   "estimated_duration",
   "estimated_distance",
   "stops_section",
-  "section_break_omyd",
   "route_stops"
  ],
  "fields": [
-  {"fieldname":"identity_section","fieldtype":"Section Break","label":"Route Identity"},
-  {"fieldname":"endpoints_section","fieldtype":"Section Break","label":"Origin & Destination"},
-  {"fieldname":"planning_section","fieldtype":"Section Break","label":"Planning Defaults"},
-  {"fieldname":"stops_section","fieldtype":"Section Break","label":"Route Stops"},
+  {
+   "fieldname": "identity_section",
+   "fieldtype": "Section Break",
+   "label": "Route Identity"
+  },
+  {
+   "fieldname": "endpoints_section",
+   "fieldtype": "Section Break",
+   "label": "Origin & Destination"
+  },
+  {
+   "fieldname": "planning_section",
+   "fieldtype": "Section Break",
+   "label": "Planning Defaults"
+  },
+  {
+   "fieldname": "stops_section",
+   "fieldtype": "Section Break",
+   "label": "Route Stops"
+  },
   {
    "fieldname": "route_name",
    "fieldtype": "Data",
@@ -58,10 +71,6 @@
    "label": "Disabled"
   },
   {
-   "fieldname": "section_break_nksm",
-   "fieldtype": "Section Break"
-  },
-  {
    "fieldname": "origin",
    "fieldtype": "Data",
    "label": "Origin",
@@ -78,10 +87,6 @@
    "reqd": 1
   },
   {
-   "fieldname": "section_break_ikvr",
-   "fieldtype": "Section Break"
-  },
-  {
    "fieldname": "transport_zone",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -95,16 +100,13 @@
   {
    "fieldname": "estimated_duration",
    "fieldtype": "Float",
-   "label": "Estimated Duration"
+   "label": "Estimated Duration (Hours)"
   },
   {
    "fieldname": "estimated_distance",
    "fieldtype": "Float",
-   "label": "Estimated Distance"
-  },
-  {
-   "fieldname": "section_break_omyd",
-   "fieldtype": "Section Break"
+   "label": "Estimated Distance",
+   "description": "Uses Default Distance UOM from Transport Settings."
   },
   {
    "fieldname": "route_stops",
@@ -116,7 +118,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-08-16 15:50:49.666893",
+ "modified": "2026-11-08 14:24:53.966451",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Route",
