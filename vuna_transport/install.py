@@ -22,8 +22,40 @@ LEGACY_DEFAULT_DISPATCH_SCAN_ROLES = {
 def after_install():
 	ensure_transport_uoms()
 	normalize_transport_cost_natures()
+	ensure_transport_demand_sources()
 	ensure_dispatch_scan_roles()
 	ensure_delivery_methods()
+
+
+def ensure_transport_demand_sources():
+	"""Initialize source policies before other setup helpers save the singleton.
+
+	Keep configured rows intact and preserve legacy sales-generation choices.
+	Returns and purchasing remain explicit opt-ins; new demand stays draft.
+	"""
+	settings = frappe.get_single("Transport Settings")
+	if settings.get("demand_sources"):
+		return
+	settings.append(
+		"demand_sources",
+		{
+			"source_document_type": "Sales Order",
+			"enabled": 1,
+			"creation_mode": "Automatic" if settings.get("auto_create_delivery_orders") else "Manual",
+			"auto_submit_delivery_orders": settings.get("auto_submit_delivery_orders") or 0,
+			"auto_submit_demand": 0,
+		},
+	)
+	settings.append(
+		"demand_sources",
+		{
+			"source_document_type": "Material Request",
+			"enabled": 1,
+			"creation_mode": "Manual",
+			"auto_submit_demand": 0,
+		},
+	)
+	settings.save(ignore_permissions=True)
 
 
 def ensure_delivery_methods():
