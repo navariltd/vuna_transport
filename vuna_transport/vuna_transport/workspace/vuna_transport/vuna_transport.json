@@ -116,7 +116,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Transport",
-   "link_count": 10,
+   "link_count": 9,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -154,9 +154,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Delivery Order",
+   "label": "Transport Demands",
    "link_count": 0,
-   "link_to": "Delivery Order",
+   "link_to": "Transport Demand",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -312,7 +312,7 @@
    "role": "Transport Manager"
   }
  ],
- "sequence_id": 0.0,
+ "sequence_id": 0,
  "shortcuts": [],
  "title": "Vuna Transport",
  "type": "Workspace"

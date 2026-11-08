@@ -1,4 +1,4 @@
-frappe.query_reports["Open Delivery Demand"] = {
+frappe.query_reports["Open Transport Demand"] = {
 	filters: [
 		{ fieldname: "company", label: __("Company"), fieldtype: "Link", options: "Company" },
 		{ fieldname: "from_date", label: __("From Date"), fieldtype: "Date" },

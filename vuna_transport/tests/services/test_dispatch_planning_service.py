@@ -3,6 +3,7 @@
 
 from unittest.mock import patch
 
+import frappe
 from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
 from frappe.utils import getdate
@@ -59,10 +60,11 @@ class TestDispatchPlanningService(UnitTestCase):
 		self.assertEqual(filters["county"], "Meru County")
 		self.assertEqual(filters["town"], "Meru Town")
 
-	def test_native_filter_group_accepts_custom_delivery_order_fields(self):
-		filters = validate_additional_filters(
-			[["Delivery Order", "transport_compatibility_group", "=", "Packed Dairy"]]
-		)
+	def test_native_filter_group_accepts_custom_transport_demand_fields(self):
+		with patch.dict(frappe.conf, {"customer_demand_cutover": 1}):
+			filters = validate_additional_filters(
+				[["Transport Demand", "transport_compatibility_group", "=", "Packed Dairy"]]
+			)
 		self.assertEqual(filters[0][1:], ["transport_compatibility_group", "=", "Packed Dairy"])
 
 	def test_native_filter_group_cannot_override_security_fields(self):

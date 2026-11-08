@@ -3,6 +3,7 @@
 import frappe
 from frappe import _
 
+from vuna_transport.services.planning import customer_planning_source as source
 from vuna_transport.vuna_transport.doctype.dispatch_planning_filter.dispatch_planning_filter import (
 	ALLOWED_FILTER_KEYS,
 )
@@ -108,33 +109,40 @@ def validate_additional_filters(additional_filters):
 	if isinstance(additional_filters, str):
 		additional_filters = frappe.parse_json(additional_filters)
 	if not isinstance(additional_filters, list) or len(additional_filters) > 25:
-		frappe.throw(_("Add no more than 25 Delivery Order filters."))
-	meta = frappe.get_meta("Delivery Order")
+		frappe.throw(_("Add no more than 25 Transport Demand filters."))
+	target = source.doctype()
+	meta = frappe.get_meta(target)
 	conditions = []
 	for item in additional_filters:
 		if not isinstance(item, (list, tuple)) or len(item) < 4:
 			frappe.throw(_("Invalid Dispatch Planning filter format."))
 		doctype, fieldname, operator, value = item[:4]
-		if doctype != "Delivery Order":
-			frappe.throw(_("Dispatch Planning filters must target Delivery Order."))
-		if fieldname in PROTECTED_FILTER_FIELDS:
+		if doctype != target:
+			frappe.throw(_("Dispatch Planning filters must target {0}.").format(target))
+		if fieldname in PROTECTED_FILTER_FIELDS | {
+			"source_document_type",
+			"source_document",
+			"movement_type",
+		}:
 			frappe.throw(
 				_("The {0} filter is controlled by Dispatch Planning security rules.").format(fieldname)
 			)
-		if not meta.get_field(fieldname):
-			frappe.throw(_("Delivery Order field {0} does not exist or is not permitted.").format(fieldname))
+		if fieldname not in ("name", "creation", "modified", "owner", "modified_by") and not meta.get_field(
+			fieldname
+		):
+			frappe.throw(_("{0} field {1} does not exist or is not permitted.").format(target, fieldname))
 		if operator not in ALLOWED_FILTER_OPERATORS:
 			frappe.throw(_("Filter operator {0} is not supported.").format(operator))
-		conditions.append(["Delivery Order", fieldname, operator, value])
+		conditions.append([target, fieldname, operator, value])
 	return conditions
 
 
 def as_filter_conditions(filters, additional_filters=None):
 	"""Convert standard Frappe filter mappings and FilterGroup rows to one safe list."""
 	conditions = []
-	for fieldname, value in (filters or {}).items():
+	for fieldname, value in source.filters(filters or {}).items():
 		if isinstance(value, (list, tuple)) and len(value) == 2:
-			conditions.append(["Delivery Order", fieldname, value[0], value[1]])
+			conditions.append([source.doctype(), fieldname, value[0], value[1]])
 		else:
-			conditions.append(["Delivery Order", fieldname, "=", value])
+			conditions.append([source.doctype(), fieldname, "=", value])
 	return conditions + list(additional_filters or [])

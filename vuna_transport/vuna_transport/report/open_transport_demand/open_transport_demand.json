@@ -1,5 +1,5 @@
 {
- "add_total_row": 1,
+ "add_total_row": 0,
  "add_translate_data": 0,
  "columns": [],
  "creation": "2026-09-02 21:14:07.908329",
@@ -12,12 +12,22 @@
  "modified": "2026-09-02 21:14:07.908329",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
- "name": "Unallocated Delivery Orders",
+ "name": "Open Transport Demand",
  "owner": "Administrator",
  "prepared_report": 0,
- "ref_doctype": "Delivery Order",
- "report_name": "Unallocated Delivery Orders",
+ "ref_doctype": "Transport Demand",
+ "report_name": "Open Transport Demand",
  "report_type": "Script Report",
- "roles": [{"role": "Transport Planner"}, {"role": "Transport Dispatcher"}, {"role": "Transport Manager"}],
+ "roles": [
+  {
+   "role": "Transport Planner"
+  },
+  {
+   "role": "Transport Dispatcher"
+  },
+  {
+   "role": "Transport Manager"
+  }
+ ],
  "timeout": 0
 }

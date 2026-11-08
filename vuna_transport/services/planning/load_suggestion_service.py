@@ -18,6 +18,7 @@ from vuna_transport.services.fleet.vehicle_category_service import (
 	maximum_fitting_fraction,
 	validate_vehicle_access_limit,
 )
+from vuna_transport.services.planning import customer_planning_source as source
 from vuna_transport.services.planning.delivery_load_service import (
 	build_delivery_load_from_allocations,
 	get_capacity_buffer_percentage,
@@ -48,27 +49,27 @@ logger = frappe.logger("vuna_transport.load_suggestions")
 
 @frappe.whitelist()
 def suggest_delivery_loads(
-	company,
-	source_warehouse=None,
-	transport_zone=None,
-	delivery_method=None,
-	priority=None,
-	customer=None,
-	delivery_address=None,
-	territory=None,
-	county=None,
-	town=None,
-	constituency=None,
-	delivery_date=None,
-	delivery_order_names=None,
-	option_count=None,
-	delivery_date_from=None,
-	delivery_date_to=None,
-	planning_filters=None,
-	additional_filters=None,
+	company: str,
+	source_warehouse: str | None = None,
+	transport_zone: str | None = None,
+	delivery_method: str | None = None,
+	priority: str | None = None,
+	customer: str | None = None,
+	delivery_address: str | None = None,
+	territory: str | None = None,
+	county: str | None = None,
+	town: str | None = None,
+	constituency: str | None = None,
+	delivery_date: str | None = None,
+	delivery_order_names: list | str | None = None,
+	option_count: int | None = None,
+	delivery_date_from: str | None = None,
+	delivery_date_to: str | None = None,
+	planning_filters: dict | str | None = None,
+	additional_filters: list | str | None = None,
 ):
 	"""Return ranked load configurations without changing transactional state."""
-	require_doctype_permission("Delivery Order", "read")
+	require_doctype_permission(source.doctype(), "read")
 	require_doctype_permission("Transport Load", "create")
 	require_company_access(company)
 	settings = frappe.get_cached_doc("Transport Settings")
@@ -182,7 +183,7 @@ def suggest_delivery_loads(
 
 
 @frappe.whitelist()
-def create_delivery_load_from_suggestion(suggestion):
+def create_delivery_load_from_suggestion(suggestion: dict | str):
 	"""Revalidate browser selections and create one draft Transport Load atomically."""
 	require_doctype_permission("Transport Load", "create")
 	suggestion = frappe.parse_json(suggestion) if isinstance(suggestion, str) else suggestion
@@ -192,6 +193,13 @@ def create_delivery_load_from_suggestion(suggestion):
 	allocations = suggestion.get("allocations") or []
 	if not vehicle_category or not allocations:
 		frappe.throw(_("The suggestion does not contain a Vehicle Category and allocations."))
+	if any(row.get("transport_demand") for row in allocations):
+		load = build_delivery_load_from_allocations(
+			allocations, vehicle_category, source_warehouse=suggestion.get("source_warehouse")
+		)
+		load.insert()
+		load.add_comment("Info", _("Created from ranked customer Transport Demand suggestion."))
+		return load.name
 
 	delivery_order_names = sorted(
 		{row.get("delivery_order") for row in allocations if row.get("delivery_order")}
@@ -305,6 +313,7 @@ def _get_plannable_orders(
 		"transport_zone",
 		"preferred_route",
 		"transport_handling_profile",
+		"transport_compatibility_group",
 		"priority",
 		"customer",
 		"customer_name",
@@ -327,17 +336,28 @@ def _get_plannable_orders(
 		"restricted_access",
 		"average_service_duration",
 	]
+	warehouse_options = {}
+	if source.doctype() == "Transport Demand" and source_warehouse:
+		filters.pop("source_warehouse", None)
+		warehouse_options["or_filters"] = [
+			["source_warehouse", "=", source_warehouse],
+			["source_warehouse", "is", "not set"],
+		]
 	orders = frappe.get_list(
-		"Delivery Order",
+		source.doctype(),
 		filters=as_filter_conditions(filters, additional_filters),
-		fields=fields,
-		order_by="priority desc, required_delivery_date asc, creation asc",
+		fields=source.fields(fields),
+		order_by=f"priority desc, {source.field('required_delivery_date')} asc, creation asc",
 		limit_page_length=MAX_CANDIDATE_ORDERS,
+		**warehouse_options,
 	)
 	if delivery_order_names and len(orders) != len(set(delivery_order_names)):
 		frappe.throw(_("One or more selected Delivery Orders are unavailable or not permitted."))
 	_populate_delivery_method_workflows(orders)
-	_populate_available_items(orders)
+	_populate_available_items(orders, source_warehouse=source_warehouse)
+	if source.doctype() == "Transport Demand" and source_warehouse:
+		for order in orders:
+			order.source_warehouse = source_warehouse
 	return [
 		order
 		for order in orders
@@ -385,8 +405,22 @@ def _populate_delivery_method_workflows(orders):
 		)
 
 
-def _populate_available_items(orders):
+def _populate_available_items(orders, source_warehouse=None):
 	order_map = {order.name: order for order in orders}
+	if source.doctype() == "Transport Demand":
+		metrics = source.metrics(list(order_map), include_items=True, source_warehouse=source_warehouse)
+		for order in orders:
+			values = metrics[order.name]
+			order.order_items = []
+			order.totals = {d: values[d] for d in CAPACITY_DIMENSIONS}
+			for row in values["items"]:
+				if row["available_quantity"] <= 0:
+					continue
+				item = frappe._dict(row)
+				item.transport_qty = item.transport_quantity
+				item.metrics = {d: item[d] for d in CAPACITY_DIMENSIONS}
+				order.order_items.append(item)
+		return
 	items = frappe.get_all(
 		"Delivery Order Item",
 		filters={"parent": ["in", list(order_map)]},
@@ -497,8 +531,8 @@ def _build_candidate(pool, category, strategy):
 				continue
 			allocations.append(
 				{
-					"delivery_order": order.name,
-					"delivery_order_item": item.name,
+					source.allocation_fields()[0]: order.name,
+					source.allocation_fields()[1]: item.name,
 					"allocated_quantity": quantity,
 					"available_quantity": item.available_quantity,
 					"partial": fraction < 0.999999,
@@ -711,7 +745,7 @@ def _deduplicate_candidates(candidates):
 			tuple(
 				sorted(
 					(
-						row["delivery_order_item"],
+						row.get("transport_demand_item") or row.get("delivery_order_item"),
 						round(flt(row["allocated_quantity"]), 6),
 					)
 					for row in candidate["allocations"]
