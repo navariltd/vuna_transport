@@ -7,14 +7,26 @@
   "doctype": "DocType",
   "engine": "InnoDB",
   "field_order": [
+    "delivery_tab",
+    "delivery_context_section",
+    "naming_series",
+    "company",
     "proof_type",
     "direction",
+    "status",
+    "delivery_datetime",
+    "customer",
+    "delivery_address",
+    "column_break_eehr",
+    "delivery_trip",
+    "delivery_stop",
     "transport_trip_task",
+    "delivery_note",
     "dispatch_stock_entry",
+    "delivery_load",
+    "transport_demand",
+    "return_request",
     "rejected_goods_warehouse",
-    "outcome",
-    "recorded_by",
-    "payload_hash",
     "collection_section",
     "collection_stop",
     "collection_reference_doctype",
@@ -23,6 +35,21 @@
     "collection_warehouse",
     "collection_party_type",
     "collection_location",
+    "items_tab",
+    "items",
+    "total_accepted_qty",
+    "total_rejected_qty",
+    "exception_details",
+    "rejection_reasons",
+    "remarks",
+    "notes",
+    "recipient_section",
+    "received_by",
+    "receiver_phone",
+    "column_break_dbvk",
+    "signature",
+    "delivery_photo",
+    "collection_review_section",
     "collection_review_status",
     "collection_reported_at",
     "collection_driver",
@@ -30,39 +57,13 @@
     "collection_reviewed_by",
     "collection_reviewed_at",
     "collection_review_notes",
-    "delivery_tab",
-    "delivery_context_section",
-    "company",
-    "naming_series",
-    "delivery_load",
-    "delivery_trip",
-    "column_break_eehr",
-    "delivery_stop",
+    "proof_audit_section",
+    "recorded_by",
+    "amended_from",
+    "outcome",
+    "payload_hash",
     "delivery_order",
-    "transport_demand",
-    "delivery_note",
-    "return_request",
-    "recipient_section",
-    "customer",
-    "delivery_datetime",
-    "received_by",
-    "receiver_phone",
-    "column_break_dbvk",
-    "delivery_address",
-    "status",
-    "signature",
-    "delivery_photo",
-    "items_tab",
-    "items",
-    "total_accepted_qty",
-    "total_rejected_qty",
-    "rejection_reasons",
-    "exception_details",
-    "remarks",
-    "notes",
-    "mobile_request_id",
-    "section_break_kaie",
-    "amended_from"
+    "mobile_request_id"
   ],
   "fields": [
     {
@@ -210,7 +211,8 @@
       "label": "Dispatch Stock Entry",
       "fieldtype": "Link",
       "options": "Stock Entry",
-      "read_only": 1
+      "read_only": 1,
+      "depends_on": "eval:!!doc.dispatch_stock_entry || ['Transfer Receipt', 'Transfer Dispatch'].includes(doc.proof_type)"
     },
     {
       "fieldname": "outcome",
@@ -238,12 +240,12 @@
     {
       "fieldname": "delivery_tab",
       "fieldtype": "Tab Break",
-      "label": "Delivery"
+      "label": "Handover"
     },
     {
       "fieldname": "delivery_context_section",
       "fieldtype": "Section Break",
-      "label": "Delivery Context"
+      "label": "Delivery / Collection Details"
     },
     {
       "fieldname": "recipient_section",
@@ -253,7 +255,7 @@
     {
       "fieldname": "items_tab",
       "fieldtype": "Section Break",
-      "label": "Delivered Items"
+      "label": "Items"
     },
     {
       "default": "POD-.DD.-.MM.-.YYYY.-",
@@ -307,7 +309,8 @@
       "fieldname": "delivery_note",
       "fieldtype": "Link",
       "label": "Delivery Note",
-      "options": "Delivery Note"
+      "options": "Delivery Note",
+      "depends_on": "eval:doc.proof_type == 'Customer Delivery' || !!doc.delivery_note"
     },
     {
       "fieldname": "return_request",
@@ -323,7 +326,8 @@
       "in_standard_filter": 1,
       "label": "Customer",
       "options": "Customer",
-      "mandatory_depends_on": "eval:!doc.transport_trip_task && doc.proof_type != 'Unplanned Collection'"
+      "mandatory_depends_on": "eval:!doc.transport_trip_task && doc.proof_type != 'Unplanned Collection'",
+      "depends_on": "eval:doc.proof_type == 'Customer Delivery' || !!doc.customer"
     },
     {
       "fieldname": "delivery_address",
@@ -439,10 +443,6 @@
       "fieldtype": "Column Break"
     },
     {
-      "fieldname": "section_break_kaie",
-      "fieldtype": "Section Break"
-    },
-    {
       "fieldname": "transport_demand",
       "fieldtype": "Link",
       "label": "Transport Demand",
@@ -451,6 +451,19 @@
       "read_only": 1,
       "no_copy": 1,
       "depends_on": "eval:doc.transport_demand && !doc.delivery_order"
+    },
+    {
+      "fieldname": "proof_audit_section",
+      "fieldtype": "Section Break",
+      "label": "Recording Details",
+      "collapsible": 1
+    },
+    {
+      "fieldname": "collection_review_section",
+      "fieldtype": "Section Break",
+      "label": "Collection Review",
+      "depends_on": "eval:doc.proof_type == 'Unplanned Collection'",
+      "collapsible": 1
     }
   ],
   "grid_page_length": 50,

@@ -5,7 +5,13 @@
   "engine": "InnoDB",
   "istable": 1,
   "fields": [
-    {"fieldname":"transport_demand_item","fieldtype":"Link","options":"Transport Demand Item","label":"Transport Demand Item","read_only":1},
+    {
+      "fieldname": "transport_demand_item",
+      "fieldtype": "Link",
+      "options": "Transport Demand Item",
+      "label": "Transport Demand Item",
+      "read_only": 1
+    },
     {
       "fieldname": "return_request_item",
       "fieldtype": "Link",
@@ -66,17 +72,21 @@
     }
   ],
   "field_order": [
-    "transport_demand_item",
-    "return_request_item",
+    "item_code",
     "qty",
     "uom",
-    "conversion_factor",
-    "load_item",
-    "item_code",
     "stock_qty",
-    "stock_uom"
+    "stock_uom",
+    "conversion_factor",
+    "transport_demand_item",
+    "return_request_item",
+    "load_item"
   ],
   "permissions": [],
   "sort_field": "idx",
-  "sort_order": "ASC"
+  "sort_order": "ASC",
+  "creation": "2026-11-04 12:30:58.000000",
+  "modified": "2026-11-08 14:24:53.966451",
+  "owner": "Administrator",
+  "modified_by": "Administrator"
 }

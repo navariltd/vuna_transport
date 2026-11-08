@@ -79,7 +79,7 @@ test("draft supplier demands cannot be assigned", () => {
   );
 });
 
-test("supplier collection uses a reviewed receipt, not a driver stock-posting or POD action", async () => {
+test("supplier collection offers proof while direct receipt creation remains permission-controlled", async () => {
   const state = fixture("transport_trip_task/transport_trip_task.js", {
     name: "TASK",
     direct_assignment: 1,
@@ -108,6 +108,9 @@ test("supplier collection uses a reviewed receipt, not a driver stock-posting or
     ),
     false
   );
+  assert.ok(
+    driver.buttons.some((button) => button.label === "Proof of Collection")
+  );
 });
 
 test("existing return and transfer proof actions remain available", () => {
@@ -121,7 +124,7 @@ test("existing return and transfer proof actions remain available", () => {
     pickup.buttons.some((button) => button.label === "Remove Pickup Assignment")
   );
   assert.ok(
-    pickup.buttons.some((button) => button.label === "Proof of Pickup")
+    pickup.buttons.some((button) => button.label === "Proof of Collection")
   );
   const receipt = fixture("transport_trip_task/transport_trip_task.js", {
     task_type: "Transfer Receipt",

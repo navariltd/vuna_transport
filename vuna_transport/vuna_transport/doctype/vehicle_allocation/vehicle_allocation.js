@@ -40,6 +40,7 @@ frappe.ui.form.on("Vehicle Allocation", {
 	},
 
 	refresh(frm) {
+		render_allocation_cost_breakdown(frm);
 		refresh_allocation_items(frm);
 		// Transport Loads are retained as the demand record. The server-side
 		// cancellation flow detaches this allocation before Frappe checks links.
@@ -420,6 +421,57 @@ async function refresh_allocation_items(frm) {
 			indicator: "orange",
 		});
 	}
+}
+
+function render_allocation_cost_breakdown(frm) {
+	let components = frm.doc.cost_breakdown || [];
+	if (typeof components === "string") {
+		try {
+			components = JSON.parse(components);
+		} catch {
+			components = [];
+		}
+	}
+	if (!Array.isArray(components)) components = [];
+	frm.toggle_display(
+		"costs_tab",
+		!!(components.length || frm.doc.estimated_on || frm.doc.cost_warnings)
+	);
+	const wrapper = frm.get_field("cost_breakdown_preview")?.$wrapper;
+	if (!wrapper) return;
+	if (!components.length) {
+		wrapper.text(__("No component estimate is available."));
+		return;
+	}
+	const escape = (value) => frappe.utils.escape_html(String(value ?? ""));
+	const headers = ["Cost Component", "Basis", "Quantity", "UOM", "Rate", "Amount"];
+	const rows = components
+		.filter((row) => row && typeof row === "object")
+		.map(
+			(row) => `<tr>
+		<td>${escape(row.component)}</td><td>${escape(row.basis)}</td>
+		<td class="text-right">${frappe.format(flt(row.quantity), { fieldtype: "Float" })}</td>
+		<td>${escape(row.uom)}</td>
+		<td class="text-right">${frappe.format(
+			flt(row.rate),
+			{ fieldtype: "Currency", options: "estimated_cost_currency" },
+			{ inline: true },
+			frm.doc
+		)}</td>
+		<td class="text-right">${frappe.format(
+			flt(row.amount),
+			{ fieldtype: "Currency", options: "estimated_cost_currency" },
+			{ inline: true },
+			frm.doc
+		)}</td>
+	</tr>`
+		)
+		.join("");
+	wrapper.html(
+		`<div class="table-responsive"><table class="table table-bordered table-condensed"><thead><tr>${headers
+			.map((label) => `<th>${escape(__(label))}</th>`)
+			.join("")}</tr></thead><tbody>${rows}</tbody></table></div>`
+	);
 }
 
 function render_capacity_summary(frm, context) {
