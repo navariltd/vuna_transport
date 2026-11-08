@@ -3,7 +3,49 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import UnitTestCase
 
-from vuna_transport.api import get_delivery_loads_for_allocation, get_drivers_for_allocation
+from vuna_transport.api import (
+	get_delivery_loads_for_allocation,
+	get_drivers_for_allocation,
+	get_vehicles_for_allocation,
+)
+
+
+class TestVehicleFirstAllocationSearch(UnitTestCase):
+	def test_optional_category_keeps_availability_and_permission_filters(self):
+		for category in (None, "Canter"):
+			with (
+				self.subTest(category=category),
+				patch("vuna_transport.api.get_vehicle_availability_map") as availability,
+				patch("vuna_transport.api.frappe.get_list") as get_list,
+			):
+				availability.return_value = {
+					"TRUCK": frappe._dict(vehicle="TRUCK", dispatch_eligible=True),
+					"UNAVAILABLE": frappe._dict(vehicle="UNAVAILABLE", dispatch_eligible=False),
+				}
+				get_list.return_value = [("TRUCK", "KDA 123A", "Make", "Model")]
+				result = get_vehicles_for_allocation(
+					"Vehicle",
+					"KDA",
+					"name",
+					0,
+					20,
+					{"company": "Company", "required_vehicle_category": category},
+				)
+				self.assertEqual(result, get_list.return_value)
+				self.assertEqual(availability.call_args.kwargs["vehicle_category"], category)
+				self.assertEqual(availability.call_args.kwargs["company"], "Company")
+				self.assertEqual(get_list.call_args.kwargs["filters"], {"name": ["in", ["TRUCK"]]})
+				self.assertTrue(get_list.call_args.kwargs["as_list"])
+
+	def test_missing_category_does_not_offer_unavailable_vehicles(self):
+		with (
+			patch("vuna_transport.api.get_vehicle_availability_map", return_value={}),
+			patch("vuna_transport.api.frappe.get_list") as get_list,
+		):
+			self.assertEqual(
+				get_vehicles_for_allocation("Vehicle", "", "name", 0, 20, {"company": "Company"}), []
+			)
+			get_list.assert_not_called()
 
 
 class TestVehicleAllocationDriverSearch(UnitTestCase):

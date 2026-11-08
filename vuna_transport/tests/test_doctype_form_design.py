@@ -103,6 +103,18 @@ class TestDocTypeFormDesign(unittest.TestCase):
 		self.assertEqual(fields("vehicle_allocation")["cost_breakdown"]["hidden"], 1)
 		self.assertEqual(fields("vehicle_allocation")["cost_breakdown_preview"]["fieldtype"], "HTML")
 
+	def test_vehicle_and_category_precede_transport_load_selection(self):
+		order = definition("vehicle_allocation")["field_order"]
+		self.assertLess(order.index("company"), order.index("required_vehicle_category"))
+		self.assertLess(order.index("owned_fleet_section"), order.index("required_vehicle_category"))
+		self.assertLess(order.index("vehicle"), order.index("required_vehicle_category"))
+		self.assertLess(order.index("planned_reporting_time"), order.index("delivery_load_section"))
+		self.assertLess(order.index("delivery_load_section"), order.index("delivery_loads"))
+		category = fields("vehicle_allocation")["required_vehicle_category"]
+		self.assertTrue(category["reqd"])
+		self.assertFalse(category.get("hidden"))
+		self.assertFalse(fields("vehicle_allocation")["owned_fleet_section"].get("collapsible"))
+
 	def test_handover_identity_precedes_evidence_and_audit(self):
 		order = definition("proof_of_delivery")["field_order"]
 		self.assertEqual(order[0], "delivery_tab")

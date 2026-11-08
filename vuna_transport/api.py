@@ -644,15 +644,20 @@ def _loads_at_vehicle_allocation_step(candidates):
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def get_vehicles_for_allocation(doctype, txt, searchfield, start, page_len, filters):
+def get_vehicles_for_allocation(
+	doctype: str,
+	txt: str,
+	searchfield: str,
+	start: int,
+	page_len: int,
+	filters: dict | str | None,
+) -> list:
 	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
 	load_names = filters.get("delivery_loads") or []
 	if isinstance(load_names, str):
 		load_names = frappe.parse_json(load_names) or []
 	load_names = [name for name in load_names if name]
 	category = filters.get("required_vehicle_category")
-	if not category:
-		return []
 	if load_names:
 		loads = validate_allocation_load_set(load_names, category)
 		for load in loads:
