@@ -19,6 +19,18 @@ from vuna_transport.services.demand.transport_demand_service import preserve_sou
 
 
 class TestCustomerDemandFields(unittest.TestCase):
+	def test_duplicate_sales_order_reference_is_hidden_but_retained_for_internal_links(self):
+		path = Path(
+			frappe.get_app_path(
+				"vuna_transport", "vuna_transport", "doctype", "transport_demand", "transport_demand.json"
+			)
+		)
+		meta = json.loads(path.read_text())
+		field = next(row for row in meta["fields"] if row["fieldname"] == "sales_order")
+		self.assertEqual(field["hidden"], 1)
+		self.assertEqual(field["options"], "Sales Order")
+		self.assertEqual(field["read_only"], 1)
+
 	def test_projection_transfers_sales_identity_routing_capability_and_item_dimensions(self):
 		source = frappe._dict(
 			{

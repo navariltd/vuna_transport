@@ -425,6 +425,7 @@ after_migrate = [
 	"vuna_transport.install.normalize_transport_cost_natures",
 	"vuna_transport.install.ensure_transport_demand_sources",
 	"vuna_transport.install.ensure_dispatch_scan_roles",
+	"vuna_transport.install.cleanup_retired_delivery_order_navigation",
 	"vuna_transport.services.routing.location_service.backfill_address_coordinates",
 	"vuna_transport.services.fleet.fleet_service.sync_vehicle_operational_snapshots",
 ]

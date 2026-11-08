@@ -2,6 +2,7 @@
  "doctype": "DocType",
  "name": "Transport Demand",
  "module": "Vuna Transport",
+ "modified": "2026-11-08 08:26:48.154395",
  "engine": "InnoDB",
  "istable": 0,
  "is_submittable": 1,
@@ -164,6 +165,7 @@
   {
    "fieldname": "sales_order",
    "fieldtype": "Link",
+   "hidden": 1,
    "label": "Sales Order",
    "options": "Sales Order",
    "read_only": 1,
