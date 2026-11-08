@@ -57,7 +57,7 @@ def run(verify_vehicle_stock=False, batched=False, partial_transfer=False, verif
 		source = frappe.copy_doc(template)
 		source.name = "TEST-PICKUP-" + frappe.generate_hash(length=12)
 		source.docstatus, source.status = 1, "To Receive and Bill"
-		source.vuna_delivery_method, source.vuna_pickup_address = "Company Collection", address.name
+		source.vuna_delivery_method, source.dispatch_address = "Company Collection", address.name
 		if verify_assignment:
 			manual = frappe.get_doc(
 				{

@@ -13,13 +13,17 @@ from vuna_transport.services.demand.delivery_method_service import (
 )
 
 
+def get_supplier_pickup_address(order):
+	return order.get("dispatch_address") or order.get("supplier_address")
+
+
 def validate_supplier_pickup_order(doc, method=None):
 	"""Existing demand snapshots cannot silently change their pickup identity."""
 	previous = doc.get_doc_before_save()
 	if not doc.get("vuna_delivery_method") and not (previous and previous.get("vuna_delivery_method")):
 		doc.vuna_transport_arranged_by = None
 		return
-	fields = ("vuna_delivery_method", "vuna_pickup_address", "supplier", "company", "set_warehouse")
+	fields = ("vuna_delivery_method", "supplier", "company", "set_warehouse")
 
 	def endpoints(order):
 		return sorted(
@@ -33,6 +37,7 @@ def validate_supplier_pickup_order(doc, method=None):
 
 	if previous and (
 		any(previous.get(field) != doc.get(field) for field in fields)
+		or get_supplier_pickup_address(previous) != get_supplier_pickup_address(doc)
 		or endpoints(previous) != endpoints(doc)
 	):
 		# Use the same source lock as demand creation, so an address/opt-in
@@ -53,19 +58,18 @@ def validate_supplier_pickup_order(doc, method=None):
 	doc.vuna_transport_arranged_by = workflow.transport_arranged_by
 	if not workflow.company_pickup:
 		return
-	if not doc.get("vuna_pickup_address"):
-		frappe.throw(_("Select the Supplier Pickup Address for company collection."))
 	validate_pickup_location(doc)
 
 
 def validate_pickup_location(source):
-	address = frappe.get_doc("Address", source.vuna_pickup_address)
+	name = get_supplier_pickup_address(source)
+	if not name:
+		frappe.throw(_("Select a Dispatch Address or Supplier Address for company collection."))
+	address = frappe.get_doc("Address", name)
 	if address.disabled or not any(
 		link.link_doctype == "Supplier" and link.link_name == source.supplier for link in address.links
 	):
-		frappe.throw(
-			_("Supplier Pickup Address must be active and linked to this Purchase Order's Supplier.")
-		)
+		frappe.throw(_("The pickup address must be active and linked to this Purchase Order's Supplier."))
 	return address
 
 
@@ -96,8 +100,13 @@ def build_supplier_pickup_legs(source):
 		frappe.throw(
 			_("Subcontracting and unit-price orders are not supported by the supplier pickup adapter.")
 		)
-	if not source.get("supplier") or not source.get("vuna_pickup_address"):
-		frappe.throw(_("Select the Supplier and Supplier Pickup Address before creating transport demand."))
+	pickup_address = get_supplier_pickup_address(source)
+	if not source.get("supplier") or not pickup_address:
+		frappe.throw(
+			_(
+				"Select the Supplier and a Dispatch Address or Supplier Address before creating transport demand."
+			)
+		)
 	validate_pickup_location(source)
 	legs = defaultdict(list)
 	for row in source.get("items") or []:
@@ -154,11 +163,9 @@ def build_supplier_pickup_legs(source):
 			"movement_type": "Supplier Pickup",
 			"source_document_type": "Purchase Order",
 			"source_document": source.name,
-			"source_key": get_source_key(
-				"Purchase Order", source.name, source.vuna_pickup_address, [destination, date]
-			),
+			"source_key": get_source_key("Purchase Order", source.name, pickup_address, [destination, date]),
 			"source_warehouse": None,
-			"source_address": source.vuna_pickup_address,
+			"source_address": pickup_address,
 			"supplier": source.supplier,
 			"customer": None,
 			"destination_address": None,

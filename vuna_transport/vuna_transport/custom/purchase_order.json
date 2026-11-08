@@ -2,20 +2,7 @@
   "doctype": "Purchase Order",
   "custom_fields": [
     {"dt":"Purchase Order","name":"Purchase Order-vuna_delivery_method","fieldname":"vuna_delivery_method","label":"Delivery Method","fieldtype":"Link","options":"Delivery Method","allow_on_submit":1,"insert_after":"supplier_address","module":"Vuna Transport"},
-    {"dt":"Purchase Order","name":"Purchase Order-vuna_transport_arranged_by","fieldname":"vuna_transport_arranged_by","label":"Transport Arranged By","fieldtype":"Data","read_only":1,"hidden":1,"fetch_from":"vuna_delivery_method.transport_arranged_by","allow_on_submit":1,"insert_after":"vuna_delivery_method","module":"Vuna Transport"},
-    {
-      "dt": "Purchase Order",
-      "name": "Purchase Order-vuna_pickup_address",
-      "fieldname": "vuna_pickup_address",
-      "label": "Supplier Pickup Address",
-      "fieldtype": "Link",
-      "options": "Address",
-      "allow_on_submit": 1,
-      "depends_on": "eval:doc.vuna_transport_arranged_by == 'Company'",
-      "mandatory_depends_on": "eval:doc.vuna_transport_arranged_by == 'Company'",
-      "insert_after": "vuna_transport_arranged_by",
-      "module": "Vuna Transport"
-    }
+    {"dt":"Purchase Order","name":"Purchase Order-vuna_transport_arranged_by","fieldname":"vuna_transport_arranged_by","label":"Transport Arranged By","fieldtype":"Data","read_only":1,"hidden":1,"fetch_from":"vuna_delivery_method.transport_arranged_by","allow_on_submit":1,"insert_after":"vuna_delivery_method","module":"Vuna Transport"}
   ],
   "property_setters": [],
   "custom_perms": [],

@@ -18,7 +18,8 @@ def purchase_order():
 		docstatus=1,
 		status="To Receive and Bill",
 		vuna_delivery_method="Company Pickup",
-		vuna_pickup_address="Supplier Gate",
+		dispatch_address="Supplier Gate",
+		supplier_address="Supplier Office",
 		items=[
 			frappe._dict(
 				name="POI-1",
@@ -100,6 +101,40 @@ class TestSupplierPickupDemand(TestCase):
 		self.assertEqual(len({leg["source_key"] for leg in legs}), 3)
 		self.assertEqual(legs, build_source_legs(self.source))
 
+	def test_dispatch_address_takes_precedence_over_supplier_address(self):
+		self.assertEqual(service.get_supplier_pickup_address(self.source), "Supplier Gate")
+
+	def test_supplier_address_is_used_when_dispatch_is_blank(self):
+		self.source.dispatch_address = None
+		self.assertEqual(build_source_legs(self.source)[0]["source_address"], "Supplier Office")
+
+	def test_missing_both_standard_addresses_is_rejected(self):
+		self.source.dispatch_address = self.source.supplier_address = None
+		with self.assertRaises(ValueError):
+			build_source_legs(self.source)
+
+	def test_billing_address_change_does_not_change_explicit_pickup(self):
+		previous = purchase_order()
+		self.source.supplier_address = "New Office"
+		doc = MagicMock()
+		doc.supplier = self.source.supplier
+		doc.get.side_effect = self.source.get
+		doc.get_doc_before_save.return_value = previous
+		service.validate_supplier_pickup_order(doc)
+		self.framework.db.get_value.assert_not_called()
+
+	def test_fallback_address_change_requires_demand_release(self):
+		previous = purchase_order()
+		previous.dispatch_address = self.source.dispatch_address = None
+		self.source.supplier_address = "New Office"
+		doc = MagicMock()
+		doc.name = "PO-1"
+		doc.get.side_effect = self.source.get
+		doc.get_doc_before_save.return_value = previous
+		self.framework.db.exists.return_value = True
+		with self.assertRaises(ValueError):
+			service.validate_supplier_pickup_order(doc)
+
 	def test_unopted_draft_closed_on_hold_subcontracted_orders_are_rejected(self):
 		for changes in (
 			{"vuna_delivery_method": None},
@@ -158,7 +193,7 @@ class TestSupplierPickupDemand(TestCase):
 
 	def test_editing_pickup_identity_locks_source_and_requires_demand_release(self):
 		previous = purchase_order()
-		self.source.vuna_pickup_address = "New Gate"
+		self.source.dispatch_address = "New Gate"
 		doc = MagicMock(name="PO-1", vuna_delivery_method="Company Pickup")
 		doc.name = "PO-1"
 		doc.get.side_effect = self.source.get
