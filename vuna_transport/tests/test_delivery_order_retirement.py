@@ -15,6 +15,13 @@ from vuna_transport.tests.test_delivery_order_migration import source_fixture
 
 
 class TestDeliveryOrderRetirement(unittest.TestCase):
+	def test_projection_retains_legacy_row_identity_even_when_target_ids_differ(self):
+		plan, source, keys = self.fixture()
+		plan["items"][0]["name"] = "existing-native-row"
+		projected = retirement.project_groups(plan, source, keys)[0]
+		self.assertEqual(projected["legacy_item_names"], ["old-row-1"])
+		self.assertEqual(projected["items"][0]["name"], "existing-native-row")
+
 	def test_direct_delivery_note_still_refreshes_native_demand_without_legacy_type(self):
 		proof_source = SimpleNamespace(items=[SimpleNamespace(against_sales_order="SO-1")])
 		with (
@@ -146,3 +153,85 @@ class TestDeliveryOrderRetirement(unittest.TestCase):
 			patch.dict(frappe.conf, {"customer_demand_cutover": 0}),
 		):
 			self.assertTrue(sales.native_customer_demand_enabled())
+
+
+class TestHistoricalLoadClosure(unittest.TestCase):
+	def setUp(self):
+		self.framework = self.enterContext(patch.object(retirement, "frappe"))
+		self.framework.db.sql_list.return_value = ["LOAD"]
+		self.framework.db.exists.side_effect = lambda dt, filters: dt == "DocType"
+		self.framework.db.has_column.return_value = True
+		self.load = SimpleNamespace(
+			name="LOAD",
+			docstatus=1,
+			status="Approved",
+			delivery_trip=None,
+			active_vehicle_allocation=None,
+			delivery_orders=[SimpleNamespace(delivery_order="DO", delivery_order_item="archived-row")],
+		)
+		self.load.as_dict = lambda: {
+			"name": self.load.name,
+			"docstatus": self.load.docstatus,
+			"status": self.load.status,
+		}
+		self.framework.get_doc.return_value = self.load
+		self.targets = [
+			{
+				"legacy_source": "DO",
+				"legacy_item_names": ["archived-row"],
+				"demand": {"migration_archived": 1},
+			},
+			{"legacy_source": "DO", "legacy_item_names": ["live-row"], "demand": {"migration_archived": 0}},
+		]
+
+	def test_archived_row_in_mixed_parent_can_close_independently(self):
+		closures = retirement._obsolete_loads(self.targets)
+		self.assertEqual([row["load"]["name"] for row in closures], ["LOAD"])
+
+	def test_mixed_rows_are_preserved_instead_of_rejecting_whole_parent(self):
+		self.load.delivery_orders.append(SimpleNamespace(delivery_order="DO", delivery_order_item="live-row"))
+		self.assertEqual(retirement._obsolete_loads(self.targets), [])
+		self.assertEqual(self.load.status, "Approved")
+
+	def test_unknown_or_noncustomer_cargo_is_never_auto_closed(self):
+		self.load.delivery_orders.append(SimpleNamespace(delivery_order=None, delivery_order_item=None))
+		self.assertEqual(retirement._obsolete_loads(self.targets), [])
+
+	def test_completed_trip_load_is_preserved_even_when_item_is_disabled(self):
+		self.load.delivery_trip, self.load.status = "TRIP", "Completed with Exceptions"
+		self.assertEqual(retirement._obsolete_loads(self.targets), [])
+		self.assertEqual(self.load.status, "Completed with Exceptions")
+		self.framework.db.set_value.assert_not_called()
+
+	def test_any_existing_execution_prevents_automatic_closure(self):
+		for doctype in ("Proof of Delivery", "Transport Trip Task", "Delivery Note", "Stock Entry"):
+			self.framework.db.exists.side_effect = (
+				lambda dt, filters, found=doctype: dt == "DocType" or dt == found
+			)
+			with self.subTest(doctype=doctype):
+				self.assertEqual(retirement._obsolete_loads(self.targets), [])
+
+	def test_shared_or_executed_allocation_is_preserved(self):
+		self.load.active_vehicle_allocation = "VA"
+		allocation = SimpleNamespace(name="VA", docstatus=1)
+		allocation.as_dict = lambda: {"name": "VA", "docstatus": 1}
+		self.framework.get_doc.side_effect = (
+			lambda dt, name: self.load if dt == "Transport Load" else allocation
+		)
+		with patch(
+			"vuna_transport.services.fleet.vehicle_allocation_service.get_allocation_load_names",
+			return_value=["LOAD", "OTHER"],
+		):
+			self.assertEqual(retirement._obsolete_loads(self.targets), [])
+		with patch(
+			"vuna_transport.services.fleet.vehicle_allocation_service.get_allocation_load_names",
+			return_value=["LOAD"],
+		):
+			self.framework.db.exists.side_effect = lambda dt, filters: dt in ("DocType", "Delivery Trip")
+			self.assertEqual(retirement._obsolete_loads(self.targets), [])
+
+	def test_missing_optional_execution_schema_is_not_queried(self):
+		self.framework.db.exists.return_value = False
+		self.framework.db.exists.side_effect = None
+		self.assertFalse(retirement._existing_execution("Transport Trip Task", {"transport_load": "LOAD"}))
+		self.framework.db.exists.assert_called_once_with("DocType", "Transport Trip Task")
