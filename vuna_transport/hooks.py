@@ -417,8 +417,6 @@ fixtures = [
 	}
 ]
 
-before_migrate = ["vuna_transport.services.demand.delivery_order_retirement.guard_upgrade"]
-
 after_migrate = [
 	"vuna_transport.install.ensure_delivery_methods",
 	"vuna_transport.install.ensure_transport_uoms",

@@ -786,9 +786,11 @@ def install_schema(backup_confirmed: bool = False, workers_paused: bool = False)
 	"""Explicit pre-upgrade schema preparation; DDL is outside data savepoints."""
 	preparation._authorize(False, backup_confirmed, workers_paused)
 	for name in (
+		"transport_demand_source",
 		"transport_demand_item",
 		"transport_demand",
 		"transport_load_item",
+		"transport_load",
 		"proof_of_delivery_item",
 		"proof_of_delivery",
 		"return_request_item",
@@ -861,5 +863,39 @@ def guard_upgrade():
 		for dt in (*RETIRED_TYPES, "Transport Requirement", "Transport Requirement Item")
 	):
 		raise preparation.MigrationConflict(
-			"Delivery Order retirement must be applied and verified before upgrading. Pause writers, confirm backups, run delivery_order_retirement.install_schema, inspect and retire. No historical documents have been deleted."
+			"Delivery Order retirement did not complete before model sync. Resolve the pre-model-sync conversion blockers and retry the migration; do not skip the failing patch. Historical source tables are retained."
 		)
+
+
+def migrate_before_model_sync():
+	"""Retire history inside the real migration patch, before orphan cleanup.
+
+	Only schema preparation may commit implicitly (MariaDB DDL). Conversion is
+	verified with the existing checksum/ledger guards; the patch runner controls
+	its transaction and Patch Log. Failed conversion must not reach model sync.
+	"""
+	if frappe.flags.in_migrate is not True or frappe.flags.in_patch is not True:
+		raise preparation.MigrationConflict(
+			"Automatic retirement must run through bench migrate's patch runner."
+		)
+	preparation._authorize(True, False, False)
+	if not frappe.db.exists("DocType", "Delivery Order"):
+		guard_upgrade()
+		manifest = frappe.db.get_single_value("Transport Settings", MANIFEST_FIELD)
+		if manifest:
+			return verify()
+		preparation._conflict(
+			frappe.db.table_exists("Delivery Order")
+			and frappe.db.sql("select name from `tabDelivery Order` limit 1"),
+			"Delivery Order history exists without metadata or a retirement manifest. Restore its metadata from backup before migrating; no source tables have been deleted.",
+		)
+		return {"retired": True, "source_count": 0}
+	install_schema()
+	report = inspect()
+	preparation._conflict(
+		report.get("blockers"),
+		"Delivery Order conversion requires review: " + preparation._json(report.get("blockers", [])),
+	)
+	result = retire(dry_run=False, expected_checksum=report.get("projection_checksum"))
+	guard_upgrade()
+	return result
