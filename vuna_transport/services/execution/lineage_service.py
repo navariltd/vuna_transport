@@ -4,6 +4,7 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
+from vuna_transport.services.execution import customer_reference_service as customer
 from vuna_transport.services.execution.dispatch_guard_service import (
 	get_locked_delivery_load,
 	set_delivery_load_status,
@@ -49,6 +50,15 @@ def populate_delivery_note_delivery_links(doc, method=None):
 		return
 	load = get_locked_delivery_load(doc.vuna_delivery_load)
 	validate_load_is_operational(load, _("creating or updating a Delivery Note"))
+	from vuna_transport.services.execution.customer_reference_service import (
+		native_load,
+		native_note,
+		validate_customer_note,
+	)
+
+	if native_load(load) or native_note(doc):
+		validate_customer_note(doc, load)
+		return
 	if not doc.vuna_delivery_order:
 		delivery_orders = frappe.get_all(
 			"Transport Load Item",
@@ -269,7 +279,7 @@ def validate_delivery_trip(doc, method=None):
 		delivery_note = frappe.db.get_value(
 			"Delivery Note",
 			stop.delivery_note,
-			["vuna_delivery_load", "vuna_delivery_order"],
+			["vuna_delivery_load", "vuna_delivery_order", "vuna_transport_demand"],
 			as_dict=True,
 		)
 		if not delivery_note or (
@@ -285,6 +295,7 @@ def validate_delivery_trip(doc, method=None):
 				)
 			)
 		stop.vuna_delivery_order = delivery_note.vuna_delivery_order
+		stop.vuna_transport_demand = delivery_note.get("vuna_transport_demand")
 		stop.vuna_delivery_load = delivery_note.vuna_delivery_load
 		if stop.vuna_delivery_load not in {selected_load.name for selected_load in loads}:
 			load_order = frappe.db.get_value(
@@ -392,6 +403,30 @@ def validate_delivery_trip_note_set(expected_delivery_notes, stop_delivery_notes
 
 def validate_delivery_note_quantities_for_loads(loads):
 	"""Ensure submitted Delivery Notes cover every allocated item quantity."""
+	from vuna_transport.services.execution.customer_reference_service import native_load
+
+	native_names = [load.name for load in loads if native_load(load)]
+	if native_names:
+		native_rows = frappe.get_all(
+			"Transport Load Item",
+			filters={"parent": ["in", native_names]},
+			fields=["name", "allocated_quantity"],
+		)
+		actual = dict(
+			frappe.db.sql(
+				"""select i.vuna_delivery_load_order, sum(i.qty)
+		from `tabDelivery Note Item` i join `tabDelivery Note` n on n.name=i.parent
+		where n.docstatus=1 and n.is_return=0 and i.vuna_delivery_load_order in %(rows)s
+		group by i.vuna_delivery_load_order""",
+				{"rows": tuple(r.name for r in native_rows) or ("",)},
+			)
+		)
+		for row in native_rows:
+			if abs(flt(actual.get(row.name)) - flt(row.allocated_quantity)) > 1e-6:
+				frappe.throw(
+					_("Submitted Delivery Notes must exactly cover Transport Load Item {0}.").format(row.name)
+				)
+		loads = [load for load in loads if load.name not in native_names]
 	load_names = [load.name for load in loads if getattr(load, "name", None)]
 	if not load_names:
 		return
@@ -533,6 +568,26 @@ def complete_load_without_trip(doc, method=None):
 	load_name = getattr(doc, "vuna_delivery_load", None)
 	if not load_name or doc.docstatus != 1:
 		return
+	if customer.native_note(doc):
+		names = frappe.db.sql_list(
+			"""select distinct l.parent from `tabDelivery Note Item` n
+		join `tabTransport Load Item` l on l.name=n.vuna_delivery_load_order where n.parent=%s""",
+			doc.name,
+		)
+		for name in names:
+			load = get_locked_delivery_load(name)
+			if (
+				load.delivery_method
+				and not frappe.db.get_value("Delivery Method", load.delivery_method, "requires_delivery_trip")
+				and customer.note_submission_status(load)["ready"]
+			):
+				set_delivery_load_status(
+					load,
+					"Completed",
+					_("All required customer Delivery Note quantities were submitted; no trip is required."),
+				)
+				_recompute_delivery_order_statuses(name)
+		return
 	load = frappe.get_doc("Transport Load", load_name)
 	if not load.delivery_method:
 		return
@@ -554,6 +609,30 @@ def complete_load_without_trip(doc, method=None):
 def reconcile_load_after_delivery_note_cancel(doc, method=None):
 	if getattr(doc, "is_return", 0):
 		return
+	if customer.native_note(doc):
+		names = frappe.db.sql_list(
+			"""select distinct l.parent from `tabDelivery Note Item` n
+		join `tabTransport Load Item` l on l.name=n.vuna_delivery_load_order where n.parent=%s""",
+			doc.name,
+		)
+		for name in names:
+			load = get_locked_delivery_load(name)
+			if (
+				load.delivery_trip
+				and frappe.db.get_value("Delivery Trip", load.delivery_trip, "docstatus") != 2
+			):
+				continue
+			if not customer.note_submission_status(load)["ready"]:
+				set_delivery_load_status(
+					load,
+					"Allocated" if load.active_vehicle_allocation else "Approved",
+					_(
+						"Delivery Note {0} cancelled; customer delivery quantities are no longer ready."
+					).format(doc.name),
+					force=True,
+				)
+			_recompute_delivery_order_statuses(name)
+		return
 	load_name = getattr(doc, "vuna_delivery_load", None)
 	if not load_name:
 		return
@@ -573,7 +652,21 @@ def _recompute_delivery_order_statuses(delivery_load):
 	from vuna_transport.services.execution.pod_service import recompute_delivery_order_status
 
 	for delivery_order in _get_delivery_orders(delivery_load):
-		recompute_delivery_order_status(delivery_order)
+		if delivery_order:
+			recompute_delivery_order_status(delivery_order)
+	from vuna_transport.services.execution.customer_reference_service import recompute_native_demand
+
+	for name in frappe.get_all(
+		"Transport Load Item",
+		filters={
+			"parent": delivery_load,
+			"delivery_order": ["is", "not set"],
+			"transport_demand": ["is", "set"],
+		},
+		pluck="transport_demand",
+		distinct=True,
+	):
+		recompute_native_demand(name)
 
 
 def _get_delivery_orders(delivery_load):

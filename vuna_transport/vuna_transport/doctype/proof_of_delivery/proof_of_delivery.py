@@ -57,6 +57,7 @@ class ProofofDelivery(Document):
 				"address",
 				"delivery_note",
 				"vuna_delivery_order",
+				"vuna_transport_demand",
 				"vuna_delivery_load",
 			],
 			as_dict=True,
@@ -64,6 +65,7 @@ class ProofofDelivery(Document):
 		if not stop or stop.parenttype != "Delivery Trip" or stop.parent != self.delivery_trip:
 			frappe.throw(_("The selected Delivery Stop does not belong to the selected Delivery Trip."))
 		self.delivery_order = stop.vuna_delivery_order
+		self.transport_demand = stop.get("vuna_transport_demand")
 		self.customer = stop.customer
 		self.delivery_address = stop.address
 		self.delivery_note = stop.delivery_note
@@ -92,6 +94,10 @@ class ProofofDelivery(Document):
 
 	def populate_item_details(self):
 		"""Populate item snapshots with one batched query instead of one query per row."""
+		from vuna_transport.services.execution.customer_reference_service import populate_native_pod
+
+		if populate_native_pod(self):
+			return
 		item_names = {item.delivery_order_item for item in self.items if item.delivery_order_item}
 		requirement_items = {}
 		if item_names:

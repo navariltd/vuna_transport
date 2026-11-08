@@ -37,8 +37,22 @@ from vuna_transport.services.routing.route_service import apply_route_defaults
 class TransportLoad(Document):
 	def validate(self):
 		_validate_source_warehouse_change(self)
+		from vuna_transport.services.planning.customer_demand_load_service import (
+			is_customer_demand_load,
+			validate_customer_allocations,
+		)
+
+		if is_customer_demand_load(self):
+			validate_customer_allocations(self, for_execution=self.docstatus == 1)
+			apply_route_defaults(self)
+			apply_delivery_load_distance_estimate(self)
+			validate_capacity(self)
+			return
 		if is_demand_load(self):
 			validate_demand_allocations(self)
+			if self.get("movement_type") == "Customer Delivery":
+				apply_route_defaults(self)
+				apply_delivery_load_distance_estimate(self)
 			validate_capacity(self)
 			return
 		apply_route_defaults(self)
@@ -51,6 +65,19 @@ class TransportLoad(Document):
 	def before_submit(self):
 		if not self.source_warehouse:
 			frappe.throw(_("Select a Source Warehouse before submitting this Transport Load."))
+		from vuna_transport.services.planning.customer_demand_load_service import is_customer_demand_load
+
+		if is_customer_demand_load(self):
+			from vuna_transport.services.planning.customer_demand_load_service import (
+				validate_customer_allocations,
+			)
+
+			validate_customer_allocations(self)
+			validate_capacity(self)
+			if not self.required_vehicle_category:
+				self.required_vehicle_category = recommend_vehicle_category(self)
+			self.status = "Approved"
+			return
 		if is_demand_load(self):
 			validate_demand_allocations(self)
 			validate_capacity(self)

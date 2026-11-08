@@ -29,6 +29,7 @@
     "sales_invoice",
     "column_break_source",
     "delivery_order",
+    "transport_demand",
     "delivery_trip",
     "proof_of_delivery",
     "delivery_address",
@@ -215,10 +216,12 @@
     },
     {
       "fieldname": "delivery_order",
-      "fieldtype": "Link",
-      "label": "Delivery Order",
-      "options": "Delivery Order",
-      "read_only": 1
+      "fieldtype": "Data",
+      "label": "Legacy Delivery Order",
+      "read_only": 1,
+      "depends_on": "eval:doc.delivery_order",
+      "hidden": 1,
+      "in_list_view": 0
     },
     {
       "fieldname": "delivery_trip",
@@ -390,8 +393,8 @@
       "fieldname": "replacement_delivery_reference",
       "fieldtype": "Link",
       "hidden": 1,
-      "label": "Replacement / Follow-up Delivery Order",
-      "options": "Delivery Order"
+      "label": "Replacement / Follow-up Transport Demand",
+      "options": "Transport Demand"
     },
     {
       "default": "0",
@@ -484,6 +487,16 @@
     {
       "fieldname": "section_break_mgma",
       "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "transport_demand",
+      "fieldtype": "Link",
+      "label": "Transport Demand",
+      "options": "Transport Demand",
+      "hidden": 0,
+      "read_only": 1,
+      "no_copy": 1,
+      "depends_on": "eval:doc.transport_demand && !doc.delivery_order"
     }
   ],
   "grid_page_length": 50,

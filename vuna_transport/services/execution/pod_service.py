@@ -52,6 +52,9 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 	pod.delivery_stop = stop.name
 	pod.delivery_load = delivery_note.vuna_delivery_load
 	pod.delivery_order = stop.vuna_delivery_order or delivery_note.vuna_delivery_order
+	pod.transport_demand = getattr(stop, "vuna_transport_demand", None) or delivery_note.get(
+		"vuna_transport_demand"
+	)
 	pod.delivery_note = delivery_note.name
 	pod.customer = stop.customer
 	pod.delivery_address = stop.address
@@ -63,12 +66,28 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 	if rebuild:
 		pod.set("items", [])
 		for delivery_item in delivery_note.items:
-			delivery_order_item = frappe.db.get_value(
-				"Delivery Order Item",
-				{
-					"parent": pod.delivery_order,
-					"sales_order_item": delivery_item.so_detail,
-				},
+			load_item = (
+				frappe.db.get_value(
+					"Transport Load Item",
+					delivery_item.get("vuna_delivery_load_order"),
+					["transport_demand_item", "delivery_order_item"],
+					as_dict=True,
+				)
+				if delivery_item.get("vuna_delivery_load_order")
+				else None
+			)
+			delivery_order_item = (
+				load_item.delivery_order_item
+				if load_item
+				else frappe.db.get_value(
+					"Delivery Order Item",
+					{
+						"parent": pod.delivery_order,
+						"sales_order_item": delivery_item.so_detail,
+					},
+				)
+				if pod.delivery_order
+				else None
 			)
 			ordered_qty = flt(delivery_item.qty)
 			pod.append(
@@ -77,6 +96,9 @@ def create_proof_of_delivery(delivery_trip, delivery_stop):
 					"item_code": delivery_item.item_code,
 					"item_name": delivery_item.item_name,
 					"delivery_order_item": delivery_order_item,
+					"transport_demand_item": load_item.transport_demand_item
+					if load_item and not load_item.delivery_order_item
+					else None,
 					"delivery_note_item": delivery_item.name,
 					"ordered_qty": ordered_qty,
 					"delivered_qty": ordered_qty,
@@ -169,6 +191,9 @@ def update_delivery_stop_from_pod(pod, status):
 	recompute_delivery_load_completion(pod.delivery_load, pod.delivery_trip)
 	if pod.delivery_order:
 		recompute_delivery_order_status(pod.delivery_order)
+	from vuna_transport.services.execution.customer_reference_service import recompute_pod_demands
+
+	recompute_pod_demands(pod)
 
 
 def reset_delivery_stop_from_pod(pod):
@@ -193,9 +218,16 @@ def reset_delivery_stop_from_pod(pod):
 		pod.delivery_load,
 		"Dispatched",
 		_("Proof of Delivery {0} cancelled").format(pod.name),
+		force=any(
+			getattr(row, "transport_demand_item", None) and not getattr(row, "delivery_order_item", None)
+			for row in pod.items
+		),
 	)
 	if pod.delivery_order:
 		recompute_delivery_order_status(pod.delivery_order)
+	from vuna_transport.services.execution.customer_reference_service import recompute_pod_demands
+
+	recompute_pod_demands(pod)
 
 
 def prepare_pod_cancellation(pod):

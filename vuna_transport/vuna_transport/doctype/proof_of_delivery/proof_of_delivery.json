@@ -39,6 +39,7 @@
     "column_break_eehr",
     "delivery_stop",
     "delivery_order",
+    "transport_demand",
     "delivery_note",
     "return_request",
     "recipient_section",
@@ -295,10 +296,12 @@
     },
     {
       "fieldname": "delivery_order",
-      "fieldtype": "Link",
-      "label": "Delivery Order",
-      "options": "Delivery Order",
-      "read_only": 1
+      "fieldtype": "Data",
+      "label": "Legacy Delivery Order",
+      "read_only": 1,
+      "depends_on": "eval:doc.delivery_order",
+      "hidden": 1,
+      "in_list_view": 0
     },
     {
       "fieldname": "delivery_note",
@@ -438,6 +441,16 @@
     {
       "fieldname": "section_break_kaie",
       "fieldtype": "Section Break"
+    },
+    {
+      "fieldname": "transport_demand",
+      "fieldtype": "Link",
+      "label": "Transport Demand",
+      "options": "Transport Demand",
+      "hidden": 0,
+      "read_only": 1,
+      "no_copy": 1,
+      "depends_on": "eval:doc.transport_demand && !doc.delivery_order"
     }
   ],
   "grid_page_length": 50,
@@ -456,7 +469,13 @@
   "naming_rule": "By \"Naming Series\" field",
   "owner": "Administrator",
   "permissions": [
-    { "role": "Stock User", "read": 1, "write": 1, "create": 1, "submit": 1 },
+    {
+      "role": "Stock User",
+      "read": 1,
+      "write": 1,
+      "create": 1,
+      "submit": 1
+    },
     {
       "role": "Stock Manager",
       "read": 1,
