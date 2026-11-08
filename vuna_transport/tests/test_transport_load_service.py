@@ -6,10 +6,59 @@ from unittest.mock import MagicMock, patch
 import frappe
 from frappe.utils import flt
 
-from vuna_transport.services.planning.transport_load_service import validate_demand_allocations
+from vuna_transport.services.planning.transport_load_service import (
+	get_transfer_load_items,
+	validate_demand_allocations,
+)
 
 
 class TestTransportLoadAllocations(unittest.TestCase):
+	def dialog_items(self):
+		self.demand.name = "TD-1"
+		self.demand.get.return_value = False
+		with patch(
+			"vuna_transport.services.planning.transport_load_service.require_doctype_permission"
+		) as permission:
+			rows = get_transfer_load_items("TD-1")
+			permission.assert_called_once_with("Transport Load", "create")
+		return rows
+
+	def test_transfer_dialog_uses_requested_uom_and_only_unallocated_balance(self):
+		self.item.conversion_factor = 10
+		self.item.transaction_uom = "Carton"
+		self.commitments.return_value = {"TDI-1": 20}
+		rows = self.dialog_items()
+		self.assertEqual(len(rows), 1)
+		self.assertEqual(rows[0]["transport_demand_item"], "TDI-1")
+		self.assertEqual(rows[0]["uom"], "Carton")
+		self.assertEqual(rows[0]["available_quantity"], 8)
+		self.assertEqual(rows[0]["allocated_quantity"], 8)
+		self.demand.check_permission.assert_called_with("read")
+
+	def test_transfer_dialog_reconciles_posted_stock_without_double_subtraction(self):
+		self.item.conversion_factor = 10
+		self.item.transaction_uom = "Carton"
+		self.commitments.return_value = {"TDI-1": 20}
+		self.legs.return_value[0]["items"][0]["stock_qty"] = 80
+		with patch(
+			"vuna_transport.services.planning.transport_load_service.get_posted_transfer_quantities",
+			return_value={"TDI-1": 20},
+		):
+			self.assertEqual(self.dialog_items()[0]["available_quantity"], 8)
+
+	def test_transfer_dialog_omits_exhausted_source_rows(self):
+		self.legs.return_value = []
+		self.assertEqual(self.dialog_items(), [])
+
+	def test_transfer_dialog_rejects_closed_demand_and_invalid_uom_factor(self):
+		self.demand.status = "Closed"
+		with self.assertRaises(ValueError):
+			self.dialog_items()
+		self.demand.status = "Open"
+		self.item.conversion_factor = 0
+		with self.assertRaises(ValueError):
+			self.dialog_items()
+
 	def setUp(self):
 		self.enterContext(
 			patch(

@@ -304,6 +304,50 @@ def bundle_transport_demands(demand_names: list | str, source_warehouse: str | N
 
 
 @frappe.whitelist()
+def get_transfer_load_items(transport_demand: str) -> list:
+	"""Read live unallocated transfer quantities in the original requested UOM."""
+	require_doctype_permission("Transport Load", "create")
+	demand = frappe.get_doc("Transport Demand", transport_demand)
+	demand.check_permission("read")
+	require_company_access(demand.company)
+	if (
+		demand.docstatus != 1
+		or demand.movement_type != "Warehouse Transfer"
+		or demand.status in ("Closed", "Cancelled")
+		or demand.get("migration_archived")
+	):
+		frappe.throw(_("Select an open, submitted warehouse-transfer Transport Demand."))
+	source = frappe.get_doc(demand.source_document_type, demand.source_document)
+	source.check_permission("read")
+	leg = next((leg for leg in build_source_legs(source) if leg["source_key"] == demand.source_key), None)
+	live = {item["source_item"]: item["stock_qty"] for item in (leg or {}).get("items", [])}
+	committed = get_committed_quantities([item.name for item in demand.items])
+	posted = get_posted_transfer_quantities([item.name for item in demand.items])
+	rows = []
+	for item in demand.items:
+		available = available_stock_quantity(
+			item.stock_qty, live.get(item.source_item), committed.get(item.name), posted.get(item.name)
+		)
+		if available <= 0:
+			continue
+		factor = flt(item.conversion_factor)
+		if not math.isfinite(factor) or factor <= 0:
+			frappe.throw(_("The requested UOM requires a positive conversion factor."))
+		rows.append(
+			{
+				"transport_demand": demand.name,
+				"transport_demand_item": item.name,
+				"item_code": item.item_code,
+				"item_name": frappe.get_cached_value("Item", item.item_code, "item_name"),
+				"available_quantity": available / factor,
+				"allocated_quantity": available / factor,
+				"uom": item.transaction_uom,
+			}
+		)
+	return rows
+
+
+@frappe.whitelist()
 def get_transfer_planning_items(
 	company: str,
 	source_warehouse: str | None = None,

@@ -19,17 +19,13 @@ frappe.ui.form.on("Transport Demand", {
 			frm.doc.source_document_type === "Sales Order" &&
 			!["Closed", "Cancelled", "Delivered"].includes(frm.doc.status)
 		) {
-			frm.add_custom_button(
-				__("Transport Load"),
-				() => open_customer_load_dialog(frm),
-				__("Create")
-			);
+			frm.add_custom_button(__("Transport Load"), () => open_load_dialog(frm), __("Create"));
 		}
 		if (frm.doc.docstatus === 1 && frm.doc.movement_type === "Supplier Pickup") {
 			if (frm.doc.__onload?.supplier_requires_planning) {
 				frm.add_custom_button(
 					__("Transport Load"),
-					() => open_customer_load_dialog(frm),
+					() => open_load_dialog(frm),
 					__("Create")
 				);
 			} else
@@ -62,31 +58,33 @@ frappe.ui.form.on("Transport Demand", {
 					);
 				});
 		}
-		if (frm.doc.docstatus === 1 && frm.doc.movement_type === "Warehouse Transfer") {
-			frm.add_custom_button(
-				__("Transport Load"),
-				async () => {
-					const response = await frm.call("create_load");
-					if (response.message)
-						frappe.set_route("Form", "Transport Load", response.message);
-				},
-				__("Create")
-			);
+		if (
+			frm.doc.docstatus === 1 &&
+			frm.doc.movement_type === "Warehouse Transfer" &&
+			!["Closed", "Cancelled"].includes(frm.doc.status)
+		) {
+			frm.add_custom_button(__("Transport Load"), () => open_load_dialog(frm), __("Create"));
 		}
 	},
 });
 
-async function open_customer_load_dialog(frm) {
+async function open_load_dialog(frm) {
 	const { message: items } = await frappe.call({
 		method:
 			frm.doc.movement_type === "Supplier Pickup"
 				? "vuna_transport.services.planning.supplier_load_service.get_load_items"
+				: frm.doc.movement_type === "Warehouse Transfer"
+				? "vuna_transport.services.planning.transport_load_service.get_transfer_load_items"
 				: "vuna_transport.services.planning.customer_demand_load_service.get_load_items",
 		args: { transport_demand: frm.doc.name },
 		freeze: true,
 	});
 	if (!items?.length) return frappe.msgprint(__("No unallocated items remain."));
-	const data = items.map((row) => ({ ...row, __checked: 1 }));
+	const data = items.map((row) => ({
+		...row,
+		allocated_quantity: row.available_quantity,
+		__checked: 1,
+	}));
 	const dialog = new frappe.ui.Dialog({
 		title: __("Create Transport Load"),
 		size: "large",
@@ -157,20 +155,25 @@ async function open_customer_load_dialog(frm) {
 					__("Enter a positive quantity no greater than the available quantity.")
 				);
 			}
-			const { message: load } = await frappe.call({
-				method: "vuna_transport.services.planning.transport_load_service.create_transport_load_from_demands",
-				args: {
-					allocations: selected.map((r) => ({
-						transport_demand: r.transport_demand,
-						transport_demand_item: r.transport_demand_item,
-						allocated_quantity: flt(r.allocated_quantity),
-					})),
-				},
-				freeze: true,
-			});
-			if (load) {
-				dialog.hide();
-				frappe.set_route("Form", "Transport Load", load);
+			dialog.disable_primary_action();
+			try {
+				const { message: load } = await frappe.call({
+					method: "vuna_transport.services.planning.transport_load_service.create_transport_load_from_demands",
+					args: {
+						allocations: selected.map((r) => ({
+							transport_demand: r.transport_demand,
+							transport_demand_item: r.transport_demand_item,
+							allocated_quantity: flt(r.allocated_quantity),
+						})),
+					},
+					freeze: true,
+				});
+				if (load) {
+					dialog.hide();
+					frappe.set_route("Form", "Transport Load", load);
+				}
+			} finally {
+				dialog.enable_primary_action();
 			}
 		},
 	});
