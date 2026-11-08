@@ -6,14 +6,14 @@ from frappe import _
 def get_data(data):
 	data["non_standard_fieldnames"].update(
 		{
-			"Delivery Order": "sales_order",
+			"Transport Demand": "sales_order",
 			"Transport Load": "sales_order",
 		}
 	)
 	data["transactions"].append(
 		{
 			"label": _("Transport Fulfillment"),
-			"items": ["Delivery Order", "Transport Load"],
+			"items": ["Transport Demand", "Transport Load"],
 		}
 	)
 	return data

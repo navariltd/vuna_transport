@@ -20,6 +20,12 @@ class TransportDemand(Document):
 		)
 
 		committed = get_committed_quantities([row.name for row in self.items])
+		if self.movement_type == "Customer Delivery":
+			from vuna_transport.services.planning.customer_demand_load_service import get_load_items
+
+			return create_transport_load_from_demands(
+				get_load_items(self.name), source_warehouse=source_warehouse
+			)
 		return create_transport_load_from_demands(
 			[
 				{

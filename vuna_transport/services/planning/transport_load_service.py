@@ -12,6 +12,10 @@ from vuna_transport.services.shared.security_service import require_company_acce
 
 
 def is_demand_load(load):
+	# Native customer demands use standard customer delivery execution, never
+	# warehouse-transfer tasks or Add/End Transit posting.
+	if getattr(load, "movement_type", None) == "Customer Delivery":
+		return False
 	return any(
 		getattr(row, "transport_demand", None) and not getattr(row, "delivery_order", None)
 		for row in load.delivery_orders
@@ -87,11 +91,39 @@ def validate_demand_allocations(load):
 	)
 	if not names or any(not row.get("transport_demand") for row in load.delivery_orders):
 		frappe.throw(_("Do not mix legacy Delivery Order rows and Transport Demand rows in one load."))
+	# Native customer planning uses SO -> demand lock order, matching source
+	# generation/quantity refresh. Do not take the generic demand lock first.
+	kinds = frappe.get_all(
+		"Transport Demand",
+		filters={"name": ["in", names]},
+		fields=["name", "movement_type", "source_document_type"],
+	)
+	if len(kinds) == len(names) and all(
+		d.movement_type == "Customer Delivery" and d.source_document_type == "Sales Order" for d in kinds
+	):
+		from vuna_transport.services.planning.customer_demand_load_service import (
+			validate_customer_allocations,
+		)
+
+		return validate_customer_allocations(load)
 	frappe.db.sql(
 		"select name from `tabTransport Demand` where name in %(names)s order by name for update",
 		{"names": tuple(names)},
 	)
 	demands = {name: frappe.get_doc("Transport Demand", name) for name in names}
+	if all(d.movement_type == "Customer Delivery" for d in demands.values()):
+		from vuna_transport.services.planning.customer_demand_load_service import (
+			validate_customer_allocations,
+		)
+
+		return validate_customer_allocations(load)
+	if any(d.movement_type == "Customer Delivery" for d in demands.values()):
+		frappe.throw(
+			_(
+				"Keep customer deliveries and warehouse transfers in separate loads; they may share an allocation."
+			)
+		)
+	load.movement_type = "Warehouse Transfer"
 	return_sources = {d.source_document_type == "Return Request" for d in demands.values()}
 	if len(return_sources) > 1:
 		frappe.throw(
@@ -211,6 +243,7 @@ def create_transport_load_from_demands(allocations: list | str, source_warehouse
 	first.check_permission("read")
 	load = frappe.new_doc("Transport Load")
 	load.company = first.company
+	load.movement_type = first.movement_type
 	load.source_warehouse = source_warehouse or first.source_warehouse
 	load.dispatch_date = first.required_date
 	load.status = "Proposed"
@@ -238,6 +271,11 @@ def bundle_transport_demands(demand_names: list | str, source_warehouse: str | N
 		demand = frappe.get_doc("Transport Demand", name)
 		demand.check_permission("read")
 		require_company_access(demand.company)
+		if demand.movement_type == "Customer Delivery":
+			from vuna_transport.services.planning.customer_demand_load_service import get_load_items
+
+			allocations.extend(get_load_items(demand.name))
+			continue
 		committed = get_committed_quantities([item.name for item in demand.items])
 		for item in demand.items:
 			quantity = (flt(item.stock_qty) - flt(committed.get(item.name))) / flt(item.conversion_factor)

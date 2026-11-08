@@ -13,6 +13,24 @@ from vuna_transport.vuna_transport.doctype.transport_settings.transport_settings
 
 
 class TestSourcePolicy(unittest.TestCase):
+	@patch(
+		"vuna_transport.services.demand.sales_transport_demand_service.create_sales_demands",
+		return_value=["TD-NATIVE"],
+	)
+	@patch("vuna_transport.services.demand.delivery_order_service.create_delivery_orders_for_sales_order")
+	def test_automatic_sales_generation_uses_native_demand_not_delivery_order(self, legacy, native):
+		self.configure()
+		row = self.settings.demand_sources[0]
+		row.source_document_type, row.creation_mode = "Sales Order", "Automatic"
+		source = frappe._dict(doctype="Sales Order", name="SO-1", docstatus=1)
+		with patch(
+			"vuna_transport.services.demand.sales_transport_demand_service.native_customer_demand_enabled",
+			return_value=True,
+		):
+			self.assertEqual(automatically_create_from_source(source), ["TD-NATIVE"])
+		native.assert_called_once_with(source, automated=True)
+		legacy.assert_not_called()
+
 	def setUp(self):
 		self.framework = self.enterContext(
 			patch("vuna_transport.services.demand.source_policy_service.frappe")

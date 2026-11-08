@@ -16,6 +16,14 @@ PLANNABLE_DELIVERY_ORDER_STATUSES = ("Open", "Partially Allocated")
 
 def validate_load_allocations(load, lock=True, for_execution=False):
 	"""Validate and rebuild every load row from authoritative Delivery Order data."""
+	from vuna_transport.services.execution.customer_reference_service import native_load
+
+	if native_load(load):
+		from vuna_transport.services.planning.customer_demand_load_service import (
+			validate_customer_allocations,
+		)
+
+		return validate_customer_allocations(load, for_execution=for_execution)
 	if not load.delivery_orders:
 		frappe.throw(_("At least one Delivery Order is required."))
 
