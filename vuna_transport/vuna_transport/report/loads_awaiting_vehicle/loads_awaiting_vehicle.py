@@ -42,7 +42,7 @@ def execute(filters=None):
 			"status",
 		],
 		order_by="dispatch_date, creation",
-		limit_page_length=500,
+		limit=500,
 	)
 	rows = [
 		row

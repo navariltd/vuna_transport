@@ -18,6 +18,11 @@ from vuna_transport.vuna_transport.report.loads_awaiting_vehicle import loads_aw
 
 
 class TestSemgrepBoundaries(unittest.TestCase):
+	def setUp(self):
+		# Keep translation-cache database reads outside query-boundary assertions.
+		for report in (loads_awaiting_vehicle, dispatch_readiness, delivery_notes_pending_submission):
+			self.enterContext(patch.object(report, "_", side_effect=lambda value: value))
+
 	def test_search_api_preserves_json_filters_and_coerces_pagination(self):
 		function = inspect.unwrap(get_delivery_loads_for_allocation)
 		_, values = transform_parameter_types(
@@ -96,10 +101,39 @@ class TestSemgrepBoundaries(unittest.TestCase):
 			self.assertEqual(sql.call_args.args[1], {"company": "Example", "delivery_load": "TL-1"})
 
 	def test_awaiting_vehicle_report_cannot_override_fixed_scope(self):
-		with patch.object(frappe, "get_all", return_value=[]) as query:
-			loads_awaiting_vehicle.execute({"company": "Example", "status": "Open", "docstatus": 0})
+		with (
+			patch.object(frappe, "get_list", return_value=[]) as query,
+			patch.object(frappe, "get_all") as unrestricted_query,
+		):
+			loads_awaiting_vehicle.execute(
+				{
+					"company": "Example",
+					"status": "Open",
+					"docstatus": 0,
+					"active_vehicle_allocation": ["is", "set"],
+					"ignore_permissions": True,
+					"limit": 10000,
+				}
+			)
+			self.assertEqual(query.call_args.args, ("Transport Load",))
 			self.assertEqual(
 				query.call_args.kwargs["filters"],
-				{"company": "Example", "status": "Awaiting Vehicle", "docstatus": 1},
+				{
+					"company": "Example",
+					"status": ["in", ["Approved", "Awaiting Vehicle"]],
+					"docstatus": 1,
+					"active_vehicle_allocation": ["is", "not set"],
+				},
 			)
-			self.assertEqual(query.call_args.kwargs["limit_page_length"], 500)
+			self.assertEqual(query.call_args.kwargs["limit"], 500)
+			self.assertFalse(query.call_args.kwargs.get("ignore_permissions", False))
+			unrestricted_query.assert_not_called()
+
+	def test_awaiting_vehicle_report_does_not_bypass_permission_denials(self):
+		with (
+			patch.object(frappe, "get_list", side_effect=frappe.PermissionError),
+			patch.object(frappe, "get_all") as unrestricted_query,
+			self.assertRaises(frappe.PermissionError),
+		):
+			loads_awaiting_vehicle.execute({"company": "Example"})
+		unrestricted_query.assert_not_called()

@@ -443,6 +443,9 @@ class TestMovementCostPreview(TestCase):
 
 
 class TestMovementPendingLoadsReport(TestCase):
+	def setUp(self):
+		self.enterContext(patch.object(pending_loads, "_", side_effect=lambda value: value))
+
 	def test_methods_that_bypass_allocation_are_not_reported_as_waiting(self):
 		rows = [
 			frappe._dict(name="Pickup", delivery_method="Planned"),
@@ -475,5 +478,6 @@ class TestMovementPendingLoadsReport(TestCase):
 		self.assertEqual(conditions["movement_type"], "Supplier Pickup")
 		self.assertEqual(conditions["source_address"], "Supplier")
 		self.assertIn("source_address", get_list.call_args.kwargs["fields"])
+		self.assertEqual(get_list.call_args.kwargs["limit"], 500)
 		self.assertTrue(any(row["fieldname"] == "source_address" for row in columns))
 		get_all.assert_not_called()
