@@ -48,11 +48,13 @@ class TestCustomerPlanningScreens(unittest.TestCase):
 			with (
 				patch.dict(frappe.conf, {"customer_demand_cutover": mode}),
 				patch.object(frappe.db, "exists", return_value=True),
+				patch.object(frappe.db, "get_single_value", return_value=1),
 				patch.object(planner, "require_doctype_permission"),
 			):
 				context = planner.get_customer_planning_context()
 				self.assertEqual(context["doctype"], target)
 				self.assertEqual(context["order_field"], parent)
+				self.assertTrue(context["costing_enabled"])
 				self.assertEqual(
 					source.field("delivery_address"), "destination_address" if mode else "delivery_address"
 				)
