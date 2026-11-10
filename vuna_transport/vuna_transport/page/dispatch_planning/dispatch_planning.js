@@ -1114,9 +1114,12 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			});
 			if (request_id !== this.cost_request_id) return;
 			const candidates = response?.cost_structures || [];
+			const warning_html = (response?.warnings || [])
+				.map((warning) => `<div class="text-warning small">${this.escape(warning)}</div>`)
+				.join("");
 			$target.html(
 				candidates.length
-					? `<div class="small text-muted">${__(
+					? `${warning_html}<div class="small text-muted">${__(
 							"Applicable Cost Structures ranked by estimated cost"
 					  )}</div>${candidates
 							.map(

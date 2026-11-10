@@ -185,6 +185,15 @@ frappe.ui.form.on("Transport Load", {
 		}
 
 		render_capacity_summary(frm);
+		if (
+			customer_context.costing_enabled &&
+			frm.doc.docstatus !== 2 &&
+			frappe.model.can_read("Transport Cost Structure")
+		) {
+			frm.add_custom_button(__("Estimate Costs"), () =>
+				show_transport_load_cost_estimates(frm)
+			);
+		}
 		frm.trigger("load_execution_progress");
 	},
 
@@ -270,6 +279,65 @@ frappe.ui.form.on("Transport Load", {
 		}
 	},
 });
+
+async function show_transport_load_cost_estimates(frm) {
+	if (frm.is_dirty()) {
+		frappe.msgprint(__("Save the Transport Load before estimating costs."));
+		return;
+	}
+	const { message } = await frappe.call({
+		method: "vuna_transport.services.planning.dispatch_planning_service.get_transport_load_cost_estimates",
+		args: { transport_load: frm.doc.name },
+		freeze: true,
+	});
+	if (!message) return;
+	const escape = (value) => frappe.utils.escape_html(String(value ?? ""));
+	const estimates = message.cost_structures || [];
+	const warnings = (values) =>
+		(values || []).map((value) => `<div class="text-warning">${escape(value)}</div>`).join("");
+	const rows = estimates
+		.map((row) => {
+			const details = (row.cost_breakdown || [])
+				.map((component) => `<li>${escape(component.explanation)}</li>`)
+				.join("");
+			const amount = row.cost_structure_assignment
+				? `${escape(
+						frappe.format(row.estimated_full_cost, { fieldtype: "Float" })
+				  )} ${escape(row.currency)}`
+				: escape(__("Not estimated"));
+			return `<tr><td>${escape(row.cost_structure_label || row.cost_structure)}</td>
+			<td>${escape(row.cost_structure_assignment || __("No applicable assignment"))}</td>
+			<td>${escape(frappe.format(row.estimated_distance, { fieldtype: "Float" }))} ${escape(
+				row.distance_uom
+			)}</td>
+			<td>${amount}</td><td>${warnings(row.warnings)}${
+				details
+					? `<details><summary>${escape(
+							__("Breakdown")
+					  )}</summary><ul>${details}</ul></details>`
+					: ""
+			}</td></tr>`;
+		})
+		.join("");
+	const headings = ["Cost Structure", "Assignment", "Distance", "Estimate", "Details"]
+		.map((value) => `<th>${escape(__(value))}</th>`)
+		.join("");
+	new frappe.ui.Dialog({
+		title: __("Transport Cost Estimates"),
+		size: "extra-large",
+		fields: [
+			{
+				fieldname: "estimates",
+				fieldtype: "HTML",
+				options:
+					warnings(message.warnings) +
+					(rows
+						? `<div class="table-responsive"><table class="table"><thead><tr>${headings}</tr></thead><tbody>${rows}</tbody></table></div>`
+						: `<p>${escape(__("No applicable Cost Structures found."))}</p>`),
+			},
+		],
+	}).show();
+}
 
 function add_execution_actions(frm, summary) {
 	const action = summary.next_action;
