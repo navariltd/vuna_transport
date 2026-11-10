@@ -61,7 +61,12 @@ def get_customer_planning_context() -> dict:
 	"""Use server-selected DocType metadata and canonical allocation fields."""
 	require_doctype_permission("Transport Load", "read")
 	parent, item = source.allocation_fields()
-	return {"doctype": source.doctype(), "order_field": parent, "item_field": item}
+	return {
+		"doctype": source.doctype(),
+		"order_field": parent,
+		"item_field": item,
+		"costing_enabled": bool(frappe.db.get_single_value("Transport Settings", "enable_transport_costing")),
+	}
 
 
 @frappe.whitelist()
@@ -289,7 +294,7 @@ def create_delivery_load_from_plan(
 
 
 @frappe.whitelist()
-def get_fleet_availability_summary(company, from_time, to_time):
+def get_fleet_availability_summary(company: str, from_time: str, to_time: str):
 	require_doctype_permission("Vehicle", "read")
 	require_company_access(company)
 	results = _permitted_vehicle_availability(company, from_time, to_time)
@@ -302,7 +307,7 @@ def get_fleet_availability_summary(company, from_time, to_time):
 
 
 @frappe.whitelist()
-def get_vehicle_availability_details(company, vehicle_category, from_time, to_time):
+def get_vehicle_availability_details(company: str, vehicle_category: str, from_time: str, to_time: str):
 	require_doctype_permission("Vehicle", "read")
 	require_company_access(company)
 	results = _permitted_vehicle_availability(company, from_time, to_time, vehicle_category)
@@ -366,8 +371,25 @@ def get_costed_vehicle_candidates(
 				"warnings": estimate.get("warnings", []),
 			}
 		)
+	return _rank_costed_vehicles(candidates)
+
+
+def _rank_costed_vehicles(candidates):
+	currencies = {row.get("currency") for row in candidates if row.get("currency")}
+	if len(currencies) > 1:
+		for row in candidates:
+			row.setdefault("warnings", []).append(
+				_("Vehicle estimates use different currencies. Compare costs within the same currency only.")
+			)
 	return sorted(
-		candidates, key=lambda row: (row["marginal_cost"] is None, row["marginal_cost"], row["vehicle"])
+		candidates,
+		key=lambda row: (
+			not bool(row.get("cost_structure_assignment")),
+			row.get("currency") or "",
+			row["marginal_cost"] is None,
+			row["marginal_cost"],
+			row["vehicle"],
+		),
 	)
 
 
@@ -383,6 +405,23 @@ def get_cost_structure_estimates(
 	)
 	validate_load_allocations(load, lock=False)
 	calculate_load_totals(load)
+	return _cost_structure_estimates_for_load(load, vehicle_category)
+
+
+@frappe.whitelist()
+def get_transport_load_cost_estimates(transport_load: str) -> dict:
+	"""Preview any saved movement type without reserving cargo or changing the load."""
+	require_doctype_permission("Transport Cost Structure", "read")
+	load = frappe.get_doc("Transport Load", transport_load)
+	require_document_permission(load, "read")
+	require_company_access(load.company)
+	if not frappe.db.get_single_value("Transport Settings", "enable_transport_costing"):
+		frappe.throw(_("Enable Transport Costing in Transport Settings before estimating costs."))
+	return _cost_structure_estimates_for_load(load, load.required_vehicle_category)
+
+
+def _cost_structure_estimates_for_load(load, vehicle_category=None):
+	"""Share rate selection and explanations across planning and saved-load previews."""
 	structures = frappe.get_all(
 		"Transport Cost Structure",
 		filters={"disabled": 0, "docstatus": 1},
@@ -417,17 +456,22 @@ def get_cost_structure_estimates(
 	available = [row for row in results if row["cost_structure_assignment"] and not row["warnings"]]
 	if not available:
 		available = [row for row in results if row["cost_structure_assignment"]]
-	if available:
+	currencies = {row["currency"] for row in results if row["currency"]}
+	if available and len(currencies) == 1:
 		recommended = min(available, key=lambda row: (row["estimated_full_cost"], row["cost_structure"]))
 		for row in results:
 			row["recommended"] = row["cost_structure"] == recommended["cost_structure"]
 	return {
 		"distance": getattr(load, "estimated_distance", None),
-		"distance_uom": getattr(load, "distance_uom", None),
+		"distance_uom": results[0].get("distance_uom") if results else None,
+		"warnings": [_("Estimates use different currencies. Compare amounts within the same currency only.")]
+		if len(currencies) > 1
+		else [],
 		"cost_structures": sorted(
 			results,
 			key=lambda row: (
 				not bool(row["cost_structure_assignment"]),
+				row["currency"] or "",
 				row["estimated_full_cost"],
 				row["cost_structure"],
 			),
@@ -436,7 +480,7 @@ def get_cost_structure_estimates(
 
 
 @frappe.whitelist()
-def get_driver_availability_summary(company, from_time, to_time):
+def get_driver_availability_summary(company: str, from_time: str, to_time: str):
 	require_doctype_permission("Driver", "read")
 	require_company_access(company)
 	results = _permitted_driver_availability(from_time, to_time, company)
@@ -454,7 +498,7 @@ def get_driver_availability_summary(company, from_time, to_time):
 
 
 @frappe.whitelist()
-def get_driver_availability_details(company, from_time, to_time):
+def get_driver_availability_details(company: str, from_time: str, to_time: str):
 	require_doctype_permission("Driver", "read")
 	require_company_access(company)
 	return list(_permitted_driver_availability(from_time, to_time, company).values())

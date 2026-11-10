@@ -52,7 +52,7 @@ class TransportLoad(Document):
 			validate_demand_allocations(self)
 			if self.get("movement_type") == "Customer Delivery":
 				apply_route_defaults(self)
-				apply_delivery_load_distance_estimate(self)
+			apply_delivery_load_distance_estimate(self)
 			validate_capacity(self)
 			return
 		apply_route_defaults(self)
