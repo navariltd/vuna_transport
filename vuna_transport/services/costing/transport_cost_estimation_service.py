@@ -9,7 +9,7 @@ from frappe.model.document import Document
 from frappe.utils import flt, getdate, nowdate
 
 from vuna_transport.services.routing.distance_estimation_service import estimate_delivery_load_distance
-from vuna_transport.services.routing.location_service import get_address_planning_data
+from vuna_transport.services.routing.load_location_service import get_load_planning_locations
 from vuna_transport.services.shared.measurement_service import convert_measurement, get_transport_uoms
 from vuna_transport.services.shared.security_service import (
 	require_company_access,
@@ -30,6 +30,7 @@ class CostContext:
 	destinations: list[str]
 	destination_geographies: list[object] | None = None
 	source_warehouse: str | None = None
+	planning_warnings: list[str] | None = None
 
 
 @frappe.whitelist()
@@ -124,6 +125,14 @@ def get_applicable_cost_structure_assignment(vehicle, company, date=None):
 	candidates = []
 	for profile in profiles:
 		if not _profile_is_active(profile, company, date):
+			continue
+		# Scope restrictions remain restrictions even when another field matches.
+		# A different vehicle/supplier must not fall back to a category match.
+		if profile.vehicle and profile.vehicle != vehicle.name:
+			continue
+		if profile.supplier and profile.supplier != supplier:
+			continue
+		if profile.vehicle_category and profile.vehicle_category != vehicle_category:
 			continue
 		if profile.vehicle and profile.vehicle == vehicle.name:
 			precedence = 4
@@ -259,7 +268,21 @@ def estimate_transport_cost_for_loads(delivery_loads, vehicle):
 	if len(assignments) > 1:
 		warnings.append(_("Attached loads resolved to different Cost Structure Assignments."))
 	if len(currencies) > 1:
-		warnings.append(_("Attached loads resolved to different currencies."))
+		frappe.throw(
+			_(
+				"Attached loads use different cost currencies. Configure one currency before combining estimates."
+			)
+		)
+	if len(load_documents) > 1 and any(
+		component.get("basis") == "Flat Per Trip"
+		for result in results
+		for component in result.get("components", [])
+	):
+		warnings.append(
+			_(
+				"Flat Per Trip charges are estimated per load. Review shared-trip charges before using the combined total."
+			)
+		)
 
 	components = []
 	for load, result in zip(load_documents, results, strict=False):
@@ -274,7 +297,12 @@ def estimate_transport_cost_for_loads(delivery_loads, vehicle):
 		"cost_structure": next(iter(structures), None) if len(structures) == 1 else None,
 		"cost_structure_assignment": next(iter(assignments), None) if len(assignments) == 1 else None,
 		"currency": next(iter(currencies), None) if len(currencies) == 1 else None,
-		"distance": sum(flt(result.get("distance")) for result in results),
+		"distance": sum(
+			_distance_in_rate_uom(
+				result.get("distance"), result.get("distance_uom"), results[0].get("distance_uom")
+			)
+			for result in results
+		),
 		"distance_uom": results[0].get("distance_uom"),
 		"distance_source": "Estimated" if len(load_documents) > 1 else results[0].get("distance_source"),
 		"components": components,
@@ -317,10 +345,17 @@ def estimate_cost_component(component, context, profile=None):
 		warnings.append(_("Monthly Fixed cost is reported separately and is not included in marginal cost."))
 		explanation = _explanation(component, amount)
 	elif basis == "Destination Rate":
-		amount = _destination_rate(component, context, profile)
+		rate_amount = _resolve_destination_rate(context, profile)
+		amount = flt(rate_amount)
 		if len(context.destinations) != 1:
 			warnings.append(
-				_("Destination Rate requires one destination; no rate was applied to this multi-stop load.")
+				_("Destination Rate requires exactly one movement destination; no rate was applied.")
+			)
+		elif rate_amount is None:
+			warnings.append(
+				_(
+					"No matching Destination Rate is configured for this movement's destination and source warehouse."
+				)
 			)
 		explanation = _explanation(component, amount)
 	elif basis == "Manual / Actual":
@@ -347,37 +382,50 @@ def estimate_cost_component(component, context, profile=None):
 def _build_context(load, vehicle, uoms, *, as_of_date, distance, distance_source):
 	load_distance = distance if distance is not None else getattr(load, "estimated_distance", None)
 	source = distance_source or getattr(load, "distance_estimate_method", None)
+	distance_uom = getattr(load, "distance_uom", None) or uoms.distance_uom or "Kilometer"
+	planning_warnings = []
+	if distance is None and source == "Geographic Estimate":
+		planning_warnings.extend((getattr(load, "distance_estimate_warning", None) or "").splitlines())
 	if not load_distance:
 		distance_estimate = estimate_delivery_load_distance(load)
+		planning_warnings.extend(distance_estimate.get("warnings", []))
 		if distance_estimate["available"]:
-			load_distance = distance_estimate["distance_km"]
-			source = source or "Haversine"
+			load_distance = convert_measurement(
+				distance_estimate["distance_km"], "Kilometer", distance_uom, _("transport distance")
+			)
+			source = distance_source or "Haversine"
 	source = source or ("Planned Distance" if load_distance else "Estimated")
-	addresses = sorted(
-		{row.delivery_address for row in getattr(load, "delivery_orders", []) if row.delivery_address}
-	)
-	destination_geographies = [get_address_planning_data(address) for address in addresses]
+	if source in {"Haversine", "Geographic Estimate"}:
+		planning_warnings.append(
+			_(
+				"The geographic estimate excludes empty repositioning and return journeys. Set a planned distance if these must be included."
+			)
+		)
+	_origin, endpoints = get_load_planning_locations(load)
+	destination_geographies = [row for row in endpoints if row.get("cost_key")]
+	addresses = [row.cost_key for row in destination_geographies]
 	return CostContext(
 		company=load.company,
 		load=load,
 		vehicle=vehicle,
 		date=getdate(as_of_date or getattr(load, "dispatch_date", None) or nowdate()),
 		distance=flt(load_distance),
-		distance_uom=getattr(load, "distance_uom", None) or uoms.distance_uom,
+		distance_uom=distance_uom,
 		distance_source=source,
 		destination=addresses[0] if len(addresses) == 1 else None,
 		destinations=addresses,
 		destination_geographies=destination_geographies,
 		source_warehouse=getattr(load, "source_warehouse", None),
+		planning_warnings=planning_warnings,
 	)
 
 
 def context_warnings(context):
-	warnings = []
+	warnings = list(context.planning_warnings or [])
 	if not context.distance:
 		warnings.append(_("No planned distance is available."))
 	if not context.destinations:
-		warnings.append(_("No delivery destination is available for destination-based costing."))
+		warnings.append(_("No movement destination is available for destination-based costing."))
 	return warnings
 
 
@@ -399,16 +447,21 @@ def _distance_in_rate_uom(distance, from_uom, to_uom):
 
 def _fuel_quantity(context, component):
 	efficiency = flt(getattr(context.vehicle, "vuna_expected_fuel_efficiency", None))
-	if not efficiency or not context.distance:
+	if efficiency <= 0 or context.distance <= 0:
 		return 0, component.rate_uom or "Litre"
 	efficiency_uom = getattr(context.vehicle, "uom", None)
 	distance = _distance_in_rate_uom(context.distance, context.distance_uom, efficiency_uom)
-	return distance / efficiency, component.rate_uom or "Litre"
+	uom = component.rate_uom or "Litre"
+	return convert_measurement(distance / efficiency, "Litre", uom, _("fuel quantity")), uom
 
 
 def _destination_rate(component, context, profile):
+	return flt(_resolve_destination_rate(context, profile))
+
+
+def _resolve_destination_rate(context, profile):
 	if not context.destination or not profile:
-		return 0
+		return None
 	if len(context.destination_geographies or []) != 1:
 		return _legacy_destination_rate(context, profile)
 	geography = context.destination_geographies[0]
@@ -416,7 +469,7 @@ def _destination_rate(component, context, profile):
 	for row in getattr(profile, "destination_rates", []) or []:
 		if getattr(row, "source_warehouse", None) and row.source_warehouse != context.source_warehouse:
 			continue
-		if row.territory != geography.territory:
+		if not row.territory or row.territory != geography.territory:
 			continue
 		if row.county and row.county != geography.county:
 			continue
@@ -439,7 +492,7 @@ def _legacy_destination_rate(context, profile):
 			not getattr(row, "source_warehouse", None) or row.source_warehouse == context.source_warehouse
 		):
 			return flt(row.rate)
-	return 0
+	return None
 
 
 def _flat_amount(component):

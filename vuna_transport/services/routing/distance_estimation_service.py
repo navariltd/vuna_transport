@@ -10,11 +10,9 @@ from frappe import _
 from frappe.utils import flt
 
 from vuna_transport.services.routing.geography_service import haversine_distance_km
-from vuna_transport.services.routing.location_service import (
-	get_address_planning_data,
-	get_warehouse_planning_data,
-	resolve_planning_location,
-)
+from vuna_transport.services.routing.load_location_service import get_load_planning_locations
+from vuna_transport.services.routing.location_service import resolve_planning_location
+from vuna_transport.services.shared.measurement_service import convert_measurement, get_transport_uoms
 
 
 def resolve_location_point(location):
@@ -102,24 +100,8 @@ def estimate_origin_to_destinations(origin, destinations):
 
 
 def estimate_delivery_load_distance(load):
-	"""Estimate a Transport Load distance from its source warehouse and order snapshots."""
-	origin = get_warehouse_planning_data(getattr(load, "source_warehouse", None))
-	destinations = []
-	for order in getattr(load, "delivery_orders", []) or []:
-		address_data = get_address_planning_data(getattr(order, "delivery_address", None))
-		destinations.append(
-			{
-				"name": getattr(order, "delivery_order", None),
-				"delivery_address": getattr(order, "delivery_address", None),
-				"destination_latitude": getattr(order, "destination_latitude", None) or address_data.latitude,
-				"destination_longitude": getattr(order, "destination_longitude", None)
-				or address_data.longitude,
-				"town": getattr(order, "town", None) or address_data.town,
-				"constituency": getattr(order, "constituency", None) or address_data.constituency,
-				"county": getattr(order, "county", None) or address_data.county,
-				"territory": getattr(order, "territory", None) or address_data.territory,
-			}
-		)
+	"""Estimate the cargo leg for customer, supplier, transfer and depot-return loads."""
+	origin, destinations = get_load_planning_locations(load)
 	return estimate_origin_to_destinations(origin, destinations)
 
 
@@ -140,7 +122,10 @@ def apply_delivery_load_distance_estimate(load):
 	load.distance_estimate_confidence = result.get("confidence")
 	load.distance_estimate_warning = "\n".join(result.get("warnings") or [])
 	if result["available"]:
-		load.estimated_distance = result["distance_km"]
+		uom = get_transport_uoms().distance_uom or "Kilometer"
+		load.estimated_distance = convert_measurement(
+			result["distance_km"], "Kilometer", uom, _("transport distance")
+		)
 	else:
 		load.estimated_distance = None
 
