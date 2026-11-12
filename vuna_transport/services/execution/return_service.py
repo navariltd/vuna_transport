@@ -852,13 +852,14 @@ def create_return_stock_document(return_request: str):
 		source = frappe.get_doc("Sales Invoice", request.sales_invoice)
 		require_document_permission(source, "read")
 		target = make_return_doc("Sales Invoice", source.name)
+		collected = _get_collected_return_stock_quantities(request, "sales_invoice_item")
 		requested_by_item = {row.sales_invoice_item: row for row in request.items}
 		target_items = []
 		for row in target.items:
 			request_item = requested_by_item.get(row.sales_invoice_item)
 			if not request_item:
 				continue
-			quantity = _round_return_request_qty(request_item.requested_return_qty)
+			quantity = _sales_return_quantity(row, request_item, collected, "sales_invoice_item")
 			if quantity <= 0:
 				continue
 			row.qty = -quantity
@@ -867,6 +868,8 @@ def create_return_stock_document(return_request: str):
 			target_items.append(row)
 		target.set("items", target_items)
 		if not target.items:
+			if collected is not None:
+				frappe.throw(_("No collected return quantity remains to create a Sales Return."))
 			frappe.throw(_("No return items could be mapped to the original Sales Invoice."))
 		target.insert()
 		request.db_set("credit_note", target.name, update_modified=True)
@@ -883,6 +886,7 @@ def create_return_stock_document(return_request: str):
 	source = frappe.get_doc("Delivery Note", request.delivery_note)
 	require_document_permission(source, "read")
 	target = make_return_doc("Delivery Note", source.name)
+	collected = _get_collected_return_stock_quantities(request, "delivery_note_item")
 	requested_by_item = {row.delivery_note_item: row for row in request.items}
 	target_items = []
 	for row in target.items:
@@ -890,7 +894,7 @@ def create_return_stock_document(return_request: str):
 		if not request_item:
 			continue
 		conversion_factor = flt(row.conversion_factor) or 1
-		expected_qty = _round_return_request_qty(request_item.requested_return_qty)
+		expected_qty = _sales_return_quantity(row, request_item, collected, "delivery_note_item")
 		if expected_qty <= 0:
 			continue
 		row.qty = -expected_qty
@@ -899,12 +903,71 @@ def create_return_stock_document(return_request: str):
 		target_items.append(row)
 	target.set("items", target_items)
 	if not target.items:
+		if collected is not None:
+			frappe.throw(_("No collected return quantity remains to create a Sales Return."))
 		frappe.throw(_("No return items could be mapped to the original Delivery Note."))
 	target.vuna_return_request = request.name
 	target.insert()
 	request.db_set("return_stock_document", target.name, update_modified=True)
 	recalculate_return_request(request.name)
 	return {"doctype": "Delivery Note", "name": target.name}
+
+
+def _get_collected_return_stock_quantities(request, source_field):
+	"""Return remaining collected stock by original sales row, or None without pickup proof.
+
+	Keep a zero collection distinct from no pickup. Expected return quantities
+	remain untouched; cancelled and draft collection proofs are not evidence.
+	"""
+	if request.get("return_context") == "Depot":
+		return None
+	proofs = frappe.get_all(
+		"Proof of Delivery",
+		filters={"return_request": request.name, "proof_type": "Return Pickup", "docstatus": 1},
+		pluck="name",
+	)
+	if not proofs:
+		return None
+	collected = defaultdict(float)
+	request_items = {row.name: row for row in request.items}
+	for row in frappe.get_all(
+		"Proof of Delivery Item",
+		filters={"parent": ["in", proofs], "parenttype": "Proof of Delivery"},
+		fields=["source_row", "stock_qty"],
+	):
+		if item := request_items.get(row.source_row):
+			collected[item.get(source_field)] += max(flt(row.stock_qty), 0)
+	# A prior partial Sales Return must not make the same collection available twice.
+	for item in request.items:
+		collected[item.get(source_field)] -= max(flt(item.received_qty), 0) * (
+			flt(item.conversion_factor) or 1
+		)
+	return collected
+
+
+def _sales_return_quantity(row, request_item, collected, source_field):
+	if collected is None:
+		return _round_return_request_qty(request_item.requested_return_qty)
+	factor = flt(row.conversion_factor)
+	if factor <= 0:
+		frappe.throw(_("Sales Return items require a positive UOM conversion factor."))
+	key = request_item.get(source_field)
+	stock_qty = min(
+		max(flt(collected.get(key)), 0),
+		abs(flt(row.stock_qty)),
+		_round_return_request_qty(request_item.requested_return_qty)
+		* (flt(request_item.conversion_factor) or 1),
+	)
+	quantity = flt(stock_qty / factor, row.precision("qty"))
+	if flt(quantity * factor - stock_qty, row.precision("stock_qty")) > 0:
+		frappe.throw(
+			_(
+				"Collected quantity for {0} cannot be represented in the Sales Return UOM at the current quantity precision."
+			).format(request_item.item_code)
+		)
+	# Consume the allowance in case ERPNext maps the same source row more than once.
+	collected[key] = max(flt(collected.get(key)) - quantity * factor, 0)
+	return quantity
 
 
 @frappe.whitelist()
