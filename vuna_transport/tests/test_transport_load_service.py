@@ -7,12 +7,68 @@ import frappe
 from frappe.utils import flt
 
 from vuna_transport.services.planning.transport_load_service import (
+	_add_planning_stock_snapshot,
 	get_transfer_load_items,
 	validate_demand_allocations,
 )
 
 
 class TestTransportLoadAllocations(unittest.TestCase):
+	def test_depot_stock_snapshot_uses_selected_warehouse_not_preferred_origin(self):
+		self.framework.get_doc.side_effect = None
+		warehouse = MagicMock(company="Company", disabled=0, is_group=0)
+		self.framework.get_doc.return_value = warehouse
+		self.framework.get_all.return_value = [
+			frappe._dict(item_code="Milk", warehouse="Loading", actual_qty=120)
+		]
+		rows = [{"item_code": "Milk", "source_warehouse": "Preferred", "available_stock_qty": 20}]
+		_add_planning_stock_snapshot(rows, "Company", "Loading")
+		warehouse.check_permission.assert_called_once_with("read")
+		self.assertEqual(rows[0]["stock_warehouse"], "Loading")
+		self.assertEqual(rows[0]["stock_available_quantity"], 120)
+		self.assertEqual(rows[0]["available_stock_qty"], 20)
+		self.assertEqual(rows[0]["stock_availability_status"], "Available")
+		self.assertEqual(self.framework.get_all.call_args.kwargs["filters"]["warehouse"], ["in", ["Loading"]])
+
+	def test_depot_stock_snapshot_missing_bin_is_zero_but_missing_warehouse_is_unknown(self):
+		self.framework.get_doc.side_effect = None
+		self.framework.get_doc.return_value = MagicMock(company="Company", disabled=0, is_group=0)
+		self.framework.get_all.return_value = []
+		rows = [
+			{"item_code": "Milk", "source_warehouse": "Loading", "available_stock_qty": 20},
+			{"item_code": "Milk", "source_warehouse": None, "available_stock_qty": 20},
+		]
+		_add_planning_stock_snapshot(rows, "Company")
+		self.assertEqual(rows[0]["stock_available_quantity"], 0)
+		self.assertEqual(rows[0]["stock_availability_status"], "Insufficient")
+		self.assertEqual(rows[1]["stock_availability_status"], "Select Warehouse")
+
+	def test_depot_stock_snapshot_checks_warehouse_permission_before_reading_bins(self):
+		self.framework.get_doc.side_effect = None
+		warehouse = MagicMock(company="Company", disabled=0, is_group=0)
+		warehouse.check_permission.side_effect = frappe.PermissionError
+		self.framework.get_doc.return_value = warehouse
+		with self.assertRaises(frappe.PermissionError):
+			_add_planning_stock_snapshot(
+				[{"item_code": "Milk", "source_warehouse": "Hidden", "available_stock_qty": 20}], "Company"
+			)
+		self.framework.get_all.assert_not_called()
+
+	def test_depot_stock_snapshot_rejects_foreign_disabled_or_group_warehouse(self):
+		self.framework.get_doc.side_effect = None
+		for company, disabled, is_group in [("Other", 0, 0), ("Company", 1, 0), ("Company", 0, 1)]:
+			self.framework.get_doc.return_value = MagicMock(
+				company=company, disabled=disabled, is_group=is_group
+			)
+			with (
+				self.subTest(company=company, disabled=disabled, is_group=is_group),
+				self.assertRaises(ValueError),
+			):
+				_add_planning_stock_snapshot(
+					[{"item_code": "Milk", "source_warehouse": "Loading", "available_stock_qty": 20}],
+					"Company",
+				)
+
 	def dialog_items(self):
 		self.demand.name = "TD-1"
 		self.demand.get.return_value = False

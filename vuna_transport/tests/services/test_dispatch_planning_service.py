@@ -10,6 +10,7 @@ from frappe.utils import getdate
 
 from vuna_transport.services.planning.dispatch_filter_service import validate_additional_filters
 from vuna_transport.services.planning.dispatch_planning_service import (
+	_add_delivery_locations,
 	_delivery_date_filter,
 	_filter_allocation_state,
 	_planning_filters,
@@ -20,6 +21,54 @@ from vuna_transport.services.planning.load_suggestion_service import _partition_
 
 
 class TestDispatchPlanningService(UnitTestCase):
+	def test_delivery_locations_resolve_linked_address_once_without_replacing_its_type(self):
+		rows = [{"delivery_address": "CUST-001-Billing"}, {"delivery_address": "CUST-001-Billing"}]
+		with (
+			patch("frappe.has_permission", return_value=True),
+			patch(
+				"frappe.get_list",
+				return_value=[
+					frappe._dict(
+						name="CUST-001-Billing",
+						address_title="Naivas Meru",
+						address_line1="Kenyatta Highway",
+						address_line2="Meru",
+						city="meru",
+						address_type="Billing",
+					)
+				],
+			) as query,
+		):
+			_add_delivery_locations(rows)
+			query.assert_called_once()
+			self.assertEqual(query.call_args.args, ("Address",))
+			self.assertEqual(query.call_args.kwargs["filters"], {"name": ["in", ["CUST-001-Billing"]]})
+			self.assertEqual(query.call_args.kwargs["limit_page_length"], 1)
+			for row in rows:
+				self.assertEqual(row["delivery_address_summary"], "Naivas Meru, Kenyatta Highway, Meru")
+				self.assertEqual(row["delivery_city"], "meru")
+				self.assertEqual(row["delivery_address_type"], "Billing")
+				self.assertEqual(row["delivery_address"], "CUST-001-Billing")
+
+	def test_delivery_locations_do_not_query_missing_addresses(self):
+		rows = [{"delivery_address": None}]
+		with patch("frappe.get_list") as query:
+			_add_delivery_locations(rows)
+			query.assert_not_called()
+		self.assertEqual(rows[0]["delivery_address_status"], "Missing")
+
+	def test_delivery_locations_respect_doctype_and_document_read_permissions(self):
+		for allowed in (False, True):
+			rows = [{"delivery_address": "Restricted"}]
+			with (
+				patch("frappe.has_permission", return_value=allowed),
+				patch("frappe.get_list", return_value=[]) as query,
+			):
+				_add_delivery_locations(rows)
+				self.assertEqual(query.call_count, int(allowed))
+			self.assertEqual(rows[0]["delivery_address_summary"], "")
+			self.assertEqual(rows[0]["delivery_address_status"], "Unavailable")
+
 	def test_planning_filters_are_server_authoritative(self):
 		filters = _planning_filters(
 			"Vuna Foods",

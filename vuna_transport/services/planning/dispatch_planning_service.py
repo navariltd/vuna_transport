@@ -162,6 +162,7 @@ def get_planning_demand(
 	all_page_rows = _keep_selected_orders_visible(all_rows, filtered_rows, selected_delivery_order_names)
 	has_more = pool_truncated or len(all_page_rows) > start + page_length
 	rows = all_page_rows[start : start + page_length]
+	_add_delivery_locations(rows)
 	summary_rows = all_rows
 	summary_rows = _filter_allocation_state(summary_rows, allocation_state)
 	summary_rows = _keep_selected_orders_visible(
@@ -725,6 +726,7 @@ def _get_order_metrics(order_names, include_items=False, source_warehouse=None):
 					"allocated_quantity": allocated,
 					"available_quantity": available,
 					"stock_available_quantity": stock_available_quantity,
+					"stock_warehouse": warehouses_by_order.get(item.parent),
 					"stock_required_quantity": stock_required_quantity,
 					"stock_availability_status": (
 						"Available" if stock_available_quantity >= stock_required_quantity else "Insufficient"
@@ -740,6 +742,46 @@ def _get_order_metrics(order_names, include_items=False, source_warehouse=None):
 				}
 			)
 	return result
+
+
+def _add_delivery_locations(rows):
+	"""Resolve only the visible page's linked destinations, respecting Address permissions."""
+	for row in rows:
+		row.update(
+			delivery_address_summary="",
+			delivery_city="",
+			delivery_address_type="",
+			delivery_address_status="Unavailable" if row.get("delivery_address") else "Missing",
+		)
+	names = sorted({row["delivery_address"] for row in rows if row.get("delivery_address")})
+	if not names or not frappe.has_permission("Address", "read"):
+		return
+	addresses = {
+		address.name: address
+		for address in frappe.get_list(
+			"Address",
+			filters={"name": ["in", names]},
+			fields=["name", "address_title", "address_line1", "address_line2", "city", "address_type"],
+			limit_page_length=len(names),
+		)
+	}
+	for row in rows:
+		address = addresses.get(row.get("delivery_address"))
+		if not address:
+			continue
+		parts = []
+		seen = set()
+		for field in ("address_title", "address_line1", "address_line2", "city"):
+			value = (address.get(field) or "").strip()
+			if value and value.casefold() not in seen:
+				parts.append(value)
+				seen.add(value.casefold())
+		row.update(
+			delivery_address_summary=", ".join(parts),
+			delivery_city=address.city,
+			delivery_address_type=address.address_type,
+			delivery_address_status="Available" if parts else "Incomplete",
+		)
 
 
 def _format_demand_row(order, metrics):

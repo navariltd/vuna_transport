@@ -418,4 +418,41 @@ def get_transfer_planning_items(
 					"weight_uom": item.weight_uom,
 				}
 			)
-	return {"items": rows[:500], "has_more": len(demands) > 20, "truncated": len(rows) > 500}
+	visible = rows[:500]
+	_add_planning_stock_snapshot(visible, company, source_warehouse)
+	return {"items": visible, "has_more": len(demands) > 20, "truncated": len(rows) > 500}
+
+
+def _add_planning_stock_snapshot(rows, company, source_warehouse=None):
+	"""On-hand stock is advisory, distinct from unallocated demand quantities."""
+	warehouses = {source_warehouse or row["source_warehouse"] for row in rows} - {None, ""}
+	for warehouse in warehouses:
+		location = frappe.get_doc("Warehouse", warehouse)
+		location.check_permission("read")
+		if location.company != company or location.disabled or location.is_group:
+			frappe.throw(_("Select an active loading warehouse in the demand company."))
+	bins = (
+		{
+			(row.item_code, row.warehouse): flt(row.actual_qty)
+			for row in frappe.get_all(
+				"Bin",
+				filters={
+					"warehouse": ["in", sorted(warehouses)],
+					"item_code": ["in", sorted({row["item_code"] for row in rows})],
+				},
+				fields=["item_code", "warehouse", "actual_qty"],
+			)
+		}
+		if warehouses
+		else {}
+	)
+	for row in rows:
+		warehouse = source_warehouse or row["source_warehouse"]
+		stock = bins.get((row["item_code"], warehouse), 0)
+		row.update(
+			stock_warehouse=warehouse,
+			stock_available_quantity=stock,
+			stock_availability_status=("Available" if stock >= row["available_stock_qty"] else "Insufficient")
+			if warehouse
+			else "Select Warehouse",
+		)

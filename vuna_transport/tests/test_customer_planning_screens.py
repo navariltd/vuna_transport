@@ -151,3 +151,75 @@ class TestCustomerPlanningScreens(unittest.TestCase):
 		):
 			with self.assertRaises(frappe.ValidationError):
 				source.metrics(["TD-1"], source_warehouse="Foreign")
+
+	def test_item_stock_uses_selected_warehouse_and_preserves_transaction_units(self):
+		from types import SimpleNamespace
+
+		item = frappe._dict(
+			name="DI-1",
+			item_code="Milk",
+			item_name="Milk",
+			transaction_qty=2,
+			transaction_uom="Carton",
+			stock_uom="Pcs",
+			conversion_factor=10,
+			weight_uom="Kg",
+			volume_uom="Litre",
+		)
+		demand = SimpleNamespace(
+			company="A",
+			check_permission=lambda mode: None,
+			source_warehouse="Preferred",
+			name="TD-1",
+			items=[item],
+		)
+		warehouse = SimpleNamespace(company="A", check_permission=lambda mode: None, disabled=0, is_group=0)
+		with (
+			patch.object(source.frappe, "get_doc", side_effect=[demand, warehouse]) as documents,
+			patch.object(source.frappe.db, "sql", return_value=[]),
+			patch.object(
+				source.frappe, "get_all", return_value=[frappe._dict(item_code="Milk", actual_qty=120)]
+			) as bins,
+			patch(
+				"vuna_transport.services.planning.customer_demand_load_service.available_items",
+				return_value={"DI-1": {"row": item, "available_quantity": 2, "available_stock_qty": 20}},
+			),
+		):
+			result = source.metrics(["TD-1"], include_items=True, source_warehouse="Selected")["TD-1"][
+				"items"
+			][0]
+			self.assertEqual(documents.call_args.args, ("Warehouse", "Selected"))
+			self.assertEqual(bins.call_args.kwargs["filters"]["warehouse"], "Selected")
+			self.assertEqual(result["stock_warehouse"], "Selected")
+			self.assertEqual(result["stock_available_quantity"], 120)
+			self.assertEqual(result["stock_required_quantity"], 20)
+			self.assertEqual(result["available_quantity"], 2)
+			self.assertEqual(result["uom"], "Carton")
+
+	def test_item_stock_without_warehouse_is_unknown_not_insufficient(self):
+		from types import SimpleNamespace
+
+		item = frappe._dict(
+			name="DI-1",
+			item_code="Milk",
+			transaction_qty=2,
+			transaction_uom="Carton",
+			stock_uom="Pcs",
+			conversion_factor=10,
+		)
+		demand = SimpleNamespace(
+			company="A", check_permission=lambda mode: None, source_warehouse=None, name="TD-1", items=[item]
+		)
+		with (
+			patch.object(source.frappe, "get_doc", return_value=demand),
+			patch.object(source.frappe.db, "sql", return_value=[]),
+			patch.object(source.frappe, "get_all") as bins,
+			patch(
+				"vuna_transport.services.planning.customer_demand_load_service.available_items",
+				return_value={"DI-1": {"row": item, "available_quantity": 2, "available_stock_qty": 20}},
+			),
+		):
+			result = source.metrics(["TD-1"], include_items=True)["TD-1"]["items"][0]
+			self.assertFalse(result["stock_warehouse"])
+			self.assertEqual(result["stock_availability_status"], "Select Warehouse")
+			bins.assert_not_called()

@@ -135,6 +135,7 @@ def metrics(names, include_items=False, source_warehouse=None):
 				"allocated_quantity": allocation.allocated,
 				"stock_required_quantity": value["available_stock_qty"],
 				"stock_available_quantity": bins.get(row.item_code, 0),
+				"stock_warehouse": warehouse,
 				"stock_availability_status": (
 					"Available"
 					if bins.get(row.item_code, 0) >= value["available_stock_qty"]
