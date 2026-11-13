@@ -132,8 +132,12 @@ def get_source_delivery_method_workflow(source, required=False):
 
 
 def validate_source_delivery_method(doc, method=None):
-	workflow = get_source_delivery_method_workflow(doc, required=doc.docstatus == 1)
-	if workflow is None:
+	workflow = get_source_delivery_method_workflow(
+		doc, required=doc.doctype == "Return Request" and doc.docstatus == 1
+	)
+	if workflow is None and (
+		doc.doctype != "Material Request" or doc.get("material_request_type") != "Material Transfer"
+	):
 		return
 	if doc.doctype == "Return Request":
 		doc.transport_arranged_by = workflow.transport_arranged_by

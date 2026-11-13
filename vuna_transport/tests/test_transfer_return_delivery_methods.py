@@ -91,12 +91,38 @@ class TestTransferReturnDeliveryMethods(TestCase):
 		with self.assertRaises(ValueError):
 			service.get_source_delivery_method_workflow(source(return_context="Depot"))
 
-	def test_submitted_transfer_and_return_require_a_method(self):
-		for doctype in ("Material Request", "Return Request"):
-			with self.assertRaises(ValueError):
+	def test_transfer_can_save_and_submit_without_a_delivery_method(self):
+		for docstatus in (0, 1):
+			self.assertIsNone(
 				service.validate_source_delivery_method(
-					source(doctype, docstatus=1, delivery_method=None, vuna_delivery_method=None)
+					source("Material Request", docstatus=docstatus, vuna_delivery_method=None)
 				)
+			)
+
+	def test_submitted_return_still_requires_a_method(self):
+		with self.assertRaises(ValueError):
+			service.validate_source_delivery_method(source(docstatus=1, delivery_method=None))
+
+	def test_transfer_without_method_skips_automatic_transport_generation(self):
+		from vuna_transport.services.demand.source_policy_service import automatically_create_from_source
+
+		with patch(
+			"vuna_transport.services.demand.source_policy_service.get_source_policy",
+			return_value=frappe._dict(enabled=True, creation_mode="Automatic"),
+		):
+			self.assertEqual(
+				automatically_create_from_source(
+					source("Material Request", docstatus=1, vuna_delivery_method=None)
+				),
+				[],
+			)
+
+	def test_clearing_transfer_method_is_blocked_once_demand_exists(self):
+		doc = source("Material Request", docstatus=1, vuna_delivery_method=None)
+		doc.get_doc_before_save = lambda: source("Material Request")
+		self.references.return_value = True
+		with self.assertRaises(ValueError):
+			service.validate_source_delivery_method(doc)
 
 	def test_counterparty_dropoff_does_not_create_company_pickup(self):
 		self.method.selling = 1

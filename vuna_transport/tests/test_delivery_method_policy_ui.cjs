@@ -24,6 +24,24 @@ function load(relativePath) {
   return handlers;
 }
 
+test("Material Transfer delivery method remains visible but optional", () => {
+  const metadata = JSON.parse(
+    fs.readFileSync(
+      path.join(__dirname, "../vuna_transport/custom/material_request.json"),
+      "utf8"
+    )
+  );
+  const field = metadata.custom_fields.find(
+    (row) => row.fieldname === "vuna_delivery_method"
+  );
+  assert.equal(field.reqd, 0);
+  assert.equal(field.mandatory_depends_on, "");
+  assert.equal(
+    field.depends_on,
+    "eval:doc.material_request_type == 'Material Transfer'"
+  );
+});
+
 test("delivery methods use independent Buying, Selling and Internal checkboxes", () => {
   const metadata = JSON.parse(
     fs.readFileSync(
