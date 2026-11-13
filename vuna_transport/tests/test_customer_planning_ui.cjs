@@ -6,10 +6,33 @@ const vm = require("node:vm");
 
 function controller(native = true) {
   const requests = [];
+  const layouts = [];
+  const controls = [];
   const vuna_transport = { DispatchPlanning: {} };
   const frappe = {
     provide() {},
     pages: { "dispatch-planning": {} },
+    router: { slug: (value) => value.toLowerCase().replaceAll(" ", "-") },
+    datetime: { str_to_user: (value) => value || "" },
+    defaults: { get_default: () => "Example Company" },
+    ui: {
+      form: {
+        make_control(options) {
+          const attributes = {};
+          const field = {
+            $input: { attr: (values) => Object.assign(attributes, values) },
+            set_value(value) {
+              field.value = value;
+            },
+            get_value() {
+              return field.value || "";
+            },
+          };
+          controls.push({ options, attributes });
+          return field;
+        },
+      },
+    },
     call: async (request) => {
       requests.push(request);
       return { message: {} };
@@ -23,7 +46,23 @@ function controller(native = true) {
       ),
       "utf8"
     ),
-    { frappe, vuna_transport, cint: Number, $: () => ({ data: () => 0 }) }
+    {
+      frappe,
+      vuna_transport,
+      cint: Number,
+      clearTimeout,
+      flt: (value) => Number(value) || 0,
+      __: (text, args = []) => text.replace(/\{(\d+)\}/g, (_, i) => args[i]),
+      $: (element) =>
+        typeof element === "string"
+          ? {
+              appendTo() {
+                layouts.push(element);
+                return this;
+              },
+            }
+          : element.mock || { data: () => 0 },
+    }
   );
   const result = Object.create(
     vuna_transport.DispatchPlanning.Controller.prototype
@@ -42,8 +81,680 @@ function controller(native = true) {
   result.filters = {
     source_warehouse: { get_value: () => "Loading warehouse" },
   };
-  return { result, requests };
+  result.escape = (value) =>
+    String(value ?? "")
+      .replaceAll("<", "&lt;")
+      .replaceAll('"', "&quot;");
+  result.selector = (value) => value;
+  result.number = (value) => String(value);
+  return { result, requests, layouts, controls, frappe };
 }
+
+test("planning filters use report-sized inputs with placeholders and accessible labels", () => {
+  const { result, controls } = controller();
+  result.$root = { find: () => ({}) };
+  result.make_filters();
+  assert.equal(controls.length, 8);
+  for (const { options, attributes } of controls) {
+    assert.equal(options.only_input, true);
+    assert.equal(options.df.input_class, "input-xs");
+    assert.equal(options.df.placeholder, options.df.label);
+    assert.equal(attributes["aria-label"], options.df.label);
+    assert.equal(attributes.title, options.df.label);
+    assert.equal(typeof options.df.onchange, "function");
+  }
+});
+
+test("vehicle categories use a standard enabled-only Link without preloading a capped list", () => {
+  const { result, controls, requests } = controller();
+  result.$root = { find: () => ({}) };
+  let changed = 0;
+  result.category_changed = () => {
+    changed++;
+  };
+  result.make_vehicle_category_field();
+  const { df } = controls[0].options;
+  assert.equal(df.fieldtype, "Link");
+  assert.equal(df.options, "Vehicle Category");
+  assert.equal(df.only_select, 1);
+  assert.equal(result.vehicle_category.get_query().filters.disabled, 0);
+  assert.equal(result.selected_vehicle_category(), null);
+  result.vehicle_category.set_value("CATEGORY-145");
+  assert.equal(result.selected_vehicle_category(), "CATEGORY-145");
+  df.onchange();
+  assert.equal(changed, 1);
+  assert.equal(requests.length, 0);
+  result.vehicle_category.set_value("");
+  assert.equal(result.selected_vehicle_category(), null);
+});
+
+test("plan evaluation reads the selected category from the Link control", async () => {
+  const { result } = controller();
+  result.vehicle_category = { get_value: () => "CATEGORY-145" };
+  result.allocations = new Map([
+    [
+      "DI-1",
+      {
+        delivery_order: "TD-1",
+        delivery_order_item: "DI-1",
+        allocated_quantity: 1,
+      },
+    ],
+  ]);
+  result.plan_evaluation_id = 0;
+  result.$root = { find: () => ({ html() {} }) };
+  result.loading = () => "Loading";
+  result.render_plan = () => {};
+  result.call = async (method, args) => {
+    assert.equal(method, "evaluate_manual_load_plan");
+    assert.equal(args.vehicle_category, "CATEGORY-145");
+    return { recommended_vehicle_category: "CATEGORY-145" };
+  };
+  await result.evaluate_plan();
+  assert.equal(result.plan.recommended_vehicle_category, "CATEGORY-145");
+});
+
+test("settings-defined planning filters use the same compact controls", async () => {
+  const { result, controls, frappe } = controller();
+  result.$root = { find: () => ({}) };
+  result.configured_filter_keys = new Set();
+  result.configure_location_filter_queries = () => {};
+  frappe.call = async () => ({
+    message: [
+      {
+        field_key: "priority",
+        fieldtype: "Select",
+        label: "Priority",
+        options: "Low\nHigh",
+      },
+    ],
+  });
+  await result.load_configured_filters();
+  assert.equal(controls.length, 1);
+  assert.equal(controls[0].options.only_input, true);
+  assert.equal(controls[0].attributes.placeholder, "Priority");
+  result.make_planning_filter({
+    fieldname: "flag",
+    fieldtype: "Check",
+    label: "Flag",
+  });
+  assert.equal(controls[1].options.only_input, false);
+});
+
+function selectionController() {
+  const { result } = controller();
+  result.orders = [{ name: "TD-1" }];
+  result.details = {
+    "TD-1": {
+      name: "TD-1",
+      items: [
+        { name: "DI-1", item_code: "Milk", available_quantity: 5 },
+        { name: "DI-2", item_code: "Yoghurt", available_quantity: 3 },
+        { name: "DI-3", item_code: "Butter", available_quantity: 0 },
+      ],
+    },
+  };
+  result.allocations = new Map();
+  result.plan_evaluation_id = 0;
+  result.clear_suggestions = () => {};
+  result.render_plan = () => {};
+  result.schedule_plan_evaluation = () => {};
+  const controls = new Map();
+  result.$root = {
+    find(selector) {
+      if (!controls.has(selector)) controls.set(selector, {});
+      const control = controls.get(selector);
+      return {
+        get: () => control,
+        val: (value) => {
+          control.value = value;
+        },
+        prop: (key, value) => {
+          control[key] = value;
+        },
+      };
+    },
+  };
+  return { result, controls };
+}
+
+test("item selection defaults only the chosen item's remaining quantity and supports deselection", () => {
+  const { result, controls } = selectionController();
+  const checkbox = {
+    checked: true,
+    mock: { data: (key) => (key === "item" ? "DI-1" : "TD-1") },
+  };
+  result.toggle_item({ currentTarget: checkbox });
+  assert.equal(result.allocations.size, 1);
+  assert.equal(result.allocations.get("DI-1").allocated_quantity, 5);
+  assert.equal(controls.get('.dp-allocation-qty[data-item="DI-1"]').value, 5);
+  assert.equal(controls.get(".dp-select-all-orders").indeterminate, true);
+  assert.equal(
+    controls.get('[data-order="TD-1"] .dp-order-select').checked,
+    false
+  );
+  checkbox.checked = false;
+  result.toggle_item({ currentTarget: checkbox });
+  assert.equal(result.allocations.size, 0);
+  assert.equal(controls.get(".dp-select-all-orders").indeterminate, false);
+});
+
+test("order and page selection exclude exhausted rows and track partial selection", () => {
+  const { result, controls } = selectionController();
+  result.allocations.set("DI-1", { allocated_quantity: 2 });
+  result.allocations.set("DI-2", { allocated_quantity: 3 });
+  result.update_select_all_state();
+  assert.equal(result.order_selection_state("TD-1").checked, true);
+  assert.equal(controls.get(".dp-select-all-orders").checked, true);
+  result.allocations.delete("DI-1");
+  result.update_select_all_state();
+  assert.equal(controls.get(".dp-select-all-orders").indeterminate, true);
+  assert.equal(
+    controls.get('[data-order="TD-1"] .dp-order-select').indeterminate,
+    true
+  );
+});
+
+test("editing quantities updates item, order and page selection without replacing inputs", () => {
+  const { result, controls } = selectionController();
+  const input = {
+    mock: {
+      data: (key) => (key === "item" ? "DI-1" : "TD-1"),
+      val: () => "2",
+    },
+  };
+  result.change_quantity({ currentTarget: input });
+  assert.equal(result.allocations.get("DI-1").allocated_quantity, 2);
+  assert.equal(controls.get('.dp-item-select[data-item="DI-1"]').checked, true);
+  input.mock.val = () => "0";
+  result.change_quantity({ currentTarget: input });
+  assert.equal(result.allocations.has("DI-1"), false);
+  assert.equal(
+    controls.get('.dp-item-select[data-item="DI-1"]').checked,
+    false
+  );
+});
+
+test("stock display distinguishes unknown warehouse from zero stock and converts to requested UOM", () => {
+  const { result } = controller();
+  assert.match(result.render_stock({}), /Select a warehouse/);
+  assert.doesNotMatch(result.render_stock({}), /0|insufficient/i);
+  const item = {
+    stock_warehouse: "Main Store",
+    stock_available_quantity: 120,
+    stock_uom: "Pcs",
+    uom: "Carton",
+    conversion_factor: 10,
+    stock_availability_status: "Available",
+  };
+  const html = result.render_stock(item);
+  assert.match(html, /12 Carton/);
+  assert.doesNotMatch(html, /120 Pcs/);
+  assert.match(html, /Main Store/);
+  assert.match(html, /<span class="dp-stock-warehouse">Main Store<\/span>/);
+  assert.match(
+    result.render_stock({
+      ...item,
+      stock_available_quantity: 0,
+      stock_availability_status: "Insufficient",
+    }),
+    /0 Carton/
+  );
+  assert.match(html, /class="dp-stock-available"/);
+  const shortage = result.render_stock({
+    ...item,
+    stock_availability_status: "Insufficient",
+  });
+  assert.match(shortage, /class="dp-stock-insufficient"/);
+  assert.match(shortage, /class="sr-only"> — Stock is below remaining demand/);
+  assert.doesNotMatch(shortage, /<small|dp-stock-shortage/);
+  assert.doesNotMatch(
+    result.render_stock({}),
+    /dp-stock-available|dp-stock-insufficient/
+  );
+});
+
+test("expanded item rows use transaction UOM, visible selectors and labelled quantity inputs", () => {
+  const { result } = selectionController();
+  const html = result.render_item_table({
+    name: "TD-1",
+    items: [
+      {
+        name: "DI-1",
+        item_code: "Milk",
+        transport_quantity: 2,
+        available_quantity: 2,
+        allocated_quantity: 0,
+        uom: "Carton",
+        stock_uom: "Pcs",
+      },
+    ],
+  });
+  assert.match(html, /dp-item-select/);
+  assert.match(html, /2 Carton/);
+  assert.doesNotMatch(html, /2 Pcs/);
+  assert.doesNotMatch(html, /Requested \/ Allocated|dp-item-columns/);
+  assert.match(html, /aria-label="Quantity to load for Milk \(Carton\)"/);
+  assert.match(html, /aria-label="Select item Milk from order TD-1"/);
+  assert.doesNotMatch(html, /<span>Item<\/span><\/label>/);
+});
+
+test("customer demand renders item rows immediately without an Items expander", () => {
+  const { result } = selectionController();
+  let html;
+  result.$root = {
+    find: () => ({
+      html: (value) => {
+        html = value;
+      },
+    }),
+  };
+  result.update_select_all_state = () => {};
+  result.render_pagination = () => {};
+  result.render_demand();
+  assert.match(html, /dp-item-select/);
+  assert.match(html, /Yoghurt/);
+  assert.match(
+    html,
+    /class="dp-order-controls"[\s\S]*?class="dp-order-toggle"/
+  );
+  assert.doesNotMatch(html, /class="dp-order-identity"><button/);
+  assert.doesNotMatch(html, /dp-expand-order/);
+  assert.match(html, /Stock on Hand/);
+  assert.match(html, /aria-label="Select order TD-1"/);
+  assert.doesNotMatch(html, /<span>Order<\/span><\/label>/);
+  assert.doesNotMatch(
+    html,
+    /Allocated \/ Requested|No territory|dp-item-columns/
+  );
+});
+
+test("collapsing an order preserves selected quantities and updates accessible state", () => {
+  const { result, controls } = selectionController();
+  result.allocations.set("DI-1", {
+    delivery_order: "TD-1",
+    allocated_quantity: 2,
+  });
+  const attributes = {};
+  let icon;
+  const mock = {
+    data: () => "TD-1",
+    attr(values) {
+      Object.assign(attributes, values);
+      return mock;
+    },
+    text(value) {
+      icon = value;
+      return mock;
+    },
+  };
+  const event = { currentTarget: { mock } };
+  result.toggle_order_details(event);
+  assert.equal(controls.get('[data-details="TD-1"]').hidden, true);
+  assert.equal(attributes["aria-expanded"], "false");
+  assert.equal(attributes["aria-label"], "Expand items for TD-1");
+  assert.equal(icon, "▸");
+  assert.equal(result.allocations.get("DI-1").allocated_quantity, 2);
+  result.toggle_order_details(event);
+  assert.equal(controls.get('[data-details="TD-1"]').hidden, false);
+  assert.equal(attributes["aria-expanded"], "true");
+  assert.equal(icon, "▾");
+  assert.equal(result.allocations.get("DI-1").allocated_quantity, 2);
+});
+
+test("orders start expanded and retain individual collapse state after rerendering", () => {
+  const { result } = selectionController();
+  let html;
+  result.$root = {
+    find: () => ({
+      html: (value) => {
+        html = value;
+      },
+    }),
+  };
+  result.update_select_all_state = () => {};
+  result.render_pagination = () => {};
+  result.render_demand();
+  assert.match(html, /aria-expanded="true" aria-controls="dp-items-TD-1"/);
+  assert.doesNotMatch(html, /data-details="TD-1" hidden/);
+  result.collapsed_orders = new Set(["TD-1"]);
+  result.render_demand();
+  assert.match(html, /aria-expanded="false" aria-controls="dp-items-TD-1"/);
+  assert.match(html, /id="dp-items-TD-1" data-details="TD-1" hidden/);
+  assert.match(html, /Milk/);
+});
+
+test("multiple order summaries share one item heading and retain important restrictions", () => {
+  const { result } = selectionController();
+  result.orders = [
+    {
+      name: "TD-1",
+      customer_name: "Customer A",
+      required_delivery_date: "2026-11-13",
+      refrigeration_required: 1,
+    },
+    { name: "TD-2", customer_name: "Customer B", priority: "High" },
+  ];
+  result.details["TD-1"].restricted_access = true;
+  result.details["TD-1"].access_notes = "Use small vehicles";
+  result.details["TD-2"] = {
+    name: "TD-2",
+    items: [{ name: "DI-4", item_code: "Cheese", available_quantity: 4 }],
+  };
+  let html;
+  result.$root = {
+    find: () => ({
+      html: (value) => {
+        html = value;
+      },
+    }),
+  };
+  result.update_select_all_state = () => {};
+  result.render_pagination = () => {};
+  result.render_demand();
+  assert.equal((html.match(/class="dp-demand-header"/g) || []).length, 1);
+  assert.equal((html.match(/Stock on Hand/g) || []).length, 1);
+  assert.match(html, /Customer A/);
+  assert.match(html, /Customer B/);
+  assert.match(html, /Refrigerated/);
+  assert.match(html, /Restricted access/);
+  assert.match(html, /Use small vehicles/);
+  assert.match(html, /High priority/);
+  const groups = [
+    ...html.matchAll(
+      /<section class="dp-order-group"[^>]*>([\s\S]*?)<\/section>/g
+    ),
+  ];
+  assert.equal(groups.length, 2);
+  assert.match(groups[0][1], /Customer A/);
+  assert.match(groups[0][1], /Milk/);
+  assert.doesNotMatch(groups[0][1], /Cheese|Customer B/);
+  assert.match(groups[1][1], /Customer B/);
+  assert.match(groups[1][1], /Cheese/);
+  assert.doesNotMatch(groups[1][1], /Milk|Customer A/);
+  result.orders[1].priority = "Urgent";
+  result.render_demand();
+  assert.match(html, /Urgent priority/);
+});
+
+test("order headers prioritize customer and distinguish delivery branches from loading warehouses", () => {
+  const { result } = selectionController();
+  result.orders = [
+    {
+      name: "TD-1",
+      customer_name: "Naivas",
+      delivery_address: "Naivas Meru - Shipping",
+      delivery_address_summary: "Naivas Meru, Kenyatta Highway, Meru",
+      delivery_city: "Meru",
+      delivery_address_type: "Shipping",
+      town: "Meru",
+    },
+    {
+      name: "TD-2",
+      customer_name: "Naivas",
+      delivery_address: "Naivas Kisii - Shipping",
+      delivery_address_summary: "Naivas Kisii, Hospital Road, Kisii",
+      delivery_city: "Kisii",
+      town: "Kisii",
+    },
+  ];
+  result.details["TD-2"] = { name: "TD-2", items: [] };
+  let html;
+  result.$root = {
+    find: () => ({
+      html: (value) => {
+        html = value;
+      },
+    }),
+  };
+  result.update_select_all_state = () => {};
+  result.render_pagination = () => {};
+  result.render_demand();
+  assert.match(html, /<strong class="dp-order-customer">Naivas<\/strong>/);
+  assert.match(
+    html,
+    /Deliver to:<\/span> Naivas Meru, Kenyatta Highway, Meru<\/span>/
+  );
+  assert.match(
+    html,
+    /Deliver to:<\/span> Naivas Kisii, Hospital Road, Kisii<\/span>/
+  );
+  assert.ok(
+    html.indexOf('class="dp-order-customer"') <
+      html.indexOf('class="dp-order-reference"')
+  );
+  assert.doesNotMatch(html, /class="dp-order-destination">Loading warehouse/);
+  assert.match(html, /From:<\/span> Loading warehouse/);
+  assert.match(html, /class="dp-order-city">— Meru/);
+  assert.match(html, /class="dp-order-city">— Kisii/);
+  assert.match(html, /Linked address type: Shipping/);
+  assert.doesNotMatch(html, /Naivas Meru - Shipping/);
+  result.orders[0].delivery_address = null;
+  result.orders[0].delivery_address_summary = "";
+  result.render_demand();
+  assert.match(html, /Deliver to:<\/span> Delivery address not set<\/span>/);
+  result.orders[0].delivery_address = "CUST-001-Billing";
+  result.render_demand();
+  assert.match(html, /Deliver to:<\/span> Delivery address unavailable/);
+  assert.doesNotMatch(html, /CUST-001-Billing/);
+});
+
+test("availability panels use keyboard-accessible disclosure sections collapsed by default", () => {
+  const { result, layouts } = controller();
+  result.page = { main: {} };
+  result.make_layout();
+  const html = layouts[0];
+  assert.doesNotMatch(
+    html,
+    /dp-filter-grid-collapsed|btn-toggle-filters|dp-collapsible-header/
+  );
+  assert.match(
+    html,
+    /class="dp-filter-grid" role="group" aria-label="Planning Filters"/
+  );
+  assert.match(html, /<details class="dp-section dp-fleet-section">/);
+  assert.match(html, /<details class="dp-section dp-driver-section">/);
+  assert.match(html, /<details class="dp-section dp-suggestions-section">/);
+  assert.doesNotMatch(html, /<details[^>]*\bopen\b/);
+  assert.match(
+    html,
+    /<summary class="dp-section-title">Fleet Availability<\/summary>/
+  );
+  assert.match(html, /btn-create-load/);
+  assert.match(html, /class="dp-category-picker"/);
+  assert.doesNotMatch(html, /dp-category-select/);
+  assert.ok(
+    html.indexOf('class="dp-plan-metrics"') < html.indexOf("btn-evaluate")
+  );
+  assert.ok(
+    html.indexOf("btn-create-load") < html.indexOf('class="dp-plan-content')
+  );
+  assert.ok(
+    html.indexOf("btn-create-load") < html.indexOf('class="dp-costed-vehicles"')
+  );
+});
+
+test("suggestions expand when requested and collapse when selection invalidates them", async () => {
+  const { result } = controller();
+  const properties = new Map();
+  const messages = new Map();
+  result.$root = {
+    find(selector) {
+      const target = {
+        prop(key, value) {
+          properties.set(`${selector}:${key}`, value);
+          return target;
+        },
+        html(value) {
+          messages.set(selector, value);
+          return target;
+        },
+        addClass() {
+          return target;
+        },
+      };
+      return target;
+    },
+  };
+  result.suggestion_request_id = 0;
+  result.allocations = new Map();
+  result.get_filter_values = () => ({ company: "Example" });
+  result.get_configured_filter_values = () => ({});
+  result.get_native_filter_values = () => [];
+  result.selected_vehicle_category = () => null;
+  result.loading = () => "Loading";
+  await result.load_suggestions();
+  assert.equal(properties.get(".dp-suggestions-section:open"), true);
+  assert.match(
+    messages.get(".dp-suggestions"),
+    /No compatible suggestions found/
+  );
+  result.clear_suggestions();
+  assert.equal(properties.get(".dp-suggestions-section:open"), false);
+  assert.match(messages.get(".dp-suggestions"), /Run suggestions/);
+  assert.equal(properties.get(".btn-suggest:disabled"), false);
+});
+
+test("plan summary stays above the actions and clears when a plan becomes stale", () => {
+  const { result } = controller();
+  const nodes = new Map();
+  result.$root = {
+    find(selector) {
+      if (!nodes.has(selector)) {
+        const node = {
+          content: "",
+          empty() {
+            node.content = "";
+            return node;
+          },
+          html(value) {
+            node.content = value;
+            return node;
+          },
+          prop(key, value) {
+            node[key] = value;
+            return node;
+          },
+          addClass() {
+            return node;
+          },
+          removeClass() {
+            return node;
+          },
+          end() {
+            return result.$root;
+          },
+        };
+        nodes.set(selector, node);
+      }
+      return nodes.get(selector);
+    },
+  };
+  result.allocations = new Map([["DI-1", { allocated_quantity: 1 }]]);
+  result.selected_vehicle_category = () => null;
+  result.render_capacity_breakdown = () => "Capacity Available";
+  result.requirements_text = () => "";
+  result.load_cost_structure_estimates = () => {};
+  result.plan = {
+    total_stops: 2,
+    totals: { weight: 50, volume: 10 },
+    weight_uom: "Kg",
+    volume_uom: "Litre",
+    recommended_vehicle_category: "Canter",
+    compatible_vehicle_categories: [],
+  };
+  result.render_plan();
+  assert.match(nodes.get(".dp-plan-metrics").content, /Stops/);
+  assert.match(nodes.get(".dp-plan-metrics").content, /Kg/);
+  assert.match(nodes.get(".dp-plan-content").content, /Capacity Available/);
+  assert.doesNotMatch(nodes.get(".dp-plan-content").content, /dp-plan-metrics/);
+  assert.equal(nodes.get(".btn-create-load").disabled, false);
+  result.plan = null;
+  result.render_plan();
+  assert.equal(nodes.get(".dp-plan-metrics").content, "");
+  assert.equal(nodes.get(".btn-create-load").disabled, true);
+});
+
+test("refresh loads visible items together and replaces stale stock before rendering", async () => {
+  const { result } = selectionController();
+  result.refresh_request_id = 0;
+  result.get_filter_values = () => ({
+    company: "Example",
+    source_warehouse: "Loading warehouse",
+  });
+  result.get_configured_filter_values = () => ({});
+  result.get_native_filter_values = () => [];
+  result.selected_vehicle_category = () => null;
+  result.refresh_transfers = () => {};
+  result.refresh_suppliers = () => {};
+  result.$root = { find: () => ({ html() {} }) };
+  result.loading = () => "Loading";
+  const requests = [];
+  result.call = async (method, args) => {
+    requests.push({ method, args });
+    return method === "get_planning_demand"
+      ? { orders: [{ name: "TD-1" }, { name: "TD-2" }] }
+      : [
+          { name: "TD-1", items: [{ stock_warehouse: "Loading warehouse" }] },
+          { name: "TD-2", items: [] },
+        ];
+  };
+  let rendered = 0;
+  result.render_demand = () => {
+    rendered++;
+    assert.equal(
+      result.details["TD-1"].items[0].stock_warehouse,
+      "Loading warehouse"
+    );
+  };
+  await result.refresh(false, false);
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].method, "get_delivery_order_details");
+  assert.equal(
+    Array.from(requests[1].args.delivery_order_names).join(","),
+    "TD-1,TD-2"
+  );
+  assert.equal(rendered, 1);
+});
+
+test("selecting and clearing a whole demand keeps expanded item quantities synchronized", async () => {
+  const { result } = selectionController();
+  result.ensure_details = async () => {};
+  let rendered = 0;
+  result.render_demand = () => {
+    rendered++;
+  };
+  const checkbox = {
+    checked: true,
+    mock: { closest: () => ({ data: () => "TD-1" }) },
+  };
+  await result.toggle_order({ currentTarget: checkbox });
+  assert.equal(result.allocations.size, 2);
+  assert.equal(result.allocations.get("DI-1").allocated_quantity, 5);
+  assert.equal(result.allocations.get("DI-2").allocated_quantity, 3);
+  assert.equal(result.allocations.has("DI-3"), false);
+  checkbox.checked = false;
+  await result.toggle_order({ currentTarget: checkbox });
+  assert.equal(result.allocations.size, 0);
+  assert.equal(rendered, 2);
+});
+
+test("warehouse refresh cannot be overwritten by late item detail responses", async () => {
+  const { result } = controller();
+  result.details = {};
+  result.details_requests = new Map();
+  let resolve;
+  result.call = () =>
+    new Promise((done) => {
+      resolve = done;
+    });
+  const oldRequest = result.ensure_details(["TD-1"]);
+  result.details = {};
+  result.details_requests = new Map();
+  resolve([{ name: "TD-1", items: [{ stock_warehouse: "Old warehouse" }] }]);
+  await oldRequest;
+  assert.equal(result.details["TD-1"], undefined);
+});
 
 test("native planner serializes canonical links and the selected loading warehouse", async () => {
   const { result, requests } = controller();
