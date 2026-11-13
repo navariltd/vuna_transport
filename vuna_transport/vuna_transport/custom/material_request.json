@@ -1,7 +1,7 @@
 {
  "doctype": "Material Request",
  "custom_fields": [
-  {"dt":"Material Request","name":"Material Request-vuna_delivery_method","fieldname":"vuna_delivery_method","label":"Delivery Method","fieldtype":"Link","options":"Delivery Method","default":"Internal Transfer","depends_on":"eval:doc.material_request_type == 'Material Transfer'","reqd":0,"mandatory_depends_on":"","allow_on_submit":1,"insert_after":"material_request_type","module":"Vuna Transport"}
+  {"dt":"Material Request","name":"Material Request-vuna_delivery_method","fieldname":"vuna_delivery_method","label":"Delivery Method","fieldtype":"Link","options":"Delivery Method","default":"","depends_on":"eval:doc.material_request_type == 'Material Transfer'","reqd":0,"mandatory_depends_on":"","allow_on_submit":1,"insert_after":"material_request_type","module":"Vuna Transport"}
  ],
  "property_setters": [],
  "custom_perms": [],

@@ -36,6 +36,7 @@ test("Material Transfer delivery method remains visible but optional", () => {
   );
   assert.equal(field.reqd, 0);
   assert.equal(field.mandatory_depends_on, "");
+  assert.equal(field.default, "");
   assert.equal(
     field.depends_on,
     "eval:doc.material_request_type == 'Material Transfer'"
