@@ -96,6 +96,9 @@ class TestCustomerPlanningScreens(unittest.TestCase):
 		from types import SimpleNamespace
 
 		demand = SimpleNamespace(
+			name="TD-1",
+			movement_type="Customer Delivery",
+			check_permission=lambda *args: None,
 			company="A",
 			source_warehouse=None,
 			required_date="2026-11-10",
@@ -103,8 +106,18 @@ class TestCustomerPlanningScreens(unittest.TestCase):
 			transport_zone=None,
 			preferred_route=None,
 		)
-		with patch(
-			"vuna_transport.services.planning.customer_demand_load_service._read_demand", return_value=demand
+		get_doc = frappe.get_doc
+		with (
+			patch(
+				"frappe.get_doc",
+				side_effect=lambda *args, **kwargs: demand
+				if args == ("Transport Demand", "TD-1")
+				else get_doc(*args, **kwargs),
+			),
+			patch(
+				"vuna_transport.services.planning.customer_demand_load_service._read_demand",
+				return_value=demand,
+			),
 		):
 			load = build_delivery_load_from_allocations(
 				[{"transport_demand": "TD-1", "transport_demand_item": "DI-1", "allocated_quantity": 2}],

@@ -248,7 +248,15 @@ def build_delivery_load_from_allocations(allocations, vehicle_category=None, sou
 			for row in allocations
 		):
 			frappe.throw(_("Select only customer Transport Demand items for this plan."))
-		first = _read_demand(allocations[0]["transport_demand"])
+		first = frappe.get_doc("Transport Demand", allocations[0]["transport_demand"])
+		first.check_permission("read")
+		if first.movement_type != "Customer Delivery":
+			from vuna_transport.services.planning.transport_load_service import (
+				build_transport_load_from_demands,
+			)
+
+			return build_transport_load_from_demands(allocations, vehicle_category, source_warehouse)
+		first = _read_demand(first.name)
 		load = frappe.new_doc("Transport Load")
 		load.company, load.movement_type = first.company, "Customer Delivery"
 		load.source_warehouse = source_warehouse or first.source_warehouse

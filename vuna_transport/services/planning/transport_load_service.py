@@ -242,11 +242,19 @@ def validate_demand_allocations(load):
 def create_transport_load_from_demands(allocations: list | str, source_warehouse: str | None = None) -> str:
 	"""Create a draft from quantities expressed in the requested transaction UOM."""
 	require_doctype_permission("Transport Load", "create")
+	load = build_transport_load_from_demands(allocations, source_warehouse=source_warehouse)
+	load.insert()
+	return load.name
+
+
+def build_transport_load_from_demands(allocations, vehicle_category=None, source_warehouse=None):
+	"""Build an unsaved movement-specific load for preview or creation."""
 	rows = frappe.parse_json(allocations) if isinstance(allocations, str) else allocations
 	if not isinstance(rows, list) or not rows or len(rows) > 500:
 		frappe.throw(_("Select between 1 and 500 Transport Demand items."))
 	first = frappe.get_doc("Transport Demand", rows[0].get("transport_demand"))
 	first.check_permission("read")
+	require_company_access(first.company)
 	load = frappe.new_doc("Transport Load")
 	load.company = first.company
 	load.movement_type = first.movement_type
@@ -254,6 +262,7 @@ def create_transport_load_from_demands(allocations: list | str, source_warehouse
 	if first.movement_type == "Supplier Pickup":
 		load.source_warehouse = None
 	load.dispatch_date = first.required_date
+	load.required_vehicle_category = vehicle_category
 	load.status = "Proposed"
 	for row in rows:
 		load.append(
@@ -263,8 +272,24 @@ def create_transport_load_from_demands(allocations: list | str, source_warehouse
 				for key in ("transport_demand", "transport_demand_item", "allocated_quantity")
 			},
 		)
-	load.insert()
-	return load.name
+	return load
+
+
+def planning_demand_context(demand):
+	"""Presentation metadata from a demand already checked for read access."""
+	return {
+		"required_date": demand.required_date,
+		**{
+			field: demand.get(field)
+			for field in (
+				"delivery_method",
+				"transport_zone",
+				"delivery_group",
+				"transport_compatibility_group",
+				"transport_handling_profile",
+			)
+		},
+	}
 
 
 @frappe.whitelist()
@@ -406,6 +431,8 @@ def get_transfer_planning_items(
 					"transport_demand": name,
 					"transport_demand_item": item.name,
 					"item_code": item.item_code,
+					"item_name": frappe.get_cached_value("Item", item.item_code, "item_name"),
+					**planning_demand_context(demand),
 					"source_warehouse": demand.source_warehouse,
 					"destination_warehouse": demand.destination_warehouse,
 					"required_date": demand.required_date,

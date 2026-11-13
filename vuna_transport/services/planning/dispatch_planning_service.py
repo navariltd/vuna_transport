@@ -227,8 +227,7 @@ def evaluate_manual_load_plan(
 	load = build_delivery_load_from_allocations(
 		allocations, vehicle_category, source_warehouse=source_warehouse
 	)
-	validate_load_allocations(load, lock=False)
-	calculate_load_totals(load)
+	_validate_planning_load(load)
 	compatible_names = get_compatible_vehicle_category_names(load)
 	recommended = recommend_vehicle_category(load) if compatible_names else None
 	categories = get_vehicle_categories(
@@ -250,6 +249,11 @@ def evaluate_manual_load_plan(
 				"capacity": get_capacity_breakdown(_load_totals(load), category),
 			}
 		)
+	order_field, item_field = (
+		("transport_demand", "transport_demand_item")
+		if load.get("movement_type") in ("Warehouse Transfer", "Supplier Pickup")
+		else source.allocation_fields()
+	)
 	return {
 		"company": load.company,
 		"source_warehouse": load.source_warehouse,
@@ -272,8 +276,8 @@ def evaluate_manual_load_plan(
 		),
 		"allocations": [
 			{
-				source.allocation_fields()[0]: row.get(source.allocation_fields()[0]),
-				source.allocation_fields()[1]: row.get(source.allocation_fields()[1]),
+				order_field: row.get(order_field),
+				item_field: row.get(item_field),
 				"allocated_quantity": row.allocated_quantity,
 				"available_quantity": row.available_quantity,
 				"weight": row.weight,
@@ -404,9 +408,18 @@ def get_cost_structure_estimates(
 	load = build_delivery_load_from_allocations(
 		allocations, vehicle_category, source_warehouse=source_warehouse
 	)
-	validate_load_allocations(load, lock=False)
-	calculate_load_totals(load)
+	_validate_planning_load(load)
 	return _cost_structure_estimates_for_load(load, vehicle_category)
+
+
+def _validate_planning_load(load):
+	if load.get("movement_type") in ("Warehouse Transfer", "Supplier Pickup"):
+		from vuna_transport.services.planning.transport_load_service import validate_demand_allocations
+
+		validate_demand_allocations(load)
+	else:
+		validate_load_allocations(load, lock=False)
+		calculate_load_totals(load)
 
 
 @frappe.whitelist()

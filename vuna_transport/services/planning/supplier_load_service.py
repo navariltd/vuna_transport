@@ -52,12 +52,24 @@ def get_planning_items(
 		muted = frappe.flags.mute_messages
 		try:
 			frappe.flags.mute_messages = True
-			rows.extend(available_items(frappe.get_doc("Transport Demand", name)))
+			from vuna_transport.services.planning.transport_load_service import planning_demand_context
+
+			demand = frappe.get_doc("Transport Demand", name)
+			items = available_items(demand)
+			for item in items:
+				item.update(planning_demand_context(demand))
+			rows.extend(items)
 		except (frappe.ValidationError, frappe.PermissionError):
 			continue
 		finally:
 			frappe.flags.mute_messages = muted
-	return {"items": rows[:500], "has_more": len(names) > 20, "truncated": len(rows) > 500}
+	from vuna_transport.services.planning.dispatch_planning_service import _add_delivery_locations
+
+	visible = rows[:500]
+	for row in visible:
+		row["delivery_address"] = row["source_address"]
+	_add_delivery_locations(visible)
+	return {"items": visible, "has_more": len(names) > 20, "truncated": len(rows) > 500}
 
 
 def uncollected_releases(exclude_load=None):
@@ -181,6 +193,8 @@ def available_items(demand, exclude_load=None):
 					"supplier": order.supplier,
 					"source_address": demand.source_address,
 					"destination_warehouse": demand.destination_warehouse,
+					"weight": flt(item.weight) * qty / flt(item.stock_qty),
+					"weight_uom": item.weight_uom,
 				}
 			)
 	return result

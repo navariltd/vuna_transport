@@ -55,7 +55,7 @@
 .dp-transfer-pagination { display: flex; gap: 6px; justify-content: flex-end; margin-top: 10px; }
 .dp-tab-panel > .dp-section { flex: none; }
 .dp-demand-section { display: flex; flex-direction: column; height: 65vh; min-height: 320px; }
-.dp-transfer-demand { max-height: 65vh; overflow: auto; }
+.dp-transfer-demand, .dp-supplier-demand { flex: 1; min-height: 0; overflow: auto; }
 .dp-sidebar { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
 .dp-sidebar > .dp-section { min-height: 0; }
 .dp-sidebar > .dp-plan { display: flex; flex: none; flex-direction: column; }

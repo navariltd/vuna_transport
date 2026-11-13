@@ -97,6 +97,148 @@ function controller(native = true) {
   return { result, requests, layouts, controls, frappe, events };
 }
 
+test("each planning tab owns its demands, quantities and cached details", () => {
+  const { result } = controller();
+  result.orders = [{ name: "CUSTOMER" }];
+  result.allocations.set("CUSTOMER-ITEM", { allocated_quantity: 2 });
+  result.active_planning_tab = "depots";
+  assert.equal(result.orders.length, 0);
+  assert.equal(result.allocations.size, 0);
+  result.orders = [{ name: "DEPOT" }];
+  result.active_planning_tab = "suppliers";
+  assert.equal(result.orders.length, 0);
+  result.active_planning_tab = "customers";
+  assert.equal(result.orders[0].name, "CUSTOMER");
+  assert.equal(result.allocations.get("CUSTOMER-ITEM").allocated_quantity, 2);
+});
+
+test("depot items are grouped by demand and retain warehouse stock and transaction UOM", () => {
+  const { result } = controller();
+  result.set_movement_items("depots", [
+    {
+      transport_demand: "TD-1",
+      transport_demand_item: "DI-1",
+      destination_warehouse: "Meru Depot",
+      item_code: "Milk",
+      uom: "Carton",
+      available_quantity: 4,
+      stock_warehouse: "Main",
+      stock_available_quantity: 100,
+      weight: 8,
+    },
+    {
+      transport_demand: "TD-1",
+      transport_demand_item: "DI-2",
+      destination_warehouse: "Meru Depot",
+      item_code: "Cream",
+      uom: "Box",
+      available_quantity: 2,
+      weight: 3,
+    },
+  ]);
+  result.active_planning_tab = "depots";
+  assert.equal(result.orders.length, 1);
+  assert.equal(result.orders[0].customer_name, "Meru Depot");
+  assert.equal(result.orders[0].weight, 11);
+  assert.equal(result.details["TD-1"].items.length, 2);
+  assert.equal(result.details["TD-1"].items[0].uom, "Carton");
+  assert.equal(result.details["TD-1"].items[0].stock_warehouse, "Main");
+});
+
+test("supplier rows use collection locations and destination instead of invented on-hand stock", () => {
+  const { result } = controller();
+  result.set_movement_items("suppliers", [
+    {
+      transport_demand: "TD-P",
+      transport_demand_item: "PI",
+      supplier: "Packaging Supplier",
+      source_address: "SUP-001",
+      delivery_address_summary: "Industrial Road, Meru",
+      destination_warehouse: "Main",
+      item_code: "Cartons",
+      available_quantity: 3,
+      uom: "Box",
+    },
+  ]);
+  result.active_planning_tab = "suppliers";
+  let html;
+  result.$root = {
+    find: () => ({
+      html: (value) => {
+        html = value;
+      },
+    }),
+  };
+  result.update_select_all_state = () => {};
+  result.render_pagination = () => {};
+  result.render_demand();
+  assert.match(html, /Packaging Supplier/);
+  assert.match(html, /Collect from:<\/span> Industrial Road, Meru/);
+  assert.match(html, /To:<\/span> Main/);
+  assert.match(html, /Destination/);
+  assert.doesNotMatch(html, /Stock on Hand|Select a warehouse|SUP-001/);
+  assert.match(html, /dp-order-toggle/);
+  assert.match(html, /dp-allocation-qty/);
+});
+
+test("switching tabs keeps the Loading Plan visible and invalidates old previews", () => {
+  const { result } = controller();
+  const toggled = [];
+  const element = {
+    prop() {
+      return this;
+    },
+    toggleClass() {
+      return this;
+    },
+    attr() {
+      return this;
+    },
+    toggle(value) {
+      toggled.push(value);
+      return this;
+    },
+  };
+  const selectors = [];
+  result.$root = {
+    find(selector) {
+      selectors.push(selector);
+      return element;
+    },
+  };
+  result.render_demand = () => {};
+  result.render_plan = () => {};
+  result.schedule_plan_evaluation = () => {};
+  result.plan_evaluation_id = 1;
+  result.cost_request_id = 1;
+  result.plan = { totals: {} };
+  result.switch_planning_tab("depots");
+  assert.equal(result.plan, null);
+  assert.equal(result.plan_evaluation_id, 2);
+  assert.equal(result.cost_request_id, 2);
+  assert.ok(
+    selectors.every((value) => !value.includes(".dp-sidebar > .dp-plan"))
+  );
+  assert.equal(toggled.at(-1), false);
+});
+
+test("supplier preview requests preserve canonical item IDs and ignore the outbound warehouse filter", async () => {
+  const { result, requests } = controller();
+  result.active_planning_tab = "suppliers";
+  await result.call("evaluate_manual_load_plan", {
+    allocations: [
+      {
+        delivery_order: "TD-P",
+        delivery_order_item: "PI",
+        allocated_quantity: 2,
+      },
+    ],
+  });
+  assert.equal(requests[0].args.source_warehouse, null);
+  assert.equal(requests[0].args.allocations[0].transport_demand, "TD-P");
+  assert.equal(requests[0].args.allocations[0].transport_demand_item, "PI");
+});
+
 test("planning filters use report-sized inputs with placeholders and accessible labels", () => {
   const { result, controls } = controller();
   result.$root = { find: () => ({}) };
@@ -149,7 +291,7 @@ test("plan evaluation reads the selected category from the Link control", async 
     ],
   ]);
   result.plan_evaluation_id = 0;
-  result.$root = { find: () => ({ html() {} }) };
+  result.$root = { find: () => ({ html() {}, prop() {} }) };
   result.loading = () => "Loading";
   result.render_plan = () => {};
   result.call = async (method, args) => {
@@ -235,7 +377,10 @@ test("item selection defaults only the chosen item's remaining quantity and supp
   assert.equal(result.allocations.size, 1);
   assert.equal(result.allocations.get("DI-1").allocated_quantity, 5);
   assert.equal(controls.get('.dp-allocation-qty[data-item="DI-1"]').value, 5);
-  assert.equal(controls.get(".dp-select-all-orders").indeterminate, true);
+  assert.equal(
+    controls.get(".dp-demand .dp-select-all-orders").indeterminate,
+    true
+  );
   assert.equal(
     controls.get('[data-order="TD-1"] .dp-order-select').checked,
     false
@@ -243,7 +388,10 @@ test("item selection defaults only the chosen item's remaining quantity and supp
   checkbox.checked = false;
   result.toggle_item({ currentTarget: checkbox });
   assert.equal(result.allocations.size, 0);
-  assert.equal(controls.get(".dp-select-all-orders").indeterminate, false);
+  assert.equal(
+    controls.get(".dp-demand .dp-select-all-orders").indeterminate,
+    false
+  );
 });
 
 test("order and page selection exclude exhausted rows and track partial selection", () => {
@@ -252,10 +400,13 @@ test("order and page selection exclude exhausted rows and track partial selectio
   result.allocations.set("DI-2", { allocated_quantity: 3 });
   result.update_select_all_state();
   assert.equal(result.order_selection_state("TD-1").checked, true);
-  assert.equal(controls.get(".dp-select-all-orders").checked, true);
+  assert.equal(controls.get(".dp-demand .dp-select-all-orders").checked, true);
   result.allocations.delete("DI-1");
   result.update_select_all_state();
-  assert.equal(controls.get(".dp-select-all-orders").indeterminate, true);
+  assert.equal(
+    controls.get(".dp-demand .dp-select-all-orders").indeterminate,
+    true
+  );
   assert.equal(
     controls.get('[data-order="TD-1"] .dp-order-select').indeterminate,
     true
