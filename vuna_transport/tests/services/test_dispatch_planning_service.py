@@ -12,7 +12,9 @@ from vuna_transport.services.planning.dispatch_filter_service import validate_ad
 from vuna_transport.services.planning.dispatch_planning_service import (
 	_add_delivery_locations,
 	_delivery_date_filter,
+	_delivery_order_fields,
 	_filter_allocation_state,
+	_format_demand_row,
 	_planning_filters,
 	_summarize_vehicle_categories,
 	_warehouse_summaries,
@@ -21,6 +23,26 @@ from vuna_transport.services.planning.load_suggestion_service import _partition_
 
 
 class TestDispatchPlanningService(UnitTestCase):
+	def test_planning_rows_expose_grouping_fields_used_by_load_validation(self):
+		order = frappe._dict(
+			name="TD-1",
+			transport_zone="Meru",
+			delivery_method="Company Delivery",
+			delivery_group="Dairy",
+			transport_compatibility_group="Chilled",
+			transport_handling_profile="Cold Chain",
+		)
+		result = _format_demand_row(order, {})
+		for field in (
+			"transport_zone",
+			"delivery_method",
+			"delivery_group",
+			"transport_compatibility_group",
+			"transport_handling_profile",
+		):
+			self.assertIn(field, _delivery_order_fields())
+			self.assertEqual(result[field], order[field])
+
 	def test_delivery_locations_resolve_linked_address_once_without_replacing_its_type(self):
 		rows = [{"delivery_address": "CUST-001-Billing"}, {"delivery_address": "CUST-001-Billing"}]
 		with (

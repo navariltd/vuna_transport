@@ -89,6 +89,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 
 	destroy() {
 		this.destroyed = true;
+		this.close_grouping_popover();
 		clearTimeout(this.filter_timer);
 		clearTimeout(this.plan_evaluation_timer);
 		this.$root?.off();
@@ -112,7 +113,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				</div>
 				<div class="dp-planning-tabs" role="tablist" aria-label="${__("Planning demand type")}">
 					<button type="button" class="dp-planning-tab active" id="dp-customer-tab" role="tab" aria-selected="true" aria-controls="dp-customer-panel" tabindex="0" data-planning-tab="customers">${__(
-						"Customer Orders"
+						"Orders"
 					)}</button>
 					<button type="button" class="dp-planning-tab" id="dp-depot-tab" role="tab" aria-selected="false" aria-controls="dp-depot-panel" tabindex="-1" data-planning-tab="depots">${__(
 						"Depots"
@@ -379,6 +380,9 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.$root.on("click", ".btn-next", () => this.change_page(1));
 		this.$root.on("change", ".dp-order-select", (event) => this.toggle_order(event));
 		this.$root.on("click", ".dp-order-toggle", (event) => this.toggle_order_details(event));
+		this.$root.on("click", ".dp-grouping-trigger", (event) =>
+			this.show_grouping_popover(event)
+		);
 		this.$root.on("change", ".dp-select-all-orders", (event) => this.toggle_all_orders(event));
 		this.$root.on("change", ".dp-item-select", (event) => this.toggle_item(event));
 		this.$root.on("change", ".dp-allocation-qty", (event) => this.change_quantity(event));
@@ -391,6 +395,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	switch_planning_tab(tab) {
+		this.close_grouping_popover();
 		if (!["customers", "depots", "suppliers"].includes(tab)) return;
 		this.active_planning_tab = tab;
 		const customers = tab === "customers";
@@ -474,6 +479,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	async refresh(clear_selection = false, refresh_resources = true) {
+		this.close_grouping_popover();
 		const filters = this.get_filter_values();
 		if (!filters.company) return;
 		const request_id = ++this.refresh_request_id;
@@ -747,6 +753,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 	}
 
 	render_demand() {
+		this.close_grouping_popover();
 		if (!this.orders.length) {
 			this.$root
 				.find(".dp-demand")
@@ -768,7 +775,6 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				const requirements = [
 					order.refrigeration_required ? __("Refrigerated") : "",
 					order.tail_lift_required ? __("Tail lift") : "",
-					order.transport_handling_profile || "",
 				]
 					.filter(Boolean)
 					.join(", ");
@@ -810,6 +816,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 				)}"><span class="dp-location-label">${__("Deliver to:")}</span> ${this.escape(
 					destination
 				)}</span></div>
+				${this.render_grouping_details(order)}
 				<div class="dp-order-meta"><a class="dp-order-reference" href="/app/${frappe.router.slug(
 					this.customer_context.doctype
 				)}/${encodeURIComponent(order.name)}">${this.escape(
@@ -860,6 +867,95 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			);
 		this.update_select_all_state();
 		this.render_pagination();
+	}
+
+	render_grouping_details(order) {
+		const fields = [
+			[__("Zone"), order.transport_zone],
+			[__("Delivery Method"), order.delivery_method],
+			[__("Delivery Group"), order.delivery_group],
+			[__("Transport Compatibility Group"), order.transport_compatibility_group],
+		];
+		if (order.transport_handling_profile)
+			fields.push([__("Handling Profile"), order.transport_handling_profile]);
+		const tags = fields
+			.filter(([, value]) => value)
+			.map(
+				([label, value]) =>
+					`<span class="dp-grouping-tag" title="${this.escape(
+						`${label}: ${value}`
+					)}" aria-label="${this.escape(`${label}: ${value}`)}">${this.escape(
+						value
+					)}</span>`
+			)
+			.join("");
+		return `<span class="dp-order-grouping">${tags}<button type="button" class="dp-grouping-trigger" aria-haspopup="dialog" aria-expanded="false" title="${__(
+			"View grouping details"
+		)}">${
+			tags ? "" : this.escape(__("Grouping"))
+		}<span class="dp-grouping-more" aria-hidden="true">⋯</span><span class="sr-only">${__(
+			"View grouping details"
+		)}</span></button><template class="dp-grouping-template"><dl class="dp-grouping-details">${fields
+			.map(
+				([label, value]) =>
+					`<dt>${this.escape(label)}</dt><dd>${this.escape(value || __("Not set"))}</dd>`
+			)
+			.join("")}</dl></template></span>`;
+	}
+
+	show_grouping_popover(event) {
+		const trigger = event.currentTarget;
+		const already_open = this.grouping_trigger === trigger;
+		this.close_grouping_popover();
+		if (already_open) return;
+		this.grouping_trigger = trigger;
+		const $trigger = $(trigger);
+		$trigger
+			.attr("aria-expanded", "true")
+			.popover({
+				html: true,
+				content: $trigger
+					.closest(".dp-order-grouping")
+					.find(".dp-grouping-template")
+					.contents()
+					.clone(),
+				container: "body",
+				placement: "bottom",
+				boundary: "viewport",
+				trigger: "manual",
+				animation: false,
+				template: `<div class="popover dp-grouping-popover" role="dialog" aria-label="${__(
+					"Grouping details"
+				)}"><div class="arrow"></div><div class="popover-body"></div></div>`,
+			})
+			.popover("show");
+		this.grouping_outside_handler = (e) => {
+			if (!trigger.contains(e.target) && !e.target.closest?.(".dp-grouping-popover"))
+				this.close_grouping_popover();
+		};
+		this.grouping_key_handler = (e) => {
+			if (e.key === "Escape") {
+				e.preventDefault();
+				this.close_grouping_popover(true);
+			}
+		};
+		this.grouping_scroll_handler = () => this.close_grouping_popover();
+		document.addEventListener("pointerdown", this.grouping_outside_handler);
+		document.addEventListener("keydown", this.grouping_key_handler);
+		window.addEventListener("resize", this.grouping_scroll_handler);
+		this.$root.find(".dp-demand").on("scroll.dp-grouping", this.grouping_scroll_handler);
+	}
+
+	close_grouping_popover(restore_focus = false) {
+		if (!this.grouping_trigger) return;
+		const trigger = this.grouping_trigger;
+		this.grouping_trigger = null;
+		document.removeEventListener("pointerdown", this.grouping_outside_handler);
+		document.removeEventListener("keydown", this.grouping_key_handler);
+		window.removeEventListener("resize", this.grouping_scroll_handler);
+		this.$root.find(".dp-demand").off("scroll.dp-grouping");
+		$(trigger).attr("aria-expanded", "false").popover("dispose");
+		if (restore_focus && trigger.isConnected) trigger.focus();
 	}
 
 	render_pagination() {

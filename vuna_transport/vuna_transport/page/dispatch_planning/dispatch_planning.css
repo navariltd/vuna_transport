@@ -77,17 +77,25 @@
 .dp-order-group { border: 0; border-top: 1px solid var(--border-color); margin: 0; overflow: hidden; }
 .dp-demand-header + .dp-order-group { border-top: 0; }
 .dp-demand-row { align-items: center; background: var(--card-bg); display: grid; gap: 12px; grid-template-columns: 56px minmax(0, 1fr); font-size: var(--text-md); padding: 6px 8px; border-bottom: 1px solid var(--border-color); }
-.dp-order-controls { align-items: center; display: flex; gap: 8px; }
-.dp-selection-label { align-items: center; color: var(--dp-secondary-text); cursor: pointer; display: inline-flex; font-size: var(--text-sm); font-weight: normal; gap: 6px; margin: 0; white-space: nowrap; }
+.dp-order-controls { align-items: center; display: flex; gap: 0; }
+.dp-selection-label { align-items: center; color: var(--dp-secondary-text); cursor: pointer; display: inline-flex; font-size: var(--text-sm); font-weight: normal; gap: 6px; justify-content: center; margin: 0; min-height: 28px; min-width: 28px; white-space: nowrap; }
 .dp-selection-label input { margin: 0; }
-.dp-order-context { display: grid; gap: 2px 24px; grid-template-columns: minmax(0, 1.2fr) minmax(300px, 1fr); min-width: 0; }
+.dispatch-planning input[type="checkbox"] { --checkbox-size: 14px; --checkbox-right-margin: 0px; border-radius: 3px; box-shadow: none; cursor: pointer; flex: none; vertical-align: middle; }
+.dispatch-planning input[type="checkbox"]:not(:checked):not(:indeterminate):not(:disabled) { background-color: var(--card-bg); border: 1px solid var(--text-muted); }
+.dispatch-planning input[type="checkbox"]:not(:checked):not(:indeterminate):not(:disabled):hover { border-color: var(--text-color); }
+.dispatch-planning input[type="checkbox"]:focus { box-shadow: none; outline: none; }
+.dispatch-planning input[type="checkbox"]:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.dispatch-planning input[type="checkbox"]:indeterminate { background: var(--text-color); border: 0; }
+.dispatch-planning input[type="checkbox"]:indeterminate::after { background: var(--card-bg); border-radius: 1px; content: ""; height: 2px; left: 3px; position: absolute; top: 6px; width: 8px; }
+.dispatch-planning input[type="checkbox"]:disabled { cursor: not-allowed; opacity: 0.5; }
+.dp-order-context { display: grid; gap: 2px 16px; grid-template-columns: minmax(180px, 1fr) minmax(28px, 0.8fr) 420px; min-width: 0; }
 .dp-order-context > * { min-width: 0; }
 .dp-order-identity,
 .dp-order-meta { align-items: baseline; display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .dp-order-identity { font-weight: 500; gap: 4px 8px; grid-column: 1; grid-row: 1; }
 .dp-order-customer { font-weight: 600; }
 .dp-order-city { font-weight: 500; }
-.dp-order-locations { font-size: var(--text-sm); grid-column: 1; grid-row: 2; overflow-wrap: anywhere; }
+.dp-order-locations { font-size: var(--text-sm); grid-column: 1 / 3; grid-row: 2; overflow-wrap: anywhere; }
 .dp-location-label { color: var(--dp-secondary-text); }
 .dp-order-destination { font-weight: 400; }
 .dp-order-reference { color: var(--text-color); font-size: var(--text-sm); font-weight: 400; text-decoration: underline; text-underline-offset: 2px; }
@@ -95,8 +103,18 @@
 .dp-order-toggle { align-self: center; background: transparent; border: 0; border-radius: var(--border-radius); color: var(--dp-secondary-text); cursor: pointer; flex: none; height: 28px; padding: 0; width: 28px; }
 .dp-order-toggle:hover { background: var(--subtle-fg); color: var(--text-color); }
 .dp-order-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.dp-order-meta { color: var(--dp-secondary-text); font-size: var(--text-sm); grid-column: 2; grid-row: 1; justify-content: flex-end; margin-top: 0; text-align: right; }
-.dp-order-transport { align-items: baseline; color: var(--dp-secondary-text); display: flex; flex-wrap: wrap; font-size: var(--text-sm); gap: 4px 16px; grid-column: 2; grid-row: 2; justify-content: flex-end; text-align: right; }
+.dp-order-meta { color: var(--dp-secondary-text); font-size: var(--text-sm); flex-wrap: nowrap; grid-column: 3; grid-row: 1; justify-content: flex-end; margin-top: 0; text-align: right; white-space: nowrap; }
+.dp-order-transport { align-items: baseline; color: var(--dp-secondary-text); display: flex; flex-wrap: wrap; font-size: var(--text-sm); gap: 4px 16px; grid-column: 3; grid-row: 2; justify-content: flex-end; text-align: right; }
+.dp-order-grouping { align-items: center; align-self: center; color: var(--dp-secondary-text); display: flex; font-size: var(--text-xs); gap: 4px; grid-column: 2; grid-row: 1; justify-content: flex-start; min-height: 24px; min-width: 0; overflow: hidden; }
+.dp-grouping-trigger { align-items: center; background: transparent; border: 0; border-radius: var(--border-radius); color: inherit; cursor: pointer; display: inline-flex; flex: none; gap: 4px; min-height: 24px; padding: 0 4px; }
+.dp-grouping-trigger:hover { background: var(--subtle-fg); color: var(--text-color); }
+.dp-grouping-trigger:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.dp-grouping-tag { background: var(--subtle-fg); border-radius: 3px; flex: 0 1 auto; height: 20px; line-height: 20px; min-width: 0; overflow: hidden; padding: 0 6px; text-overflow: ellipsis; white-space: nowrap; }
+.dp-grouping-more { color: var(--text-color); font-size: var(--text-md); padding: 0 4px; }
+.dp-grouping-popover { font-size: var(--text-sm); max-width: min(380px, calc(100vw - 24px)); }
+.dp-grouping-details { display: grid; gap: 8px 12px; grid-template-columns: minmax(100px, 1fr) minmax(0, 1fr); margin: 0; text-align: left; }
+.dp-grouping-details dt { color: var(--text-muted); font-weight: 400; }
+.dp-grouping-details dd { color: var(--text-color); margin: 0; overflow-wrap: anywhere; }
 .dp-order-capacity { border-left: 1px solid var(--border-color); padding-left: 16px; }
 .dp-order-requirements { background: var(--control-bg); border-radius: var(--border-radius); font-size: var(--text-sm); padding: 2px 6px; }
 .dp-demand-row-warning { background: var(--alert-bg); border-left: 3px solid var(--orange-500); }
@@ -234,4 +252,9 @@
 
 @media (max-width: 600px) {
 	.dp-filter-grid { grid-template-columns: 1fr; }
+}
+
+@media (forced-colors: active) {
+	.dispatch-planning input[type="checkbox"] { appearance: auto; }
+	.dispatch-planning input[type="checkbox"]:indeterminate::after { display: none; }
 }

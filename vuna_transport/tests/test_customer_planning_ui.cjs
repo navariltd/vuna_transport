@@ -8,6 +8,11 @@ function controller(native = true) {
   const requests = [];
   const layouts = [];
   const controls = [];
+  const events = { document: new Map(), window: new Map() };
+  const eventTarget = (listeners) => ({
+    addEventListener: (name, callback) => listeners.set(name, callback),
+    removeEventListener: (name) => listeners.delete(name),
+  });
   const vuna_transport = { DispatchPlanning: {} };
   const frappe = {
     provide() {},
@@ -51,6 +56,8 @@ function controller(native = true) {
       vuna_transport,
       cint: Number,
       clearTimeout,
+      document: eventTarget(events.document),
+      window: eventTarget(events.window),
       flt: (value) => Number(value) || 0,
       __: (text, args = []) => text.replace(/\{(\d+)\}/g, (_, i) => args[i]),
       $: (element) =>
@@ -87,7 +94,7 @@ function controller(native = true) {
       .replaceAll('"', "&quot;");
   result.selector = (value) => value;
   result.number = (value) => String(value);
-  return { result, requests, layouts, controls, frappe };
+  return { result, requests, layouts, controls, frappe, events };
 }
 
 test("planning filters use report-sized inputs with placeholders and accessible labels", () => {
@@ -361,12 +368,113 @@ test("customer demand renders item rows immediately without an Items expander", 
   assert.doesNotMatch(html, /class="dp-order-identity"><button/);
   assert.doesNotMatch(html, /dp-expand-order/);
   assert.match(html, /Stock on Hand/);
+  assert.match(html, /class="dp-order-grouping"/);
+  assert.ok(
+    html.indexOf('class="dp-order-grouping"') <
+      html.indexOf('class="dp-order-meta"')
+  );
   assert.match(html, /aria-label="Select order TD-1"/);
   assert.doesNotMatch(html, /<span>Order<\/span><\/label>/);
   assert.doesNotMatch(
     html,
     /Allocated \/ Requested|No territory|dp-item-columns/
   );
+});
+
+test("grouping uses compact configured tags with full details in a hidden popover template", () => {
+  const { result } = controller();
+  const html = result.render_grouping_details({
+    transport_zone: "Meru",
+    delivery_method: "Company Delivery",
+    delivery_group: "Dairy",
+    transport_compatibility_group: "Chilled",
+    transport_handling_profile: "Cold Chain",
+  });
+  assert.match(html, /title="Zone: Meru"/);
+  assert.match(html, /title="Delivery Method: Company Delivery"/);
+  assert.match(html, /title="Delivery Group: Dairy"/);
+  assert.match(html, /title="Transport Compatibility Group: Chilled"/);
+  assert.match(html, /title="Handling Profile: Cold Chain"/);
+  assert.match(
+    html,
+    /<dt>Transport Compatibility Group<\/dt><dd>Chilled<\/dd>/
+  );
+  assert.doesNotMatch(html, /<details|<summary/);
+  assert.match(
+    html,
+    /class="dp-grouping-trigger" aria-haspopup="dialog" aria-expanded="false"/
+  );
+  assert.match(html, /<template class="dp-grouping-template">/);
+  const empty = result.render_grouping_details({});
+  assert.equal((empty.match(/Not set/g) || []).length, 4);
+  assert.doesNotMatch(empty, /Handling Profile|text-danger/);
+  const summary = empty.match(/<button[^>]*>([\s\S]*?)<\/button>/)[1];
+  assert.match(summary, /Grouping/);
+  assert.doesNotMatch(summary, /Not set/);
+  assert.match(
+    result.render_grouping_details({ transport_zone: '<img src="x">' }),
+    /&lt;img/
+  );
+});
+
+test("grouping popover closes outside, on Escape, and on a second trigger click without changing selection", () => {
+  const { result, events } = controller();
+  const calls = [];
+  const attributes = {};
+  const scroll = new Map();
+  const content = {};
+  let focused = false;
+  const trigger = {
+    contains: (target) => target === trigger,
+    isConnected: true,
+    focus: () => {
+      focused = true;
+    },
+  };
+  const mock = {
+    attr(key, value) {
+      attributes[key] = value;
+      return mock;
+    },
+    popover(value) {
+      calls.push(value);
+      return mock;
+    },
+    closest: () => ({
+      find: () => ({ contents: () => ({ clone: () => content }) }),
+    }),
+  };
+  trigger.mock = mock;
+  result.$root = {
+    find: () => ({
+      on: (name, callback) => scroll.set(name, callback),
+      off: (name) => scroll.delete(name),
+    }),
+  };
+  result.allocations = new Map([["DI-1", { allocated_quantity: 2 }]]);
+  result.show_grouping_popover({ currentTarget: trigger });
+  assert.equal(calls[0].container, "body");
+  assert.equal(calls[0].trigger, "manual");
+  assert.equal(calls[0].content, content);
+  assert.equal(attributes["aria-expanded"], "true");
+  events.document.get("pointerdown")({ target: trigger });
+  assert.equal(result.grouping_trigger, trigger);
+  events.document.get("pointerdown")({ target: { closest: () => ({}) } });
+  assert.equal(result.grouping_trigger, trigger);
+  events.document.get("pointerdown")({ target: { closest: () => null } });
+  assert.equal(result.grouping_trigger, null);
+  assert.equal(events.document.size, 0);
+  assert.equal(events.window.size, 0);
+  assert.equal(scroll.size, 0);
+  assert.equal(calls.at(-1), "dispose");
+  result.show_grouping_popover({ currentTarget: trigger });
+  events.document.get("keydown")({ key: "Escape", preventDefault() {} });
+  assert.equal(focused, true);
+  assert.equal(attributes["aria-expanded"], "false");
+  result.show_grouping_popover({ currentTarget: trigger });
+  result.show_grouping_popover({ currentTarget: trigger });
+  assert.equal(result.grouping_trigger, null);
+  assert.equal(result.allocations.get("DI-1").allocated_quantity, 2);
 });
 
 test("collapsing an order preserves selected quantities and updates accessible state", () => {
