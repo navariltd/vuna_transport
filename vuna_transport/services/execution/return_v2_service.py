@@ -48,9 +48,10 @@ def _validate_return_inspection_sales_return(inspection) -> None:
 	inspected_by_item = defaultdict(float)
 	inspected_serials_by_item = defaultdict(set)
 	quality_inspections = set()
-	require_quality_inspection = bool(
-		frappe.db.get_single_value("Transport Settings", "require_quality_inspection_for_return_inspection")
+	from vuna_transport.services.execution.return_inspection_quality_service import (
+		validate_result_quality_inspection,
 	)
+
 	accepted = rejected = 0.0
 	for row in inspection.results:
 		source = source_items.get(row.delivery_note_item)
@@ -84,8 +85,7 @@ def _validate_return_inspection_sales_return(inspection) -> None:
 			_validate_warehouse(row.target_warehouse, inspection.company)
 			if row.result == "Rejected":
 				_validate_rejected_warehouse(row.target_warehouse)
-		if require_quality_inspection:
-			_validate_result_quality_inspection(row, source, sales_return, quality_inspections)
+		validate_result_quality_inspection(inspection, row, quality_inspections)
 		serials = {serial for serial in (source.serial_no or "").splitlines() if serial}
 		row_serials = [serial for serial in (row.serial_no or "").splitlines() if serial]
 		if serials:
@@ -106,7 +106,8 @@ def _validate_return_inspection_sales_return(inspection) -> None:
 
 	for source in source_items.values():
 		expected_qty = abs(flt(source.stock_qty))
-		if abs(inspected_by_item.get(source.name, 0) - expected_qty) > 1e-6:
+		balance = inspected_by_item.get(source.name, 0) - expected_qty
+		if balance > 1e-6 or (inspection.docstatus == 1 and abs(balance) > 1e-6):
 			frappe.throw(
 				_("Inspection quantity for {0} must equal received quantity {1} {2}.").format(
 					source.item_code, expected_qty, source.stock_uom
@@ -302,6 +303,9 @@ def create_return_inspection_from_sales_return(sales_return: str) -> str:
 	if len(warehouses) != 1:
 		frappe.throw(_("All Sales Return rows must use one quarantine warehouse before inspection."))
 	inspection = frappe.new_doc("Return Inspection")
+	inspection.inspection_required = frappe.db.get_single_value(
+		"Transport Settings", "require_quality_inspection_for_return_inspection"
+	)
 	inspection.update(
 		{
 			"sales_return": target.name,
@@ -504,34 +508,14 @@ def prepare_return_quality_inspection_removal(doc, method=None) -> None:
 		fields=["name", "parent", "docstatus"],
 	)
 	for row in rows:
-		if row.docstatus == 1 and frappe.db.get_value(
-			"Return Inspection", row.parent, "receiving_stock_entry"
-		):
+		if row.docstatus == 1:
 			frappe.throw(
-				_(
-					"Cancel depot Return Inspection {0} before removing its Quality Inspection evidence."
-				).format(row.parent)
+				_("Cancel Return Inspection {0} before removing its Quality Inspection evidence.").format(
+					row.parent
+				)
 			)
 		frappe.db.set_value(
 			"Return Inspection Result", row.name, "quality_inspection", None, update_modified=False
-		)
-
-
-def sync_return_quality_inspection(doc, method=None) -> None:
-	"""Attach ERPNext's standard Quality Inspection to Vuna's detailed result groups."""
-	if doc.docstatus == 2 or doc.reference_type != "Delivery Note" or not doc.child_row_reference:
-		return
-	for row in frappe.get_all(
-		"Return Inspection Result",
-		filters={"delivery_note_item": doc.child_row_reference, "docstatus": ["!=", 2]},
-		fields=["name"],
-	):
-		frappe.db.set_value(
-			"Return Inspection Result",
-			row.name,
-			"quality_inspection",
-			doc.name,
-			update_modified=False,
 		)
 
 
@@ -546,57 +530,3 @@ def _validate_warehouse(warehouse: str, company: str) -> None:
 def _validate_rejected_warehouse(warehouse: str) -> None:
 	if not frappe.db.get_value("Warehouse", warehouse, "is_rejected_warehouse"):
 		frappe.throw(_("Warehouse {0} must be marked as a Rejected Warehouse.").format(warehouse))
-
-
-def _validate_result_quality_inspection(row, source, sales_return, used_inspections) -> None:
-	if not row.quality_inspection:
-		frappe.throw(
-			_("Row #{0}: A submitted Quality Inspection is required for this result group.").format(row.idx)
-		)
-	if row.quality_inspection in used_inspections:
-		frappe.throw(
-			_("Row #{0}: Quality Inspection {1} can only be used for one result group.").format(
-				row.idx, row.quality_inspection
-			)
-		)
-	quality_inspection = frappe.get_doc("Quality Inspection", row.quality_inspection)
-	if quality_inspection.docstatus != 1:
-		frappe.throw(
-			_("Row #{0}: Quality Inspection {1} must be submitted.").format(row.idx, row.quality_inspection)
-		)
-	if (
-		quality_inspection.reference_type != "Delivery Note"
-		or quality_inspection.reference_name != sales_return.name
-	):
-		frappe.throw(
-			_("Row #{0}: Quality Inspection {1} must reference Sales Return {2}.").format(
-				row.idx, row.quality_inspection, sales_return.name
-			)
-		)
-	if quality_inspection.item_code != source.item_code:
-		frappe.throw(
-			_("Row #{0}: Quality Inspection {1} is for item {2}, not {3}.").format(
-				row.idx, row.quality_inspection, quality_inspection.item_code, source.item_code
-			)
-		)
-	if quality_inspection.child_row_reference != source.name:
-		frappe.throw(
-			_("Row #{0}: Quality Inspection {1} must reference Delivery Note Item {2}.").format(
-				row.idx, row.quality_inspection, source.name
-			)
-		)
-	used_inspections.add(row.quality_inspection)
-
-
-def _validate_stock_identity(row) -> None:
-	item = frappe.get_cached_value("Item", row.item_code, ["has_batch_no", "has_serial_no"], as_dict=True)
-	if item.has_batch_no and not row.batch_no:
-		frappe.throw(_("Row #{0}: Batch No is required for {1}.").format(row.idx, row.item_code))
-	if item.has_serial_no:
-		serials = [serial for serial in (row.serial_no or "").splitlines() if serial]
-		if len(serials) != int(flt(row.received_stock_qty)):
-			frappe.throw(
-				_("Row #{0}: Enter one serial number for each received unit of {1}.").format(
-					row.idx, row.item_code
-				)
-			)

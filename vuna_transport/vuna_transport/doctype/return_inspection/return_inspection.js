@@ -1,12 +1,28 @@
 // Copyright (c) 2026, Yovuna Technologies Limited and contributors
 
 frappe.ui.form.on("Return Inspection", {
+	async onload(frm) {
+		if (!frm.is_new() || frm._inspection_default_doc === frm.doc) return;
+		const initial_doc = frm.doc;
+		frm._inspection_default_doc = initial_doc;
+		const initial_value = frm.doc.inspection_required;
+		const value = await frappe.db.get_single_value(
+			"Transport Settings",
+			"require_quality_inspection_for_return_inspection"
+		);
+		if (
+			frm.is_new() &&
+			frm.doc === initial_doc &&
+			frm.doc.inspection_required === initial_value
+		)
+			await frm.set_value("inspection_required", cint(value));
+	},
 	setup(frm) {
 		frm.set_query("quality_inspection", "results", (doc, cdt, cdn) => {
 			const row = frappe.get_doc(cdt, cdn);
 			return {
 				filters: {
-					docstatus: 1,
+					docstatus: ["<", 2],
 					reference_type: frm.doc.receiving_stock_entry
 						? "Stock Entry"
 						: "Delivery Note",
@@ -59,6 +75,19 @@ frappe.ui.form.on("Return Inspection", {
 	refresh(frm) {
 		render_inspection_uom_summary(frm);
 		frm.toggle_display("sales_return", !frm.doc.receiving_stock_entry);
+		if (
+			!frm.is_new() &&
+			frm.doc.docstatus === 0 &&
+			frm.has_perm("write") &&
+			frappe.model.can_create("Quality Inspection")
+		) {
+			frm.add_custom_button(
+				__("Quality Inspections"),
+				() => create_return_quality_inspections(frm),
+				__("Create")
+			);
+			frm.page.set_inner_btn_group_as_primary(__("Create"));
+		}
 		if (frm.doc.docstatus !== 1 || frm.doc.stock_entry) return;
 		frm.add_custom_button(
 			__("Stock Entry (Material Transfer)"),
@@ -80,7 +109,7 @@ frappe.ui.form.on("Return Inspection", {
 	validate(frm) {
 		render_inspection_uom_summary(frm);
 		// Depot receipts are validated per source row AND batch on the server.
-		if (frm.doc.receiving_stock_entry) return;
+		if (frm.doc.receiving_stock_entry || frm.doc.docstatus === 0) return;
 		const totals = {};
 		for (const row of frm.doc.results || []) {
 			if (!row.delivery_note_item) continue;
@@ -133,6 +162,124 @@ frappe.ui.form.on("Return Inspection", {
 		}
 	},
 });
+
+function create_return_quality_inspections(frm) {
+	if (frm.is_dirty()) {
+		frappe.msgprint(__("Save the Return Inspection before creating Quality Inspections."));
+		return;
+	}
+	const selected = new Set(
+		frm.fields_dict.results.grid.get_selected_children().map((row) => row.name)
+	);
+	const rows = (frm.doc.results || []).filter((row) => !row.quality_inspection);
+	if (!rows.length) {
+		frappe.msgprint(__("Every result row already has a Quality Inspection."));
+		return;
+	}
+	const name = frm.doc.name;
+	const modified = frm.doc.modified;
+	const dialog = new frappe.ui.Dialog({
+		title: __("Create Quality Inspections"),
+		size: "large",
+		fields: [
+			{
+				fieldtype: "Table",
+				fieldname: "results",
+				label: __("Result Rows"),
+				cannot_add_rows: true,
+				cannot_delete_rows: true,
+				data: rows.map((row) => ({
+					result_row: row.name,
+					item_code: row.item_code,
+					result: row.result,
+					inspection_qty: row.inspection_qty,
+					stock_uom: row.stock_uom,
+					batch_no: row.batch_no,
+					__checked: selected.size ? selected.has(row.name) : 1,
+				})),
+				fields: [
+					{ fieldname: "result_row", fieldtype: "Data", hidden: 1 },
+					{
+						fieldname: "item_code",
+						fieldtype: "Link",
+						options: "Item",
+						label: __("Item"),
+						read_only: 1,
+						in_list_view: 1,
+						columns: 3,
+					},
+					{
+						fieldname: "result",
+						fieldtype: "Data",
+						label: __("Result"),
+						read_only: 1,
+						in_list_view: 1,
+						columns: 2,
+					},
+					{
+						fieldname: "inspection_qty",
+						fieldtype: "Float",
+						label: __("Quantity"),
+						read_only: 1,
+						in_list_view: 1,
+						columns: 2,
+					},
+					{
+						fieldname: "stock_uom",
+						fieldtype: "Link",
+						options: "UOM",
+						label: __("UOM"),
+						read_only: 1,
+						in_list_view: 1,
+						columns: 1,
+					},
+					{
+						fieldname: "batch_no",
+						fieldtype: "Link",
+						options: "Batch",
+						label: __("Batch"),
+						read_only: 1,
+						in_list_view: 1,
+						columns: 2,
+					},
+				],
+			},
+		],
+		primary_action_label: __("Create"),
+		async primary_action() {
+			if (frm.is_dirty() || frm.doc.name !== name || frm.doc.modified !== modified) {
+				frappe.msgprint(
+					__("The Return Inspection has changed. Save it and reopen this dialog.")
+				);
+				return;
+			}
+			const names = dialog.fields_dict.results.grid
+				.get_selected_children()
+				.map((row) => row.result_row);
+			if (!names.length) {
+				frappe.msgprint(__("Select at least one result row."));
+				return;
+			}
+			dialog.get_primary_btn().prop("disabled", true);
+			try {
+				const { message } = await frappe.call({
+					method: "vuna_transport.services.execution.return_inspection_quality_service.create_quality_inspections",
+					args: { return_inspection: name, result_rows: names, modified },
+					freeze: true,
+				});
+				dialog.hide();
+				await frm.reload_doc();
+				frappe.show_alert({
+					message: __("Created {0} Quality Inspection(s).", [message.created.length]),
+					indicator: "green",
+				});
+			} finally {
+				dialog.get_primary_btn().prop("disabled", false);
+			}
+		},
+	});
+	dialog.show();
+}
 
 frappe.ui.form.on("Return Inspection Result", {
 	inspection_qty: render_inspection_uom_summary,

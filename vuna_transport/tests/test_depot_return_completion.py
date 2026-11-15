@@ -22,6 +22,11 @@ class Row(SimpleNamespace):
 class TestDepotInspection(unittest.TestCase):
 	def setUp(self):
 		self.framework = self.enterContext(patch.object(inspection, "frappe"))
+		self.enterContext(
+			patch(
+				"vuna_transport.services.execution.return_inspection_quality_service.frappe", self.framework
+			)
+		)
 		self.framework.throw.side_effect = ValueError
 		self.framework.db.exists.return_value = False
 		self.framework.db.get_value.return_value = None

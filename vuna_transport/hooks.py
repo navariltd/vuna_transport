@@ -198,14 +198,12 @@ doc_events = {
 		"on_trash": "vuna_transport.services.execution.return_service.prepare_sales_return_cancellation",
 	},
 	"Quality Inspection": {
-		"on_update": "vuna_transport.services.execution.return_v2_service.sync_return_quality_inspection",
 		"before_cancel": [
 			"vuna_transport.services.execution.return_service.prepare_quality_inspection_removal",
 			"vuna_transport.services.execution.return_v2_service.prepare_return_quality_inspection_removal",
 		],
 		"on_submit": [
 			"vuna_transport.services.execution.return_service.sync_return_request_from_quality_inspection",
-			"vuna_transport.services.execution.return_v2_service.sync_return_quality_inspection",
 		],
 		"on_cancel": "vuna_transport.services.execution.return_service.sync_return_request_from_quality_inspection",
 		"on_trash": [

@@ -114,6 +114,9 @@ def create_inspection(receiving_stock_entry: str, return_request: str | None = N
 	):
 		return existing
 	inspection = frappe.new_doc("Return Inspection")
+	inspection.inspection_required = frappe.db.get_single_value(
+		"Transport Settings", "require_quality_inspection_for_return_inspection"
+	)
 	inspection.update(
 		{
 			"receiving_stock_entry": stock.name,
@@ -173,9 +176,10 @@ def validate_inspection(inspection):
 	totals, used_serials, used_qi = defaultdict(float), set(), set()
 	accepted = rejected = 0
 	precision = frappe.get_precision("Return Inspection Result", "inspection_qty")
-	mandatory_qi = frappe.db.get_single_value(
-		"Transport Settings", "require_quality_inspection_for_return_inspection"
+	from vuna_transport.services.execution.return_inspection_quality_service import (
+		validate_result_quality_inspection,
 	)
+
 	for row in inspection.results:
 		key = (row.stock_entry_detail, row.batch_no or "")
 		source = options.get(key)
@@ -225,21 +229,7 @@ def validate_inspection(inspection):
 		row.stock_entry_detail, row.return_request_item = source.name, source.return_request_item
 		row.stock_uom, row.received_stock_qty = source.stock_uom, source.stock_qty
 		row.serial_and_batch_bundle = source.serial_and_batch_bundle
-		if inspection.docstatus == 1 and (mandatory_qi or row.quality_inspection):
-			if not row.quality_inspection or row.quality_inspection in used_qi:
-				frappe.throw(_("Each result group requires its own submitted Quality Inspection."))
-			qi = frappe.get_doc("Quality Inspection", row.quality_inspection)
-			require_document_permission(qi, "read")
-			if (
-				qi.docstatus != 1
-				or qi.reference_type != "Stock Entry"
-				or qi.reference_name != stock.name
-				or qi.child_row_reference != source.name
-				or qi.item_code != source.item_code
-				or qi.status != row.result
-			):
-				frappe.throw(_("Quality Inspection must match the receiving Stock Entry row and result."))
-			used_qi.add(qi.name)
+		validate_result_quality_inspection(inspection, row, used_qi)
 		totals[key] += qty
 		if row.result == "Accepted":
 			accepted += qty

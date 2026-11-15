@@ -394,24 +394,9 @@ def get_return_request_state(request):
 						stock_qty, request_items[row.sales_invoice_item]
 					)
 
-	inspection_complete = True
-	if request.inspection_required:
-		inspection_names = [row.quality_inspection for row in request.items if row.quality_inspection]
-		inspection_statuses = {}
-		if inspection_names:
-			inspection_statuses = {
-				row.name: (row.docstatus, row.status)
-				for row in frappe.get_all(
-					"Quality Inspection",
-					filters={"name": ["in", inspection_names]},
-					fields=["name", "docstatus", "status"],
-				)
-			}
-		for row in request.items:
-			inspection = inspection_statuses.get(row.quality_inspection)
-			if not inspection or inspection[0] != 1 or inspection[1] not in {"Accepted", "Rejected"}:
-				inspection_complete = False
-				break
+	inspection_complete = bool(
+		frappe.db.exists("Return Inspection", {"return_request": request.name, "docstatus": 1})
+	)
 
 	commercial_complete = _has_completed_commercial_resolution(request)
 	if request.docstatus == 0:
@@ -425,11 +410,9 @@ def get_return_request_state(request):
 	):
 		status = "Awaiting Sales Return"
 	elif return_docstatus == 0:
-		status = (
-			"Awaiting Inspection"
-			if request.inspection_required and not inspection_complete
-			else "Awaiting Return Submission"
-		)
+		status = "Awaiting Return Submission"
+	elif not inspection_complete:
+		status = "Awaiting Inspection"
 	elif commercial_complete:
 		status = "Closed" if request.status == "Closed" else "Resolved"
 	else:
@@ -1529,6 +1512,10 @@ def prepare_quality_inspection_removal(doc, method=None):
 
 
 def _get_return_request_item_for_quality_inspection(doc):
+	if getattr(doc, "flags", {}).get("vuna_return_inspection") or frappe.db.exists(
+		"Return Inspection Result", {"quality_inspection": doc.name}
+	):
+		return None
 	request_item = frappe.db.get_value(
 		"Return Request Item", {"quality_inspection": doc.name}, ["name", "parent"], as_dict=True
 	)

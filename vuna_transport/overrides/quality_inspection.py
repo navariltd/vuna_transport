@@ -9,6 +9,13 @@ from frappe.utils import flt
 
 
 class ReturnQualityInspectionMixin:
+	def update_qc_reference(self, remove_reference=False):
+		if self.flags.get("vuna_return_inspection") or frappe.db.exists(
+			"Return Inspection Result", {"quality_inspection": self.name}
+		):
+			return
+		return super().update_qc_reference(remove_reference=remove_reference)
+
 	def validate_inspection_required(self):
 		if self._is_vuna_return_inspection():
 			return
@@ -27,6 +34,10 @@ class ReturnQualityInspectionMixin:
 			)
 		if self.reference_type != "Delivery Note" or not self.reference_name:
 			return False
+		if frappe.db.exists(
+			"Return Inspection", {"sales_return": self.reference_name, "docstatus": ["!=", 2]}
+		):
+			return True
 		if not frappe.db.get_value("Delivery Note", self.reference_name, "is_return"):
 			return False
 		return bool(
@@ -34,7 +45,6 @@ class ReturnQualityInspectionMixin:
 				"Return Request",
 				{
 					"return_stock_document": self.reference_name,
-					"inspection_required": 1,
 					"docstatus": 1,
 				},
 				"name",
@@ -97,7 +107,6 @@ def _get_vuna_return_request(doctype, docname=None, items=None):
 		"Return Request",
 		{
 			"return_stock_document": docname,
-			"inspection_required": 1,
 			"docstatus": 1,
 		},
 		"name",

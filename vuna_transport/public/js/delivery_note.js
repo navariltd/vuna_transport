@@ -84,10 +84,7 @@ function hide_standard_delivery_trip_action_for_allocated_load(frm) {
 function configure_return_quality_inspection(frm) {
 	if (frm.is_new()) return;
 	frappe.db
-		.get_value("Return Request", { return_stock_document: frm.doc.name, docstatus: 1 }, [
-			"name",
-			"inspection_required",
-		])
+		.get_value("Return Request", { return_stock_document: frm.doc.name, docstatus: 1 }, "name")
 		.then(({ message }) => {
 			if (!message?.name) return;
 			if (!frm.doc.vuna_return_request) {

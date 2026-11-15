@@ -18,6 +18,7 @@
   "source_warehouse",
   "inspected_on",
   "inspected_by",
+  "inspection_required",
   "warehouse_defaults_section",
   "accepted_warehouse",
   "column_break_sxch",
@@ -39,6 +40,11 @@
   "amended_from"
  ],
  "fields": [
+  {
+   "fieldname": "inspection_required",
+   "fieldtype": "Check",
+   "label": "Inspection Required"
+  },
   {
    "fieldname": "inspection_tab",
    "fieldtype": "Tab Break",
@@ -256,7 +262,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-11-08 14:24:53.966451",
+ "modified": "2026-11-15 15:52:18.876656",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Return Inspection",

@@ -6,7 +6,6 @@ from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
 
 from vuna_transport.services.execution.return_v2_service import (
-	sync_return_quality_inspection,
 	validate_return_inspection,
 	validate_return_stock_entry,
 	validate_sales_return_lineage,
@@ -100,26 +99,6 @@ class TestReturnV2Service(UnitTestCase):
 		with self.assertRaises(ValidationError):
 			validate_return_stock_entry(stock_entry)
 
-	@patch("vuna_transport.services.execution.return_v2_service.frappe.db.set_value")
-	@patch("vuna_transport.services.execution.return_v2_service.frappe.get_all")
-	def test_quality_inspection_backfills_direct_delivery_note_item(self, get_all, set_value):
-		get_all.return_value = [frappe._dict(name="RIR-1"), frappe._dict(name="RIR-2")]
-		quality_inspection = DocumentStub(
-			name="QI-1",
-			docstatus=0,
-			reference_type="Delivery Note",
-			child_row_reference="DNI-RETURN-1",
-		)
-
-		sync_return_quality_inspection(quality_inspection)
-
-		get_all.assert_called_once_with(
-			"Return Inspection Result",
-			filters={"delivery_note_item": "DNI-RETURN-1", "docstatus": ["!=", 2]},
-			fields=["name"],
-		)
-		self.assertEqual(set_value.call_count, 2)
-
 	@patch("vuna_transport.services.execution.return_v2_service.validate_uom_is_integer")
 	@patch("vuna_transport.services.execution.return_v2_service._validate_warehouse")
 	@patch("vuna_transport.services.execution.return_v2_service._validate_rejected_warehouse")
@@ -200,6 +179,17 @@ class TestReturnV2Service(UnitTestCase):
 		self.assertEqual(inspection.accepted_stock_qty, 10)
 		self.assertEqual(inspection.rejected_stock_qty, 10)
 		self.assertEqual([row.reason for row in results[1:]], ["Coagulation", "Physical Damage"])
+
+		# Customer returns, like depot returns, can be inspected incrementally in draft.
+		inspection.docstatus, inspection.inspection_required = 0, 0
+		inspection.results = [results[0]]
+		get_doc.side_effect = [sales_return, request]
+		validate_return_inspection(inspection)
+		self.assertEqual(inspection.pending_stock_qty, 10)
+		inspection.docstatus = 1
+		get_doc.side_effect = [sales_return, request]
+		with self.assertRaises(ValidationError):
+			validate_return_inspection(inspection)
 
 	@patch(
 		"vuna_transport.services.execution.return_v2_service.frappe.db.get_single_value",

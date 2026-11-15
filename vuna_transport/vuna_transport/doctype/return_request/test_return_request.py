@@ -38,7 +38,6 @@ def make_request(**values):
 		docstatus=1,
 		status="Awaiting Sales Return",
 		return_stock_document=None,
-		inspection_required=0,
 		no_further_action=0,
 		credit_note=None,
 		replacement_sales_order=None,
@@ -196,12 +195,11 @@ class TestReturnRequest(UnitTestCase):
 	@patch("vuna_transport.services.execution.return_service.frappe.get_all")
 	@patch("vuna_transport.services.execution.return_service.frappe.db.get_value")
 	@patch("vuna_transport.services.execution.return_service.frappe.db.exists", return_value=True)
-	def test_draft_sales_return_awaits_required_inspection(self, exists, get_value, get_all):
+	def test_draft_sales_return_does_not_require_pre_receipt_inspection(self, exists, get_value, get_all):
 		get_value.return_value = 0
 		get_all.return_value = []
 		request = make_request(
 			return_stock_document="DN-RET-1",
-			inspection_required=1,
 			items=[
 				SimpleNamespace(
 					delivery_note_item="DNI-1",
@@ -212,7 +210,7 @@ class TestReturnRequest(UnitTestCase):
 				)
 			],
 		)
-		self.assertEqual(get_return_request_state(request)["status"], "Awaiting Inspection")
+		self.assertEqual(get_return_request_state(request)["status"], "Awaiting Return Submission")
 
 	@patch("vuna_transport.services.execution.return_service.frappe.get_all")
 	@patch("vuna_transport.services.execution.return_service.frappe.db.get_value")
@@ -319,7 +317,6 @@ class TestReturnRequest(UnitTestCase):
 	):
 		request = make_request(
 			company="Test Company",
-			inspection_required=1,
 			items=[
 				SimpleNamespace(
 					item_code="ITEM-1",
