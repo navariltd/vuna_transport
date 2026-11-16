@@ -664,6 +664,9 @@ def submit_mobile_transfer_proof(installation_id, task_name, payload, device_ide
 	proof.receiver_phone = str(data.get("receiver_phone") or "")[:140]
 	proof.remarks = str(data.get("remarks") or "")[:4000]
 	proof.mobile_request_id, proof.payload_hash = key, digest
+	from vuna_transport.services.mobile.location_evidence import apply_device_location
+
+	apply_device_location(proof, data)
 	proof.flags.ignore_permissions = True
 	if proof.is_new():
 		proof.insert(ignore_permissions=True)

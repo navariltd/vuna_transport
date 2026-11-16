@@ -219,6 +219,9 @@ def report_collection(installation_id, trip_name, payload, device_identifier=Non
 			"payload_hash": digest,
 		}
 	)
+	from vuna_transport.services.mobile.location_evidence import apply_device_location
+
+	apply_device_location(proof, payload)
 	rows = payload.get("items")
 	if (
 		not isinstance(rows, list)

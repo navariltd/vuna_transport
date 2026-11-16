@@ -231,6 +231,9 @@ def report_mobile_trip_incident(
 			"mobile_request_id": request_id,
 		}
 	)
+	from vuna_transport.services.mobile.location_evidence import apply_device_location
+
+	apply_device_location(incident, payload)
 	incident.insert(ignore_permissions=True)
 	incident.add_comment("Info", _("Reported from the driver app by {0}.").format(driver.full_name))
 	return {"incident": incident.name, "created": True}

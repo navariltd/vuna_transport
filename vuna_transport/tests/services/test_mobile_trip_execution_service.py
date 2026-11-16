@@ -254,6 +254,13 @@ class TestOfflineMobilePODSubmission(TestCase):
 		)
 		pod.save = Mock()
 		pod.submit = Mock()
+		pod.update = lambda values: [setattr(pod, key, value) for key, value in values.items()]
+		self.enterContext(
+			patch(
+				"vuna_transport.services.mobile.location_evidence.get_system_timezone",
+				return_value="Africa/Nairobi",
+			)
+		)
 		get_doc.return_value = pod
 
 		submit_mobile_proof_of_delivery(
@@ -262,6 +269,13 @@ class TestOfflineMobilePODSubmission(TestCase):
 			"STOP-0001",
 			{
 				"request_id": "52f15a24-fd9c-45b7-b395-269353b5ad79",
+				"device_location": {
+					"status": "Captured",
+					"latitude": -1.2,
+					"longitude": 36.8,
+					"accuracy": 6,
+					"captured_at": "2026-10-15T09:00:00Z",
+				},
 				"items": [
 					{
 						"name": "DN-ITEM-0001",
@@ -276,5 +290,7 @@ class TestOfflineMobilePODSubmission(TestCase):
 		self.assertEqual(item.delivered_qty, 7)
 		self.assertEqual(item.rejection_reason, "Damaged")
 		self.assertEqual(pod.mobile_request_id, "52f15a24-fd9c-45b7-b395-269353b5ad79")
+		self.assertEqual((pod.latitude, pod.longitude, pod.location_accuracy), (-1.2, 36.8, 6))
+		self.assertEqual(pod.location_capture_status, "Captured")
 		pod.save.assert_called_once()
 		pod.submit.assert_called_once()

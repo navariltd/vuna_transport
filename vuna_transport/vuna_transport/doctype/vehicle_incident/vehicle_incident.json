@@ -46,6 +46,9 @@
   "use_device_location",
   "section_break_sdnu",
   "location",
+  "location_capture_status",
+  "location_accuracy",
+  "location_captured_at",
   "connections_tab",
   "amended_from"
  ],
@@ -197,6 +200,30 @@
    "label": "Location"
   },
   {
+   "fieldname": "location_capture_status",
+   "fieldtype": "Select",
+   "label": "Location Capture",
+   "options": "\nCaptured\nPermission Denied\nUnavailable\nTimed Out",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "location_accuracy",
+   "fieldtype": "Float",
+   "label": "GPS Accuracy (m)",
+   "read_only": 1,
+   "no_copy": 1,
+   "depends_on": "eval:doc.location_capture_status == 'Captured'"
+  },
+  {
+   "fieldname": "location_captured_at",
+   "fieldtype": "Datetime",
+   "label": "Location Captured At",
+   "read_only": 1,
+   "no_copy": 1,
+   "depends_on": "eval:doc.location_capture_status == 'Captured'"
+  },
+  {
    "fieldname": "location_section",
    "fieldtype": "Section Break",
    "label": "Incident Location"
@@ -334,7 +361,7 @@
    "link_fieldname": "vehicle_incident"
   }
  ],
- "modified": "2026-10-08 14:49:55.618126",
+ "modified": "2026-11-16 13:18:39.242611",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Incident",

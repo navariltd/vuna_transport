@@ -506,6 +506,9 @@ def submit_mobile_proof_of_delivery(
 	pod.signature = payload.get("signature")
 	pod.delivery_photo = payload.get("delivery_photo")
 	pod.mobile_request_id = request_id
+	from vuna_transport.services.mobile.location_evidence import apply_device_location
+
+	apply_device_location(pod, payload)
 	item_values = {row.get("name"): row for row in payload.get("items", []) if row.get("name")}
 	item_values_by_delivery_note = {
 		row.get("delivery_note_item"): row

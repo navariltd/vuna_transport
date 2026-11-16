@@ -57,6 +57,14 @@
     "collection_reviewed_by",
     "collection_reviewed_at",
     "collection_review_notes",
+    "location_section",
+    "location_capture_status",
+    "latitude",
+    "longitude",
+    "location_column",
+    "location_accuracy",
+    "location_captured_at",
+    "location",
     "proof_audit_section",
     "recorded_by",
     "amended_from",
@@ -66,6 +74,63 @@
     "mobile_request_id"
   ],
   "fields": [
+    {
+      "fieldname": "location_section",
+      "fieldtype": "Section Break",
+      "label": "Recorded Location",
+      "collapsible": 1
+    },
+    {
+      "fieldname": "location_capture_status",
+      "fieldtype": "Select",
+      "label": "Location Capture",
+      "options": "\nCaptured\nPermission Denied\nUnavailable\nTimed Out",
+      "read_only": 1,
+      "no_copy": 1
+    },
+    {
+      "fieldname": "latitude",
+      "fieldtype": "Float",
+      "label": "Latitude",
+      "precision": "8",
+      "read_only": 1,
+      "no_copy": 1,
+      "depends_on": "eval:doc.location_capture_status == 'Captured'"
+    },
+    {
+      "fieldname": "longitude",
+      "fieldtype": "Float",
+      "label": "Longitude",
+      "precision": "8",
+      "read_only": 1,
+      "no_copy": 1,
+      "depends_on": "eval:doc.location_capture_status == 'Captured'"
+    },
+    { "fieldname": "location_column", "fieldtype": "Column Break" },
+    {
+      "fieldname": "location_accuracy",
+      "fieldtype": "Float",
+      "label": "GPS Accuracy (m)",
+      "read_only": 1,
+      "no_copy": 1,
+      "depends_on": "eval:doc.location_capture_status == 'Captured'"
+    },
+    {
+      "fieldname": "location_captured_at",
+      "fieldtype": "Datetime",
+      "label": "Location Captured At",
+      "read_only": 1,
+      "no_copy": 1,
+      "depends_on": "eval:doc.location_capture_status == 'Captured'"
+    },
+    {
+      "fieldname": "location",
+      "fieldtype": "Geolocation",
+      "label": "Recorded Location",
+      "read_only": 1,
+      "no_copy": 1,
+      "depends_on": "eval:doc.location_capture_status == 'Captured'"
+    },
     {
       "fieldname": "collection_reference_doctype",
       "fieldtype": "Link",
@@ -475,7 +540,7 @@
       "link_fieldname": "proof_of_delivery"
     }
   ],
-  "modified": "2026-11-08 15:42:59.636745",
+  "modified": "2026-11-16 13:18:39.242611",
   "modified_by": "Administrator",
   "module": "Vuna Transport",
   "name": "Proof of Delivery",
