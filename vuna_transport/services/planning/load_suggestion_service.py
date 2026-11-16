@@ -14,6 +14,7 @@ from vuna_transport.services.fleet.vehicle_category_service import (
 	CAPACITY_DIMENSIONS,
 	evaluate_vehicle_category,
 	get_available_vehicle_category_counts,
+	get_capacity_breakdown,
 	get_vehicle_categories,
 	maximum_fitting_fraction,
 	validate_vehicle_access_limit,
@@ -559,6 +560,10 @@ def _build_candidate(pool, category, strategy):
 	return {
 		"vehicle_category": category.name,
 		"vehicle_category_label": category.vehicle_category_name or category.name,
+		"capacity_override_percentage": flt(getattr(category, "capacity_override_percentage", 0)),
+		"capacity_override_applied": bool(getattr(category, "capacity_override_applied", False)),
+		"capacity_override_allowed": bool(getattr(category, "capacity_override_allowed", False)),
+		"capacity": get_capacity_breakdown(totals, category),
 		"company": pool[0].company,
 		"source_warehouse": source_warehouses[0] if len(source_warehouses) == 1 else None,
 		"source_warehouses": source_warehouses,

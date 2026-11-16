@@ -4,6 +4,36 @@ const path = require("node:path");
 const test = require("node:test");
 const vm = require("node:vm");
 
+test("capacity allowance is visible without implying it is already being used", () => {
+  const { result } = controller();
+  result.number = String;
+  const category = {
+    capacity_override_percentage: 10,
+    capacity_override_applied: true,
+    capacity: { weight: { base_capacity: 100, used: 95 } },
+  };
+  assert.match(
+    result.render_capacity_override(category),
+    /Capacity includes 10% override allowance/
+  );
+  category.capacity.weight.used = 105;
+  assert.match(
+    result.render_capacity_override(category),
+    /Using capacity override \(\+10%\)/
+  );
+  category.capacity_override_applied = false;
+  assert.match(
+    result.render_capacity_override(category),
+    /disabled or not permitted/
+  );
+  category.capacity_override_percentage = 0;
+  category.capacity_override_allowed = true;
+  assert.match(
+    result.render_capacity_override(category),
+    /No capacity override allowance configured/
+  );
+});
+
 function controller(native = true) {
   const requests = [];
   const layouts = [];

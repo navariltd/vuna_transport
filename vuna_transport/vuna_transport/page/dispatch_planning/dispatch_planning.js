@@ -1325,8 +1325,8 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		$content
 			.removeClass("dp-empty")
 			.html(
-				`${this.render_capacity_breakdown(
-					capacity
+				`${this.render_capacity_breakdown(capacity)}${this.render_capacity_override(
+					category_row
 				)}<div class="small text-muted dp-selected-category">${category_caption.replace(
 					"{0}",
 					this.escape(category_label || __("None"))
@@ -1407,6 +1407,33 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 					)}</div>`
 				);
 		}
+	}
+
+	render_capacity_override(category) {
+		if (!category) return "";
+		const percentage = Number(category.capacity_override_percentage) || 0;
+		if (category.capacity_override_applied && percentage > 0) {
+			const using_override = Object.values(category.capacity || {}).some(
+				(values) => values.base_capacity > 0 && values.used > values.base_capacity
+			);
+			return `<div class="small ${
+				using_override ? "text-warning" : "text-muted"
+			} dp-capacity-override">${__(
+				using_override
+					? "Using capacity override (+{0}%)"
+					: "Capacity includes {0}% override allowance",
+				[this.number(percentage)]
+			)}</div>`;
+		}
+		if (category.capacity_override_allowed && !percentage)
+			return `<div class="small text-muted dp-capacity-override">${__(
+				"No capacity override allowance configured for this category."
+			)}</div>`;
+		if (percentage > 0)
+			return `<div class="small text-muted dp-capacity-override">${__(
+				"Capacity override is disabled or not permitted for your user."
+			)}</div>`;
+		return "";
 	}
 
 	render_capacity_breakdown(capacity) {
@@ -1624,6 +1651,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			suggestion.recommended ? "green" : "blue"
 		}">${this.number(suggestion.score)}%</span></div>
 			<div>${orders.length} ${__("orders")} · ${suggestion.total_stops || 0} ${__("stops")}</div>
+			${this.render_capacity_override(suggestion)}
 			<div class="small text-muted">${this.escape(
 				(suggestion.positive_factors || []).slice(0, 3).join(" · ")
 			)}</div>

@@ -10,10 +10,10 @@ from vuna_transport.services.demand.delivery_method_service import (
 	delivery_methods_are_compatible,
 )
 from vuna_transport.services.fleet.vehicle_category_service import (
-	apply_capacity_override,
+	capacity_override_enabled,
+	configure_category_capacities,
 	evaluate_vehicle_category,
 	get_capacity_breakdown,
-	get_effective_capacities,
 	get_vehicle_categories,
 	validate_vehicle_access_limit,
 )
@@ -157,21 +157,18 @@ def get_vehicle_category_capacity_summary(vehicle_category, totals=None, weight_
 	require_doctype_permission("Vehicle Category", "read")
 	totals = frappe.parse_json(totals) if isinstance(totals, str) else dict(totals or {})
 	category = frappe.get_cached_doc("Vehicle Category", vehicle_category)
-	capacities = get_effective_capacities(
+	configure_category_capacities(
 		category,
 		{"weight_uom": weight_uom, "volume_uom": volume_uom},
 		get_capacity_buffer_percentage(),
+		override_enabled=_capacity_override_enabled(),
 	)
-	capacities = apply_capacity_override(
-		capacities,
-		category,
-		enabled=_capacity_override_enabled(),
-	)
-	category.capacities = capacities
 	return {
 		"vehicle_category": category.name,
 		"vehicle_category_label": category.vehicle_category_name or category.name,
 		"capacity_override_percentage": flt(getattr(category, "capacity_override_percentage", 0)),
+		"capacity_override_applied": category.capacity_override_applied,
+		"capacity_override_allowed": category.capacity_override_allowed,
 		"capacity": get_capacity_breakdown(totals, category),
 	}
 
@@ -672,16 +669,11 @@ def validate_capacity(load, vehicle_category=None):
 		frappe.throw(_("Vehicle Category {0} is disabled.").format(vehicle.name))
 
 	capacity_buffer = get_capacity_buffer_percentage()
-	vehicle.capacities = get_effective_capacities(
+	configure_category_capacities(
 		vehicle,
 		{"weight_uom": load.weight_uom, "volume_uom": load.volume_uom},
 		capacity_buffer,
-	)
-	capacity_override_enabled = _capacity_override_enabled()
-	vehicle.capacities = apply_capacity_override(
-		vehicle.capacities,
-		vehicle,
-		enabled=capacity_override_enabled,
+		override_enabled=_capacity_override_enabled(),
 	)
 	result = evaluate_vehicle_category(
 		{
@@ -710,7 +702,7 @@ def validate_capacity(load, vehicle_category=None):
 		"utilization": result["utilization"],
 		"capacity_buffer_percentage": capacity_buffer,
 		"capacity_override_percentage": flt(getattr(vehicle, "capacity_override_percentage", 0)),
-		"capacity_override_applied": bool(capacity_override_enabled),
+		"capacity_override_applied": vehicle.capacity_override_applied,
 	}
 
 
@@ -834,10 +826,7 @@ def get_capacity_buffer_percentage():
 
 def _capacity_override_enabled():
 	"""Return whether the current user may use a category's overload allowance."""
-	settings = frappe.get_cached_doc("Transport Settings")
-	return bool(getattr(settings, "allow_capacity_override", 0)) and frappe.has_permission(
-		"Vehicle Category", "write", throw=False
-	)
+	return capacity_override_enabled()
 
 
 def apply_capacity_buffer(capacity, buffer_percentage):

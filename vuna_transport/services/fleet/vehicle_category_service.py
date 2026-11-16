@@ -32,9 +32,35 @@ def get_vehicle_categories(load_uoms, capacity_buffer_percentage=0):
 			"special_equipment",
 		],
 	)
+	override_enabled = capacity_override_enabled()
 	for category in rows:
-		category.capacities = get_effective_capacities(category, load_uoms, capacity_buffer_percentage)
+		configure_category_capacities(
+			category, load_uoms, capacity_buffer_percentage, override_enabled=override_enabled
+		)
 	return rows
+
+
+def capacity_override_enabled():
+	"""Keep previews, resource choices and posting under the same authorization."""
+	settings = frappe.get_cached_doc("Transport Settings")
+	return bool(getattr(settings, "allow_capacity_override", 0)) and frappe.has_permission(
+		"Vehicle Category", "write", throw=False
+	)
+
+
+def configure_category_capacities(category, load_uoms, buffer_percentage=0, *, override_enabled=None):
+	"""Always start from nominal capacity, so repeated evaluation cannot compound an allowance."""
+	if override_enabled is None:
+		override_enabled = capacity_override_enabled()
+	category.base_capacities = get_effective_capacities(category, load_uoms, buffer_percentage)
+	category.capacity_override_allowed = bool(override_enabled)
+	category.capacity_override_applied = bool(
+		override_enabled and flt(getattr(category, "capacity_override_percentage", 0)) > 0
+	)
+	category.capacities = apply_capacity_override(
+		category.base_capacities, category, enabled=category.capacity_override_applied
+	)
+	return category.capacities
 
 
 def get_effective_capacities(category, load_uoms, buffer_percentage=0):
@@ -153,6 +179,9 @@ def get_capacity_breakdown(totals, category):
 			"capacity": capacity,
 			"remaining": capacity - used if capacity else None,
 			"utilization": round(used / capacity * 100, 2) if capacity else None,
+			"base_capacity": flt(
+				(getattr(category, "base_capacities", None) or category.capacities).get(dimension)
+			),
 		}
 	return breakdown
 

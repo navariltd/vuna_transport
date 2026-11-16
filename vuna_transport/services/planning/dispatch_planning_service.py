@@ -18,9 +18,9 @@ from vuna_transport.services.fleet.vehicle_availability_service import (
 	get_vehicle_availability_map,
 )
 from vuna_transport.services.fleet.vehicle_category_service import (
+	configure_category_capacities,
 	evaluate_vehicle_category,
 	get_capacity_breakdown,
-	get_effective_capacities,
 	get_vehicle_categories,
 	validate_vehicle_access_limit,
 )
@@ -247,6 +247,9 @@ def evaluate_manual_load_plan(
 				"utilization": result["utilization"],
 				"compatible": result["compatible"],
 				"capacity": get_capacity_breakdown(_load_totals(load), category),
+				"capacity_override_percentage": flt(category.get("capacity_override_percentage")),
+				"capacity_override_applied": bool(category.get("capacity_override_applied")),
+				"capacity_override_allowed": bool(category.get("capacity_override_allowed")),
 			}
 		)
 	order_field, item_field = (
@@ -869,12 +872,11 @@ def _filter_vehicle_category(rows, vehicle_category):
 		return []
 	filtered = []
 	for row in rows:
-		capacities = get_effective_capacities(
+		configure_category_capacities(
 			category,
 			{"weight_uom": row.get("weight_uom"), "volume_uom": row.get("volume_uom")},
 			0,
 		)
-		category.capacities = capacities
 		result = evaluate_vehicle_category(
 			{dimension: row.get(dimension) for dimension in CAPACITY_DIMENSIONS},
 			category,
