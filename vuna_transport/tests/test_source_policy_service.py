@@ -13,6 +13,19 @@ from vuna_transport.vuna_transport.doctype.transport_settings.transport_settings
 
 
 class TestSourcePolicy(unittest.TestCase):
+	def test_diversion_sale_is_not_planned_a_second_time(self):
+		source = frappe._dict(
+			doctype="Sales Order", name="SO-DIVERT", docstatus=1, vuna_shipment_diversion="SD"
+		)
+		with patch(
+			"vuna_transport.services.execution.shipment_diversion_documents.validate_diversion_document"
+		) as validate:
+			self.assertEqual(automatically_create_from_source(source), [])
+			validate.assert_called_once_with(source)
+		with self.assertRaises(ValueError):
+			require_source_enabled(source)
+		self.assertIn("already assigned", self.framework.throw.call_args.args[0])
+
 	@patch(
 		"vuna_transport.services.demand.sales_transport_demand_service.create_sales_demands",
 		return_value=["TD-NATIVE"],
