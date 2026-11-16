@@ -40,6 +40,17 @@ class TestMobileTaskPresentation(TestCase):
 			task["items"][0], {"item_code": "MILK", "item_name": "Milk", "qty": 2, "uom": "Carton"}
 		)
 
+	def test_diversion_delivery_uses_existing_depot_card_without_a_transport_demand(self):
+		task = frappe._dict(
+			name="TASK", task_type="Transfer Receipt", shipment_diversion="SD", dispatch_stock_entry="SE"
+		)
+		with patch.object(service.frappe.db, "get_value", return_value="Receiving Depot"):
+			service._attach_task_presentation([task])
+		self.assertEqual(
+			(task.reference_doctype, task.reference_name, task.party_name),
+			("Stock Entry", "SE", "Receiving Depot"),
+		)
+
 	def test_direct_customer_pickup_exposes_return_request(self):
 		self.rows["Return Request"] = [
 			frappe._dict(name="RR", return_context="Customer", customer="Customer")

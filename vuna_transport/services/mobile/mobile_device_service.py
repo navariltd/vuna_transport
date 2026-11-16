@@ -952,6 +952,7 @@ def _attach_transport_tasks(trip, stops):
 			"name",
 			"delivery_stop",
 			"task_type",
+			"shipment_diversion",
 			"status",
 			"address",
 			"transport_load",
@@ -1102,6 +1103,10 @@ def _attach_task_presentation(tasks):
 		else:
 			task["reference_doctype"], task["reference_name"] = "Stock Entry", task.dispatch_stock_entry
 			task["party_name"] = demand.destination_warehouse if demand else None
+			if task.get("shipment_diversion"):
+				task["party_name"] = frappe.db.get_value(
+					"Shipment Diversion", task.shipment_diversion, "destination_warehouse"
+				)
 		if task.task_type == "Transfer Receipt" and request_name and not task.dispatch_stock_entry:
 			task["blocked_reason"] = _("Complete the return pickup before receiving these goods.")
 
