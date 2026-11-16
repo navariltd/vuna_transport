@@ -12,6 +12,7 @@ from vuna_transport.services.demand.customer_demand_fields import (
 	enrich_customer_demand,
 )
 from vuna_transport.services.demand.delivery_order_service import _get_item_transport_measurements
+from vuna_transport.services.demand.item_transport_policy import item_requires_transport
 from vuna_transport.services.shared.security_service import (
 	require_company_access,
 	require_doctype_permission,
@@ -20,7 +21,7 @@ from vuna_transport.services.shared.security_service import (
 SUPPORTED_SOURCES = {"Sales Order", "Delivery Order", "Material Request", "Return Request", "Purchase Order"}
 
 
-def build_source_legs(source):
+def build_source_legs(source, *, preserved_source_items=()):
 	"""Normalize source rows; never sum quantities across different stock UOMs."""
 	if source.doctype not in SUPPORTED_SOURCES or source.docstatus != 1:
 		frappe.throw(_("Transport demand requires a supported, submitted source document."))
@@ -29,11 +30,11 @@ def build_source_legs(source):
 	if source.doctype == "Sales Order":
 		from vuna_transport.services.demand.sales_transport_demand_service import build_sales_legs
 
-		return build_sales_legs(source)
+		return build_sales_legs(source, preserved_source_items=preserved_source_items)
 	if source.doctype == "Purchase Order":
 		from vuna_transport.services.demand.supplier_pickup_demand_service import build_supplier_pickup_legs
 
-		return build_supplier_pickup_legs(source)
+		return build_supplier_pickup_legs(source, preserved_source_items=preserved_source_items)
 	if source.doctype == "Return Request":
 		from vuna_transport.services.demand.depot_return_demand_service import build_depot_return_legs
 
@@ -43,6 +44,12 @@ def build_source_legs(source):
 		frappe.throw(_("Only Material Transfer requests can generate transport demand."))
 	legs = defaultdict(list)
 	for row in source.get("items"):
+		if (
+			is_transfer
+			and row.name not in preserved_source_items
+			and not item_requires_transport(row.item_code)
+		):
+			continue
 		factor = flt(row.conversion_factor)
 		if factor <= 0:
 			frappe.throw(_("Source row {0} requires a positive UOM conversion factor.").format(row.idx))
@@ -129,6 +136,12 @@ def _create_transport_demands(source_doctype, source_name, automated=False):
 	source.reload()
 	legs = build_source_legs(source)
 	if not legs:
+		if source_doctype in ("Material Request", "Purchase Order") and not any(
+			item_requires_transport(row.item_code)
+			for row in source.get("items") or []
+			if not row.get("delivered_by_supplier")
+		):
+			return []
 		if source_doctype == "Return Request":
 			existing_names = frappe.get_all(
 				"Transport Demand",
@@ -202,7 +215,12 @@ def validate_transport_demand(demand):
 		if previous and previous.get("legacy_delivery_order_snapshot"):
 			for field in MIGRATION_FIELDS:
 				demand.set(field, previous.get(field))
-	leg = next((leg for leg in build_source_legs(source) if leg["source_key"] == demand.source_key), None)
+	legs = (
+		build_source_legs(source, preserved_source_items={row.source_item for row in previous.items})
+		if previous
+		else build_source_legs(source)
+	)
+	leg = next((leg for leg in legs if leg["source_key"] == demand.source_key), None)
 	if not leg:
 		frappe.throw(_("This movement leg no longer has outstanding source quantity."))
 	if source.doctype == "Purchase Order" and not demand.flags.ignore_permissions:

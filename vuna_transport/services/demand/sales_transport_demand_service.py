@@ -10,6 +10,7 @@ from frappe.utils import flt
 
 from vuna_transport.services.demand import delivery_order_service as sales
 from vuna_transport.services.demand.customer_demand_fields import ITEM_FIELDS, ROOT_FIELDS, customer_fields
+from vuna_transport.services.demand.item_transport_policy import item_requires_transport
 from vuna_transport.services.routing.location_service import (
 	get_address_planning_data,
 	get_warehouse_planning_data,
@@ -69,7 +70,7 @@ def covered_source_items(sales_order, exclude=None):
 	return covered
 
 
-def build_sales_legs(source, selected=None):
+def build_sales_legs(source, selected=None, *, preserved_source_items=()):
 	"""Reuse established grouping, handling and measurement rules; canonical names only."""
 	if source.docstatus != 1 or source.status in INACTIVE_SALES_STATUSES:
 		frappe.throw(_("Select an open, submitted Sales Order for customer transport demand."))
@@ -80,6 +81,8 @@ def build_sales_legs(source, selected=None):
 		if selected is not None and row.name not in selected:
 			continue
 		if not sales._is_stock_item(row):
+			continue
+		if row.name not in preserved_source_items and not item_requires_transport(row.item_code):
 			continue
 		quantity = sales._get_transport_quantity(row)
 		factor = flt(row.conversion_factor)
@@ -317,7 +320,7 @@ def validate_sales_demand(demand):
 			)
 	if selected & covered_source_items(source.name, demand.name):
 		frappe.throw(_("One or more Sales Order rows already have active transport planning."))
-	legs = build_sales_legs(source, selected)
+	legs = build_sales_legs(source, selected, preserved_source_items=selected if previous else ())
 	if (
 		len(legs) != 1
 		or legs[0]["source_key"] != demand.source_key

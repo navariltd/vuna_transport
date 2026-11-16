@@ -186,6 +186,7 @@ class TestSupplierPlanningPolicy(TestCase):
 			source_key="KEY",
 			source_address="Supplier Address",
 			destination_warehouse="Main",
+			items=[frappe._dict(source_item="POI")],
 		)
 		self.order = document(vuna_delivery_method="Collection")
 		self.framework.get_doc.return_value = self.order
@@ -208,6 +209,7 @@ class TestSupplierPlanningPolicy(TestCase):
 		order, rows = service.source_context(self.demand)
 		self.assertIs(order, self.order)
 		self.assertIn("POI", rows)
+		self.legs.assert_called_once_with(self.order, preserved_source_items={"POI"})
 		self.framework.get_doc.assert_called_once_with("Purchase Order", "PO", for_update=True)
 
 	def test_manual_or_disabled_method_cannot_bypass_load_policy(self):
