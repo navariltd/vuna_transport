@@ -1,0 +1,371 @@
+{
+ "actions": [],
+ "creation": "2026-11-16 10:22:18.020642",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "details_section",
+  "naming_series",
+  "return_request",
+  "company",
+  "status",
+  "details_column",
+  "delivery_trip",
+  "vehicle",
+  "driver",
+  "vehicle_warehouse",
+  "destination_section",
+  "destination_type",
+  "customer",
+  "delivery_address",
+  "destination_warehouse",
+  "reason",
+  "items_section",
+  "items",
+  "approval_section",
+  "custody_confirmed",
+  "approval_column",
+  "approved_by",
+  "approved_on",
+  "checks_section",
+  "eligibility_notes",
+  "connections_tab",
+  "previous_diversion",
+  "previous_proof_of_delivery",
+  "proof_of_delivery",
+  "delivery_note",
+  "original_customer",
+  "sales_return",
+  "sales_order",
+  "onward_delivery_note",
+  "stock_entry",
+  "execution_task",
+  "execution_stop",
+  "trip_resumed_by",
+  "trip_resumed_on",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Diversion Details"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "default": "SD-.YYYY.-.#####",
+   "options": "SD-.YYYY.-.#####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "return_request",
+   "search_index": 1,
+   "fieldtype": "Link",
+   "label": "Return Request",
+   "options": "Return Request",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "default": "Draft",
+   "options": "Draft\nApproved\nIn Transit\nCompleted\nNeeds Review\nCancelled",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "details_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "delivery_trip",
+   "fieldtype": "Link",
+   "label": "Original Delivery Trip",
+   "options": "Delivery Trip",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "vehicle",
+   "fieldtype": "Link",
+   "label": "Vehicle",
+   "options": "Vehicle",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "driver",
+   "fieldtype": "Link",
+   "label": "Driver",
+   "options": "Driver",
+   "read_only": 1
+  },
+  {
+   "fieldname": "vehicle_warehouse",
+   "fieldtype": "Link",
+   "label": "Vehicle Warehouse",
+   "options": "Warehouse",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "destination_section",
+   "fieldtype": "Section Break",
+   "label": "New Destination"
+  },
+  {
+   "fieldname": "destination_type",
+   "fieldtype": "Select",
+   "label": "Deliver To",
+   "options": "\nCustomer\nDepot",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "New Customer",
+   "options": "Customer",
+   "depends_on": "eval:doc.destination_type == 'Customer'",
+   "mandatory_depends_on": "eval:doc.docstatus == 1 && doc.destination_type == 'Customer'"
+  },
+  {
+   "fieldname": "delivery_address",
+   "fieldtype": "Link",
+   "label": "Delivery Address",
+   "options": "Address",
+   "depends_on": "eval:doc.destination_type == 'Customer'",
+   "mandatory_depends_on": "eval:doc.docstatus == 1 && doc.destination_type == 'Customer'"
+  },
+  {
+   "fieldname": "destination_warehouse",
+   "fieldtype": "Link",
+   "label": "Receiving Depot Warehouse",
+   "options": "Warehouse",
+   "depends_on": "eval:doc.destination_type == 'Depot'",
+   "mandatory_depends_on": "eval:doc.docstatus == 1 && doc.destination_type == 'Depot'"
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason for Diversion",
+   "reqd": 1
+  },
+  {
+   "fieldname": "items_section",
+   "fieldtype": "Section Break",
+   "label": "Goods to Divert"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Shipment Diversion Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "approval_section",
+   "fieldtype": "Section Break",
+   "label": "Approval"
+  },
+  {
+   "fieldname": "custody_confirmed",
+   "no_copy": 1,
+   "fieldtype": "Check",
+   "label": "Selected Goods Are on This Vehicle"
+  },
+  {
+   "fieldname": "approval_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "approved_on",
+   "fieldtype": "Datetime",
+   "label": "Approved On",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "checks_section",
+   "fieldtype": "Section Break",
+   "label": "Checks",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "eligibility_notes",
+   "fieldtype": "Small Text",
+   "label": "Checks to Resolve",
+   "read_only": 1
+  },
+  {
+   "fieldname": "connections_tab",
+   "fieldtype": "Tab Break",
+   "label": "Connections",
+   "show_dashboard": 1
+  },
+  {"fieldname":"previous_diversion","fieldtype":"Link","label":"Previous Diversion","options":"Shipment Diversion","read_only":1,"no_copy":1,"search_index":1},
+  {"fieldname":"previous_proof_of_delivery","fieldtype":"Link","label":"Previous Delivery Proof","options":"Proof of Delivery","read_only":1,"no_copy":1},
+  {
+   "fieldname": "proof_of_delivery",
+   "search_index": 1,
+   "fieldtype": "Link",
+   "label": "Original POD",
+   "options": "Proof of Delivery",
+   "read_only": 1
+  },
+  {
+   "fieldname": "delivery_note",
+   "fieldtype": "Link",
+   "label": "Original Delivery Note",
+   "options": "Delivery Note",
+   "read_only": 1
+  },
+  {
+   "fieldname": "original_customer",
+   "fieldtype": "Link",
+   "label": "Original Customer",
+   "options": "Customer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sales_return",
+   "fieldtype": "Link",
+   "label": "Sales Return",
+   "options": "Delivery Note",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sales_order",
+   "fieldtype": "Link",
+   "label": "New Customer Sales Order",
+   "options": "Sales Order",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "onward_delivery_note",
+   "fieldtype": "Link",
+   "label": "Onward Delivery Note",
+   "options": "Delivery Note",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "stock_entry",
+   "fieldtype": "Link",
+   "label": "Depot Stock Entry",
+   "options": "Stock Entry",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "execution_task",
+   "fieldtype": "Link",
+   "label": "Delivery Task",
+   "options": "Transport Trip Task",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "execution_stop",
+   "fieldtype": "Data",
+   "label": "Delivery Stop",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "trip_resumed_by",
+   "fieldtype": "Link",
+   "label": "Trip Resumed By",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "trip_resumed_on",
+   "fieldtype": "Datetime",
+   "label": "Trip Resumed On",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "options": "Shipment Diversion",
+   "read_only": 1,
+   "no_copy": 1,
+   "print_hide": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-16 12:24:24.385641",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Shipment Diversion",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "create": 1,
+   "read": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1,
+   "delete": 1,
+   "print": 1,
+   "report": 1
+  },
+  {
+   "role": "Transport Manager",
+   "create": 1,
+   "read": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1,
+   "delete": 1,
+   "print": 1,
+   "report": 1
+  },
+  {
+   "role": "Transport Dispatcher",
+   "create": 1,
+   "read": 1,
+   "write": 1,
+   "submit": 1,
+   "cancel": 1,
+   "delete": 1,
+   "print": 1,
+   "report": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "autoname": "naming_series:",
+ "naming_rule": "By \"Naming Series\" field",
+ "is_submittable": 1,
+ "track_changes": 1
+}

@@ -22,6 +22,7 @@ def get_data():
 			"Transport Trip Task": "return_request",
 			"Transport Demand": "source_document",
 			"Return Inspection": "return_request",
+			"Shipment Diversion": "return_request",
 		},
 		"transactions": [
 			{
@@ -34,6 +35,7 @@ def get_data():
 					"Delivery Note",
 					"Stock Entry",
 					"Return Inspection",
+					"Shipment Diversion",
 					"Quality Inspection",
 					"Transport Demand",
 				],

@@ -494,11 +494,27 @@ def sync_task_execution(doc, method=None):
 	tasks = frappe.get_all(
 		"Transport Trip Task",
 		filters={"delivery_trip": trip_name, "status": ["!=", "Cancelled"]},
-		fields=["name", "delivery_stop", "delivery_note", "task_type", "status"],
+		fields=[
+			"name",
+			"delivery_stop",
+			"delivery_note",
+			"task_type",
+			"status",
+			"shipment_diversion",
+			"dispatch_stock_entry",
+		],
 	)
 	if not tasks and is_task_trip(trip):
 		return
 	for task in tasks:
+		if task.get("shipment_diversion") and task.task_type == "Transfer Receipt":
+			from vuna_transport.services.execution.shipment_diversion_execution import depot_task_status
+
+			task.status = depot_task_status(task)
+			frappe.db.set_value(
+				"Transport Trip Task", task.name, "status", task.status, update_modified=False
+			)
+			continue
 		if task.task_type == "Supplier Pickup":
 			from vuna_transport.services.execution.direct_supplier_pickup_service import supplier_task_status
 

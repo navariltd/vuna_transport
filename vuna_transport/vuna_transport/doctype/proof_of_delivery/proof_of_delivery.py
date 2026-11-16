@@ -162,6 +162,13 @@ class ProofofDelivery(Document):
 				)
 
 	def on_submit(self):
+		if self.get("transport_trip_task") and frappe.db.get_value(
+			"Transport Trip Task", self.transport_trip_task, "shipment_diversion"
+		):
+			from vuna_transport.services.execution.shipment_diversion_execution import post_depot_proof
+
+			post_depot_proof(self)
+			return
 		if self.proof_type == "Unplanned Collection":
 			return
 		if self.get("transport_trip_task"):
@@ -207,6 +214,13 @@ class ProofofDelivery(Document):
 		return create_return_request_from_pod(self.name)
 
 	def before_cancel(self):
+		if self.get("transport_trip_task") and frappe.db.get_value(
+			"Transport Trip Task", self.transport_trip_task, "shipment_diversion"
+		):
+			from vuna_transport.services.execution.shipment_diversion_exceptions import guard_proof_reversal
+
+			guard_proof_reversal(self)
+			return
 		if self.proof_type == "Unplanned Collection":
 			if self.return_request and frappe.db.exists(
 				"Return Request",

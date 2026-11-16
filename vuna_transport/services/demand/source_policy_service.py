@@ -57,6 +57,12 @@ def policy_source(source):
 
 
 def require_source_enabled(source):
+	if source.doctype == "Sales Order" and source.get("vuna_shipment_diversion"):
+		frappe.throw(
+			_(
+				"This Sales Order is already assigned to a Shipment Diversion. Prepare its onward delivery from that diversion."
+			)
+		)
 	policy = get_source_policy(policy_source(source))
 	if not policy.enabled:
 		frappe.throw(_("Transport demand generation is disabled for this source in Transport Settings."))
@@ -77,6 +83,12 @@ def require_source_enabled(source):
 
 
 def automatically_create_from_source(doc, method=None):
+	# Already approved and physically on a vehicle; do not plan its onward sale twice.
+	if doc.doctype == "Sales Order" and doc.get("vuna_shipment_diversion"):
+		from vuna_transport.services.execution.shipment_diversion_documents import validate_diversion_document
+
+		validate_diversion_document(doc)
+		return []
 	policy = get_source_policy(policy_source(doc))
 	if not policy.enabled or policy.creation_mode != "Automatic" or doc.docstatus != 1:
 		return []

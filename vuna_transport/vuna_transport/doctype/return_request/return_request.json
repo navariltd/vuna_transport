@@ -24,6 +24,7 @@
     "delivery_note",
     "sales_invoice",
     "source_stock_entry",
+    "shipment_diversion",
     "rejecting_warehouse",
     "column_break_source",
     "sales_order",
@@ -45,6 +46,7 @@
     "quantity_summary_section",
     "expected_return_qty",
     "returned_qty",
+    "diverted_qty",
     "column_break_quantity_summary",
     "return_difference_qty",
     "resolution_section",
@@ -76,6 +78,8 @@
     "transport_arranged_by"
   ],
   "fields": [
+    {"fieldname":"diverted_qty","fieldtype":"Float","label":"Diverted Quantity","read_only":1,"non_negative":1,"depends_on":"eval:doc.shipment_diversion || doc.diverted_qty"},
+    {"fieldname":"shipment_diversion","fieldtype":"Link","label":"Shipment Diversion","options":"Shipment Diversion","read_only":1,"no_copy":1,"search_index":1},
     {
       "fieldname": "return_context",
       "label": "Return Context",
@@ -528,7 +532,7 @@
   "grid_page_length": 50,
   "is_submittable": 1,
   "links": [],
-  "modified": "2026-11-15 16:06:52.272597",
+  "modified": "2026-11-16 12:30:47.017967",
   "modified_by": "Administrator",
   "module": "Vuna Transport",
   "name": "Return Request",

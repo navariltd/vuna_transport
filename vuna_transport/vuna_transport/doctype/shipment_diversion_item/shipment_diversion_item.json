@@ -1,0 +1,157 @@
+{
+ "actions": [],
+ "creation": "2026-11-16 10:22:18.020642",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "item_code",
+  "available_qty",
+  "qty",
+  "uom",
+  "batch_no",
+  "identity_section",
+  "source_diversion_item",
+  "origin_diversion_item",
+  "serial_no",
+  "available_serial_nos",
+  "source_serial_and_batch_bundle",
+  "stock_uom",
+  "conversion_factor",
+  "stock_qty",
+  "return_request_item",
+  "delivery_note_item",
+  "proof_of_delivery_item"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 3,
+   "reqd": 1
+  },
+  {
+   "fieldname": "available_qty",
+   "fieldtype": "Float",
+   "label": "Available to Divert",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "label": "Quantity",
+   "reqd": 1,
+   "non_negative": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "options": "UOM",
+   "read_only": 1,
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 1
+  },
+  {
+   "fieldname": "batch_no",
+   "fieldtype": "Link",
+   "label": "Batch",
+   "options": "Batch",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "identity_section",
+   "fieldtype": "Section Break",
+   "label": "Stock Identity"
+  },
+  {"fieldname":"source_diversion_item","fieldtype":"Link","label":"Previous Diversion Item","options":"Shipment Diversion Item","read_only":1,"hidden":1},
+  {"fieldname":"origin_diversion_item","fieldtype":"Link","label":"Original Vehicle Receipt Item","options":"Shipment Diversion Item","read_only":1,"hidden":1},
+  {
+   "fieldname": "serial_no",
+   "fieldtype": "Small Text",
+   "label": "Selected Serial Numbers"
+  },
+  {
+   "fieldname": "available_serial_nos",
+   "fieldtype": "Small Text",
+   "label": "Available Rejected Serial Numbers",
+   "read_only": 1
+  },
+  {
+   "fieldname": "source_serial_and_batch_bundle",
+   "fieldtype": "Link",
+   "label": "Original Serial and Batch Bundle",
+   "options": "Serial and Batch Bundle",
+   "read_only": 1
+  },
+  {
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "label": "Stock UOM",
+   "options": "UOM",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "conversion_factor",
+   "fieldtype": "Float",
+   "label": "Conversion Factor",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "stock_qty",
+   "fieldtype": "Float",
+   "label": "Stock Quantity",
+   "read_only": 1,
+   "non_negative": 1
+  },
+  {
+   "fieldname": "return_request_item",
+   "fieldtype": "Link",
+   "label": "Return Request Item",
+   "options": "Return Request Item",
+   "read_only": 1,
+   "reqd": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "delivery_note_item",
+   "fieldtype": "Link",
+   "label": "Original Delivery Note Item",
+   "options": "Delivery Note Item",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "proof_of_delivery_item",
+   "fieldtype": "Data",
+   "label": "Original POD Item",
+   "read_only": 1,
+   "hidden": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-16 12:24:24.385641",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Shipment Diversion Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "ASC",
+ "states": [],
+ "istable": 1,
+ "editable_grid": 1
+}

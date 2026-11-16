@@ -16,6 +16,10 @@ def create_vehicle_receipt(return_request: str) -> str:
 	from vuna_transport.services.execution.return_v2_service import _validate_warehouse
 
 	request = frappe.get_doc("Return Request", return_request)
+	if request.get("shipment_diversion"):
+		from vuna_transport.services.execution.shipment_diversion_exceptions import create_return_receipt
+
+		return create_return_receipt(return_request)
 	require_document_permission(request, "read")
 	require_doctype_permission("Stock Entry", "create")
 	frappe.db.get_value("Return Request", request.name, "name", for_update=True)
@@ -111,6 +115,28 @@ def create_vehicle_receipt(return_request: str) -> str:
 
 
 def validate_vehicle_receipt(entry, method=None):
+	prior = entry.get_doc_before_save()
+	if (
+		prior
+		and prior.get("vuna_return_request")
+		and prior.get("vuna_return_request") != entry.get("vuna_return_request")
+	):
+		if frappe.db.get_value("Return Request", prior.vuna_return_request, "shipment_diversion"):
+			frappe.throw(_("The diversion rejection Return Request link cannot be removed or changed."))
+	if (
+		entry.get("vuna_return_request")
+		and not entry.get("vuna_shipment_diversion")
+		and not entry.add_to_transit
+		and not entry.outgoing_stock_entry
+	):
+		request = frappe.get_doc("Return Request", entry.vuna_return_request)
+		if request.get("shipment_diversion"):
+			from vuna_transport.services.execution.shipment_diversion_exceptions import (
+				validate_return_receipt,
+			)
+
+			validate_return_receipt(entry, request)
+			return
 	previous = entry.get_doc_before_save()
 	if (
 		previous

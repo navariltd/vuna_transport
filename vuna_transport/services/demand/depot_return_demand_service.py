@@ -66,16 +66,20 @@ def build_depot_return_legs(source):
 		# create another Add-to-Transit receipt for them.
 		if frappe.db.get_value("Warehouse", origin, "warehouse_type") == "Transit":
 			continue
-		if origin == source.return_warehouse:
-			frappe.throw(_("Return pickup and receiving warehouses must be different."))
 		factor = flt(row.conversion_factor)
 		if factor <= 0:
 			frappe.throw(_("Return items require a positive UOM conversion factor."))
 		quantity = max(
-			flt(row.requested_return_qty) * factor - flt(posted.get(row.name)) - flt(unplanned.get(row.name)),
+			flt(row.requested_return_qty) * factor
+			- max(
+				flt(posted.get(row.name)) + flt(unplanned.get(row.name)),
+				flt(row.get("received_qty")) * factor,
+			),
 			0,
 		)
 		if quantity:
+			if origin == source.return_warehouse:
+				frappe.throw(_("Return pickup and receiving warehouses must be different."))
 			legs[origin].append(
 				{
 					"source_item": row.name,

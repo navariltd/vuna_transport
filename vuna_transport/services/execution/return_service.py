@@ -435,6 +435,12 @@ def get_return_request_state(request):
 
 def _get_v2_return_request_state(request):
 	"""Derive V2 progress from the linked Sales Return and inspection."""
+	if frappe.db.table_exists("Shipment Diversion") and frappe.db.exists(
+		"Shipment Diversion", {"return_request": request.name, "docstatus": ["!=", 2]}
+	):
+		from vuna_transport.services.execution.shipment_diversion_followup import customer_return_state
+
+		return customer_return_state(request)
 	return _get_v2_sales_return_state(request)
 
 
@@ -513,6 +519,7 @@ def _apply_return_state(request, state):
 	request.status = state["status"]
 	request.expected_return_qty = state["expected_return_qty"]
 	request.returned_qty = state["returned_qty"]
+	request.diverted_qty = state.get("diverted_qty", 0)
 	request.return_difference_qty = state["return_difference_qty"]
 	for row in request.items:
 		row.received_qty = state["returned_by_item"].get(
@@ -521,7 +528,13 @@ def _apply_return_state(request, state):
 			else getattr(row, "source_pod_item", None) or row.delivery_note_item or row.sales_invoice_item,
 			0,
 		)
-		row.remaining_qty = max(flt(row.requested_return_qty) - flt(row.received_qty), 0)
+		row.diverted_qty = state.get("diverted_by_item", {}).get(row.name, 0)
+		row.remaining_qty = max(
+			flt(row.requested_return_qty)
+			- flt(row.received_qty)
+			- (flt(row.diverted_qty) if request.get("return_context") == "Depot" else 0),
+			0,
+		)
 		if request.get("return_context") == "Depot":
 			factor = flt(row.conversion_factor) or 1
 			row.accepted_return_qty = state.get("accepted_by_item", {}).get(row.name, 0) / factor
@@ -542,12 +555,17 @@ def recalculate_return_request(return_request):
 			"status": request.status,
 			"expected_return_qty": request.expected_return_qty,
 			"returned_qty": request.returned_qty,
+			"diverted_qty": request.diverted_qty,
 			"return_difference_qty": request.return_difference_qty,
 		},
 		update_modified=False,
 	)
 	for row in request.items:
-		values = {"received_qty": row.received_qty, "remaining_qty": row.remaining_qty}
+		values = {
+			"received_qty": row.received_qty,
+			"remaining_qty": row.remaining_qty,
+			"diverted_qty": row.diverted_qty,
+		}
 		if request.get("return_context") == "Depot":
 			values.update(
 				accepted_return_qty=row.accepted_return_qty, rejected_return_qty=row.rejected_return_qty
@@ -1482,6 +1500,9 @@ def _sync_direct_credit_note_outcomes(request, credit_note):
 
 
 def sync_return_request_from_quality_inspection(doc, method=None):
+	if doc.reference_type == "Delivery Note" and doc.reference_name:
+		if source := frappe.db.get_value("Delivery Note", doc.reference_name, "vuna_return_request"):
+			recalculate_return_request(source)
 	request_item = _get_return_request_item_for_quality_inspection(doc)
 	return_request = request_item.parent if request_item else None
 	if return_request:

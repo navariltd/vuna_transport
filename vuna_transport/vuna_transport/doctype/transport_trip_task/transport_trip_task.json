@@ -3,13 +3,22 @@
   "name": "Transport Trip Task",
   "module": "Vuna Transport",
   "creation": "2026-11-04 12:30:58.000000",
-  "modified": "2026-11-08 14:24:53.966451",
+  "modified": "2026-11-16 11:53:41.467966",
   "owner": "Administrator",
   "modified_by": "Administrator",
   "engine": "InnoDB",
   "istable": 0,
   "autoname": "hash",
   "fields": [
+    {
+      "fieldname": "shipment_diversion",
+      "search_index": 1,
+      "fieldtype": "Link",
+      "label": "Shipment Diversion",
+      "options": "Shipment Diversion",
+      "read_only": 1,
+      "no_copy": 1
+    },
     {
       "fieldname": "direct_assignment",
       "fieldtype": "Check",
@@ -199,6 +208,7 @@
   ],
   "field_order": [
     "task_section",
+    "shipment_diversion",
     "company",
     "delivery_trip",
     "task_type",

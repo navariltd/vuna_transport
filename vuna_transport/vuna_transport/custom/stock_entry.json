@@ -1,6 +1,7 @@
 {
   "doctype": "Stock Entry",
   "custom_fields": [
+  {"dt":"Stock Entry","name":"Stock Entry-vuna_shipment_diversion","fieldname":"vuna_shipment_diversion","fieldtype":"Link","label":"Shipment Diversion","options":"Shipment Diversion","read_only":1,"no_copy":1,"hidden":0,"insert_after":"outgoing_stock_entry","module":"Vuna Transport"},
     {"dt":"Stock Entry","name":"Stock Entry-vuna_supplier_purchase_receipt","fieldname":"vuna_supplier_purchase_receipt","fieldtype":"Link","label":"Supplier Vehicle Purchase Receipt","options":"Purchase Receipt","read_only":1,"no_copy":1,"insert_after":"outgoing_stock_entry","module":"Vuna Transport"},
     {
       "dt": "Stock Entry",

@@ -37,6 +37,14 @@ class ReturnRequest(Document):
 	def on_submit(self):
 		recalculate_return_request(self.name)
 		if self.return_context == "Depot":
+			if self.get("shipment_diversion") and frappe.db.exists(
+				"Stock Entry", {"vuna_return_request": self.name, "docstatus": 1}
+			):
+				frappe.throw(
+					_(
+						"Cancel the linked receiving Stock Entries before cancelling this diversion return case."
+					)
+				)
 			from vuna_transport.services.demand.source_policy_service import automatically_create_from_source
 
 			automatically_create_from_source(self)
@@ -46,6 +54,12 @@ class ReturnRequest(Document):
 
 		guard_return_cancellation(self)
 		if self.return_context == "Depot":
+			if self.get("shipment_diversion") and frappe.db.exists(
+				"Shipment Diversion", {"previous_diversion": self.shipment_diversion, "docstatus": ["!=", 2]}
+			):
+				frappe.throw(
+					_("Cancel the follow-up diversions before cancelling this rejection Return Request.")
+				)
 			if frappe.db.exists("Return Inspection", {"return_request": self.name, "docstatus": ["!=", 2]}):
 				frappe.throw(_("Cancel or delete depot Return Inspections before cancelling this request."))
 			from vuna_transport.services.execution.depot_return_service import depot_return_state

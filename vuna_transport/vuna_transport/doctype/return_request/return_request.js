@@ -1,6 +1,33 @@
 // Copyright (c) 2026, Yovuna Technologies Limited and contributors
 // For license information, please see license.txt
 
+function add_shipment_diversion_action(frm) {
+	if (
+		frm.doc.docstatus !== 1 ||
+		frm.doc.return_context === "Depot" ||
+		!frm.doc.proof_of_delivery ||
+		!frm.doc.delivery_note ||
+		["Closed", "Cancelled", "Resolved"].includes(frm.doc.status) ||
+		!frm.perm?.[0]?.write ||
+		!frappe.model.can_create("Shipment Diversion")
+	)
+		return;
+	frm.add_custom_button(
+		__("Divert Shipment"),
+		() => {
+			if (frm.is_dirty())
+				return frappe.msgprint(
+					__("Save the Return Request before preparing a diversion.")
+				);
+			frappe.model.open_mapped_doc({
+				method: "vuna_transport.services.execution.shipment_diversion_service.make_shipment_diversion",
+				frm,
+			});
+		},
+		__("Create")
+	);
+}
+
 function update_pickup_assignment_action(dialog) {
 	const selected = dialog.get_value("delivery_stop");
 	const ready =
@@ -232,6 +259,7 @@ frappe.ui.form.on("Return Request", {
 	},
 
 	refresh(frm) {
+		add_shipment_diversion_action(frm);
 		for (const field of [
 			"customer",
 			"delivery_note",
@@ -324,7 +352,7 @@ frappe.ui.form.on("Return Request", {
 					["Still With Vehicle", "Split Custody"].includes(frm.doc.custody)
 				) {
 					frm.add_custom_button(
-						__("End Transit Stock Entry"),
+						__(frm.doc.shipment_diversion ? "Stock Entry" : "End Transit Stock Entry"),
 						() =>
 							frappe.call({
 								method: "vuna_transport.services.execution.depot_return_receiving_service.create_vehicle_receipt",

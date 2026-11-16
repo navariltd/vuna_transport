@@ -15,6 +15,11 @@ def create_depot_return_from_pod(pod):
 	rejected = [row for row in pod.items if flt(row.rejected_qty) > 0]
 	if not rejected:
 		return None
+	if parent := frappe.db.get_value("Transport Trip Task", pod.transport_trip_task, "shipment_diversion"):
+		from vuna_transport.services.execution.shipment_diversion_exceptions import create_rejection_request
+
+		request = create_rejection_request(frappe.get_doc("Shipment Diversion", parent), pod)
+		return request.name if request else None
 	frappe.db.get_value("Proof of Delivery", pod.name, "name", for_update=True)
 	if existing := frappe.db.get_value(
 		"Return Request", {"proof_of_delivery": pod.name, "docstatus": ["!=", 2]}, "name"
@@ -78,6 +83,11 @@ def create_depot_return_from_pod(pod):
 
 
 def validate_depot_return(request):
+	if request.get("shipment_diversion"):
+		from vuna_transport.services.execution.shipment_diversion_exceptions import validate_rejection_request
+
+		validate_rejection_request(request)
+		return
 	if not request.proof_of_delivery:
 		from vuna_transport.services.execution.manual_depot_return_service import validate_manual_depot_return
 
@@ -196,8 +206,10 @@ def depot_return_state(request):
 		"""select d.vuna_return_request_item, sum(d.transfer_qty)
 		from `tabStock Entry Detail` d join `tabStock Entry` s on s.name=d.parent
 		where s.docstatus=1 and s.add_to_transit=0 and s.vuna_return_request=%s
+		and d.t_warehouse=%s
+		and d.vuna_return_request_item is not null and d.vuna_return_request_item!=''
 		group by d.vuna_return_request_item""",
-		request.name,
+		(request.name, request.return_warehouse),
 	):
 		stock_received[item_name] = flt(stock_received.get(item_name)) + flt(quantity)
 	by_item = {
@@ -208,6 +220,22 @@ def depot_return_state(request):
 		for row in request.items
 	}
 	received = sum(by_item.values())
+	diverted_by_item = dict.fromkeys(by_item, 0.0)
+	if request.get("shipment_diversion"):
+		from vuna_transport.services.execution.shipment_diversion_followup import completed_followup_stock
+
+		parent = frappe.get_doc("Shipment Diversion", request.shipment_diversion)
+		onward = completed_followup_stock(parent.name)
+		proof = frappe.get_doc("Proof of Delivery", request.proof_of_delivery)
+		sources = {row.name: row.source_row for row in proof.items}
+		for row in request.items:
+			if row.custody_warehouse == parent.vehicle_warehouse:
+				diverted_by_item[row.name] = min(
+					max(flt(row.requested_return_qty) - by_item[row.name], 0),
+					flt(onward.get(sources.get(row.source_pod_item))) / (flt(row.conversion_factor) or 1),
+				)
+	diverted = sum(diverted_by_item.values())
+	accounted = received + diverted
 	progress = inspection_progress(request)
 	quality = {"Accepted": {}, "Rejected": {}}
 	for item_name, result, quantity in frappe.db.sql(
@@ -225,15 +253,17 @@ def depot_return_state(request):
 		else "Draft"
 		if request.docstatus == 0
 		else "Resolved"
-		if received >= expected and expected and progress["posted"] >= sum(stock_received.values())
+		if accounted >= expected and expected and progress["posted"] >= sum(stock_received.values())
 		else "Awaiting Disposition"
-		if received >= expected and expected and progress["inspected"] >= sum(stock_received.values())
+		if accounted >= expected and expected and progress["inspected"] >= sum(stock_received.values())
 		else "Awaiting Inspection"
-		if received >= expected and expected
+		if accounted >= expected and expected
 		else "Awaiting Receipt",
 		"expected_return_qty": expected,
 		"returned_qty": received,
-		"return_difference_qty": max(expected - received, 0),
+		"return_difference_qty": max(expected - accounted, 0),
+		"diverted_qty": diverted,
+		"diverted_by_item": diverted_by_item,
 		"returned_by_item": by_item,
 		"accepted_by_item": quality["Accepted"],
 		"rejected_by_item": quality["Rejected"],

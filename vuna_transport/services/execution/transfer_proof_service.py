@@ -111,6 +111,10 @@ def make_transfer_proof(source_name: str):
 
 
 def prepare_proof(task):
+	if task.get("shipment_diversion") and task.task_type == "Transfer Receipt":
+		from vuna_transport.services.execution.shipment_diversion_execution import prepare_depot_proof
+
+		return prepare_depot_proof(task)
 	if task.task_type == "Supplier Pickup":
 		from vuna_transport.services.execution.supplier_collection_proof_service import prepare_collection
 
@@ -231,6 +235,11 @@ def validate_proof(doc):
 	task = _lock_task(doc.transport_trip_task)
 	if not doc.flags.ignore_permissions:
 		require_document_permission(task)
+	if task.get("shipment_diversion"):
+		from vuna_transport.services.execution.shipment_diversion_execution import validate_depot_proof
+
+		validate_depot_proof(doc, task)
+		return
 	trip, stock = proof_context(task)
 	from vuna_transport.services.execution.warehouse_receipt_service import assert_no_manual_receipt
 

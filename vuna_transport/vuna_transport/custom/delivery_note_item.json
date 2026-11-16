@@ -1,5 +1,6 @@
 {
  "custom_fields": [
+  {"dt":"Delivery Note Item","name":"Delivery Note Item-vuna_diversion_item","fieldname":"vuna_diversion_item","fieldtype":"Link","label":"Diversion Item","options":"Shipment Diversion Item","read_only":1,"no_copy":1,"hidden":1,"insert_after":"item_code","module":"Vuna Transport"},
   {
    "_assign": null,
    "_comments": null,

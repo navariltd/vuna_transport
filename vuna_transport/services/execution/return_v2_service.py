@@ -20,6 +20,14 @@ def is_v2_return_request(request) -> bool:
 
 
 def _validate_return_inspection_sales_return(inspection) -> None:
+	if inspection.sales_return and frappe.db.exists(
+		"Shipment Diversion", {"sales_return": inspection.sales_return, "docstatus": ["!=", 2]}
+	):
+		frappe.throw(
+			_(
+				"This vehicle receipt is committed to a Shipment Diversion. Record its Quality Inspection on the Sales Return or inspect the receiving depot's return case; do not move the same stock again."
+			)
+		)
 	sales_return = frappe.get_doc("Delivery Note", inspection.sales_return)
 	require_document_permission(sales_return, "read")
 	if sales_return.docstatus != 1 or not sales_return.is_return:
@@ -150,6 +158,12 @@ def validate_return_inspection_cancellation(inspection) -> None:
 def validate_sales_return_lineage(sales_return, request) -> None:
 	"""Validate Sales Return lineage and aggregate split rows against the request."""
 	request_items = {row.delivery_note_item: row for row in request.items}
+	receiving_warehouse = request.return_warehouse
+	if sales_return.get("vuna_shipment_diversion"):
+		diversion = frappe.get_doc("Shipment Diversion", sales_return.vuna_shipment_diversion)
+		if diversion.docstatus != 1 or diversion.return_request != request.name:
+			frappe.throw(_("Vehicle returns require an approved diversion for this Return Request."))
+		receiving_warehouse = diversion.vehicle_warehouse
 	totals = defaultdict(float)
 	for row in sales_return.items:
 		request_item = request_items.get(row.dn_detail)
@@ -157,10 +171,10 @@ def validate_sales_return_lineage(sales_return, request) -> None:
 			frappe.throw(
 				_("Row #{0}: Delivery Note lineage does not match the Return Request.").format(row.idx)
 			)
-		if row.warehouse != request.return_warehouse:
+		if row.warehouse != receiving_warehouse:
 			frappe.throw(
 				_("Row #{0}: Returned stock must enter the Return Warehouse {1}.").format(
-					row.idx, request.return_warehouse
+					row.idx, receiving_warehouse
 				)
 			)
 		totals[row.dn_detail] += abs(flt(row.stock_qty))
