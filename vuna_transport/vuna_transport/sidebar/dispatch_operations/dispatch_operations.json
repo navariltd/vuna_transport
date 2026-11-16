@@ -352,6 +352,22 @@
    "child": 1,
    "collapsible": 1,
    "hidden": 0,
+   "icon": "truck",
+   "indent": 0,
+   "is_default_module": 0,
+   "keep_closed": 0,
+   "label": "Shipment Diversions",
+   "link_to": "Shipment Diversion",
+   "link_type": "DocType",
+   "open_in_new_tab": 1,
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "added": 0,
+   "child": 1,
+   "collapsible": 1,
+   "hidden": 0,
    "icon": "book-open-check",
    "indent": 0,
    "is_default_module": 0,
@@ -678,7 +694,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-11-08 15:08:23.723382",
+ "modified": "2026-11-16 13:59:27.518724",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Dispatch Operations",

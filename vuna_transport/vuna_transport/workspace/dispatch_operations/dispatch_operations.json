@@ -119,7 +119,7 @@
   {
    "label": "Returns & Resolution",
    "type": "Card Break",
-   "link_count": 3
+   "link_count": 4
   },
   {
    "label": "Return Requests",
@@ -130,6 +130,12 @@
   {
    "label": "Return Inspections",
    "link_to": "Return Inspection",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Shipment Diversions",
+   "link_to": "Shipment Diversion",
    "link_type": "DocType",
    "type": "Link"
   },
@@ -263,7 +269,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-11-08 15:11:21.178957",
+ "modified": "2026-11-16 13:59:27.518724",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Dispatch Operations",

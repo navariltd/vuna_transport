@@ -45,6 +45,7 @@ class TestTransportNavigation(unittest.TestCase):
 	def test_dispatch_surfaces_include_operational_and_source_documents(self):
 		required = {
 			"Return Inspection",
+			"Shipment Diversion",
 			"Transport Trip Task",
 			"Dispatch Planning Filter",
 			"County",
@@ -71,6 +72,7 @@ class TestTransportNavigation(unittest.TestCase):
 			workspace("dispatch_operations"),
 		):
 			self.assertIn("Return Inspection", section_targets(doc, "Returns & Resolution"))
+			self.assertIn("Shipment Diversion", section_targets(doc, "Returns & Resolution"))
 			self.assertIn("Transport Trip Task", section_targets(doc, "Execution"))
 			self.assertIn("Dispatch Planning Filter", section_targets(doc, "Dispatch Setup"))
 			self.assertEqual(
@@ -90,6 +92,19 @@ class TestTransportNavigation(unittest.TestCase):
 		self.assertTrue(
 			{"Vehicle Allocation", "Delivery Trip"}.issubset(section_targets(current, "Fleet Operations"))
 		)
+
+	def test_diversion_workspace_links_belong_to_the_returns_card_with_correct_counts(self):
+		for name in ("dispatch_operations", "vuna_transport"):
+			doc = workspace(name)
+			with self.subTest(workspace=name):
+				links = section_targets(doc, "Returns & Resolution")
+				self.assertIn("Shipment Diversion", links)
+				card = next(
+					row
+					for row in doc["links"]
+					if row["type"] == "Card Break" and row["label"] == "Returns & Resolution"
+				)
+				self.assertEqual(card["link_count"], len(links))
 
 	def test_workspace_cards_actually_render_every_link_group(self):
 		for name in ("dispatch_operations", "fleet_management", "vuna_transport"):

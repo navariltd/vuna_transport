@@ -268,6 +268,19 @@
   {
    "child": 1,
    "collapsible": 1,
+   "icon": "truck",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "Shipment Diversions",
+   "link_to": "Shipment Diversion",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link",
+   "hidden": 0
+  },
+  {
+   "child": 1,
+   "collapsible": 1,
    "icon": "settings",
    "indent": 0,
    "keep_closed": 0,
@@ -515,7 +528,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-11-08 15:08:23.723382",
+ "modified": "2026-11-16 13:59:27.518724",
  "modified_by": "Administrator",
  "name": "Dispatch Operations",
  "owner": "Administrator",
