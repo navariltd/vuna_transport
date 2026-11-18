@@ -1,4 +1,5 @@
 import frappe
+from frappe.rate_limiter import rate_limit
 from frappe.utils import add_to_date, now_datetime
 
 from vuna_transport.services.fleet.driver_availability_service import (
@@ -233,6 +234,14 @@ def get_mobile_offline_work(installation_id, device_identifier=None):
 @frappe.whitelist()
 def get_mobile_delivery_trip_details(installation_id, trip_name, device_identifier=None):
 	return get_delivery_trip_details(installation_id, trip_name, device_identifier)
+
+
+@frappe.whitelist(methods=["POST"])
+@rate_limit(limit=5, seconds=60, user_based=True)
+def get_mobile_trip_road_route(installation_id: str, trip_name: str, device_identifier: str | None = None):
+	from vuna_transport.services.mobile.mobile_road_route_service import get_trip_road_route
+
+	return get_trip_road_route(installation_id, trip_name, device_identifier)
 
 
 @frappe.whitelist()

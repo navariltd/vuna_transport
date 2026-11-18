@@ -1,4 +1,4 @@
-"""Bounded Google Routes requests. No route geometry, caching or document writes."""
+"""Bounded Google Routes requests; optional display geometry, never document writes."""
 
 import math
 import re
@@ -16,17 +16,26 @@ def split_route_points(points):
 	return [points[index : index + MAX_POINTS] for index in range(0, len(points) - 1, MAX_POINTS - 1)]
 
 
-def compute_ordered_route(points, api_key):
+def compute_ordered_route(points, api_key, *, include_geometry=False):
 	"""One continuous journey: a shared boundary, never a repeated road leg."""
-	results = [compute_route(batch, api_key) for batch in split_route_points(points)]
-	return {
+	results = [
+		compute_route(batch, api_key, include_geometry=True)
+		if include_geometry
+		else compute_route(batch, api_key)
+		for batch in split_route_points(points)
+	]
+	result = {
 		"distance_meters": sum(result["distance_meters"] for result in results),
 		"duration_seconds": sum(result["duration_seconds"] for result in results),
 		"legs": [leg for result in results for leg in result["legs"]],
 	}
+	if include_geometry:
+		# Each batch is encoded independently; never concatenate encoded strings.
+		result["encoded_polylines"] = [row["encoded_polyline"] for row in results]
+	return result
 
 
-def compute_route(points, api_key):
+def compute_route(points, api_key, *, include_geometry=False):
 	if not 2 <= len(points) <= MAX_POINTS:
 		frappe.throw(_("Google road routing supports 2 to 27 route points per preview."))
 	waypoints = [
@@ -43,6 +52,8 @@ def compute_route(points, api_key):
 		"units": "METRIC",
 		"languageCode": "en",
 	}
+	if include_geometry:
+		body.update(polylineEncoding="ENCODED_POLYLINE", polylineQuality="OVERVIEW")
 	failed = False
 	try:
 		response = requests.post(
@@ -50,7 +61,8 @@ def compute_route(points, api_key):
 			json=body,
 			headers={
 				"X-Goog-Api-Key": api_key,
-				"X-Goog-FieldMask": FIELD_MASK,
+				"X-Goog-FieldMask": FIELD_MASK
+				+ (",routes.polyline.encodedPolyline" if include_geometry else ""),
 				"Content-Type": "application/json",
 			},
 			timeout=(5, 15),
@@ -69,7 +81,14 @@ def compute_route(points, api_key):
 		data = response.json()
 	except ValueError:
 		pass
-	return parse_route(data, len(points) - 1)
+	result = parse_route(data, len(points) - 1)
+	if include_geometry:
+		geometry = data["routes"][0].get("polyline")
+		polyline = geometry.get("encodedPolyline") if isinstance(geometry, dict) else None
+		if not isinstance(polyline, str) or not re.fullmatch(r"[\x3f-\x7e]{2,200000}", polyline):
+			frappe.throw(_("Google returned no usable road route line. No transport records were changed."))
+		result["encoded_polyline"] = polyline
+	return result
 
 
 def _raise_provider_error(response):
