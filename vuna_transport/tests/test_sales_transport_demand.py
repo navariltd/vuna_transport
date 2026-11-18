@@ -10,6 +10,9 @@ from vuna_transport.vuna_transport.doctype.transport_load.transport_load import 
 
 
 class TestDirectSalesDemand(unittest.TestCase):
+	def setUp(self):
+		self.enterContext(patch.object(service, "item_requires_transport", return_value=True))
+
 	def test_preview_switch_is_off_by_default_and_uses_numeric_site_opt_in(self):
 		for value, expected in ((0, False), ("0", False), (1, True), ("1", True)):
 			with (

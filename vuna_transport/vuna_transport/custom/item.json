@@ -1,6 +1,23 @@
 {
  "custom_fields": [
   {
+   "creation": "2026-11-16 14:48:52.289607",
+   "default": "1",
+   "depends_on": "eval:doc.is_stock_item",
+   "description": "Changing this does not alter existing Transport Demands.",
+   "dt": "Item",
+   "fieldname": "vuna_requires_transport",
+   "fieldtype": "Check",
+   "insert_after": "vuna_delivery_group",
+   "label": "Requires Transport",
+   "modified": "2026-11-16 14:48:52.289607",
+   "modified_by": "Administrator",
+   "module": "Vuna Transport",
+   "name": "Item-vuna_requires_transport",
+   "owner": "Administrator",
+   "permlevel": 0
+  },
+  {
    "_assign": null,
    "_comments": null,
    "_liked_by": null,

@@ -73,13 +73,14 @@ def validate_pickup_location(source):
 	return address
 
 
-def build_supplier_pickup_legs(source):
+def build_supplier_pickup_legs(source, *, preserved_source_items=()):
 	"""ERPNext PO received_qty is transaction UOM, unlike MR ordered_qty.
 
 	Use the same qty - received_qty arithmetic as make_purchase_receipt. Keep
 	stock-UOM arithmetic alongside that snapshot, never substitute Stock UOM
 	for the requested packaging UOM. External suppliers are not company warehouses.
 	"""
+	from vuna_transport.services.demand.item_transport_policy import item_requires_transport
 	from vuna_transport.services.demand.transport_demand_service import get_source_key
 
 	if (
@@ -100,6 +101,14 @@ def build_supplier_pickup_legs(source):
 		frappe.throw(
 			_("Subcontracting and unit-price orders are not supported by the supplier pickup adapter.")
 		)
+	eligible_rows = [
+		row
+		for row in source.get("items") or []
+		if not row.get("delivered_by_supplier")
+		and (row.name in preserved_source_items or item_requires_transport(row.item_code))
+	]
+	if not eligible_rows:
+		return []
 	pickup_address = get_supplier_pickup_address(source)
 	if not source.get("supplier") or not pickup_address:
 		frappe.throw(
@@ -109,7 +118,7 @@ def build_supplier_pickup_legs(source):
 		)
 	validate_pickup_location(source)
 	legs = defaultdict(list)
-	for row in source.get("items") or []:
+	for row in eligible_rows:
 		if row.get("delivered_by_supplier"):
 			continue  # Drop shipments never enter the company's receiving warehouse.
 		if not frappe.get_cached_value("Item", row.item_code, "is_stock_item"):

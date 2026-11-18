@@ -166,7 +166,16 @@ def validate_demand_allocations(load):
 			frappe.throw(_("Keep different movement types in separate Transport Loads."))
 		source = frappe.get_doc(demand.source_document_type, demand.source_document)
 		source.check_permission("read")
-		leg = next((leg for leg in build_source_legs(source) if leg["source_key"] == demand.source_key), None)
+		leg = next(
+			(
+				leg
+				for leg in build_source_legs(
+					source, preserved_source_items={item.source_item for item in demand.items}
+				)
+				if leg["source_key"] == demand.source_key
+			),
+			None,
+		)
 		item = next((item for item in demand.items if item.name == row.transport_demand_item), None)
 		live = next(
 			(
@@ -344,7 +353,16 @@ def get_transfer_load_items(transport_demand: str) -> list:
 		frappe.throw(_("Select an open, submitted warehouse-transfer Transport Demand."))
 	source = frappe.get_doc(demand.source_document_type, demand.source_document)
 	source.check_permission("read")
-	leg = next((leg for leg in build_source_legs(source) if leg["source_key"] == demand.source_key), None)
+	leg = next(
+		(
+			leg
+			for leg in build_source_legs(
+				source, preserved_source_items={item.source_item for item in demand.items}
+			)
+			if leg["source_key"] == demand.source_key
+		),
+		None,
+	)
 	live = {item["source_item"]: item["stock_qty"] for item in (leg or {}).get("items", [])}
 	committed = get_committed_quantities([item.name for item in demand.items])
 	posted = get_posted_transfer_quantities([item.name for item in demand.items])
@@ -416,7 +434,16 @@ def get_transfer_planning_items(
 		demand.check_permission("read")
 		source = frappe.get_doc(demand.source_document_type, demand.source_document)
 		source.check_permission("read")
-		leg = next((leg for leg in build_source_legs(source) if leg["source_key"] == demand.source_key), None)
+		leg = next(
+			(
+				leg
+				for leg in build_source_legs(
+					source, preserved_source_items={item.source_item for item in demand.items}
+				)
+				if leg["source_key"] == demand.source_key
+			),
+			None,
+		)
 		live = {item["source_item"]: item["stock_qty"] for item in (leg or {}).get("items", [])}
 		committed = get_committed_quantities([item.name for item in demand.items])
 		posted = get_posted_transfer_quantities([item.name for item in demand.items])

@@ -22,12 +22,24 @@ LEGACY_DEFAULT_DISPATCH_SCAN_ROLES = {
 def after_install():
 	from vuna_transport.services.execution.driver_stock_policy import initialize_driver_stock_policy
 
+	ensure_item_transport_requirement()
 	ensure_transport_uoms()
 	normalize_transport_cost_natures()
 	ensure_transport_demand_sources()
 	ensure_dispatch_scan_roles()
 	ensure_delivery_methods()
 	initialize_driver_stock_policy()
+
+
+def ensure_item_transport_requirement():
+	"""Install just this new field on upgrades; do not overwrite unrelated Item customizations."""
+	from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+	fixture = frappe.get_file_json(
+		frappe.get_app_path("vuna_transport", "vuna_transport", "custom", "item.json")
+	)
+	field = next(row for row in fixture["custom_fields"] if row["fieldname"] == "vuna_requires_transport")
+	create_custom_fields({"Item": [field]})
 
 
 def ensure_transport_demand_sources():

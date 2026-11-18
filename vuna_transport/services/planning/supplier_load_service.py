@@ -148,7 +148,14 @@ def source_context(demand):
 			)
 		)
 	leg = next(
-		(leg for leg in build_supplier_pickup_legs(order) if leg["source_key"] == demand.source_key), None
+		(
+			leg
+			for leg in build_supplier_pickup_legs(
+				order, preserved_source_items={item.source_item for item in demand.items}
+			)
+			if leg["source_key"] == demand.source_key
+		),
+		None,
 	)
 	if (
 		not leg

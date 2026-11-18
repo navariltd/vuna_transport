@@ -32,6 +32,7 @@ class TestTransportSettingsBootstrap(unittest.TestCase):
 			saved.append(copy.deepcopy(settings.as_dict()))
 
 		with (
+			patch.object(install, "ensure_item_transport_requirement"),
 			patch.object(install, "ensure_transport_uoms"),
 			patch.object(install, "normalize_transport_cost_natures"),
 			patch.object(install, "ensure_delivery_methods"),

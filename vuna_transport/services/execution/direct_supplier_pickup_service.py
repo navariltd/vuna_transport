@@ -62,7 +62,13 @@ def validate_assignment_context(demand, trip):
 			)
 		)
 	leg = next(
-		(value for value in build_supplier_pickup_legs(order) if value["source_key"] == demand.source_key),
+		(
+			value
+			for value in build_supplier_pickup_legs(
+				order, preserved_source_items={item.source_item for item in demand.items}
+			)
+			if value["source_key"] == demand.source_key
+		),
 		None,
 	)
 	if (

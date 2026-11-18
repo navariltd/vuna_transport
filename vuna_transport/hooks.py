@@ -447,6 +447,7 @@ fixtures = [
 ]
 
 after_migrate = [
+	"vuna_transport.install.ensure_item_transport_requirement",
 	"vuna_transport.install.ensure_delivery_methods",
 	"vuna_transport.install.ensure_transport_uoms",
 	"vuna_transport.install.normalize_transport_cost_natures",
