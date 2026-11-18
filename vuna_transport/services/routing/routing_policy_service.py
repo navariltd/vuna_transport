@@ -12,6 +12,7 @@ LIMITS = {
 	"routing_max_locations": (100, 200),
 	"routing_daily_request_limit": (100, 10000),
 	"routing_daily_shipment_limit": (1000, 100000),
+	"routing_mobile_daily_request_limit": (25, 10000),
 }
 
 # Reserve both counters together. Failed attempts remain counted deliberately;
@@ -19,10 +20,15 @@ LIMITS = {
 RESERVE_SCRIPT = """
 local requests = tonumber(redis.call('HGET', KEYS[1], 'requests') or '0')
 local shipments = tonumber(redis.call('HGET', KEYS[1], 'shipments') or '0')
+local mobile = tonumber(redis.call('HGET', KEYS[1], 'mobile_requests') or '0')
+local mobile_units = tonumber(ARGV[5]) or 0
+local mobile_limit = tonumber(ARGV[6]) or 0
 if requests + tonumber(ARGV[1]) > tonumber(ARGV[3]) then return -1 end
 if shipments + tonumber(ARGV[2]) > tonumber(ARGV[4]) then return -2 end
+if mobile_units > 0 and mobile + mobile_units > mobile_limit then return -3 end
 redis.call('HINCRBY', KEYS[1], 'requests', ARGV[1])
 redis.call('HINCRBY', KEYS[1], 'shipments', ARGV[2])
+if mobile_units > 0 then redis.call('HINCRBY', KEYS[1], 'mobile_requests', mobile_units) end
 redis.call('EXPIRE', KEYS[1], 172800)
 return 1
 """
@@ -56,19 +62,34 @@ def require_routing_role(settings):
 		)
 
 
-def reserve_usage(settings, *, requests, shipments=0):
+def reserve_usage(settings, *, requests, shipments=0, mobile=False):
 	if requests < 1 or shipments < 0:
 		raise ValueError("Invalid routing usage reservation")
 	request_limit = get_limit(settings, "routing_daily_request_limit")
 	shipment_limit = get_limit(settings, "routing_daily_shipment_limit")
+	mobile_limit = get_limit(settings, "routing_mobile_daily_request_limit") if mobile else 0
 	failed = False
 	try:
 		key = frappe.cache.make_key("vuna_transport:routing:usage:" + nowdate())
-		result = frappe.cache.eval(RESERVE_SCRIPT, 1, key, requests, shipments, request_limit, shipment_limit)
+		result = frappe.cache.eval(
+			RESERVE_SCRIPT,
+			1,
+			key,
+			requests,
+			shipments,
+			request_limit,
+			shipment_limit,
+			requests if mobile else 0,
+			mobile_limit,
+		)
 	except RedisError:
 		failed = True
 	if failed:
 		frappe.throw(_("Routing usage limits could not be checked. No Google request was sent."))
+	if result == -3:
+		frappe.throw(
+			_("The daily driver road-route request limit has been reached. Contact your administrator.")
+		)
 	if result != 1:
 		frappe.throw(
 			_(

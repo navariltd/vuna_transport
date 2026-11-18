@@ -240,3 +240,61 @@ class TestRoutingPolicy(unittest.TestCase):
 			self.assertEqual(int(cache.execute_command("HGET", key, "shipments")), 10)
 		finally:
 			cache.delete(key)
+
+	def test_driver_requests_share_overall_budget_and_have_a_separate_atomic_cap(self):
+		settings = frappe._dict(routing_daily_request_limit=10, routing_mobile_daily_request_limit=5)
+		day = "test-mobile-" + uuid4().hex
+		with patch.object(policy, "nowdate", return_value=day):
+			key = frappe.cache.make_key("vuna_transport:routing:usage:" + day)
+			try:
+				policy.reserve_usage(settings, requests=3, mobile=True)
+				with self.assertRaises(ValueError):
+					policy.reserve_usage(settings, requests=3, mobile=True)
+				self.assertEqual(int(frappe.cache.execute_command("HGET", key, "requests")), 3)
+				policy.reserve_usage(settings, requests=2)  # Desk usage does not consume the mobile sublimit.
+				policy.reserve_usage(settings, requests=2, mobile=True)
+				self.assertEqual(int(frappe.cache.execute_command("HGET", key, "requests")), 7)
+				self.assertEqual(int(frappe.cache.execute_command("HGET", key, "mobile_requests")), 5)
+				with self.assertRaises(ValueError):
+					policy.reserve_usage(settings, requests=1, mobile=True)
+			finally:
+				frappe.cache.delete(key)
+
+	def test_overall_limit_also_blocks_driver_requests(self):
+		settings = frappe._dict(routing_daily_request_limit=2, routing_mobile_daily_request_limit=25)
+		day = "test-mobile-global-" + uuid4().hex
+		with patch.object(policy, "nowdate", return_value=day):
+			key = frappe.cache.make_key("vuna_transport:routing:usage:" + day)
+			try:
+				policy.reserve_usage(settings, requests=2)
+				with self.assertRaises(ValueError):
+					policy.reserve_usage(settings, requests=1, mobile=True)
+				self.assertIsNone(frappe.cache.execute_command("HGET", key, "mobile_requests"))
+			finally:
+				frappe.cache.delete(key)
+
+	def test_concurrent_driver_requests_cannot_exceed_mobile_sublimit(self):
+		cache = frappe.cache
+		key = cache.make_key("vuna_transport:routing:mobile-concurrency-test:" + uuid4().hex)
+		try:
+
+			def reserve(_index):
+				return cache.eval(policy.RESERVE_SCRIPT, 1, key, 2, 0, 100, 1000, 2, 10)
+
+			with ThreadPoolExecutor(max_workers=8) as pool:
+				results = list(pool.map(reserve, range(20)))
+			self.assertEqual(results.count(1), 5)
+			self.assertEqual(results.count(-3), 15)
+			self.assertEqual(int(cache.execute_command("HGET", key, "requests")), 10)
+			self.assertEqual(int(cache.execute_command("HGET", key, "mobile_requests")), 10)
+		finally:
+			cache.delete(key)
+
+	def test_mobile_limit_is_positive_and_bounded(self):
+		self.assertEqual(policy.get_limit(frappe._dict(), "routing_mobile_daily_request_limit"), 25)
+		for value in (0, -1, 10001, 1.5, True, "bad"):
+			with self.subTest(value=value), self.assertRaises(ValueError):
+				policy.get_limit(
+					frappe._dict(routing_mobile_daily_request_limit=value),
+					"routing_mobile_daily_request_limit",
+				)

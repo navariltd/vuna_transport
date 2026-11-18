@@ -32,6 +32,9 @@
   "mobile_map_provider",
   "routing_column",
   "google_routes_api_key",
+  "driver_routing_section",
+  "allow_driver_road_routes",
+  "routing_mobile_daily_request_limit",
   "routing_optimization_section",
   "enable_google_optimization",
   "google_optimization_service_account",
@@ -96,6 +99,27 @@
    "label": "Google Routes API Key",
    "depends_on": "eval:doc.routing_provider == 'Google'",
    "description": "Optional server-restricted key; otherwise uses API Key in Google Settings. Enable Routes API and billing in Google Cloud."
+  },
+  {
+   "fieldname": "driver_routing_section",
+   "fieldtype": "Section Break",
+   "label": "Driver Road Routes",
+   "depends_on": "eval:doc.routing_provider == 'Google'"
+  },
+  {
+   "fieldname": "allow_driver_road_routes",
+   "fieldtype": "Check",
+   "label": "Allow Driver Road Routes",
+   "default": "0",
+   "description": "Allows assigned drivers to show their trip's road route without planning permissions."
+  },
+  {
+   "fieldname": "routing_mobile_daily_request_limit",
+   "fieldtype": "Int",
+   "label": "Daily Driver Routing Requests",
+   "default": "25",
+   "depends_on": "eval:doc.allow_driver_road_routes",
+   "description": "Shared across all drivers; split requests and failed attempts count toward this and the overall daily Google limit."
   },
   {
    "fieldname": "routing_optimization_section",
@@ -391,7 +415,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-18 16:46:32.452393",
+ "modified": "2026-11-18 21:34:46.986173",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Settings",
