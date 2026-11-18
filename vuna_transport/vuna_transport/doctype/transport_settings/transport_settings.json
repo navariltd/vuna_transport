@@ -31,6 +31,15 @@
   "routing_provider",
   "routing_column",
   "google_routes_api_key",
+  "routing_optimization_section",
+  "enable_google_optimization",
+  "google_optimization_service_account",
+  "routing_limits_section",
+  "routing_max_locations",
+  "routing_allowed_roles",
+  "routing_limits_column",
+  "routing_daily_request_limit",
+  "routing_daily_shipment_limit",
   "features_tab",
   "feature_controls_section",
   "enable_carrier_management",
@@ -66,7 +75,7 @@
    "options": "Geographic Estimate\nGoogle",
    "default": "Geographic Estimate",
    "reqd": 1,
-   "description": "Each Google road route preview sends stop coordinates to Google and may incur charges on your Google Cloud project. Configure billing and request quotas before enabling Google. Requests run only when users click Preview Route."
+   "description": "Google previews send coordinates to Google and incur request charges; dedicated optimization is billed per routing location. Set Google Cloud quotas as well as the application limits below."
   },
   {
    "fieldname": "routing_column",
@@ -78,6 +87,64 @@
    "label": "Google Routes API Key",
    "depends_on": "eval:doc.routing_provider == 'Google'",
    "description": "Optional server-restricted key; otherwise uses API Key in Google Settings. Enable Routes API and billing in Google Cloud."
+  },
+  {
+   "fieldname": "routing_optimization_section",
+   "fieldtype": "Section Break",
+   "label": "Stop Optimization",
+   "depends_on": "eval:doc.routing_provider == 'Google'"
+  },
+  {
+   "fieldname": "enable_google_optimization",
+   "fieldtype": "Check",
+   "label": "Enable Google Route Optimization",
+   "default": "0"
+  },
+  {
+   "fieldname": "google_optimization_service_account",
+   "fieldtype": "Password",
+   "label": "Google Service Account JSON",
+   "depends_on": "eval:doc.enable_google_optimization",
+   "mandatory_depends_on": "eval:doc.enable_google_optimization",
+   "description": "Enable Route Optimization API and grant this service account routeoptimization.locations.use, for example through the Route Optimization Viewer role."
+  },
+  {
+   "fieldname": "routing_limits_section",
+   "fieldtype": "Section Break",
+   "label": "Routing Access and Usage",
+   "depends_on": "eval:doc.routing_provider == 'Google'"
+  },
+  {
+   "fieldname": "routing_max_locations",
+   "fieldtype": "Int",
+   "label": "Maximum Routing Locations",
+   "default": "100",
+   "description": "Per preview or optimization; maximum 200 locations."
+  },
+  {
+   "fieldname": "routing_allowed_roles",
+   "fieldtype": "Table MultiSelect",
+   "label": "Allowed Routing Roles",
+   "options": "Transport Scan Role",
+   "description": "Leave empty for System Manager, Transport Manager, Transport Dispatcher and Transport Planner."
+  },
+  {
+   "fieldname": "routing_limits_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "routing_daily_request_limit",
+   "fieldtype": "Int",
+   "label": "Daily Google Routing Requests",
+   "default": "100",
+   "description": "Site-wide attempted requests, including split previews; failures still count."
+  },
+  {
+   "fieldname": "routing_daily_shipment_limit",
+   "fieldtype": "Int",
+   "label": "Daily Optimization Locations",
+   "default": "1000",
+   "description": "Site-wide attempted location units submitted to the optimizer; failures still count."
   },
   {
    "fieldname": "driver_stock_posting_section",
@@ -315,7 +382,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-18 12:33:43.132104",
+ "modified": "2026-11-18 14:08:29.164874",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Settings",

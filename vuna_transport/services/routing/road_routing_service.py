@@ -7,36 +7,50 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils import cint, escape_html
 
-from vuna_transport.services.routing.google_routes_service import MAX_POINTS, compute_route
+from vuna_transport.services.routing.google_optimization_service import optimize_route
+from vuna_transport.services.routing.google_routes_service import compute_ordered_route, split_route_points
 from vuna_transport.services.routing.location_service import (
 	get_address_planning_data,
 	get_warehouse_planning_data,
 )
+from vuna_transport.services.routing.routing_policy_service import (
+	get_limit,
+	require_routing_role,
+	reserve_usage,
+)
 from vuna_transport.services.shared.security_service import require_authenticated, require_document_permission
 
-ROUTING_ROLES = {"System Manager", "Transport Manager", "Transport Dispatcher", "Transport Planner"}
 SUPPORTED_DOCUMENTS = {"Transport Load", "Delivery Trip"}
 
 
 @frappe.whitelist(methods=["POST"])
 @rate_limit(limit=10, seconds=60, user_based=True)
-def preview_road_route(doctype: str, name: str, return_to_start: int = 0):
+def preview_road_route(doctype: str, name: str, return_to_start: int = 0, optimize_stops: int = 0):
 	"""A live preview only: no save, reordering, stock posting or costing mutation."""
 	require_authenticated()
-	if doctype not in SUPPORTED_DOCUMENTS or not (set(frappe.get_roles()) & ROUTING_ROLES):
+	if doctype not in SUPPORTED_DOCUMENTS:
 		frappe.throw(
 			_("Road route previews require a transport planning role and a supported document."),
 			frappe.PermissionError,
 		)
+	settings = frappe.get_cached_doc("Transport Settings")
+	require_routing_role(settings)
 	doc = frappe.get_doc(doctype, name)
 	require_document_permission(doc, "write")
 	if doc.docstatus == 2:
 		frappe.throw(_("Cancelled transport records cannot request road routes."))
-	settings = frappe.get_cached_doc("Transport Settings")
 	if not settings.enabled or settings.get("routing_provider") != "Google":
 		frappe.throw(_("Select Google as the Routing Provider in Transport Settings to preview road routes."))
 	if cint(return_to_start) not in (0, 1):
 		frappe.throw(_("Choose whether the route returns to its start."))
+	if cint(optimize_stops) not in (0, 1):
+		frappe.throw(_("Choose whether to optimize the stop order."))
+	if cint(optimize_stops):
+		if not settings.get("enable_google_optimization"):
+			frappe.throw(
+				_("Enable Google Route Optimization and configure its service account in Transport Settings.")
+			)
+		_validate_optimization(doc, doctype)
 	if doctype == "Delivery Trip":
 		if not doc.driver_address:
 			frappe.throw(_("Set the trip's Driver Address before previewing its road route."))
@@ -51,18 +65,27 @@ def preview_road_route(doctype: str, name: str, return_to_start: int = 0):
 	points = [origin, *stops]
 	if cint(return_to_start):
 		points.append(origin)
-	if len(points) > MAX_POINTS:
-		frappe.throw(
-			_("This route exceeds Google's 25 intermediate-waypoint limit. Split it into smaller routes.")
-		)
-	key = settings.get_password("google_routes_api_key", raise_exception=False)
-	if not key:
-		key = frappe.get_cached_doc("Google Settings").get("api_key")
-	if not key:
-		frappe.throw(_("Set a Google Routes API Key in Transport Settings or an API Key in Google Settings."))
-	result = compute_route(points, key)
+	if len(stops) > get_limit(settings, "routing_max_locations"):
+		frappe.throw(_("This route exceeds the Maximum Routing Locations configured in Transport Settings."))
+	if cint(optimize_stops) and len(stops) < 2:
+		frappe.throw(_("Stop optimization needs at least two distinct delivery locations."))
+	if cint(optimize_stops):
+		result = optimize_route(origin, stops, settings, return_to_start=bool(cint(return_to_start)))
+		ordered_stops = [stops[index] for index in result.pop("stop_order")]
+		ordered_points = [origin, *ordered_stops, *([origin] if cint(return_to_start) else [])]
+	else:
+		key = settings.get_password("google_routes_api_key", raise_exception=False)
+		if not key:
+			key = frappe.get_cached_doc("Google Settings").get("api_key")
+		if not key:
+			frappe.throw(
+				_("Set a Google Routes API Key in Transport Settings or an API Key in Google Settings.")
+			)
+		reserve_usage(settings, requests=len(split_route_points(points)))
+		result = compute_ordered_route(points, key)
+		ordered_points = points
 	for index, leg in enumerate(result["legs"]):
-		leg.update(from_label=points[index]["label"], to_label=points[index + 1]["label"])
+		leg.update(from_label=ordered_points[index]["label"], to_label=ordered_points[index + 1]["label"])
 	result.update(
 		provider="Google",
 		attribution="Google Maps",
@@ -76,13 +99,89 @@ def preview_road_route(doctype: str, name: str, return_to_start: int = 0):
 			),
 		],
 	)
-	if doctype == "Transport Load":
+	if cint(optimize_stops):
+		ordered_stops = ordered_points[1:-1] if cint(return_to_start) else ordered_points[1:]
+		result["load_row_order"] = _load_row_order(doc, ordered_stops)
+		result["source_modified"] = str(doc.modified)
+		result["warnings"].extend(
+			[
+				_("Suggested order only. Apply it to the draft form, then save to keep the sequence."),
+				_(
+					"Google Route Optimization selected the full journey order. A return leg is included only when requested."
+				),
+			]
+		)
+	if doctype == "Transport Load" and not cint(optimize_stops):
 		result["warnings"].append(
 			_(
 				"Load destinations follow their first occurrence; the Delivery Trip determines the actual visit order."
 			)
 		)
 	return result
+
+
+def _validate_optimization(doc, doctype):
+	if (
+		doctype != "Transport Load"
+		or doc.docstatus != 0
+		or doc.movement_type not in ("Customer Delivery", "Warehouse Transfer")
+		or doc.get("active_vehicle_allocation")
+		or doc.get("delivery_trip")
+	):
+		frappe.throw(
+			_("Stop optimization is available only for draft customer/depot loads before allocation.")
+		)
+	# Routing does not model delivery windows, maximum vehicle access or
+	# pickup-before-delivery dependencies. Never silently override those rules.
+	if doc.get("preferred_route") or doc.get("transport_route"):
+		frappe.throw(_("This load has a planned route. Review its stop order manually."))
+	constraint_fields = (
+		"delivery_from_time",
+		"delivery_to_time",
+		"maximum_vehicle_category",
+		"restricted_access",
+		"preferred_route",
+	)
+	for row in doc.delivery_orders:
+		if row.get("transport_demand"):
+			demand = frappe.get_doc("Transport Demand", row.transport_demand)
+			require_document_permission(demand, "read")
+			if demand.company != doc.company or demand.source_document_type == "Return Request":
+				frappe.throw(
+					_("Return pickups and cross-company demands cannot use automatic stop ordering.")
+				)
+			if any(demand.get(field) for field in constraint_fields):
+				frappe.throw(
+					_(
+						"This demand has delivery windows, access restrictions or a planned route. Plan its stop order manually."
+					)
+				)
+		if doc.movement_type == "Warehouse Transfer":
+			if not row.destination_warehouse:
+				continue
+			warehouse = frappe.get_doc("Warehouse", row.destination_warehouse)
+			require_document_permission(warehouse, "read")
+			data = get_warehouse_planning_data(row.destination_warehouse)
+			address = data.get("address")
+		else:
+			address = row.delivery_address
+		if not address:
+			continue
+		address_doc = frappe.get_doc("Address", address)
+		require_document_permission(address_doc, "read")
+		data = get_address_planning_data(address)
+		if any(data.get(field) for field in constraint_fields):
+			frappe.throw(
+				_("This load has delivery windows or access restrictions. Plan its stop order manually.")
+			)
+
+
+def _load_row_order(doc, ordered_stops):
+	field = "destination_warehouse" if doc.movement_type == "Warehouse Transfer" else "delivery_address"
+	groups = {}
+	for row in doc.delivery_orders:
+		groups.setdefault(row.get(field), []).append(row.name)
+	return [name for point in ordered_stops for name in groups[point["stop_key"]]]
 
 
 def _address_point(name, company):
@@ -160,9 +259,9 @@ def _load_stops(doc):
 		if key in seen:
 			continue
 		seen.add(key)
-		stops.append(
-			_warehouse_point(name, doc.company) if is_warehouse else _address_point(name, doc.company)
-		)
+		point = _warehouse_point(name, doc.company) if is_warehouse else _address_point(name, doc.company)
+		point["stop_key"] = name
+		stops.append(point)
 	return stops
 
 

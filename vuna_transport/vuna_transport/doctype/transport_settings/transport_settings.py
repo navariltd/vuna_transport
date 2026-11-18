@@ -8,6 +8,14 @@ from frappe.model.document import Document
 
 class TransportSettings(Document):
 	def validate(self):
+		from vuna_transport.services.routing.routing_policy_service import LIMITS, get_limit
+
+		for field in LIMITS:
+			get_limit(self, field)
+		if self.get("enable_google_optimization"):
+			from vuna_transport.services.routing.google_optimization_service import parse_credentials
+
+			parse_credentials(self.get_password("google_optimization_service_account", raise_exception=False))
 		if self.get("routing_provider") and self.routing_provider not in ("Geographic Estimate", "Google"):
 			frappe.throw(_("Choose a supported Routing Provider."))
 		if self.load_suggestion_option_count < 3 or self.load_suggestion_option_count > 10:

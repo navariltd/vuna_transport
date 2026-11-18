@@ -114,7 +114,7 @@ class TestGoogleRoutes(unittest.TestCase):
 class TestRoadPreview(unittest.TestCase):
 	def setUp(self):
 		self.api = inspect.unwrap(routing.preview_road_route)
-		self.settings = frappe._dict(enabled=1, routing_provider="Google")
+		self.settings = frappe._dict(enabled=1, routing_provider="Google", enable_google_optimization=1)
 		self.settings.get_password = Mock(return_value="server-key")
 		self.doc = Mock(
 			doctype="Transport Load",
@@ -124,10 +124,12 @@ class TestRoadPreview(unittest.TestCase):
 			source_warehouse="Main",
 		)
 		self.doc.name = "TL-1"
+		self.doc.modified = "2026-11-18 12:00:00.000000"
+		self.doc.get = Mock(return_value=None)
 		self.doc.delivery_orders = [
-			frappe._dict(delivery_address="A"),
-			frappe._dict(delivery_address="A"),
-			frappe._dict(delivery_address="B"),
+			frappe._dict(name="row-1", delivery_address="A"),
+			frappe._dict(name="row-2", delivery_address="A"),
+			frappe._dict(name="row-3", delivery_address="B"),
 		]
 		self.enterContext(patch.object(routing, "_", side_effect=lambda value: value))
 		self.enterContext(patch.object(routing, "require_authenticated"))
@@ -155,14 +157,29 @@ class TestRoadPreview(unittest.TestCase):
 		self.compute = self.enterContext(
 			patch.object(
 				routing,
-				"compute_route",
-				side_effect=lambda points, key: {
+				"compute_ordered_route",
+				side_effect=self.route,
+			)
+		)
+		self.pair = self.enterContext(
+			patch.object(
+				routing,
+				"optimize_route",
+				side_effect=lambda origin, stops, settings, return_to_start: {
 					"distance_meters": 1000,
 					"duration_seconds": 60,
-					"legs": [{} for _ in points[1:]],
+					"legs": [{} for _ in range(len(stops) + int(return_to_start))],
+					"stop_order": list(reversed(range(len(stops)))),
 				},
 			)
 		)
+		self.enterContext(patch.object(routing, "reserve_usage"))
+
+	def route(self, points, key, **kwargs):
+		result = {"distance_meters": 1000, "duration_seconds": 60, "legs": [{} for _ in points[1:]]}
+		if kwargs.get("optimize"):
+			result["point_order"] = [0, *reversed(range(1, len(points) - 1)), len(points) - 1]
+		return result
 
 	def document(self, doctype, name):
 		if doctype in routing.SUPPORTED_DOCUMENTS:
@@ -300,7 +317,111 @@ class TestRoadPreview(unittest.TestCase):
 
 	def test_oversized_trip_is_not_silently_truncated(self):
 		self.doc.driver_address = "Driver"
-		self.doc.delivery_stops = [frappe._dict(address="A") for _ in range(27)]
+		self.doc.delivery_stops = [frappe._dict(address="A") for _ in range(101)]
 		with self.assertRaises(ValueError):
 			self.api("Delivery Trip", "TRIP-1")
 		self.compute.assert_not_called()
+
+	def test_round_trip_optimization_reorders_destinations_and_preserves_load_rows(self):
+		result = self.api("Transport Load", "TL-1", return_to_start=1, optimize_stops=1)
+		self.assertEqual(result["load_row_order"], ["row-3", "row-1", "row-2"])
+		self.assertEqual(result["legs"][0]["to_label"], "B")
+		self.assertEqual(result["legs"][-1]["to_label"], "Main")
+		self.assertEqual(result["source_modified"], self.doc.modified)
+		self.doc.save.assert_not_called()
+
+	def test_two_locations_keep_three_customer_deliveries_and_need_no_return(self):
+		self.doc.delivery_orders = [
+			frappe._dict(name="row-1", delivery_address="A", customer="BKN"),
+			frappe._dict(name="row-2", delivery_address="B", customer="BKN"),
+			frappe._dict(name="row-3", delivery_address="B", customer="Wephukulu"),
+		]
+		result = self.api("Transport Load", "TL-1", optimize_stops=1)
+		self.assertEqual(result["load_row_order"], ["row-2", "row-3", "row-1"])
+		self.assertEqual([leg["to_label"] for leg in result["legs"]], ["B", "A"])
+		self.assertEqual(len(self.doc.delivery_orders), 3)
+		self.pair.assert_called_once()
+		self.compute.assert_not_called()
+		self.doc.save.assert_not_called()
+
+	def test_managed_open_route_can_choose_a_new_final_destination(self):
+		self.doc.delivery_orders.append(frappe._dict(name="row-4", delivery_address="C"))
+		result = self.api("Transport Load", "TL-1", optimize_stops=1)
+		self.assertEqual(result["load_row_order"], ["row-4", "row-3", "row-1", "row-2"])
+		self.assertEqual(result["legs"][-1]["to_label"], "A")
+
+	def test_forty_location_optimization_is_not_limited_by_compute_routes_waypoints(self):
+		self.doc.delivery_orders = [
+			frappe._dict(name=f"row-{index}", delivery_address=f"Address {index}") for index in range(40)
+		]
+		result = self.api("Transport Load", "TL-1", optimize_stops=1)
+		self.assertEqual(len(result["load_row_order"]), 40)
+		self.assertEqual(len(result["legs"]), 40)
+		self.assertEqual(result["load_row_order"][0], "row-39")
+
+	def test_optimizer_disabled_and_configured_role_denial_make_no_provider_call(self):
+		self.settings.enable_google_optimization = 0
+		with self.assertRaises(ValueError):
+			self.api("Transport Load", "TL-1", optimize_stops=1)
+		self.settings.routing_allowed_roles = [frappe._dict(role="Transport Manager")]
+		with self.assertRaises(ValueError):
+			self.api("Transport Load", "TL-1")
+		self.compute.assert_not_called()
+		self.pair.assert_not_called()
+
+	def test_depot_optimization_groups_rows_by_receiving_warehouse(self):
+		self.doc.movement_type = "Warehouse Transfer"
+		for row in self.doc.delivery_orders:
+			row.destination_warehouse = row.delivery_address
+		result = self.api("Transport Load", "TL-1", return_to_start=1, optimize_stops=1)
+		self.assertEqual(result["load_row_order"], ["row-3", "row-1", "row-2"])
+		self.assertEqual(result["legs"][0]["to_label"], "B")
+
+	def test_saved_demand_constraints_are_checked_even_if_master_changed(self):
+		self.doc.delivery_orders[0].transport_demand = "TD-1"
+		for values in (
+			{"company": "Company", "source_document_type": "Sales Order", "delivery_from_time": "08:00:00"},
+			{"company": "Company", "source_document_type": "Return Request"},
+			{"company": "Other", "source_document_type": "Sales Order"},
+		):
+			self.get_doc.side_effect = (
+				lambda dt, name: frappe._dict(values) if dt == "Transport Demand" else self.document(dt, name)
+			)
+			with self.subTest(values=values), self.assertRaises(ValueError):
+				self.api("Transport Load", "TL-1", return_to_start=1, optimize_stops=1)
+		self.compute.assert_not_called()
+
+	def test_allocated_load_cannot_be_optimized_even_while_draft(self):
+		self.doc.get.side_effect = lambda field: "VA-1" if field == "active_vehicle_allocation" else None
+		with self.assertRaises(ValueError):
+			self.api("Transport Load", "TL-1", return_to_start=1, optimize_stops=1)
+		self.compute.assert_not_called()
+
+	def test_optimization_rejects_execution_and_pickup_dependencies(self):
+		for doctype, status, movement in (
+			("Delivery Trip", 0, "Customer Delivery"),
+			("Transport Load", 1, "Customer Delivery"),
+			("Transport Load", 0, "Supplier Pickup"),
+			("Transport Load", 0, "Return Pickup"),
+		):
+			self.doc.docstatus, self.doc.movement_type = status, movement
+			with (
+				self.subTest(doctype=doctype, status=status, movement=movement),
+				self.assertRaises(ValueError),
+			):
+				self.api(doctype, "TL-1", optimize_stops=1)
+		self.compute.assert_not_called()
+
+	def test_optimization_rejects_constraints_and_too_few_stops(self):
+		with (
+			patch.object(
+				routing, "get_address_planning_data", return_value={"delivery_from_time": "08:00:00"}
+			),
+			self.assertRaises(ValueError),
+		):
+			self.api("Transport Load", "TL-1", optimize_stops=1)
+		self.doc.delivery_orders = self.doc.delivery_orders[:2]
+		with self.assertRaises(ValueError):
+			self.api("Transport Load", "TL-1", optimize_stops=1)
+		self.compute.assert_not_called()
+		self.pair.assert_not_called()

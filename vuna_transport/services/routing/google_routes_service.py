@@ -12,6 +12,20 @@ FIELD_MASK = "routes.distanceMeters,routes.duration,routes.legs.distanceMeters,r
 MAX_POINTS = 27  # Origin, destination and at most 25 intermediates.
 
 
+def split_route_points(points):
+	return [points[index : index + MAX_POINTS] for index in range(0, len(points) - 1, MAX_POINTS - 1)]
+
+
+def compute_ordered_route(points, api_key):
+	"""One continuous journey: a shared boundary, never a repeated road leg."""
+	results = [compute_route(batch, api_key) for batch in split_route_points(points)]
+	return {
+		"distance_meters": sum(result["distance_meters"] for result in results),
+		"duration_seconds": sum(result["duration_seconds"] for result in results),
+		"legs": [leg for result in results for leg in result["legs"]],
+	}
+
+
 def compute_route(points, api_key):
 	if not 2 <= len(points) <= MAX_POINTS:
 		frappe.throw(_("Google road routing supports 2 to 27 route points per preview."))
