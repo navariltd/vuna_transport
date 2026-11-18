@@ -18,6 +18,10 @@ class TransportSettings(Document):
 			parse_credentials(self.get_password("google_optimization_service_account", raise_exception=False))
 		if self.get("routing_provider") and self.routing_provider not in ("Geographic Estimate", "Google"):
 			frappe.throw(_("Choose a supported Routing Provider."))
+		from vuna_transport.services.mobile.mobile_map_service import MOBILE_MAP_PROVIDERS
+
+		if self.get("mobile_map_provider") and self.mobile_map_provider not in MOBILE_MAP_PROVIDERS:
+			frappe.throw(_("Choose a supported Mobile Map Provider."))
 		if self.load_suggestion_option_count < 3 or self.load_suggestion_option_count > 10:
 			frappe.throw(_("Load Suggestion Options must be between 3 and 10."))
 		from vuna_transport.services.demand.source_policy_service import SUPPORTED_SOURCES

@@ -10,6 +10,7 @@ from vuna_transport.services.execution.pod_service import create_proof_of_delive
 from vuna_transport.services.execution.stock_identity_service import (
 	get_single_delivery_note_item_batch,
 )
+from vuna_transport.services.mobile.mobile_map_service import get_mobile_map_configuration
 
 MOBILE_REQUEST_ID_PATTERN = re.compile(r"^[a-f0-9-]{16,64}$", re.IGNORECASE)
 
@@ -306,12 +307,15 @@ def get_mobile_offline_manifest(installation_id, device_identifier=None):
 
 
 def _offline_manifest_response(assigned, delivery_notes=None):
-	return {
+	response = {
 		"assigned": assigned,
 		"delivery_notes": delivery_notes or [],
 		"rejection_reasons": _get_rejection_reasons(),
 		"synced_at": now_datetime(),
 	}
+	if assigned.get("linked"):
+		response["map_config"] = get_mobile_map_configuration()
+	return response
 
 
 def register_mobile_push_token(
@@ -883,7 +887,7 @@ def _get_active_device(installation_id, device_identifier=None):
 
 
 def _device_response(device, *, allowed, message=None):
-	return {
+	response = {
 		"allowed": allowed,
 		"device": {
 			"name": device.name,
@@ -896,6 +900,9 @@ def _device_response(device, *, allowed, message=None):
 		},
 		"message": message,
 	}
+	if allowed:
+		response["map_config"] = get_mobile_map_configuration()
+	return response
 
 
 def _lock_mobile_user(user):

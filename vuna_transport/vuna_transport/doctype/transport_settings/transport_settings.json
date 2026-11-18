@@ -29,6 +29,7 @@
   "routing_tab",
   "routing_section",
   "routing_provider",
+  "mobile_map_provider",
   "routing_column",
   "google_routes_api_key",
   "routing_optimization_section",
@@ -76,6 +77,14 @@
    "default": "Geographic Estimate",
    "reqd": 1,
    "description": "Google previews send coordinates to Google and incur request charges; dedicated optimization is billed per routing location. Applied allocation routes retain Google-calculated distance and application-calculated cost estimates. Set Google Cloud quotas as well as the application limits below."
+  },
+  {
+   "fieldname": "mobile_map_provider",
+   "fieldtype": "Select",
+   "label": "Mobile Map Provider",
+   "options": "Automatic\nOpenStreetMap\nGoogle Maps",
+   "default": "Automatic",
+   "description": "Automatic follows Routing Provider; Google Maps requires a compatible mobile app build."
   },
   {
    "fieldname": "routing_column",
@@ -382,7 +391,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-18 16:03:40.949566",
+ "modified": "2026-11-18 16:46:32.452393",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Settings",
