@@ -52,6 +52,16 @@ frappe.ui.form.on("Delivery Stop", {
 });
 
 frappe.ui.form.on("Delivery Trip", {
+	before_save(frm) {
+		if (
+			frm.doc.vuna_route_preview_token &&
+			frm.__trip_road_preview_inputs &&
+			frm.__trip_road_preview_inputs !==
+				window.vuna_transport.road_routing.trip_preview_inputs(frm)
+		) {
+			return frm.set_value("vuna_route_preview_token", null);
+		}
+	},
 	setup(frm) {
 		frm.set_query("vehicle", () => {
 			const loads = (frm.doc.delivery_stops || [])
@@ -66,6 +76,7 @@ frappe.ui.form.on("Delivery Trip", {
 	},
 
 	refresh(frm) {
+		render_trip_route_costs(frm);
 		if (frm.perm?.some((p) => p.write) && !frm.is_new() && frm.doc.docstatus !== 2)
 			frappe
 				.call({
@@ -242,3 +253,34 @@ frappe.ui.form.on("Delivery Trip", {
 		frm.page.set_inner_btn_group_as_primary(__("Create"));
 	},
 });
+
+function render_trip_route_costs(frm) {
+	const wrapper = frm.fields_dict?.vuna_route_cost_details?.$wrapper;
+	if (!wrapper) return;
+	const escape = frappe.utils.escape_html;
+	let rows = frm.doc.vuna_route_cost_breakdown || [];
+	if (typeof rows === "string") {
+		try {
+			rows = JSON.parse(rows);
+		} catch {
+			rows = [];
+		}
+	}
+	if (!Array.isArray(rows) || !rows.length) return wrapper.empty();
+	wrapper.html(
+		`<div class="table-responsive"><table class="table table-bordered table-sm"><thead><tr><th>${__(
+			"Component"
+		)}</th><th>${__("Basis")}</th><th class="text-right">${__(
+			"Amount"
+		)}</th></tr></thead><tbody>${rows
+			.map(
+				(row) =>
+					`<tr><td>${escape(row.component || "")}</td><td>${escape(
+						row.basis || ""
+					)}</td><td class="text-right">${escape(
+						format_number(row.amount, null, 2)
+					)}</td></tr>`
+			)
+			.join("")}</tbody></table></div>`
+	);
+}

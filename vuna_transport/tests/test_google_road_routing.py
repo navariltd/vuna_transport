@@ -192,6 +192,13 @@ class TestRoadPreview(unittest.TestCase):
 			)
 		)
 		self.doc.delivery_stops = []
+		self.enterContext(
+			patch.object(
+				routing.trip_estimates,
+				"build_trip_manifest",
+				return_value={"fingerprint": "trip-inputs", "loads": []},
+			)
+		)
 
 	def route(self, points, key, **kwargs):
 		result = {"distance_meters": 1000, "duration_seconds": 60, "legs": [{} for _ in points[1:]]}
@@ -261,6 +268,7 @@ class TestRoadPreview(unittest.TestCase):
 		result = self.api("Delivery Trip", "TRIP", optimize_stops=1)
 		self.assertEqual(self.pair.call_args.args[0]["label"], "Main")
 		self.assertEqual(result["trip_stop_order"], ["s2", "s1"])
+		self.assertTrue(result["route_preview_token"])
 		self.doc.save.assert_not_called()
 
 	def test_trip_with_extra_pickup_task_is_not_optimized(self):

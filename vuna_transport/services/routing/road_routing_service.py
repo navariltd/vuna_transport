@@ -8,6 +8,7 @@ from frappe.rate_limiter import rate_limit
 from frappe.utils import cint, escape_html
 
 from vuna_transport.services.routing import allocation_route_service as allocation_routes
+from vuna_transport.services.routing import trip_route_estimate_service as trip_estimates
 from vuna_transport.services.routing.google_optimization_service import optimize_route
 from vuna_transport.services.routing.google_routes_service import compute_ordered_route, split_route_points
 from vuna_transport.services.routing.location_service import (
@@ -53,6 +54,7 @@ def preview_road_route(doctype: str, name: str, return_to_start: int = 0, optimi
 			)
 		_validate_optimization(doc, doctype)
 	manifest = None
+	trip_manifest = None
 	if doctype == "Vehicle Allocation":
 		manifest = allocation_routes.build_manifest(doc, return_to_start=bool(cint(return_to_start)))
 		origin = _warehouse_point(manifest["source_warehouse"], doc.company)
@@ -79,6 +81,11 @@ def preview_road_route(doctype: str, name: str, return_to_start: int = 0, optimi
 			else _address_point(doc.driver_address, doc.company)
 		)
 		stops = _trip_stops(doc)
+		if doc.docstatus == 0 and loads:
+			_validate_optimization(doc, "Delivery Trip")
+			trip_manifest = trip_estimates.build_trip_manifest(
+				doc, return_to_start=bool(cint(return_to_start)), loads=loads
+			)
 	elif doc.movement_type == "Supplier Pickup":
 		origin = _address_point(doc.source_address, doc.company)
 	else:
@@ -178,6 +185,31 @@ def preview_road_route(doctype: str, name: str, return_to_start: int = 0, optimi
 				distance=result["distance_meters"] / 1000,
 				distance_source="Routing Provider",
 				as_of_date=doc.planned_reporting_time,
+			)
+	if trip_manifest:
+		from vuna_transport.services.routing.route_preview_receipt import issue_receipt
+
+		ordered = ordered_points[1:-1] if cint(return_to_start) else ordered_points[1:]
+		keys = [point["stop_key"] for point in ordered]
+		result.update(
+			trip_stop_order=keys,
+			source_modified=str(doc.modified),
+			route_preview_token=issue_receipt(
+				doc, trip_manifest["fingerprint"], keys, result["distance_meters"]
+			),
+		)
+		if settings.get("enable_transport_costing") and doc.vehicle:
+			from vuna_transport.services.costing.transport_cost_estimation_service import (
+				estimate_transport_journey,
+			)
+
+			result["cost_estimate"] = estimate_transport_journey(
+				trip_manifest["loads"],
+				doc.vehicle,
+				distance=result["distance_meters"] / 1000,
+				distance_source="Routing Provider",
+				as_of_date=doc.departure_time,
+				journey_destinations=trip_manifest.get("destinations"),
 			)
 	return result
 

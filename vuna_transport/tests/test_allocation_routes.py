@@ -397,7 +397,12 @@ class TestJourneyCosting(unittest.TestCase):
 			patch.object(costing, "get_applicable_cost_structure_assignment", return_value=profile),
 		):
 			result = costing.estimate_transport_journey(loads, vehicle, distance=100)
+			with patch.object(costing, "_build_context", side_effect=contexts):
+				revised_trip = costing.estimate_transport_journey(
+					loads, vehicle, distance=100, journey_destinations=[b]
+				)
 		self.assertEqual(result["marginal_cost"], 130)
+		self.assertEqual(revised_trip["marginal_cost"], 80)
 		self.assertEqual(len(result["components"]), 2)
 
 	def test_explicit_zero_distance_does_not_trigger_geographic_fallback(self):

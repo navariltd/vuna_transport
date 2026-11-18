@@ -11,7 +11,7 @@ from frappe import _
 from frappe.utils import now_datetime
 from frappe.utils.verified_command import get_secret
 
-PURPOSE = "vuna-transport-allocation-road-distance-v1:"
+PURPOSE = "vuna-transport-road-distance-v2:"
 MAX_AGE = 1800
 
 
@@ -22,7 +22,8 @@ def _sign(payload):
 
 def issue_receipt(doc, manifest_fingerprint, stop_keys, distance_meters):
 	payload = {
-		"allocation": doc.name,
+		"doctype": doc.doctype,
+		"document": doc.name,
 		"user": frappe.session.user,
 		"modified": str(doc.modified),
 		"manifest": manifest_fingerprint,
@@ -43,7 +44,8 @@ def verify_receipt(token, doc, previous, manifest_fingerprint, stop_keys):
 		payload = envelope["payload"]
 		valid = (
 			hmac.compare_digest(envelope["signature"], _sign(payload))
-			and payload["allocation"] == doc.name
+			and payload["doctype"] == doc.doctype
+			and payload["document"] == doc.name
 			and payload["user"] == frappe.session.user
 			and previous is not None
 			and payload["modified"] == str(previous.modified)

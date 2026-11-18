@@ -191,12 +191,41 @@ test("trip application preserves shared-address stops and rejects incomplete per
     routing.apply_stop_order(frm, {
       trip_stop_order: ["s2", "s1"],
       return_to_start: 1,
+      route_preview_token: "trip-signed-receipt",
     }),
     true
   );
   assert.equal(frm.doc.delivery_stops[0].customer, "C2");
   assert.equal(frm.doc.delivery_stops[1].idx, 2);
   assert.equal(frm.doc.vuna_route_return_to_start, 1);
+  assert.equal(frm.doc.vuna_route_preview_token, "trip-signed-receipt");
+});
+
+test("ordered trip preview can apply distance without requesting optimization or another Google call", async () => {
+  const { state, frm, routing } = fixture();
+  frm.doc.doctype = "Delivery Trip";
+  frm.doc.delivery_stops = [
+    { name: "s1", address: "A" },
+    { name: "s2", address: "B" },
+  ];
+  state.response = {
+    message: {
+      source_doctype: "Delivery Trip",
+      trip_stop_order: ["s1", "s2"],
+      source_modified: frm.doc.modified,
+      route_preview_token: "trip-receipt",
+      distance_meters: 1000,
+      duration_seconds: 60,
+      legs: [],
+    },
+  };
+  routing.show_preview(frm, { can_optimize: false });
+  await state.options.primary_action({ return_to_start: 0, optimize_stops: 0 });
+  assert.equal(state.apply_visible, true);
+  state.options.secondary_action();
+  assert.equal(frm.doc.vuna_route_preview_token, "trip-receipt");
+  assert.equal(state.calls.length, 1);
+  assert.equal(state.dirty, true);
 });
 
 test("routing settings keep the administrator billing and data-sharing notice", () => {

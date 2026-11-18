@@ -317,7 +317,14 @@ def estimate_transport_cost_for_loads(delivery_loads, vehicle):
 
 
 def estimate_transport_journey(
-	loads, vehicle, *, distance, distance_uom="Kilometer", distance_source="Planned Distance", as_of_date=None
+	loads,
+	vehicle,
+	*,
+	distance,
+	distance_uom="Kilometer",
+	distance_source="Planned Distance",
+	as_of_date=None,
+	journey_destinations=None,
 ):
 	"""Cost one journey, charging shared components once and retaining destination rates."""
 	loads = [_resolve_document("Transport Load", load) for load in loads]
@@ -352,6 +359,11 @@ def estimate_transport_journey(
 			replace(context, distance=distance, distance_uom=distance_uom, distance_source=distance_source)
 		)
 	context = contexts[0]
+	destination_contexts = (
+		contexts
+		if journey_destinations is None
+		else [replace(context, destination_geographies=journey_destinations)]
+	)
 	profile = get_applicable_cost_structure_assignment(vehicle, context.company, context.date)
 	warnings = []
 	if not profile:
@@ -364,7 +376,7 @@ def estimate_transport_journey(
 		if component.calculation_basis == "Destination Rate":
 			applicable = []
 			seen = set()
-			for load_context in contexts:
+			for load_context in destination_contexts:
 				for geography in load_context.destination_geographies or []:
 					key = (load_context.source_warehouse, geography.cost_key)
 					if key in seen:

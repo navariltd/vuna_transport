@@ -44,10 +44,9 @@ vuna_transport.road_routing.show_preview = function (frm, context = {}) {
 			{ fieldname: "result", fieldtype: "HTML" },
 		],
 		primary_action_label: __("Preview Route"),
-		secondary_action_label:
-			frm.doc.doctype === "Vehicle Allocation"
-				? __("Apply Route & Distance")
-				: __("Apply Stop Order"),
+		secondary_action_label: ["Vehicle Allocation", "Delivery Trip"].includes(frm.doc.doctype)
+			? __("Apply Route & Distance")
+			: __("Apply Stop Order"),
 		secondary_action() {
 			if (
 				!suggestion ||
@@ -62,12 +61,11 @@ vuna_transport.road_routing.show_preview = function (frm, context = {}) {
 			if (!vuna_transport.road_routing.apply_stop_order(frm, suggestion)) return;
 			dialog.hide();
 			frappe.show_alert({
-				message:
-					frm.doc.doctype === "Vehicle Allocation"
-						? __(
-								"Route and distance applied. Save the allocation to calculate and retain costs."
-						  )
-						: __("Stop order applied. Save the document to keep it."),
+				message: ["Vehicle Allocation", "Delivery Trip"].includes(frm.doc.doctype)
+					? __(
+							"Route and distance applied. Save the document to calculate and retain costs."
+					  )
+					: __("Stop order applied. Save the document to keep it."),
 				indicator: "green",
 			});
 		},
@@ -115,6 +113,7 @@ vuna_transport.road_routing.show_preview = function (frm, context = {}) {
 				if (
 					frm.doc.docstatus === 0 &&
 					(message?.allocation_route_rows ||
+						(message?.trip_stop_order && message?.route_preview_token) ||
 						((message?.load_row_order || message?.trip_stop_order) &&
 							values.optimize_stops))
 				) {
@@ -173,7 +172,9 @@ vuna_transport.road_routing.apply_stop_order = function (frm, result) {
 			Object.assign(by_name.get(name), { idx: index + 1 })
 		);
 		frm.set_value("vuna_route_return_to_start", result.return_to_start || 0);
+		frm.set_value("vuna_route_preview_token", result.route_preview_token || null);
 		frm.refresh_field("delivery_stops");
+		frm.__trip_road_preview_inputs = vuna_transport.road_routing.trip_preview_inputs(frm);
 		frm.dirty();
 		return true;
 	}
@@ -226,12 +227,20 @@ vuna_transport.road_routing.render_result = function (result) {
 		.map((message) => `<li>${escape(message)}</li>`)
 		.join("");
 	const cost = result.cost_estimate;
+	const retention_message =
+		result.source_doctype === "Delivery Trip"
+			? __(
+					"Apply the route and save the trip to update its distance and costs. The allocation planning estimate is unchanged."
+			  )
+			: __(
+					"Apply the route and save the allocation to retain its distance and calculated costs."
+			  );
 	const cost_html = cost
 		? `<div class="border-top pt-2 mb-2"><strong>${__("Journey cost preview")}: ${number(
 				cost.marginal_cost
 		  )} ${escape(cost.currency || "")}</strong><p class="small text-muted">${__(
-				"Shared trip charges are counted once. Monthly fixed costs are separate. Apply the route and save the allocation to retain its distance and calculated costs."
-		  )}</p>${(cost.warnings || [])
+				"Shared trip charges are counted once. Monthly fixed costs are separate."
+		  )} ${retention_message}</p>${(cost.warnings || [])
 				.map((warning) => `<p class="small text-muted">${escape(warning)}</p>`)
 				.join("")}</div>`
 		: "";
@@ -243,6 +252,25 @@ vuna_transport.road_routing.render_result = function (result) {
 	)}</th><th>${__("To")}</th><th>${__("Road Distance")}</th><th>${__(
 		"Driving Time"
 	)}</th></tr></thead><tbody>${rows}</tbody></table></div>${cost_html}<ul class="small text-muted">${warnings}</ul></div>`;
+};
+
+vuna_transport.road_routing.trip_preview_inputs = function (frm) {
+	return JSON.stringify([
+		frm.doc.company,
+		frm.doc.vehicle,
+		frm.doc.driver,
+		frm.doc.departure_time,
+		frm.doc.vuna_route_return_to_start,
+		frm.doc.vuna_vehicle_allocation,
+		(frm.doc.delivery_stops || []).map((row) => [
+			row.name,
+			row.address,
+			row.customer,
+			row.delivery_note,
+			row.vuna_delivery_load,
+			row.vuna_task_keys,
+		]),
+	]);
 };
 
 vuna_transport.road_routing.preview_inputs = function (frm) {

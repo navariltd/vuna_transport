@@ -289,7 +289,10 @@ doc_events = {
 			"vuna_transport.services.execution.transfer_execution_service.guard_trip_stock_cancellation",
 			"vuna_transport.services.execution.lineage_service.prepare_delivery_trip_cancellation",
 		],
-		"validate": "vuna_transport.services.execution.lineage_service.validate_delivery_trip",
+		"validate": [
+			"vuna_transport.services.execution.lineage_service.validate_delivery_trip",
+			"vuna_transport.services.routing.trip_route_estimate_service.validate_trip_estimate",
+		],
 		"on_update": [
 			"vuna_transport.services.execution.trip_task_service.sync_task_plan",
 			"vuna_transport.services.execution.trip_task_service.sync_task_execution",
