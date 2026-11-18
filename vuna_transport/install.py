@@ -39,7 +39,12 @@ def ensure_item_transport_requirement():
 		frappe.get_app_path("vuna_transport", "vuna_transport", "custom", "item.json")
 	)
 	field = next(row for row in fixture["custom_fields"] if row["fieldname"] == "vuna_requires_transport")
-	create_custom_fields({"Item": [field]})
+	# Exported record metadata is not part of the field definition. In particular,
+	# an old `modified` value replaces the live timestamp and makes save() fail
+	# Frappe's optimistic-lock check on an already-installed Custom Field.
+	record_metadata = {"name", "creation", "modified", "modified_by", "owner", "docstatus", "doctype"}
+	definition = {key: value for key, value in field.items() if key not in record_metadata}
+	create_custom_fields({"Item": [definition]})
 
 
 def ensure_transport_demand_sources():

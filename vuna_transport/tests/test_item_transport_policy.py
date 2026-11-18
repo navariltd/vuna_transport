@@ -210,3 +210,32 @@ class TestItemTransportPolicy(unittest.TestCase):
 		self.assertEqual(len(fields["Item"]), 1)
 		self.assertEqual(fields["Item"][0]["fieldname"], "vuna_requires_transport")
 		self.assertEqual(fields["Item"][0]["default"], "1")
+		self.assertEqual(fields["Item"][0]["insert_after"], "vuna_delivery_group")
+		for key in ("name", "creation", "modified", "modified_by", "owner", "docstatus", "doctype"):
+			self.assertNotIn(key, fields["Item"][0])
+
+	def test_upgrade_does_not_mutate_exported_record_metadata(self):
+		fixture = {
+			"custom_fields": [
+				{
+					"name": "Item-vuna_requires_transport",
+					"fieldname": "vuna_requires_transport",
+					"fieldtype": "Check",
+					"default": "1",
+					"creation": "2026-11-16 14:48:52.289607",
+					"modified": "2026-11-16 14:48:52.289607",
+					"owner": "Administrator",
+				}
+			]
+		}
+		before = copy.deepcopy(fixture)
+		with (
+			patch.object(install.frappe, "get_file_json", return_value=fixture),
+			patch("frappe.custom.doctype.custom_field.custom_field.create_custom_fields") as create,
+		):
+			install.ensure_item_transport_requirement()
+			install.ensure_item_transport_requirement()
+		self.assertEqual(fixture, before)
+		self.assertEqual(create.call_count, 2)
+		self.assertEqual(create.call_args_list[0], create.call_args_list[1])
+		self.assertNotIn("modified", create.call_args.args[0]["Item"][0])
