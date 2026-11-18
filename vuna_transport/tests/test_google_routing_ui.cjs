@@ -10,6 +10,9 @@ function fixture() {
   const frappe = {
     provide() {},
     msgprint: (message) => state.messages.push(message),
+    show_alert: (message) => {
+      state.alert = message;
+    },
     utils: {
       escape_html: (value) =>
         String(value)
@@ -58,6 +61,19 @@ function fixture() {
             },
           };
         }
+        get_secondary_btn() {
+          return {
+            hide: () => {
+              state.apply_visible = false;
+            },
+            show: () => {
+              state.apply_visible = true;
+            },
+          };
+        }
+        hide() {
+          state.options.onhide();
+        }
         get_value(key) {
           return this.values[key];
         }
@@ -82,9 +98,21 @@ function fixture() {
     }
   );
   const frm = {
-    doc: { doctype: "Transport Load", name: "TL-1" },
+    doc: {
+      doctype: "Transport Load",
+      name: "TL-1",
+      docstatus: 0,
+      movement_type: "Customer Delivery",
+      modified: "2026-11-18 12:00:00.000000",
+    },
     is_new: () => false,
     is_dirty: () => Boolean(state.dirty),
+    refresh_field: (field) => {
+      state.refreshed = field;
+    },
+    dirty: () => {
+      state.dirty = true;
+    },
   };
   return { state, frappe, frm, routing: transport.road_routing };
 }
@@ -127,9 +155,42 @@ test("routing settings keep the administrator billing and data-sharing notice", 
   const provider = settings.fields.find(
     (field) => field.fieldname === "routing_provider"
   );
-  assert.match(provider.description, /may incur charges/);
-  assert.match(provider.description, /stop coordinates to Google/);
-  assert.match(provider.description, /billing and request quotas/);
+  assert.match(provider.description, /incur request charges/);
+  assert.match(provider.description, /coordinates to Google/);
+  assert.match(provider.description, /Google Cloud quotas/);
+  const credential = settings.fields.find(
+    (field) => field.fieldname === "google_optimization_service_account"
+  );
+  assert.equal(credential.fieldtype, "Password");
+  assert.equal(
+    settings.fields.find(
+      (field) => field.fieldname === "enable_google_optimization"
+    ).default,
+    "0"
+  );
+});
+
+test("optimizer controls follow administrator enablement and remain hidden on trips", () => {
+  const { frm, state, routing } = fixture();
+  routing.show_preview(frm, { can_optimize: false });
+  assert.equal(
+    state.options.fields.find((field) => field.fieldname === "optimize_stops")
+      .hidden,
+    true
+  );
+  routing.show_preview(frm, { can_optimize: true });
+  assert.equal(
+    state.options.fields.find((field) => field.fieldname === "optimize_stops")
+      .hidden,
+    false
+  );
+  frm.doc.doctype = "Delivery Trip";
+  routing.show_preview(frm, { can_optimize: true });
+  assert.equal(
+    state.options.fields.find((field) => field.fieldname === "optimize_stops")
+      .hidden,
+    true
+  );
 });
 
 test("route numbers use plain formatting rather than escaped Frappe field HTML", () => {
@@ -204,4 +265,115 @@ test("master labels and warnings are escaped, and provider errors are not render
   await state.options.primary_action(state.dialog.values);
   assert.doesNotMatch(state.html, /secret/);
   assert.match(state.html, /No route preview/);
+});
+
+test("applying an optimized order preserves rows, quantities and names and leaves saving to the user", () => {
+  const { frm, state, routing } = fixture();
+  frm.doc.delivery_orders = [
+    { name: "A", delivery_address: "First", allocated_quantity: 5 },
+    { name: "B", delivery_address: "Second", allocated_quantity: 7 },
+    { name: "C", delivery_address: "First", allocated_quantity: 9 },
+  ];
+  const original = frm.doc.delivery_orders[1];
+  assert.equal(
+    routing.apply_stop_order(frm, { load_row_order: ["B", "A", "C"] }),
+    true
+  );
+  assert.equal(frm.doc.delivery_orders[0], original);
+  assert.deepEqual(
+    frm.doc.delivery_orders.map((row) => row.allocated_quantity),
+    [7, 5, 9]
+  );
+  assert.deepEqual(
+    frm.doc.delivery_orders.map((row) => row.stop_sequence),
+    [1, 2, 2]
+  );
+  assert.equal(state.dirty, true);
+  assert.equal(state.refreshed, "delivery_orders");
+});
+
+test("invalid permutations and submitted loads cannot apply a suggested order", () => {
+  const { frm, routing } = fixture();
+  frm.doc.delivery_orders = [{ name: "A" }, { name: "B" }];
+  for (const order of [["A"], ["A", "A"], ["A", "Other"]]) {
+    assert.equal(
+      routing.apply_stop_order(frm, { load_row_order: order }),
+      false
+    );
+  }
+  frm.doc.docstatus = 1;
+  assert.equal(
+    routing.apply_stop_order(frm, { load_row_order: ["B", "A"] }),
+    false
+  );
+});
+
+test("customers at the same address remain separate deliveries after reordering", () => {
+  const { frm, routing } = fixture();
+  frm.doc.delivery_orders = [
+    {
+      name: "A",
+      customer: "BKN",
+      delivery_address: "Utawala",
+      allocated_quantity: 5,
+    },
+    {
+      name: "B",
+      customer: "BKN",
+      delivery_address: "Kisumu",
+      allocated_quantity: 7,
+    },
+    {
+      name: "C",
+      customer: "Wephukulu",
+      delivery_address: "Kisumu",
+      allocated_quantity: 9,
+    },
+  ];
+  assert.equal(
+    routing.apply_stop_order(frm, { load_row_order: ["B", "C", "A"] }),
+    true
+  );
+  assert.deepEqual(
+    frm.doc.delivery_orders.map((row) => row.stop_sequence),
+    [1, 2, 3]
+  );
+  assert.deepEqual(
+    frm.doc.delivery_orders.map((row) => row.customer),
+    ["BKN", "Wephukulu", "BKN"]
+  );
+  assert.deepEqual(
+    frm.doc.delivery_orders.map((row) => row.allocated_quantity),
+    [7, 9, 5]
+  );
+});
+
+test("optimization is reviewed before applying and stale suggestions are rejected", async () => {
+  const { frm, state, routing } = fixture();
+  frm.doc.delivery_orders = [
+    { name: "A", delivery_address: "First" },
+    { name: "B", delivery_address: "Second" },
+  ];
+  state.response = {
+    message: {
+      distance_meters: 1000,
+      duration_seconds: 60,
+      legs: [],
+      source_modified: frm.doc.modified,
+      load_row_order: ["B", "A"],
+    },
+  };
+  routing.show_preview(frm);
+  state.dialog.values.optimize_stops = 1;
+  await state.options.primary_action({ ...state.dialog.values });
+  assert.equal(state.apply_visible, true);
+  assert.equal(frm.doc.delivery_orders[0].name, "A");
+  frm.doc.modified = "changed";
+  state.options.secondary_action();
+  assert.equal(frm.doc.delivery_orders[0].name, "A");
+  assert.match(state.messages.at(-1), /load changed/);
+  state.options.fields
+    .find((field) => field.fieldname === "optimize_stops")
+    .onchange();
+  assert.equal(state.apply_visible, false);
 });

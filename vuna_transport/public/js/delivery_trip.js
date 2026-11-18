@@ -66,26 +66,25 @@ frappe.ui.form.on("Delivery Trip", {
 	},
 
 	refresh(frm) {
-		if (
-			frm.perm?.some((p) => p.write) &&
-			!frm.is_new() &&
-			frm.doc.docstatus !== 2 &&
-			[
-				"System Manager",
-				"Transport Manager",
-				"Transport Dispatcher",
-				"Transport Planner",
-			].some((role) => frappe.user.has_role(role))
-		)
-			frm.add_custom_button(
-				__("Road Route Preview"),
-				() => {
-					frappe
-						.require("/assets/vuna_transport/js/road_routing.js")
-						.then(() => window.vuna_transport.road_routing.show_preview(frm));
-				},
-				__("Actions")
-			);
+		if (frm.perm?.some((p) => p.write) && !frm.is_new() && frm.doc.docstatus !== 2)
+			frappe
+				.call({
+					method: "vuna_transport.services.routing.routing_policy_service.get_routing_context",
+				})
+				.then(({ message }) => {
+					if (!message?.can_preview) return;
+					frm.add_custom_button(
+						__("Road Route Preview"),
+						() => {
+							frappe
+								.require("/assets/vuna_transport/js/road_routing.js")
+								.then(() =>
+									window.vuna_transport.road_routing.show_preview(frm, message)
+								);
+						},
+						__("Actions")
+					);
+				});
 		const grid = frm.fields_dict?.delivery_stops?.grid;
 		if (grid) {
 			const stops = frm.doc.delivery_stops || [];
