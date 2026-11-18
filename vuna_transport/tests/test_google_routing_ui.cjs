@@ -113,6 +113,15 @@ function fixture() {
     dirty: () => {
       state.dirty = true;
     },
+    set_value: (field, value) => {
+      frm.doc[field] = value;
+    },
+    clear_table: (field) => {
+      frm.doc[field] = [];
+    },
+    add_child: (field, row) => {
+      frm.doc[field].push(row);
+    },
   };
   return { state, frappe, frm, routing: transport.road_routing };
 }
@@ -140,6 +149,54 @@ test("opening a preview makes no billable call; explicit action sends document i
   assert.equal(state.disabled, false);
   state.options.onhide();
   assert.equal(state.html, "");
+});
+
+test("allocation application sends a signed distance receipt, not browser-calculated costs", () => {
+  const { frm, routing } = fixture();
+  frm.doc.doctype = "Vehicle Allocation";
+  const result = {
+    allocation_route_rows: [
+      { stop_key: "own-key", address: "A", source_rows: '["load-row"]' },
+    ],
+    route_fingerprint: "manifest",
+    source_warehouse: "Main",
+    return_to_start: 1,
+    route_preview_token: "signed-receipt",
+    distance_meters: 150000,
+    duration_seconds: 2000,
+    cost_estimate: { marginal_cost: 300 },
+  };
+  assert.equal(routing.apply_stop_order(frm, result), true);
+  assert.equal(frm.doc.route_stops[0].stop_key, "own-key");
+  assert.equal(frm.doc.route_status, "Proposed");
+  assert.equal(frm.doc.route_return_to_start, 1);
+  assert.equal(frm.doc.route_preview_token, "signed-receipt");
+  assert.equal(frm.doc.route_planned_distance, undefined);
+  assert.equal(frm.doc.estimated_distance, undefined);
+  assert.equal(frm.doc.estimated_marginal_cost, undefined);
+});
+
+test("trip application preserves shared-address stops and rejects incomplete permutations", () => {
+  const { frm, routing } = fixture();
+  frm.doc.doctype = "Delivery Trip";
+  frm.doc.delivery_stops = [
+    { name: "s1", address: "Shared", customer: "C1" },
+    { name: "s2", address: "Shared", customer: "C2" },
+  ];
+  assert.equal(
+    routing.apply_stop_order(frm, { trip_stop_order: ["s2"] }),
+    false
+  );
+  assert.equal(
+    routing.apply_stop_order(frm, {
+      trip_stop_order: ["s2", "s1"],
+      return_to_start: 1,
+    }),
+    true
+  );
+  assert.equal(frm.doc.delivery_stops[0].customer, "C2");
+  assert.equal(frm.doc.delivery_stops[1].idx, 2);
+  assert.equal(frm.doc.vuna_route_return_to_start, 1);
 });
 
 test("routing settings keep the administrator billing and data-sharing notice", () => {
@@ -170,7 +227,7 @@ test("routing settings keep the administrator billing and data-sharing notice", 
   );
 });
 
-test("optimizer controls follow administrator enablement and remain hidden on trips", () => {
+test("optimizer controls follow administrator enablement and support draft trips", () => {
   const { frm, state, routing } = fixture();
   routing.show_preview(frm, { can_optimize: false });
   assert.equal(
@@ -189,7 +246,7 @@ test("optimizer controls follow administrator enablement and remain hidden on tr
   assert.equal(
     state.options.fields.find((field) => field.fieldname === "optimize_stops")
       .hidden,
-    true
+    false
   );
 });
 
@@ -371,7 +428,7 @@ test("optimization is reviewed before applying and stale suggestions are rejecte
   frm.doc.modified = "changed";
   state.options.secondary_action();
   assert.equal(frm.doc.delivery_orders[0].name, "A");
-  assert.match(state.messages.at(-1), /load changed/);
+  assert.match(state.messages.at(-1), /document changed/);
   state.options.fields
     .find((field) => field.fieldname === "optimize_stops")
     .onchange();

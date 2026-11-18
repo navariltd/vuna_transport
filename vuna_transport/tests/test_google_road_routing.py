@@ -174,6 +174,24 @@ class TestRoadPreview(unittest.TestCase):
 			)
 		)
 		self.enterContext(patch.object(routing, "reserve_usage"))
+		self.enterContext(
+			patch(
+				"vuna_transport.services.routing.route_preview_receipt.now_datetime",
+				return_value="2026-11-18 16:00:00",
+			)
+		)
+		self.enterContext(
+			patch(
+				"vuna_transport.services.routing.route_preview_receipt.get_secret",
+				return_value="test-only-signing-secret",
+			)
+		)
+		self.trip_loads = self.enterContext(
+			patch(
+				"vuna_transport.services.execution.lineage_service.get_delivery_trip_loads", return_value=[]
+			)
+		)
+		self.doc.delivery_stops = []
 
 	def route(self, points, key, **kwargs):
 		result = {"distance_meters": 1000, "duration_seconds": 60, "legs": [{} for _ in points[1:]]}
@@ -199,6 +217,63 @@ class TestRoadPreview(unittest.TestCase):
 		self.permission.assert_any_call(self.doc, "write")
 		self.doc.save.assert_not_called()
 		self.doc.db_set.assert_not_called()
+
+	def test_allocation_preview_orders_all_load_stops_without_persisting_google_metrics(self):
+		manifest = {
+			"fingerprint": "own-inputs",
+			"source_warehouse": "Main",
+			"stops": [
+				{
+					"stop_key": "C1-A",
+					"address": "A",
+					"customer": "C1",
+					"warehouse": None,
+					"source_rows": ["r1"],
+				},
+				{
+					"stop_key": "C2-A",
+					"address": "A",
+					"customer": "C2",
+					"warehouse": None,
+					"source_rows": ["r2"],
+				},
+			],
+			"loads": [],
+		}
+		with patch.object(routing.allocation_routes, "build_manifest", return_value=manifest):
+			result = self.api("Vehicle Allocation", "VA-1", optimize_stops=1)
+		self.assertEqual([r["customer"] for r in result["allocation_route_rows"]], ["C2", "C1"])
+		self.assertEqual(result["route_fingerprint"], "own-inputs")
+		self.assertEqual(self.pair.call_args.args[0]["label"], "Main")
+		self.assertEqual(len(self.pair.call_args.args[1]), 2)
+		self.doc.save.assert_not_called()
+		self.doc.db_set.assert_not_called()
+
+	def test_trip_preview_uses_load_origin_and_preserves_every_actual_visit(self):
+		self.doc.delivery_stops = [
+			frappe._dict(name="s1", address="A", vuna_delivery_load="L"),
+			frappe._dict(name="s2", address="A", vuna_delivery_load="L"),
+		]
+		load = frappe._dict(
+			company="Company", source_warehouse="Main", movement_type="Customer Delivery", delivery_orders=[]
+		)
+		self.trip_loads.return_value = [load]
+		result = self.api("Delivery Trip", "TRIP", optimize_stops=1)
+		self.assertEqual(self.pair.call_args.args[0]["label"], "Main")
+		self.assertEqual(result["trip_stop_order"], ["s2", "s1"])
+		self.doc.save.assert_not_called()
+
+	def test_trip_with_extra_pickup_task_is_not_optimized(self):
+		self.doc.delivery_stops = [
+			frappe._dict(name="s1", address="A", vuna_delivery_load="L", vuna_task_keys='["return-task"]')
+		]
+		self.trip_loads.return_value = [
+			frappe._dict(company="Company", movement_type="Customer Delivery", delivery_orders=[])
+		]
+		with self.assertRaises(ValueError):
+			self.api("Delivery Trip", "TRIP", optimize_stops=1)
+		self.assertIn("dependency-aware", routing.frappe.throw.call_args.args[0])
+		self.pair.assert_not_called()
 
 	def test_trip_preserves_repeated_visits_and_optional_return(self):
 		self.doc.driver_address = "Driver"

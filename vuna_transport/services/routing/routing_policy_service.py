@@ -85,6 +85,7 @@ def get_routing_context():
 		settings.enabled and settings.get("routing_provider") == "Google" and allowed_role(settings)
 	)
 	return {
+		"can_plan": allowed_role(settings),
 		"can_preview": can_preview,
 		"can_optimize": bool(can_preview and settings.get("enable_google_optimization")),
 	}

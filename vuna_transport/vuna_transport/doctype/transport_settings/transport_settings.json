@@ -75,7 +75,7 @@
    "options": "Geographic Estimate\nGoogle",
    "default": "Geographic Estimate",
    "reqd": 1,
-   "description": "Google previews send coordinates to Google and incur request charges; dedicated optimization is billed per routing location. Set Google Cloud quotas as well as the application limits below."
+   "description": "Google previews send coordinates to Google and incur request charges; dedicated optimization is billed per routing location. Applied allocation routes retain Google-calculated distance and application-calculated cost estimates. Set Google Cloud quotas as well as the application limits below."
   },
   {
    "fieldname": "routing_column",
@@ -382,7 +382,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-18 14:08:29.164874",
+ "modified": "2026-11-18 16:03:40.949566",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Settings",

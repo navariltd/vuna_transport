@@ -7,6 +7,7 @@ from frappe import _
 from frappe.rate_limiter import rate_limit
 from frappe.utils import cint, escape_html
 
+from vuna_transport.services.routing import allocation_route_service as allocation_routes
 from vuna_transport.services.routing.google_optimization_service import optimize_route
 from vuna_transport.services.routing.google_routes_service import compute_ordered_route, split_route_points
 from vuna_transport.services.routing.location_service import (
@@ -20,7 +21,7 @@ from vuna_transport.services.routing.routing_policy_service import (
 )
 from vuna_transport.services.shared.security_service import require_authenticated, require_document_permission
 
-SUPPORTED_DOCUMENTS = {"Transport Load", "Delivery Trip"}
+SUPPORTED_DOCUMENTS = {"Transport Load", "Vehicle Allocation", "Delivery Trip"}
 
 
 @frappe.whitelist(methods=["POST"])
@@ -51,15 +52,39 @@ def preview_road_route(doctype: str, name: str, return_to_start: int = 0, optimi
 				_("Enable Google Route Optimization and configure its service account in Transport Settings.")
 			)
 		_validate_optimization(doc, doctype)
-	if doctype == "Delivery Trip":
-		if not doc.driver_address:
-			frappe.throw(_("Set the trip's Driver Address before previewing its road route."))
-		origin = _address_point(doc.driver_address, doc.company)
+	manifest = None
+	if doctype == "Vehicle Allocation":
+		manifest = allocation_routes.build_manifest(doc, return_to_start=bool(cint(return_to_start)))
+		origin = _warehouse_point(manifest["source_warehouse"], doc.company)
+		operational_stops = manifest["stops"]
+		if doc.get("route_stops"):
+			operational_stops = allocation_routes.ordered_stops(doc, manifest)
+		stops = []
+		for stop in operational_stops:
+			point = _address_point(stop["address"], doc.company)
+			point["stop_key"] = stop["stop_key"]
+			stops.append(point)
+	elif doctype == "Delivery Trip":
+		from vuna_transport.services.execution.lineage_service import get_delivery_trip_loads
+
+		loads = get_delivery_trip_loads(doc)
+		for load in loads:
+			require_document_permission(load, "read")
+		origins = {load.source_warehouse for load in loads}
+		if loads and (len(origins) != 1 or not next(iter(origins))):
+			frappe.throw(_("Trip road routing needs one common loading warehouse."))
+		origin = (
+			_warehouse_point(next(iter(origins)), doc.company)
+			if loads
+			else _address_point(doc.driver_address, doc.company)
+		)
+		stops = _trip_stops(doc)
 	elif doc.movement_type == "Supplier Pickup":
 		origin = _address_point(doc.source_address, doc.company)
 	else:
 		origin = _warehouse_point(doc.source_warehouse, doc.company)
-	stops = _trip_stops(doc) if doctype == "Delivery Trip" else _load_stops(doc)
+	if doctype == "Transport Load":
+		stops = _load_stops(doc)
 	if not stops:
 		frappe.throw(_("Add at least one destination before previewing a road route."))
 	points = [origin, *stops]
@@ -88,6 +113,7 @@ def preview_road_route(doctype: str, name: str, return_to_start: int = 0, optimi
 		leg.update(from_label=ordered_points[index]["label"], to_label=ordered_points[index + 1]["label"])
 	result.update(
 		provider="Google",
+		return_to_start=cint(return_to_start),
 		attribution="Google Maps",
 		source_doctype=doctype,
 		source_name=doc.name,
@@ -101,7 +127,10 @@ def preview_road_route(doctype: str, name: str, return_to_start: int = 0, optimi
 	)
 	if cint(optimize_stops):
 		ordered_stops = ordered_points[1:-1] if cint(return_to_start) else ordered_points[1:]
-		result["load_row_order"] = _load_row_order(doc, ordered_stops)
+		if doctype == "Transport Load":
+			result["load_row_order"] = _load_row_order(doc, ordered_stops)
+		elif doctype == "Delivery Trip":
+			result["trip_stop_order"] = [point["stop_key"] for point in ordered_stops]
 		result["source_modified"] = str(doc.modified)
 		result["warnings"].extend(
 			[
@@ -117,10 +146,83 @@ def preview_road_route(doctype: str, name: str, return_to_start: int = 0, optimi
 				"Load destinations follow their first occurrence; the Delivery Trip determines the actual visit order."
 			)
 		)
+	if manifest:
+		by_key = {row["stop_key"]: row for row in manifest["stops"]}
+		ordered = ordered_points[1:-1] if cint(return_to_start) else ordered_points[1:]
+		result.update(
+			allocation_route_rows=allocation_routes.route_rows(
+				[by_key[point["stop_key"]] for point in ordered]
+			),
+			route_fingerprint=manifest["fingerprint"],
+			source_warehouse=manifest["source_warehouse"],
+			source_modified=str(doc.modified),
+			return_to_start=cint(return_to_start),
+		)
+		if doc.docstatus == 0:
+			from vuna_transport.services.routing.route_preview_receipt import issue_receipt
+
+			result["route_preview_token"] = issue_receipt(
+				doc,
+				manifest["fingerprint"],
+				[point["stop_key"] for point in ordered],
+				result["distance_meters"],
+			)
+		if settings.get("enable_transport_costing") and doc.vehicle:
+			from vuna_transport.services.costing.transport_cost_estimation_service import (
+				estimate_transport_journey,
+			)
+
+			result["cost_estimate"] = estimate_transport_journey(
+				manifest["loads"],
+				doc.vehicle,
+				distance=result["distance_meters"] / 1000,
+				distance_source="Routing Provider",
+				as_of_date=doc.planned_reporting_time,
+			)
 	return result
 
 
 def _validate_optimization(doc, doctype):
+	if doctype in ("Vehicle Allocation", "Delivery Trip"):
+		if (
+			doc.docstatus != 0
+			or doc.get("vuna_actual_start")
+			or any(row.get("visited") for row in doc.get("delivery_stops") or [])
+		):
+			frappe.throw(_("Optimize the route before submitting or starting execution."))
+		if doctype == "Vehicle Allocation":
+			loads = allocation_routes.build_manifest(doc)["loads"]
+		else:
+			from vuna_transport.services.execution.lineage_service import get_delivery_trip_loads
+
+			loads = get_delivery_trip_loads(doc)
+			if not loads or any(not row.get("vuna_delivery_load") for row in doc.delivery_stops):
+				frappe.throw(_("Trip optimization requires customer/depot stops linked to Transport Loads."))
+			from vuna_transport.services.execution.trip_task_service import plan_tasks
+
+			specs = plan_tasks(loads) if doc.get("vuna_task_based") else []
+			keys = {
+				spec["task_key"]
+				for spec in specs
+				if spec["task_type"] in ("Customer Delivery", "Transfer Receipt")
+			}
+			if len(keys) != len(specs) or any(
+				key not in keys
+				for stop in doc.delivery_stops
+				for key in frappe.parse_json(stop.get("vuna_task_keys") or "[]")
+			):
+				frappe.throw(
+					_("Pickup and diversion tasks need dependency-aware planning; review this trip manually.")
+				)
+		for load in loads:
+			require_document_permission(load, "read")
+			if load.company != doc.company or load.movement_type not in (
+				"Customer Delivery",
+				"Warehouse Transfer",
+			):
+				frappe.throw(_("Pickup-dependent journeys need manual stop planning."))
+			_validate_load_constraints(load)
+		return
 	if (
 		doctype != "Transport Load"
 		or doc.docstatus != 0
@@ -131,6 +233,10 @@ def _validate_optimization(doc, doctype):
 		frappe.throw(
 			_("Stop optimization is available only for draft customer/depot loads before allocation.")
 		)
+	_validate_load_constraints(doc)
+
+
+def _validate_load_constraints(doc):
 	# Routing does not model delivery windows, maximum vehicle access or
 	# pickup-before-delivery dependencies. Never silently override those rules.
 	if doc.get("preferred_route") or doc.get("transport_route"):
@@ -267,4 +373,6 @@ def _load_stops(doc):
 
 def _trip_stops(doc):
 	# Never sort or deduplicate actual visits: a repeat address can be a later pickup.
-	return [_address_point(stop.address, doc.company) for stop in doc.delivery_stops]
+	return [
+		{**_address_point(stop.address, doc.company), "stop_key": stop.name} for stop in doc.delivery_stops
+	]

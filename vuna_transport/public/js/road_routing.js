@@ -20,7 +20,7 @@ vuna_transport.road_routing.show_preview = function (frm, context = {}) {
 				fieldname: "return_to_start",
 				fieldtype: "Check",
 				label: __("Return to Start"),
-				default: 0,
+				default: frm.doc.route_return_to_start || frm.doc.vuna_route_return_to_start || 0,
 				onchange: clear_result,
 			},
 			{
@@ -30,10 +30,12 @@ vuna_transport.road_routing.show_preview = function (frm, context = {}) {
 				default: 0,
 				hidden:
 					!context.can_optimize ||
-					frm.doc.doctype !== "Transport Load" ||
 					frm.doc.docstatus !== 0 ||
-					!["Customer Delivery", "Warehouse Transfer"].includes(frm.doc.movement_type) ||
-					Boolean(frm.doc.active_vehicle_allocation || frm.doc.delivery_trip),
+					(frm.doc.doctype === "Transport Load" &&
+						(!["Customer Delivery", "Warehouse Transfer"].includes(
+							frm.doc.movement_type
+						) ||
+							Boolean(frm.doc.active_vehicle_allocation || frm.doc.delivery_trip))),
 				description: __(
 					"Google suggests the full stop order. Return to Start adds a journey back to the source warehouse."
 				),
@@ -42,7 +44,10 @@ vuna_transport.road_routing.show_preview = function (frm, context = {}) {
 			{ fieldname: "result", fieldtype: "HTML" },
 		],
 		primary_action_label: __("Preview Route"),
-		secondary_action_label: __("Apply Stop Order"),
+		secondary_action_label:
+			frm.doc.doctype === "Vehicle Allocation"
+				? __("Apply Route & Distance")
+				: __("Apply Stop Order"),
 		secondary_action() {
 			if (
 				!suggestion ||
@@ -50,12 +55,19 @@ vuna_transport.road_routing.show_preview = function (frm, context = {}) {
 				frm.is_dirty() ||
 				frm.doc.modified !== suggestion.source_modified
 			) {
-				return frappe.msgprint(__("The load changed. Save and preview the route again."));
+				return frappe.msgprint(
+					__("The document changed. Save and preview the route again.")
+				);
 			}
 			if (!vuna_transport.road_routing.apply_stop_order(frm, suggestion)) return;
 			dialog.hide();
 			frappe.show_alert({
-				message: __("Stop order applied. Save the load to keep it."),
+				message:
+					frm.doc.doctype === "Vehicle Allocation"
+						? __(
+								"Route and distance applied. Save the allocation to calculate and retain costs."
+						  )
+						: __("Stop order applied. Save the document to keep it."),
 				indicator: "green",
 			});
 		},
@@ -100,7 +112,12 @@ vuna_transport.road_routing.show_preview = function (frm, context = {}) {
 				dialog.fields_dict.result.$wrapper.html(
 					vuna_transport.road_routing.render_result(message)
 				);
-				if (message?.load_row_order && values.optimize_stops) {
+				if (
+					frm.doc.docstatus === 0 &&
+					(message?.allocation_route_rows ||
+						((message?.load_row_order || message?.trip_stop_order) &&
+							values.optimize_stops))
+				) {
 					suggestion = message;
 					dialog.get_secondary_btn().show();
 				}
@@ -122,6 +139,44 @@ vuna_transport.road_routing.show_preview = function (frm, context = {}) {
 };
 
 vuna_transport.road_routing.apply_stop_order = function (frm, result) {
+	if (frm.doc.docstatus !== 0) return false;
+	if (frm.doc.doctype === "Vehicle Allocation") {
+		if (!result.allocation_route_rows?.length || !result.route_fingerprint) return false;
+		frm.clear_table("route_stops");
+		for (const row of result.allocation_route_rows) frm.add_child("route_stops", row);
+		frm.set_value("route_manifest_fingerprint", result.route_fingerprint);
+		frm.set_value("route_preview_token", result.route_preview_token || null);
+		frm.set_value("route_source_warehouse", result.source_warehouse);
+		frm.set_value("route_return_to_start", result.return_to_start || 0);
+		frm.set_value("route_status", "Proposed");
+		frm.refresh_field("route_stops");
+		frm.__road_preview_inputs = vuna_transport.road_routing.preview_inputs(frm);
+		frm.dirty();
+		return true;
+	}
+	if (frm.doc.doctype === "Delivery Trip") {
+		const rows = frm.doc.delivery_stops || [];
+		const names = result.trip_stop_order || [];
+		if (
+			!names.length ||
+			names.length !== rows.length ||
+			new Set(names).size !== rows.length ||
+			!names.every((name) => rows.some((row) => row.name === name))
+		) {
+			frappe.msgprint(
+				__("This stop order no longer matches the draft trip. Preview it again.")
+			);
+			return false;
+		}
+		const by_name = new Map(rows.map((row) => [row.name, row]));
+		frm.doc.delivery_stops = names.map((name, index) =>
+			Object.assign(by_name.get(name), { idx: index + 1 })
+		);
+		frm.set_value("vuna_route_return_to_start", result.return_to_start || 0);
+		frm.refresh_field("delivery_stops");
+		frm.dirty();
+		return true;
+	}
 	const rows = frm.doc.delivery_orders || [];
 	const names = result.load_row_order || [];
 	if (
@@ -170,6 +225,16 @@ vuna_transport.road_routing.render_result = function (result) {
 	const warnings = (result.warnings || [])
 		.map((message) => `<li>${escape(message)}</li>`)
 		.join("");
+	const cost = result.cost_estimate;
+	const cost_html = cost
+		? `<div class="border-top pt-2 mb-2"><strong>${__("Journey cost preview")}: ${number(
+				cost.marginal_cost
+		  )} ${escape(cost.currency || "")}</strong><p class="small text-muted">${__(
+				"Shared trip charges are counted once. Monthly fixed costs are separate. Apply the route and save the allocation to retain its distance and calculated costs."
+		  )}</p>${(cost.warnings || [])
+				.map((warning) => `<p class="small text-muted">${escape(warning)}</p>`)
+				.join("")}</div>`
+		: "";
 	return `<div class="border rounded p-3"><div class="d-flex justify-content-between mb-3"><strong>${__(
 		"{0} km · {1} driving hours",
 		[number(result.distance_meters / 1000), number(result.duration_seconds / 3600)]
@@ -177,5 +242,18 @@ vuna_transport.road_routing.render_result = function (result) {
 		"From"
 	)}</th><th>${__("To")}</th><th>${__("Road Distance")}</th><th>${__(
 		"Driving Time"
-	)}</th></tr></thead><tbody>${rows}</tbody></table></div><ul class="small text-muted">${warnings}</ul></div>`;
+	)}</th></tr></thead><tbody>${rows}</tbody></table></div>${cost_html}<ul class="small text-muted">${warnings}</ul></div>`;
+};
+
+vuna_transport.road_routing.preview_inputs = function (frm) {
+	return JSON.stringify([
+		frm.doc.company,
+		frm.doc.vehicle,
+		frm.doc.driver,
+		frm.doc.cost_structure,
+		frm.doc.planned_reporting_time,
+		frm.doc.route_return_to_start,
+		(frm.doc.delivery_loads || []).map((row) => row.delivery_load),
+		(frm.doc.route_stops || []).map((row) => row.stop_key),
+	]);
 };

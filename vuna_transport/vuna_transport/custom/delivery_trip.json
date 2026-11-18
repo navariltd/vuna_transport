@@ -1,5 +1,6 @@
 {
  "custom_fields": [
+  {"dt":"Delivery Trip","fieldname":"vuna_route_return_to_start","fieldtype":"Check","label":"Return to Loading Warehouse","default":"0","no_copy":1,"insert_after":"vuna_task_based","module":"Vuna Transport","name":"Delivery Trip-vuna_route_return_to_start","creation":"2026-11-18 15:39:55.710088","modified":"2026-11-18 15:39:55.710088"},
   {"dt":"Delivery Trip","fieldname":"vuna_task_based","fieldtype":"Check","label":"Task-based Transport Trip","read_only":1,"insert_after":"company","module":"Vuna Transport","name":"Delivery Trip-vuna_task_based"},
   {
    "_assign": null,

@@ -1,6 +1,7 @@
 """Read-only transport cost estimates based on configured profiles and rates."""
 
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, replace
 from datetime import date
 
 import frappe
@@ -315,6 +316,95 @@ def estimate_transport_cost_for_loads(delivery_loads, vehicle):
 	}
 
 
+def estimate_transport_journey(
+	loads, vehicle, *, distance, distance_uom="Kilometer", distance_source="Planned Distance", as_of_date=None
+):
+	"""Cost one journey, charging shared components once and retaining destination rates."""
+	loads = [_resolve_document("Transport Load", load) for load in loads]
+	if not loads:
+		frappe.throw(_("Select at least one Transport Load for journey costing."))
+	try:
+		distance = float(distance)
+	except (ValueError, TypeError, OverflowError):
+		distance = -1
+	if not math.isfinite(distance) or distance < 0:
+		frappe.throw(_("Journey distance must be a finite, non-negative number."))
+	if not distance_uom:
+		frappe.throw(_("Select a Distance UOM for journey costing."))
+	convert_measurement(1, distance_uom, "Kilometer", _("journey distance"))
+	vehicle = _resolve_document("Vehicle", vehicle)
+	require_document_permission(vehicle, "read")
+	contexts = []
+	for load in loads:
+		require_document_permission(load, "read")
+		require_company_access(load.company)
+		if load.company != loads[0].company or (vehicle.get("company") and vehicle.company != load.company):
+			frappe.throw(_("Journey loads and vehicle must belong to the same company."))
+		context = _build_context(
+			load,
+			vehicle,
+			get_transport_uoms(),
+			as_of_date=as_of_date,
+			distance=0,
+			distance_source=distance_source,
+		)
+		contexts.append(
+			replace(context, distance=distance, distance_uom=distance_uom, distance_source=distance_source)
+		)
+	context = contexts[0]
+	profile = get_applicable_cost_structure_assignment(vehicle, context.company, context.date)
+	warnings = []
+	if not profile:
+		return _empty_estimate(
+			vehicle, context, [_("No active Cost Structure Assignment applies to this journey.")]
+		)
+	components = []
+	for component in profile.components:
+		applicable = [context]
+		if component.calculation_basis == "Destination Rate":
+			applicable = []
+			seen = set()
+			for load_context in contexts:
+				for geography in load_context.destination_geographies or []:
+					key = (load_context.source_warehouse, geography.cost_key)
+					if key in seen:
+						continue
+					seen.add(key)
+					applicable.append(
+						replace(
+							load_context,
+							destination=geography.cost_key,
+							destinations=[geography.cost_key],
+							destination_geographies=[geography],
+						)
+					)
+			if not applicable:
+				warnings.append(_("No destination is available for destination-based journey costing."))
+		for item_context in applicable:
+			result = estimate_cost_component(component, item_context, profile)
+			warnings.extend(result.pop("warnings", []))
+			components.append(result)
+	marginal = sum(flt(row["amount"]) for row in components if row["basis"] != "Monthly Fixed")
+	fixed = sum(flt(row["amount"]) for row in components if row["basis"] == "Monthly Fixed")
+	return {
+		"vehicle": vehicle.name,
+		"vehicle_category": vehicle.get("vuna_vehicle_category"),
+		"cost_structure": profile.cost_structure,
+		"cost_structure_assignment": profile.name,
+		"currency": profile.currency,
+		"distance": distance,
+		"distance_uom": distance_uom,
+		"distance_source": distance_source,
+		"components": components,
+		"marginal_cost": marginal,
+		"fixed_cost": fixed,
+		"allocated_fixed_cost": 0,
+		"unallocated_fixed_cost": fixed,
+		"estimated_full_cost": marginal,
+		"warnings": _unique(warnings),
+	}
+
+
 def estimate_cost_component(component, context, profile=None):
 	"""Calculate one configured component and return an explainable result."""
 	basis = component.calculation_basis
@@ -386,7 +476,7 @@ def _build_context(load, vehicle, uoms, *, as_of_date, distance, distance_source
 	planning_warnings = []
 	if distance is None and source == "Geographic Estimate":
 		planning_warnings.extend((getattr(load, "distance_estimate_warning", None) or "").splitlines())
-	if not load_distance:
+	if distance is None and not load_distance:
 		distance_estimate = estimate_delivery_load_distance(load)
 		planning_warnings.extend(distance_estimate.get("warnings", []))
 		if distance_estimate["available"]:
