@@ -26,6 +26,11 @@
   "default_distance_uom",
   "default_weight_uom",
   "default_volume_uom",
+  "routing_tab",
+  "routing_section",
+  "routing_provider",
+  "routing_column",
+  "google_routes_api_key",
   "features_tab",
   "feature_controls_section",
   "enable_carrier_management",
@@ -44,6 +49,36 @@
   "delivery_order_retirement_manifest"
  ],
  "fields": [
+  {
+   "fieldname": "routing_tab",
+   "fieldtype": "Tab Break",
+   "label": "Routing"
+  },
+  {
+   "fieldname": "routing_section",
+   "fieldtype": "Section Break",
+   "label": "Road Routing"
+  },
+  {
+   "fieldname": "routing_provider",
+   "fieldtype": "Select",
+   "label": "Routing Provider",
+   "options": "Geographic Estimate\nGoogle",
+   "default": "Geographic Estimate",
+   "reqd": 1,
+   "description": "Each Google road route preview sends stop coordinates to Google and may incur charges on your Google Cloud project. Configure billing and request quotas before enabling Google. Requests run only when users click Preview Route."
+  },
+  {
+   "fieldname": "routing_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "google_routes_api_key",
+   "fieldtype": "Password",
+   "label": "Google Routes API Key",
+   "depends_on": "eval:doc.routing_provider == 'Google'",
+   "description": "Optional server-restricted key; otherwise uses API Key in Google Settings. Enable Routes API and billing in Google Cloud."
+  },
   {
    "fieldname": "driver_stock_posting_section",
    "fieldtype": "Section Break",
@@ -280,7 +315,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-08 15:42:59.636745",
+ "modified": "2026-11-18 12:33:43.132104",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Settings",

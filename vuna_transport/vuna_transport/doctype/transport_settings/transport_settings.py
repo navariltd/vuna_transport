@@ -8,6 +8,8 @@ from frappe.model.document import Document
 
 class TransportSettings(Document):
 	def validate(self):
+		if self.get("routing_provider") and self.routing_provider not in ("Geographic Estimate", "Google"):
+			frappe.throw(_("Choose a supported Routing Provider."))
 		if self.load_suggestion_option_count < 3 or self.load_suggestion_option_count > 10:
 			frappe.throw(_("Load Suggestion Options must be between 3 and 10."))
 		from vuna_transport.services.demand.source_policy_service import SUPPORTED_SOURCES
