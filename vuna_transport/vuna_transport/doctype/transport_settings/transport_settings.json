@@ -119,10 +119,10 @@
   {
    "fieldname": "routing_mobile_daily_request_limit",
    "fieldtype": "Int",
-   "label": "Daily Driver Routing Requests",
+   "label": "Daily Driver Route Preview Requests",
    "default": "25",
    "depends_on": "eval:doc.allow_driver_road_routes",
-   "description": "Shared across all drivers; split requests and failed attempts count toward this and the overall daily Google limit."
+   "description": "Daily requests for drivers to display trip road routes, shared across all drivers; split routes use multiple requests and also count toward Daily Routing Requests — Desk and Mobile. Failed attempts count."
   },
   {
    "fieldname": "driver_navigation_section",
@@ -139,10 +139,10 @@
   {
    "fieldname": "navigation_daily_start_limit",
    "fieldtype": "Int",
-   "label": "Daily Navigation Start Limit",
+   "label": "Daily Driver Navigation Starts",
    "default": "25",
    "depends_on": "eval:doc.allow_driver_navigation",
-   "description": "Shared across drivers. Failed attempts count. Also set Google Cloud billing alerts and quotas; this is not a monetary cap."
+   "description": "Daily authorized attempts to start turn-by-turn navigation, shared across all drivers; navigating to five stops uses five starts. Failed attempts count; these starts are separate from route preview requests."
   },
   {
    "fieldname": "routing_optimization_section",
@@ -168,14 +168,15 @@
    "fieldname": "routing_limits_section",
    "fieldtype": "Section Break",
    "label": "Routing Access and Usage",
+   "description": "Daily allowances are shared across this site and reset at midnight in the site's timezone. These are application safeguards, not spending caps; also configure Google Cloud quotas and billing alerts.",
    "depends_on": "eval:doc.routing_provider == 'Google'"
   },
   {
    "fieldname": "routing_max_locations",
    "fieldtype": "Int",
-   "label": "Maximum Routing Locations",
+   "label": "Maximum Stops per Route",
    "default": "100",
-   "description": "Per preview or optimization; maximum 200 locations."
+   "description": "Maximum destination stops in one route preview or optimization, excluding the starting location and return to start; this is not a daily allowance. Up to 200 stops are supported."
   },
   {
    "fieldname": "routing_allowed_roles",
@@ -191,16 +192,16 @@
   {
    "fieldname": "routing_daily_request_limit",
    "fieldtype": "Int",
-   "label": "Daily Google Routing Requests",
+   "label": "Daily Routing Requests — Desk and Mobile",
    "default": "100",
-   "description": "Site-wide attempted requests, including split previews; failures still count."
+   "description": "Combined daily server requests for Desk previews, driver route previews and stop optimization; a split route uses multiple requests. Failed attempts count; turn-by-turn navigation starts do not."
   },
   {
    "fieldname": "routing_daily_shipment_limit",
    "fieldtype": "Int",
-   "label": "Daily Optimization Locations",
+   "label": "Daily Stops Submitted for Optimization",
    "default": "1000",
-   "description": "Site-wide attempted location units submitted to the optimizer; failures still count."
+   "description": "Total destination stops submitted for stop-order optimization each day; optimizing 40 stops twice uses 80 of this allowance. Failed attempts count; ordinary route previews do not."
   },
   {
    "fieldname": "driver_stock_posting_section",
@@ -438,7 +439,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-19 13:01:46.320360",
+ "modified": "2026-11-19 16:16:52.046297",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Settings",

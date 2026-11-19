@@ -98,7 +98,7 @@ def preview_road_route(doctype: str, name: str, return_to_start: int = 0, optimi
 	if cint(return_to_start):
 		points.append(origin)
 	if len(stops) > get_limit(settings, "routing_max_locations"):
-		frappe.throw(_("This route exceeds the Maximum Routing Locations configured in Transport Settings."))
+		frappe.throw(_("This route exceeds the Maximum Stops per Route configured in Transport Settings."))
 	if cint(optimize_stops) and len(stops) < 2:
 		frappe.throw(_("Stop optimization needs at least two distinct delivery locations."))
 	if cint(optimize_stops):

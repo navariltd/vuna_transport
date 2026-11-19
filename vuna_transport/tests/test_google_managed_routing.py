@@ -5,6 +5,7 @@ import json
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from itertools import pairwise
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from uuid import uuid4
@@ -207,6 +208,20 @@ class TestRoutingPolicy(unittest.TestCase):
 		for value in (0, -1, 201, 1.5, "bad", True):
 			with self.subTest(value=value), self.assertRaises(ValueError):
 				policy.get_limit(frappe._dict(routing_max_locations=value), "routing_max_locations")
+
+	def test_form_defaults_match_runtime_defaults_and_preserve_configured_limits(self):
+		definition = Path(
+			frappe.get_app_path(
+				"vuna_transport", "vuna_transport", "doctype", "transport_settings", "transport_settings.json"
+			)
+		)
+		fields = {field["fieldname"]: field for field in json.loads(definition.read_text())["fields"]}
+		for field, (default, maximum) in policy.LIMITS.items():
+			with self.subTest(field=field):
+				self.assertEqual(int(fields[field]["default"]), default)
+				for blank in (None, ""):
+					self.assertEqual(policy.get_limit(frappe._dict({field: blank}), field), default)
+				self.assertEqual(policy.get_limit(frappe._dict({field: maximum}), field), maximum)
 
 	def test_atomic_reservation_enforces_both_counters_without_refunding_failures(self):
 		settings = frappe._dict(routing_daily_request_limit=2, routing_daily_shipment_limit=4)

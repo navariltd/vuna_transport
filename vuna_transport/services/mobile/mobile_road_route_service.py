@@ -35,7 +35,7 @@ def get_trip_road_route(installation_id, trip_name, device_identifier=None):
 		frappe.throw(_("Google road-route display is not enabled for this mobile app."))
 	stops = sorted(trip.delivery_stops, key=lambda row: cint(row.idx))
 	if not stops or len(stops) > get_limit(settings, "routing_max_locations"):
-		frappe.throw(_("The trip must have stops within the configured Maximum Routing Locations."))
+		frappe.throw(_("The trip must have stops within the configured Maximum Stops per Route."))
 	origin = _trip_origin(trip)
 	# Keep repeated/co-located visits. Never skip an unresolved stop or optimize order.
 	points = [origin, *[_address_point(stop.address) for stop in stops]]
