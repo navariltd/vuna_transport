@@ -245,6 +245,25 @@ def get_mobile_trip_road_route(installation_id: str, trip_name: str, device_iden
 
 
 @frappe.whitelist()
+def get_mobile_navigation_destination(
+	installation_id: str, trip_name: str, stop_name: str, device_identifier: str | None = None
+):
+	from vuna_transport.services.mobile.mobile_navigation_service import get_navigation_destination
+
+	return get_navigation_destination(installation_id, trip_name, stop_name, device_identifier)
+
+
+@frappe.whitelist(methods=["POST"])
+@rate_limit(limit=5, seconds=60, user_based=True)
+def start_mobile_navigation(
+	installation_id: str, trip_name: str, stop_name: str, device_identifier: str | None = None
+):
+	from vuna_transport.services.mobile.mobile_navigation_service import get_navigation_destination
+
+	return get_navigation_destination(installation_id, trip_name, stop_name, device_identifier, start=True)
+
+
+@frappe.whitelist()
 def get_mobile_delivery_note_details(
 	installation_id,
 	trip_name,

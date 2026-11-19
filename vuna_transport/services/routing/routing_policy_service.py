@@ -13,6 +13,7 @@ LIMITS = {
 	"routing_daily_request_limit": (100, 10000),
 	"routing_daily_shipment_limit": (1000, 100000),
 	"routing_mobile_daily_request_limit": (25, 10000),
+	"navigation_daily_start_limit": (25, 10000),
 }
 
 # Reserve both counters together. Failed attempts remain counted deliberately;

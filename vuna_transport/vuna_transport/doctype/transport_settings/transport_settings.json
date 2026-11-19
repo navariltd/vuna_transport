@@ -35,6 +35,9 @@
   "driver_routing_section",
   "allow_driver_road_routes",
   "routing_mobile_daily_request_limit",
+  "driver_navigation_section",
+  "allow_driver_navigation",
+  "navigation_daily_start_limit",
   "routing_optimization_section",
   "enable_google_optimization",
   "google_optimization_service_account",
@@ -120,6 +123,26 @@
    "default": "25",
    "depends_on": "eval:doc.allow_driver_road_routes",
    "description": "Shared across all drivers; split requests and failed attempts count toward this and the overall daily Google limit."
+  },
+  {
+   "fieldname": "driver_navigation_section",
+   "fieldtype": "Section Break",
+   "label": "Driver Navigation"
+  },
+  {
+   "fieldname": "allow_driver_navigation",
+   "fieldtype": "Check",
+   "label": "Allow In-App Google Navigation",
+   "default": "0",
+   "description": "Requires Navigation SDK and billing in the app's Google Cloud project. Standard driving only; heavy/large-vehicle use requires Google's authorization or a provisioned supported solution."
+  },
+  {
+   "fieldname": "navigation_daily_start_limit",
+   "fieldtype": "Int",
+   "label": "Daily Navigation Start Limit",
+   "default": "25",
+   "depends_on": "eval:doc.allow_driver_navigation",
+   "description": "Shared across drivers. Failed attempts count. Also set Google Cloud billing alerts and quotas; this is not a monetary cap."
   },
   {
    "fieldname": "routing_optimization_section",
@@ -415,7 +438,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-18 21:34:46.986173",
+ "modified": "2026-11-19 13:01:46.320360",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Settings",
