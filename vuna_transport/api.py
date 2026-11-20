@@ -245,6 +245,13 @@ def get_mobile_trip_road_route(installation_id: str, trip_name: str, device_iden
 
 
 @frappe.whitelist()
+def get_mobile_google_maps_key(installation_id: str, platform: str, device_identifier: str | None = None):
+	from vuna_transport.services.mobile.mobile_map_service import get_mobile_google_maps_key as get_key
+
+	return get_key(installation_id, platform, device_identifier)
+
+
+@frappe.whitelist()
 def get_mobile_navigation_destination(
 	installation_id: str, trip_name: str, stop_name: str, device_identifier: str | None = None
 ):

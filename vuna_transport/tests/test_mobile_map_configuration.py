@@ -143,3 +143,53 @@ class TestMobileMapDelivery(unittest.TestCase):
 		response = mobile._offline_manifest_response({"linked": True})
 		self.assertEqual(response["map_config"]["provider"], "openstreetmap")
 		self.assertEqual(self.device.status, "Active")
+
+
+class TestCustomerMobileKeys(unittest.TestCase):
+	def setUp(self):
+		self.driver = self.enterContext(patch.object(mobile, "_require_mobile_driver"))
+		self.enterContext(patch.object(maps, "_", side_effect=lambda text: text))
+		self.enterContext(patch.object(frappe, "throw", side_effect=ValueError))
+		self.settings = frappe._dict(enabled=1, mobile_map_provider="Google Maps")
+		self.settings.get_password = Mock(return_value=" restricted-mobile-key ")
+		self.cached = self.enterContext(patch.object(frappe, "get_cached_doc", return_value=self.settings))
+
+	def test_only_requested_mobile_key_is_released_after_device_authorization(self):
+		for platform, field in (
+			("android", "google_maps_android_api_key"),
+			("ios", "google_maps_ios_api_key"),
+		):
+			with self.subTest(platform=platform):
+				result = maps.get_mobile_google_maps_key("INSTALL", platform, "PHONE")
+				self.driver.assert_called_with("INSTALL", "PHONE")
+				self.settings.get_password.assert_called_with(field, raise_exception=False)
+				self.assertEqual(
+					result, {"version": 1, "platform": platform, "api_key": "restricted-mobile-key"}
+				)
+
+	def test_denied_device_does_not_load_settings_or_credentials(self):
+		self.driver.side_effect = ValueError("Denied")
+		with self.assertRaises(ValueError):
+			maps.get_mobile_google_maps_key("INSTALL", "android", "PHONE")
+		self.cached.assert_not_called()
+		self.settings.get_password.assert_not_called()
+
+	def test_missing_mobile_key_never_falls_back_to_server_credentials(self):
+		self.settings.get_password.return_value = None
+		with self.assertRaises(ValueError):
+			maps.get_mobile_google_maps_key("INSTALL", "android", "PHONE")
+		self.settings.get_password.assert_called_once_with(
+			"google_maps_android_api_key", raise_exception=False
+		)
+
+	def test_disabled_maps_and_invalid_platform_never_read_passwords(self):
+		for values, platform in (
+			({}, "other"),
+			({"enabled": 0}, "android"),
+			({"mobile_map_provider": "OpenStreetMap"}, "ios"),
+		):
+			self.settings.update(enabled=1, mobile_map_provider="Google Maps")
+			self.settings.update(values)
+			with self.assertRaises(ValueError):
+				maps.get_mobile_google_maps_key("INSTALL", platform, "PHONE")
+		self.settings.get_password.assert_not_called()

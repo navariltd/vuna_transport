@@ -30,6 +30,8 @@
   "routing_section",
   "routing_provider",
   "mobile_map_provider",
+  "google_maps_android_api_key",
+  "google_maps_ios_api_key",
   "routing_column",
   "google_routes_api_key",
   "driver_routing_section",
@@ -90,7 +92,21 @@
    "label": "Mobile Map Provider",
    "options": "Automatic\nOpenStreetMap\nGoogle Maps",
    "default": "Automatic",
-   "description": "Automatic follows Routing Provider; Google Maps requires a compatible mobile app build."
+   "description": "Automatic follows Routing Provider; Google Maps bills the project owning this site's mobile key. Fully close and reopen the app after changing the key or customer site."
+  },
+  {
+   "fieldname": "google_maps_android_api_key",
+   "fieldtype": "Password",
+   "label": "Android Google Maps API Key",
+   "depends_on": "eval:doc.mobile_map_provider == 'Google Maps' || (doc.mobile_map_provider == 'Automatic' && doc.routing_provider == 'Google')",
+   "description": "Customer-owned mobile key, restricted to the Android package and release signing SHA-1; enable Maps SDK for Android and Navigation SDK. Shared only with approved driver devices, never used for server routing."
+  },
+  {
+   "fieldname": "google_maps_ios_api_key",
+   "fieldtype": "Password",
+   "label": "iOS Google Maps API Key",
+   "depends_on": "eval:doc.mobile_map_provider == 'Google Maps' || (doc.mobile_map_provider == 'Automatic' && doc.routing_provider == 'Google')",
+   "description": "Customer-owned mobile key, restricted to the iOS bundle ID; enable the required Google Maps and Navigation SDKs. Changing the key or customer site requires fully closing and reopening the app."
   },
   {
    "fieldname": "routing_column",
@@ -439,7 +455,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-19 16:16:52.046297",
+ "modified": "2026-11-20 09:20:25.873288",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Settings",
