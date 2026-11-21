@@ -1,56 +1,32 @@
-"""Retired navigation cleanup is scoped, idempotent and preserves site intent."""
+"""Standard navigation is maintained in JSON, not an after-migrate cleanup."""
 
+import json
 import unittest
-from unittest.mock import patch
+from pathlib import Path
 
-import frappe
-
-from vuna_transport import install
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class TestRetiredDeliveryOrderNavigation(unittest.TestCase):
-	@patch.object(install, "frappe")
-	def test_active_legacy_doctype_is_not_cleaned_up_early(self, framework):
-		framework.db.exists.return_value = True
-		self.assertEqual(install.cleanup_retired_delivery_order_navigation(), 0)
-		framework.db.delete.assert_not_called()
-
-	@patch.object(install, "frappe")
-	def test_only_retired_links_in_this_apps_sidebars_are_removed(self, framework):
-		framework.db.exists.side_effect = lambda dt, name: name == "Sidebar"
-		framework.get_meta.return_value.get_field.return_value.options = "Sidebar Item"
-		framework.get_all.side_effect = [
-			["Dispatch Operations"],
-			[
-				frappe._dict(name="legacy", link_type="DocType", link_to="Delivery Order"),
-				frappe._dict(name="old-report", link_type="Report", link_to="Unallocated Delivery Orders"),
-				frappe._dict(name="demand", link_type="DocType", link_to="Transport Demand"),
-				frappe._dict(name="custom", link_type="URL", link_to="Delivery Order"),
-			],
-		]
-		self.assertEqual(install.cleanup_retired_delivery_order_navigation(), 2)
-		self.assertEqual(framework.get_all.call_args_list[0].kwargs["filters"], {"app": "vuna_transport"})
-		self.assertEqual(
-			framework.get_all.call_args_list[1].kwargs["filters"]["parent"], ["in", ["Dispatch Operations"]]
+	def test_navigation_json_has_no_retired_names(self):
+		paths = sorted(
+			path
+			for directory in (
+				ROOT / "workspace_sidebar",
+				ROOT / "vuna_transport" / "sidebar",
+				ROOT / "vuna_transport" / "workspace",
+			)
+			for path in directory.rglob("*.json")
 		)
-		framework.db.delete.assert_called_once_with(
-			"Sidebar Item", {"name": ["in", ["legacy", "old-report"]]}
-		)
-		framework.clear_cache.assert_called_once_with()
+		self.assertTrue(paths)
+		for path in paths:
+			with self.subTest(path=str(path.relative_to(ROOT))):
+				content = path.read_text()
+				json.loads(content)
+				for retired in ("Delivery Order", "Open Delivery Demand", "Unallocated Delivery Orders"):
+					self.assertNotIn(retired, content)
 
-	@patch.object(install, "frappe")
-	def test_personal_customizations_are_scoped_to_transport_module(self, framework):
-		framework.db.exists.side_effect = lambda dt, name: name == "Custom Sidebar"
-		framework.get_meta.return_value.get_field.return_value.options = "Sidebar Item"
-		framework.get_all.side_effect = [["Transport User Sidebar"], []]
-		self.assertEqual(install.cleanup_retired_delivery_order_navigation(), 0)
-		self.assertEqual(framework.get_all.call_args_list[0].kwargs["filters"], {"module": "Vuna Transport"})
-		framework.db.delete.assert_not_called()
-		framework.clear_cache.assert_not_called()
-
-	@patch.object(install, "frappe")
-	def test_empty_site_or_repeated_cleanup_is_a_noop(self, framework):
-		framework.db.exists.side_effect = lambda dt, name: name != "Delivery Order"
-		framework.get_all.return_value = []
-		self.assertEqual(install.cleanup_retired_delivery_order_navigation(), 0)
-		framework.db.delete.assert_not_called()
+	def test_retired_navigation_cleanup_is_not_registered_or_defined(self):
+		for filename in ("hooks.py", "install.py"):
+			with self.subTest(filename=filename):
+				self.assertNotIn("cleanup_retired_delivery_order_navigation", (ROOT / filename).read_text())

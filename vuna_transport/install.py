@@ -78,52 +78,6 @@ def ensure_transport_demand_sources():
 	settings.save(ignore_permissions=True)
 
 
-def cleanup_retired_delivery_order_navigation():
-	"""Remove stale retired links without overwriting sidebar customizations.
-
-	Clean archived sidebars as well: subsequent framework conversion must not
-	reintroduce links to removed DocTypes/reports. Never export site navigation
-	back into the app's source files from this upgrade helper.
-	"""
-	if frappe.db.exists("DocType", "Delivery Order"):
-		return 0
-	retired_links = {
-		("DocType", "Delivery Order"),
-		("DocType", "Delivery Order Item"),
-		("Report", "Open Delivery Demand"),
-		("Report", "Unallocated Delivery Orders"),
-	}
-	removed = 0
-	for parent_type, table_field in (
-		("Sidebar", "items"),
-		("Workspace Sidebar", "items"),
-		("Custom Sidebar", "sidebar_items"),
-		("Workspace", "links"),
-	):
-		if not frappe.db.exists("DocType", parent_type):
-			continue
-		meta = frappe.get_meta(parent_type)
-		table = meta.get_field(table_field)
-		if not table:
-			continue
-		scope = {"module": "Vuna Transport"} if parent_type == "Custom Sidebar" else {"app": "vuna_transport"}
-		parents = frappe.get_all(parent_type, filters=scope, pluck="name")
-		if not parents:
-			continue
-		rows = frappe.get_all(
-			table.options,
-			filters={"parent": ["in", parents], "parenttype": parent_type, "parentfield": table_field},
-			fields=["name", "link_type", "link_to"],
-		)
-		obsolete = [row.name for row in rows if (row.link_type, row.link_to) in retired_links]
-		if obsolete:
-			frappe.db.delete(table.options, {"name": ["in", obsolete]})
-			removed += len(obsolete)
-	if removed:
-		frappe.clear_cache()
-	return removed
-
-
 def ensure_delivery_methods():
 	"""Seed standard policies. Custom names never determine workflow behavior."""
 	for name, buying, selling, internal, required, arranger in (
