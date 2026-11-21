@@ -4,6 +4,7 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import frappe
 from frappe.exceptions import ValidationError
 from frappe.tests import UnitTestCase
 
@@ -176,13 +177,11 @@ class TestVehicleAllocation(UnitTestCase):
 		return_value=0,
 	)
 	def test_cost_snapshot_is_skipped_when_costing_is_disabled(self, _get_single_value):
-		allocation = SimpleNamespace(
-			vehicle="KDA 123A", delivery_loads=[SimpleNamespace(delivery_load="DL-1")]
-		)
+		allocation = frappe._dict(vehicle="KDA 123A", delivery_loads=[SimpleNamespace(delivery_load="DL-1")])
 
 		snapshot_transport_cost(allocation)
 
-		self.assertFalse(hasattr(allocation, "estimated_marginal_cost"))
+		self.assertNotIn("estimated_marginal_cost", allocation)
 
 	@patch(
 		"vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation.estimate_transport_cost_for_loads",
@@ -205,9 +204,7 @@ class TestVehicleAllocation(UnitTestCase):
 		return_value=1,
 	)
 	def test_cost_snapshot_is_captured_on_submission(self, _get_single_value, estimate):
-		allocation = SimpleNamespace(
-			vehicle="KDA 123A", delivery_loads=[SimpleNamespace(delivery_load="DL-1")]
-		)
+		allocation = frappe._dict(vehicle="KDA 123A", delivery_loads=[SimpleNamespace(delivery_load="DL-1")])
 
 		snapshot_transport_cost(allocation)
 
@@ -215,6 +212,7 @@ class TestVehicleAllocation(UnitTestCase):
 		self.assertEqual(allocation.estimated_marginal_cost, 11100)
 		self.assertEqual(allocation.estimated_cost_currency, "KES")
 		self.assertEqual(allocation.cost_breakdown[0]["component"], "Fuel")
+		estimate.assert_called_once_with(["DL-1"], "KDA 123A")
 
 	def test_overlapping_time_windows(self):
 		first = SimpleNamespace(

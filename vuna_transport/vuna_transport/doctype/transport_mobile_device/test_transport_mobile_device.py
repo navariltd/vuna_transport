@@ -16,6 +16,16 @@ IGNORE_TEST_RECORD_DEPENDENCIES = []  # eg. ["User"]
 
 
 class TestTransportMobileDeviceRegistration(UnitTestCase):
+	def setUp(self):
+		super().setUp()
+		self.map_config = {"version": 1, "selection": "Automatic", "provider": "openstreetmap"}
+		self.get_map_config = self.enterContext(
+			patch(
+				"vuna_transport.services.mobile.mobile_device_service.get_mobile_map_configuration",
+				return_value=self.map_config,
+			)
+		)
+
 	def _new_device(self, values):
 		device = frappe._dict(values)
 		device.name = values["installation_id"]
@@ -41,6 +51,8 @@ class TestTransportMobileDeviceRegistration(UnitTestCase):
 
 		self.assertTrue(result["allowed"])
 		self.assertEqual(result["device"]["status"], "Active")
+		self.assertEqual(result["map_config"], self.map_config)
+		self.get_map_config.assert_called_once_with()
 
 	@patch("vuna_transport.services.mobile.mobile_device_service._lock_mobile_user")
 	@patch("vuna_transport.services.mobile.mobile_device_service._find_device", return_value=None)
@@ -65,6 +77,8 @@ class TestTransportMobileDeviceRegistration(UnitTestCase):
 		self.assertFalse(result["allowed"])
 		self.assertEqual(result["device"]["status"], "Pending Approval")
 		self.assertIn("awaiting administrator approval", result["message"])
+		self.assertNotIn("map_config", result)
+		self.get_map_config.assert_not_called()
 
 	@patch("vuna_transport.services.mobile.mobile_device_service._lock_mobile_user")
 	@patch("vuna_transport.services.mobile.mobile_device_service._find_device")
