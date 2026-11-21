@@ -1,0 +1,66 @@
+{
+ "actions": [],
+ "creation": "2026-11-18 15:34:04.054231",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "customer",
+  "warehouse",
+  "address",
+  "stop_key",
+  "source_rows"
+ ],
+ "fields": [
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 3
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Depot Warehouse",
+   "options": "Warehouse",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 3
+  },
+  {
+   "fieldname": "address",
+   "fieldtype": "Link",
+   "label": "Delivery Address",
+   "options": "Address",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 4
+  },
+  {
+   "fieldname": "stop_key",
+   "fieldtype": "Data",
+   "label": "Stop Key",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "source_rows",
+   "fieldtype": "JSON",
+   "label": "Source Load Rows",
+   "read_only": 1,
+   "hidden": 1
+  }
+ ],
+ "istable": 1,
+ "modified": "2026-11-18 15:34:04.054231",
+ "modified_by": "Administrator",
+ "module": "Vuna Transport",
+ "name": "Vehicle Allocation Route Stop",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "idx",
+ "sort_order": "ASC"
+}

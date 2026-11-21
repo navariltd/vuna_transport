@@ -1,3 +1,4 @@
+from datetime import datetime
 from unittest.mock import patch
 
 import frappe
@@ -11,6 +12,10 @@ from vuna_transport.api import (
 
 
 class TestVehicleFirstAllocationSearch(UnitTestCase):
+	def setUp(self):
+		super().setUp()
+		self.enterContext(patch("vuna_transport.api.now_datetime", return_value=datetime(2026, 11, 21, 8)))
+
 	def test_optional_category_keeps_availability_and_permission_filters(self):
 		for category in (None, "Canter"):
 			with (

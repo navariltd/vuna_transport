@@ -26,6 +26,29 @@
   "default_distance_uom",
   "default_weight_uom",
   "default_volume_uom",
+  "routing_tab",
+  "routing_section",
+  "routing_provider",
+  "mobile_map_provider",
+  "google_maps_android_api_key",
+  "google_maps_ios_api_key",
+  "routing_column",
+  "google_routes_api_key",
+  "driver_routing_section",
+  "allow_driver_road_routes",
+  "routing_mobile_daily_request_limit",
+  "driver_navigation_section",
+  "allow_driver_navigation",
+  "navigation_daily_start_limit",
+  "routing_optimization_section",
+  "enable_google_optimization",
+  "google_optimization_service_account",
+  "routing_limits_section",
+  "routing_max_locations",
+  "routing_allowed_roles",
+  "routing_limits_column",
+  "routing_daily_request_limit",
+  "routing_daily_shipment_limit",
   "features_tab",
   "feature_controls_section",
   "enable_carrier_management",
@@ -44,6 +67,158 @@
   "delivery_order_retirement_manifest"
  ],
  "fields": [
+  {
+   "fieldname": "routing_tab",
+   "fieldtype": "Tab Break",
+   "label": "Routing"
+  },
+  {
+   "fieldname": "routing_section",
+   "fieldtype": "Section Break",
+   "label": "Road Routing"
+  },
+  {
+   "fieldname": "routing_provider",
+   "fieldtype": "Select",
+   "label": "Routing Provider",
+   "options": "Geographic Estimate\nGoogle",
+   "default": "Geographic Estimate",
+   "reqd": 1,
+   "description": "Google previews send coordinates to Google and incur request charges; dedicated optimization is billed per routing location. Applied allocation routes retain Google-calculated distance and application-calculated cost estimates. Set Google Cloud quotas as well as the application limits below."
+  },
+  {
+   "fieldname": "mobile_map_provider",
+   "fieldtype": "Select",
+   "label": "Mobile Map Provider",
+   "options": "Automatic\nOpenStreetMap\nGoogle Maps",
+   "default": "Automatic",
+   "description": "Automatic follows Routing Provider; Google Maps bills the project owning this site's mobile key. Fully close and reopen the app after changing the key or customer site."
+  },
+  {
+   "fieldname": "google_maps_android_api_key",
+   "fieldtype": "Password",
+   "label": "Android Google Maps API Key",
+   "depends_on": "eval:doc.mobile_map_provider == 'Google Maps' || (doc.mobile_map_provider == 'Automatic' && doc.routing_provider == 'Google')",
+   "description": "Customer-owned mobile key, restricted to the Android package and release signing SHA-1; enable Maps SDK for Android and Navigation SDK. Shared only with approved driver devices, never used for server routing."
+  },
+  {
+   "fieldname": "google_maps_ios_api_key",
+   "fieldtype": "Password",
+   "label": "iOS Google Maps API Key",
+   "depends_on": "eval:doc.mobile_map_provider == 'Google Maps' || (doc.mobile_map_provider == 'Automatic' && doc.routing_provider == 'Google')",
+   "description": "Customer-owned mobile key, restricted to the iOS bundle ID; enable the required Google Maps and Navigation SDKs. Changing the key or customer site requires fully closing and reopening the app."
+  },
+  {
+   "fieldname": "routing_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "google_routes_api_key",
+   "fieldtype": "Password",
+   "label": "Google Routes API Key",
+   "depends_on": "eval:doc.routing_provider == 'Google'",
+   "description": "Optional server-restricted key; otherwise uses API Key in Google Settings. Enable Routes API and billing in Google Cloud."
+  },
+  {
+   "fieldname": "driver_routing_section",
+   "fieldtype": "Section Break",
+   "label": "Driver Road Routes",
+   "depends_on": "eval:doc.routing_provider == 'Google'"
+  },
+  {
+   "fieldname": "allow_driver_road_routes",
+   "fieldtype": "Check",
+   "label": "Allow Driver Road Routes",
+   "default": "0",
+   "description": "Allows assigned drivers to show their trip's road route without planning permissions."
+  },
+  {
+   "fieldname": "routing_mobile_daily_request_limit",
+   "fieldtype": "Int",
+   "label": "Daily Driver Route Preview Requests",
+   "default": "25",
+   "depends_on": "eval:doc.allow_driver_road_routes",
+   "description": "Daily requests for drivers to display trip road routes, shared across all drivers; split routes use multiple requests and also count toward Daily Routing Requests — Desk and Mobile. Failed attempts count."
+  },
+  {
+   "fieldname": "driver_navigation_section",
+   "fieldtype": "Section Break",
+   "label": "Driver Navigation"
+  },
+  {
+   "fieldname": "allow_driver_navigation",
+   "fieldtype": "Check",
+   "label": "Allow In-App Google Navigation",
+   "default": "0",
+   "description": "Requires Navigation SDK and billing in the app's Google Cloud project. Standard driving only; heavy/large-vehicle use requires Google's authorization or a provisioned supported solution."
+  },
+  {
+   "fieldname": "navigation_daily_start_limit",
+   "fieldtype": "Int",
+   "label": "Daily Driver Navigation Starts",
+   "default": "25",
+   "depends_on": "eval:doc.allow_driver_navigation",
+   "description": "Daily authorized attempts to start turn-by-turn navigation, shared across all drivers; navigating to five stops uses five starts. Failed attempts count; these starts are separate from route preview requests."
+  },
+  {
+   "fieldname": "routing_optimization_section",
+   "fieldtype": "Section Break",
+   "label": "Stop Optimization",
+   "depends_on": "eval:doc.routing_provider == 'Google'"
+  },
+  {
+   "fieldname": "enable_google_optimization",
+   "fieldtype": "Check",
+   "label": "Enable Google Route Optimization",
+   "default": "0"
+  },
+  {
+   "fieldname": "google_optimization_service_account",
+   "fieldtype": "Password",
+   "label": "Google Service Account JSON",
+   "depends_on": "eval:doc.enable_google_optimization",
+   "mandatory_depends_on": "eval:doc.enable_google_optimization",
+   "description": "Enable Route Optimization API and grant this service account routeoptimization.locations.use, for example through the Route Optimization Viewer role."
+  },
+  {
+   "fieldname": "routing_limits_section",
+   "fieldtype": "Section Break",
+   "label": "Routing Access and Usage",
+   "description": "Daily allowances are shared across this site and reset at midnight in the site's timezone. These are application safeguards, not spending caps; also configure Google Cloud quotas and billing alerts.",
+   "depends_on": "eval:doc.routing_provider == 'Google'"
+  },
+  {
+   "fieldname": "routing_max_locations",
+   "fieldtype": "Int",
+   "label": "Maximum Stops per Route",
+   "default": "100",
+   "description": "Maximum destination stops in one route preview or optimization, excluding the starting location and return to start; this is not a daily allowance. Up to 200 stops are supported."
+  },
+  {
+   "fieldname": "routing_allowed_roles",
+   "fieldtype": "Table MultiSelect",
+   "label": "Allowed Routing Roles",
+   "options": "Transport Scan Role",
+   "description": "Leave empty for System Manager, Transport Manager, Transport Dispatcher and Transport Planner."
+  },
+  {
+   "fieldname": "routing_limits_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "routing_daily_request_limit",
+   "fieldtype": "Int",
+   "label": "Daily Routing Requests — Desk and Mobile",
+   "default": "100",
+   "description": "Combined daily server requests for Desk previews, driver route previews and stop optimization; a split route uses multiple requests. Failed attempts count; turn-by-turn navigation starts do not."
+  },
+  {
+   "fieldname": "routing_daily_shipment_limit",
+   "fieldtype": "Int",
+   "label": "Daily Stops Submitted for Optimization",
+   "default": "1000",
+   "description": "Total destination stops submitted for stop-order optimization each day; optimizing 40 stops twice uses 80 of this allowance. Failed attempts count; ordinary route previews do not."
+  },
   {
    "fieldname": "driver_stock_posting_section",
    "fieldtype": "Section Break",
@@ -280,7 +455,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-08 15:42:59.636745",
+ "modified": "2026-11-20 09:20:25.873288",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Transport Settings",

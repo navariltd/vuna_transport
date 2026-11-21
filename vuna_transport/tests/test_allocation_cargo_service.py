@@ -97,6 +97,8 @@ class TestAllocationItems(unittest.TestCase):
 		)
 
 		allocation = MagicMock(loaded_items=[{"qty": 999999}])
+		allocation.get.side_effect = {"route_stops": [], "route_status": "Unplanned"}.get
+		allocation.get_doc_before_save.return_value = None
 		with (
 			patch(
 				"vuna_transport.vuna_transport.doctype.vehicle_allocation.vehicle_allocation.validate_allocation"
@@ -110,8 +112,12 @@ class TestAllocationItems(unittest.TestCase):
 			),
 		):
 			VehicleAllocation.validate(allocation)
-		self.assertEqual(allocation.set.call_args.args[0], "loaded_items")
-		self.assertEqual(allocation.set.call_args.args[1][0]["qty"], 2)
+		item_updates = [
+			call.args[1] for call in allocation.set.call_args_list if call.args[0] == "loaded_items"
+		]
+		self.assertEqual(len(item_updates), 1)
+		self.assertEqual(item_updates[0][0]["qty"], 2)
+		self.assertEqual(allocation.route_status, "Unplanned")
 
 	def test_load_permission_is_checked_before_source_access(self):
 		self.permissions.side_effect = PermissionError

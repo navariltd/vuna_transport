@@ -17,6 +17,7 @@ from vuna_transport.services.fleet.vehicle_allocation_service import (
 	validate_allocation,
 	validate_allocation_cancellation,
 )
+from vuna_transport.services.routing.allocation_route_service import validate_route
 
 
 class VehicleAllocation(Document):
@@ -31,6 +32,9 @@ class VehicleAllocation(Document):
 		)
 
 		validate_replacement_allocation_incident(self)
+		validate_route(self)
+		if self.get("route_status") in ("Proposed", "Approved") and self.get("route_calculated_on"):
+			snapshot_transport_cost(self)
 
 	def after_insert(self):
 		from vuna_transport.services.fleet.vehicle_incident_service import (
@@ -88,13 +92,32 @@ class VehicleAllocation(Document):
 
 
 def snapshot_transport_cost(allocation):
-	"""Persist the estimate used when an allocation becomes confirmed."""
+	"""Calculate and retain costs from the verified road distance and configured rates."""
 	if not frappe.db.get_single_value("Transport Settings", "enable_transport_costing"):
 		return
 	load_names = get_allocation_load_names(allocation)
 	if not allocation.vehicle or not load_names:
 		return
-	result = estimate_transport_cost_for_loads(load_names, allocation.vehicle)
+	if allocation.get("route_stops"):
+		if not allocation.get("route_calculated_on"):
+			allocation.cost_warnings = _(
+				"Preview and apply the road route to calculate a journey cost estimate."
+			)
+			return
+		from vuna_transport.services.costing.transport_cost_estimation_service import (
+			estimate_transport_journey,
+		)
+
+		result = estimate_transport_journey(
+			load_names,
+			allocation.vehicle,
+			distance=allocation.route_distance_km,
+			distance_uom="Kilometer",
+			distance_source="Routing Provider",
+			as_of_date=allocation.planned_reporting_time,
+		)
+	else:
+		result = estimate_transport_cost_for_loads(load_names, allocation.vehicle)
 	allocation.cost_structure_assignment = result.get("cost_structure_assignment")
 	allocation.cost_structure = result.get("cost_structure")
 	allocation.estimated_distance = result.get("distance")
