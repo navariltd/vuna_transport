@@ -273,7 +273,6 @@ def _ensure_vehicle_categories():
 		doc.max_pallets = pallets
 		doc.max_cases = 1000
 		doc.max_crates = 500
-		doc.closed_body = 1
 		doc.refrigerated = refrigerated
 		doc.tail_lift = tail_lift
 		doc.special_equipment = equipment
@@ -308,6 +307,7 @@ def _ensure_vehicles(categories):
 		doc.fuel_type = "Diesel"
 		doc.uom = "Litre"
 		doc.vuna_vehicle_category = categories[category_label]
+		doc.vuna_body_configuration = "Closed Body"
 		doc.vuna_transport_enabled = 1
 		doc.vuna_vehicle_owner = "Company"
 		doc.save(ignore_permissions=True)
