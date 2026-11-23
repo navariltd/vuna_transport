@@ -155,7 +155,15 @@ def get_planning_demand(
 	)
 	pool_truncated = len(orders) > MAX_SUMMARY_ORDERS
 	orders = orders[:MAX_SUMMARY_ORDERS]
-	metrics = _get_order_metrics([row.name for row in orders], source_warehouse=source_warehouse)
+	metrics = _get_order_metrics(
+		[row.name for row in orders], source_warehouse=source_warehouse, tolerate_stale_grouping=True
+	)
+	planning_issues = [
+		{"name": name, "message": values["planning_issue"]}
+		for name, values in metrics.items()
+		if values.get("planning_issue")
+	]
+	orders = [order for order in orders if not metrics.get(order.name, {}).get("planning_issue")]
 	all_rows = [_format_demand_row(order, metrics.get(order.name)) for order in orders]
 	all_rows = _filter_allocation_state(all_rows, allocation_state)
 	filtered_rows = _filter_vehicle_category(all_rows, required_vehicle_category)
@@ -172,6 +180,7 @@ def get_planning_demand(
 	)
 	return {
 		"orders": rows,
+		"planning_issues": planning_issues,
 		"warehouse_summaries": _warehouse_summaries(summary_rows),
 		"start": start,
 		"page_length": page_length,
@@ -627,12 +636,19 @@ def _delivery_order_fields():
 	]
 
 
-def _get_order_metrics(order_names, include_items=False, source_warehouse=None):
+def _get_order_metrics(
+	order_names, include_items=False, source_warehouse=None, tolerate_stale_grouping=False
+):
 	order_names = list(dict.fromkeys(order_names or []))
 	if not order_names:
 		return {}
 	if source.doctype() == "Transport Demand":
-		return source.metrics(order_names, include_items=include_items, source_warehouse=source_warehouse)
+		return source.metrics(
+			order_names,
+			include_items=include_items,
+			source_warehouse=source_warehouse,
+			tolerate_stale_grouping=tolerate_stale_grouping,
+		)
 	items = frappe.get_all(
 		"Delivery Order Item",
 		filters={"parent": ["in", order_names]},

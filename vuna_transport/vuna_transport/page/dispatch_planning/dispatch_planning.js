@@ -571,6 +571,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			const demand = await this.call("get_planning_demand", args);
 			if (request_id !== this.refresh_request_id) return;
 			state.orders = demand.orders || [];
+			state.planning_issues = demand.planning_issues || [];
 			state.has_more = demand.has_more;
 			await this.ensure_details(
 				state.orders.map((order) => order.name),
@@ -777,10 +778,15 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 
 	render_demand() {
 		this.close_grouping_popover();
+		const notice = this.render_planning_issues();
 		if (!this.orders.length) {
 			this.$root
 				.find(this.demand_target())
-				.html(`<div class="dp-empty">${__("No pending transport demand found.")}</div>`);
+				.html(
+					`${notice}<div class="dp-empty">${__(
+						"No pending transport demand found."
+					)}</div>`
+				);
 			this.render_pagination();
 			return;
 		}
@@ -882,7 +888,7 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 		this.$root
 			.find(this.demand_target())
 			.html(
-				`<div class="dp-demand-header"><span><label class="dp-selection-label"><input type="checkbox" class="dp-select-all-orders" title="${__(
+				`${notice}<div class="dp-demand-header"><span><label class="dp-selection-label"><input type="checkbox" class="dp-select-all-orders" title="${__(
 					"Select all visible demand"
 				)}" aria-label="${__("Select all visible demand")}"><span>${__(
 					"All"
@@ -896,6 +902,25 @@ vuna_transport.DispatchPlanning.Controller = class DispatchPlanningController {
 			);
 		this.update_select_all_state();
 		this.render_pagination();
+	}
+
+	render_planning_issues() {
+		const issues = this.planning_state().planning_issues || [];
+		if (!issues.length) return "";
+		return `<details class="alert alert-warning" role="status"><summary>${this.escape(
+			__("{0} transport demand(s) need review and cannot be loaded.", [issues.length])
+		)}</summary><p>${this.escape(
+			__(
+				"Delivery details no longer match the Sales Order. Review linked loads before correcting the demand."
+			)
+		)}</p><ul>${issues
+			.map(
+				(issue) =>
+					`<li><a href="/app/transport-demand/${encodeURIComponent(
+						issue.name
+					)}">${this.escape(issue.name)}</a>: ${this.escape(issue.message)}</li>`
+			)
+			.join("")}</ul></details>`;
 	}
 
 	render_grouping_details(order) {

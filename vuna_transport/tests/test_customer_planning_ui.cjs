@@ -4,6 +4,20 @@ const path = require("node:path");
 const test = require("node:test");
 const vm = require("node:vm");
 
+test("stale demand notice is compact, linked and escapes server text", () => {
+  const { result } = controller();
+  assert.equal(result.render_planning_issues(), "");
+  result.planning_state().planning_issues = [
+    { name: "TD-1", message: "Review <script>bad</script>" },
+  ];
+  const html = result.render_planning_issues();
+  assert.match(html, /<details class="alert alert-warning" role="status">/);
+  assert.doesNotMatch(html, /<details[^>]*\sopen/);
+  assert.match(html, /href="\/app\/transport-demand\/TD-1"/);
+  assert.match(html, /need review and cannot be loaded/);
+  assert.doesNotMatch(html, /<script>/);
+});
+
 test("capacity allowance is visible without implying it is already being used", () => {
   const { result } = controller();
   result.number = String;
