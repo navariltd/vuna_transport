@@ -132,6 +132,10 @@ def suggest_delivery_loads(
 			first_date,
 			from_time=f"{first_date} 00:00:00" if first_date else None,
 			to_time=f"{add_days(last_date, 1)} 00:00:00" if last_date else None,
+			refrigeration_required=any(
+				order.refrigeration_required or _requires_refrigeration(order.transport_handling_profile)
+				for order in pool
+			),
 		)
 		for category in categories:
 			available_count = cint(availability["counts"].get(category.name))
@@ -665,7 +669,10 @@ def _score_candidate(candidate):
 	if not candidate["delivery_method"]:
 		warnings.append(_("Delivery Method is not configured on these orders."))
 	if candidate["requirements"].get("refrigeration_required"):
-		reasons.append(_("The Vehicle Category satisfies the refrigeration requirement."))
+		if candidate["available_vehicle_count"] > 0:
+			reasons.append(_("Refrigerated vehicles are available in this category."))
+		else:
+			warnings.append(_("A refrigerated vehicle must be selected during Vehicle Allocation."))
 	if candidate["requirements"].get("tail_lift_required"):
 		reasons.append(_("The Vehicle Category has the required tail lift."))
 	if candidate["requirements"].get("required_body_type"):

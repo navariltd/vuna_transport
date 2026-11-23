@@ -103,6 +103,17 @@ test("vehicles can be selected without first choosing a category", () => {
   assert.equal(state.messages.length, 0);
 });
 
+test("vehicle searches include every selected load for capability checks", () => {
+  const state = fixture();
+  state.frm.doc.delivery_loads = [
+    { delivery_load: "AMBIENT" },
+    { delivery_load: "COLD" },
+    { delivery_load: "" },
+  ];
+  const query = state.queries.vehicle();
+  assert.deepEqual(Array.from(query.filters.delivery_loads), ["AMBIENT", "COLD"]);
+});
+
 test("selecting a vehicle fills category, ownership, supplier and cost structure", async () => {
   const state = fixture();
   state.frm.doc.vehicle = "TRUCK";

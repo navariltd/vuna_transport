@@ -14,7 +14,6 @@
   "body_type",
   "column_break_pxpq",
   "disabled",
-  "refrigerated",
   "section_break_pbqv",
   "max_payload_weight",
   "max_payload_weight_uom",
@@ -82,12 +81,6 @@
    "fieldname": "disabled",
    "fieldtype": "Check",
    "label": "Disabled"
-  },
-  {
-   "default": "0",
-   "fieldname": "refrigerated",
-   "fieldtype": "Check",
-   "label": "Refrigerated"
   },
   {
    "fieldname": "section_break_pbqv",
