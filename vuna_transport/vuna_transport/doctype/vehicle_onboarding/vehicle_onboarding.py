@@ -131,6 +131,7 @@ class VehicleOnboarding(Document):
 				"vuna_vehicle_owner": self.vehicle_owner,
 				"vuna_supplier": self.supplier,
 				"vuna_vehicle_category": self.vehicle_category,
+				"vuna_body_configuration": self.body_configuration,
 				"vuna_vehicle_model": self.vehicle_model,
 				"vuna_transport_cost_structure": self.transport_cost_structure,
 				"fuel_type": self.fuel_type,

@@ -1,7 +1,6 @@
 """Move legacy category body selections onto their individual vehicles before sync."""
 
 import frappe
-from frappe import _
 from frappe.database.schema import add_column
 
 BODY_OPTIONS = (
@@ -28,27 +27,18 @@ def execute():
 		as_dict=True,
 	)
 	selections = {}
-	conflicts = []
 	for row in rows:
 		# A previously migrated dropdown supersedes retained checkbox columns.
 		selected = row.get("body_configuration")
 		if selected:
-			if selected not in {label for _, label in BODY_OPTIONS}:
-				conflicts.append(row.name)
-			else:
+			if selected in {label for _, label in BODY_OPTIONS}:
 				selections[row.name] = selected
 			continue
 		checked = [label for field, label in BODY_OPTIONS if row.get(field)]
-		if len(checked) > 1:
-			conflicts.append(row.name)
-		elif checked:
+		if len(checked) == 1:
 			selections[row.name] = checked[0]
-	if conflicts:
-		frappe.throw(
-			_(
-				"Resolve ambiguous or invalid body selections on Vehicle Categories before migrating: {0}"
-			).format(", ".join(conflicts))
-		)
+		# Missing, invalid or ambiguous selections stay blank for users to resolve
+		# on their next Vehicle save. They must not block migration of the site.
 
 	# This patch runs before model/customization sync removes the category fields.
 	# Create only the column here; custom/vehicle.json supplies the field metadata.

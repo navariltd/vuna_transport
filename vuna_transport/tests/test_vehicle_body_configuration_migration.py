@@ -30,11 +30,6 @@ class TestVehicleBodyConfigurationMigration(TestCase):
 		self.framework.db.has_column.side_effect = self.has_column
 		self.framework.db.sql.side_effect = self.sql
 
-		def fail(message):
-			raise ValueError(message)
-
-		self.framework.throw.side_effect = fail
-		self.enterContext(patch.object(migration, "_", side_effect=lambda message: message))
 		self.add_column = self.enterContext(
 			patch.object(migration, "add_column", side_effect=self.create_column)
 		)
@@ -71,14 +66,25 @@ class TestVehicleBodyConfigurationMigration(TestCase):
 			[self.body(name) for name in "ABCD"], ["Open Body", "Open Body", "Closed Body", None]
 		)
 
-	def test_conflicting_checkboxes_stop_before_any_vehicle_updates(self):
+	def test_conflicting_checkboxes_are_skipped_while_valid_categories_are_migrated(self):
 		self.connection.execute("insert into `tabVehicle Category` values ('Valid', 1, 0, 0, 0)")
 		self.connection.execute("insert into `tabVehicle Category` values ('Conflict', 0, 0, 1, 1)")
 		self.add_vehicle("A", "Valid")
-		with self.assertRaisesRegex(ValueError, "Conflict"):
-			migration.execute()
+		self.add_vehicle("B", "Conflict")
+		self.add_vehicle("C", "Conflict", "Trailer")
+		migration.execute()
+		self.assertEqual(self.body("A"), "Tanker")
+		self.assertIsNone(self.body("B"))
+		self.assertEqual(self.body("C"), "Trailer")
+		self.framework.throw.assert_not_called()
+
+	def test_invalid_category_dropdown_is_skipped_without_blocking_migration(self):
+		self.create_column("Vehicle Category", "body_configuration", "Select")
+		self.connection.execute("insert into `tabVehicle Category` values ('FRR', 0, 0, 1, 0, 'Unknown')")
+		self.add_vehicle("A", "FRR")
+		migration.execute()
 		self.assertIsNone(self.body("A"))
-		self.add_column.assert_not_called()
+		self.framework.throw.assert_not_called()
 
 	def test_previously_migrated_dropdown_takes_precedence_over_retained_checkbox_values(self):
 		self.create_column("Vehicle Category", "body_configuration", "Select")

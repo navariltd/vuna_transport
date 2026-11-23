@@ -17,6 +17,7 @@
   "transport_cost_structure",
   "specifications_section",
   "vehicle_category",
+  "body_configuration",
   "vehicle_model",
   "column_break_ppqr",
   "fuel_type",
@@ -72,6 +73,13 @@
    "fieldtype": "Link",
    "label": "Vehicle Category",
    "options": "Vehicle Category",
+   "reqd": 1
+  },
+  {
+   "fieldname": "body_configuration",
+   "fieldtype": "Select",
+   "label": "Body Configuration",
+   "options": "\nTanker\nTrailer\nOpen Body\nClosed Body",
    "reqd": 1
   },
   {
