@@ -36,6 +36,22 @@
   "allocation_capacity_summary",
   "loaded_items_section",
   "loaded_items",
+  "route_tab",
+  "route_plan_section",
+  "route_status",
+  "route_source_warehouse",
+  "route_return_to_start",
+  "route_plan_column",
+  "route_distance_km",
+  "route_distance_provider",
+  "route_calculated_on",
+  "route_distance_fingerprint",
+  "route_preview_token",
+  "route_stops",
+  "route_approval_section",
+  "route_approved_by",
+  "route_approved_on",
+  "route_manifest_fingerprint",
   "costs_tab",
   "cost_estimate_section",
   "cost_structure_assignment",
@@ -65,6 +81,116 @@
   "cost_breakdown"
  ],
  "fields": [
+  {
+   "fieldname": "route_tab",
+   "fieldtype": "Tab Break",
+   "label": "Route"
+  },
+  {
+   "fieldname": "route_plan_section",
+   "fieldtype": "Section Break",
+   "label": "Journey Plan"
+  },
+  {
+   "fieldname": "route_status",
+   "fieldtype": "Select",
+   "label": "Route Status",
+   "options": "Unplanned\nProposed\nApproved\nOutdated",
+   "default": "Unplanned",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "route_source_warehouse",
+   "fieldtype": "Link",
+   "label": "Loading Warehouse",
+   "options": "Warehouse",
+   "read_only": 1
+  },
+  {
+   "fieldname": "route_return_to_start",
+   "fieldtype": "Check",
+   "label": "Return to Loading Warehouse",
+   "default": "0"
+  },
+  {
+   "fieldname": "route_plan_column",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "route_distance_km",
+   "fieldtype": "Float",
+   "label": "Road Distance (km)",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "route_distance_provider",
+   "fieldtype": "Data",
+   "label": "Distance Provider",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "route_calculated_on",
+   "fieldtype": "Datetime",
+   "label": "Route Calculated On",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "route_distance_fingerprint",
+   "fieldtype": "Data",
+   "label": "Distance Fingerprint",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "route_preview_token",
+   "fieldtype": "Small Text",
+   "label": "Road Preview Receipt",
+   "hidden": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "route_stops",
+   "fieldtype": "Table",
+   "label": "Stop Sequence",
+   "options": "Vehicle Allocation Route Stop",
+   "cannot_add_rows": 1,
+   "cannot_delete_rows": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "route_approval_section",
+   "fieldtype": "Section Break",
+   "label": "Route Approval"
+  },
+  {
+   "fieldname": "route_approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "route_approved_on",
+   "fieldtype": "Datetime",
+   "label": "Approved On",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "route_manifest_fingerprint",
+   "fieldtype": "Data",
+   "label": "Route Manifest Fingerprint",
+   "read_only": 1,
+   "hidden": 1,
+   "no_copy": 1
+  },
   {
    "fieldname": "loaded_items_section",
    "fieldtype": "Section Break",
@@ -453,7 +579,7 @@
    "table_fieldname": "delivery_loads"
   }
  ],
- "modified": "2026-11-08 18:25:50.554112",
+ "modified": "2026-11-18 16:03:40.949566",
  "modified_by": "Administrator",
  "module": "Vuna Transport",
  "name": "Vehicle Allocation",
@@ -511,5 +637,6 @@
  "rows_threshold_for_grid_search": 20,
  "sort_field": "creation",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "track_changes": 1
 }

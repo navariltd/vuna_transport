@@ -57,19 +57,33 @@ def allocation_fields():
 	)
 
 
-def metrics(names, include_items=False, source_warehouse=None):
+def metrics(names, include_items=False, source_warehouse=None, tolerate_stale_grouping=False):
 	"""Bounded callers have already permission-filtered these demand parents.
 
 	Re-use the live Sales Order balance checks used by load validation, not stale
 	remaining caches. Source permissions and grouping/UOM checks still apply.
 	"""
-	from vuna_transport.services.planning.customer_demand_load_service import available_items
+	from vuna_transport.services.planning.customer_demand_load_service import (
+		CustomerDemandGroupingChanged,
+		available_items,
+	)
 
 	result = {}
 	for name in names:
 		demand = frappe.get_doc("Transport Demand", name)
 		demand.check_permission("read")
-		values = available_items(demand)
+		mute = frappe.flags.mute_messages
+		try:
+			if tolerate_stale_grouping:
+				frappe.flags.mute_messages = True
+			values = available_items(demand)
+		except CustomerDemandGroupingChanged as error:
+			if not tolerate_stale_grouping:
+				raise
+			result[name] = {"planning_issue": str(error)}
+			continue
+		finally:
+			frappe.flags.mute_messages = mute
 		quantities = frappe.db.sql(
 			"""select i.transport_demand_item,
 		coalesce(sum(case when l.docstatus=0 then i.allocated_quantity else 0 end),0) reserved,

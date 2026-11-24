@@ -325,10 +325,11 @@ def _is_stock_item(sales_order_item):
 
 
 def _get_group_key(sales_order, item):
+	# ERPNext's customer_address is the billing address, not the shipping destination.
 	delivery_address = (
 		getattr(item, "customer_address", None)
-		or getattr(sales_order, "customer_address", None)
 		or getattr(sales_order, "shipping_address_name", None)
+		or getattr(sales_order, "customer_address", None)
 	)
 	address_data = get_address_planning_data(delivery_address)
 	values = {

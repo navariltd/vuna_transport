@@ -2,6 +2,15 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Vehicle Allocation", {
+	before_save(frm) {
+		if (
+			frm.doc.route_preview_token &&
+			frm.__road_preview_inputs &&
+			frm.__road_preview_inputs !== vuna_transport.road_routing.preview_inputs(frm)
+		) {
+			return frm.set_value("route_preview_token", null);
+		}
+	},
 	setup(frm) {
 		frm.set_query("cost_structure", () => ({
 			filters: {
@@ -48,6 +57,7 @@ frappe.ui.form.on("Vehicle Allocation", {
 	},
 
 	refresh(frm) {
+		setup_allocation_route_actions(frm);
 		render_allocation_cost_breakdown(frm);
 		refresh_allocation_items(frm);
 		// Transport Loads are retained as the demand record. The server-side
@@ -132,6 +142,86 @@ frappe.ui.form.on("Vehicle Allocation", {
 			});
 	},
 });
+
+function setup_allocation_route_actions(frm) {
+	if (frm.is_new() || frm.doc.docstatus === 2 || !frm.perm?.some((p) => p.write)) return;
+	frappe
+		.call({
+			method: "vuna_transport.services.routing.routing_policy_service.get_routing_context",
+		})
+		.then(({ message }) => {
+			if (message?.can_plan) add_allocation_route_plan_actions(frm);
+			if (message?.can_preview)
+				frm.add_custom_button(__("Road Route Preview"), async () => {
+					await frappe.require("/assets/vuna_transport/js/road_routing.js");
+					vuna_transport.road_routing.show_preview(frm, message);
+				});
+		});
+}
+
+function add_allocation_route_plan_actions(frm) {
+	if (frm.doc.docstatus !== 0) return;
+	if ((frm.doc.route_stops || []).length)
+		frm.add_custom_button(
+			__("Clear Route Plan"),
+			() => {
+				frappe.confirm(
+					__(
+						"Remove this draft route plan and its approval? Save the allocation to keep this change."
+					),
+					() => {
+						frm.clear_table("route_stops");
+						frm.refresh_field("route_stops");
+						frm.set_value("route_manifest_fingerprint", null);
+						frm.set_value("route_status", "Unplanned");
+						frm.dirty();
+					}
+				);
+			},
+			__("Route")
+		);
+	frm.add_custom_button(
+		__("Get Route Stops"),
+		async () => {
+			if (frm.is_dirty()) return frappe.msgprint(__("Save the allocation first."));
+			const modified = frm.doc.modified;
+			const { message } = await frappe.call({
+				method: "vuna_transport.services.routing.allocation_route_service.prepare_route",
+				args: { allocation_name: frm.doc.name },
+			});
+			if (
+				frm.is_dirty() ||
+				frm.doc.modified !== modified ||
+				message.source_modified !== modified
+			)
+				return frappe.msgprint(__("The allocation changed. Reload and try again."));
+			await frappe.require("/assets/vuna_transport/js/road_routing.js");
+			vuna_transport.road_routing.apply_stop_order(frm, message);
+			frappe.show_alert(
+				__("Route stops ready. Save, review the sequence, then approve the route.")
+			);
+		},
+		__("Route")
+	);
+	if ((frm.doc.route_stops || []).length)
+		frm.add_custom_button(
+			__("Approve Route"),
+			async () => {
+				if (frm.is_dirty())
+					return frappe.msgprint(__("Save and review the route before approval."));
+				await frappe.call({
+					method: "vuna_transport.services.routing.allocation_route_service.approve_route",
+					args: {
+						allocation_name: frm.doc.name,
+						expected_fingerprint: frm.doc.route_manifest_fingerprint,
+						expected_modified: frm.doc.modified,
+					},
+				});
+				await frm.reload_doc();
+			},
+			__("Route")
+		);
+}
 
 function add_next_execution_action(frm) {
 	frappe

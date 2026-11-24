@@ -17,6 +17,10 @@ from vuna_transport.services.demand.sales_transport_demand_service import (
 from vuna_transport.services.shared.security_service import require_company_access, require_doctype_permission
 
 
+class CustomerDemandGroupingChanged(frappe.ValidationError):
+	"""The demand snapshot no longer matches its live source grouping."""
+
+
 def is_customer_demand_load(load):
 	return getattr(load, "movement_type", None) == "Customer Delivery" and any(
 		row.get("transport_demand") and not row.get("delivery_order") for row in load.delivery_orders
@@ -107,7 +111,12 @@ def available_items(demand, exclude_load=None, lock_source=False, for_execution=
 		or sales_source_key(source.name, next(iter(keys)), [r.source_item for r in demand.items])
 		!= demand.source_key
 	):
-		frappe.throw(_("Sales Order delivery grouping changed; review the affected demand."))
+		frappe.throw(
+			_(
+				"Transport Demand {0}: Sales Order delivery grouping changed; review the demand before loading."
+			).format(demand.name),
+			CustomerDemandGroupingChanged,
+		)
 	return result
 
 

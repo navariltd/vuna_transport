@@ -291,8 +291,12 @@ def make_task_trip(allocation, loads):
 	trip.vuna_vehicle_allocation = trip.vuna_current_vehicle_allocation = allocation.name
 	trip.departure_time = allocation.planned_reporting_time or now_datetime()
 	trip.vuna_task_based = 1
-	for stop in group_stops(plan_tasks(loads)):
+	specs = plan_tasks(loads)
+	for stop in group_stops(specs):
 		trip.append("delivery_stops", {key: value for key, value in stop.items() if key != "tasks"})
+	from vuna_transport.services.routing.allocation_route_service import order_trip_stops
+
+	order_trip_stops(trip, allocation, loads, specs)
 	return trip
 
 

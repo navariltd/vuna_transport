@@ -12,6 +12,62 @@ from vuna_transport.services.planning.delivery_load_service import build_deliver
 
 
 class TestCustomerPlanningScreens(unittest.TestCase):
+	def test_summary_reports_stale_grouping_without_hiding_healthy_demands(self):
+		from types import SimpleNamespace
+
+		from vuna_transport.services.planning.customer_demand_load_service import (
+			CustomerDemandGroupingChanged,
+		)
+
+		mute = frappe.flags.mute_messages
+		with (
+			patch.object(
+				source.frappe,
+				"get_doc",
+				side_effect=[
+					SimpleNamespace(name=name, check_permission=lambda mode: None, source_warehouse=None)
+					for name in ("STALE", "HEALTHY")
+				],
+			),
+			patch.object(source.frappe.db, "sql", return_value=[]),
+			patch(
+				"vuna_transport.services.planning.customer_demand_load_service.available_items",
+				side_effect=[CustomerDemandGroupingChanged("Review STALE"), {}],
+			),
+		):
+			result = source.metrics(["STALE", "HEALTHY"], tolerate_stale_grouping=True)
+		self.assertEqual(result["STALE"], {"planning_issue": "Review STALE"})
+		self.assertEqual(result["HEALTHY"]["unallocated_quantity"], 0)
+		self.assertEqual(frappe.flags.mute_messages, mute)
+
+	def test_detail_validation_stays_strict_and_other_failures_are_not_swallowed(self):
+		from types import SimpleNamespace
+
+		from vuna_transport.services.planning.customer_demand_load_service import (
+			CustomerDemandGroupingChanged,
+		)
+
+		for error, tolerant in (
+			(CustomerDemandGroupingChanged("stale"), False),
+			(frappe.PermissionError("denied"), True),
+			(frappe.ValidationError("invalid UOM"), True),
+			(RuntimeError("unexpected"), True),
+		):
+			with (
+				self.subTest(error=type(error).__name__, tolerant=tolerant),
+				patch.object(
+					source.frappe,
+					"get_doc",
+					return_value=SimpleNamespace(check_permission=lambda mode: None),
+				),
+				patch(
+					"vuna_transport.services.planning.customer_demand_load_service.available_items",
+					side_effect=error,
+				),
+				self.assertRaises(type(error)),
+			):
+				source.metrics(["TD-1"], tolerate_stale_grouping=tolerant)
+
 	def test_one_consolidated_note_can_cover_multiple_demands(self):
 		from types import SimpleNamespace
 

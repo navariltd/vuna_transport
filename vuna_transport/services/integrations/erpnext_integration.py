@@ -576,6 +576,9 @@ def create_delivery_trip_for_load(load):
 	delivery_trip.vuna_current_driver = allocation.driver if allocation else None
 	delivery_trip.vuna_reallocation_count = 0
 	_populate_delivery_stop_links(delivery_trip, loads)
+	from vuna_transport.services.routing.allocation_route_service import order_trip_stops
+
+	order_trip_stops(delivery_trip, allocation, loads)
 	return delivery_trip
 
 

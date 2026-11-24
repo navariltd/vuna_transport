@@ -22,12 +22,29 @@ LEGACY_DEFAULT_DISPATCH_SCAN_ROLES = {
 def after_install():
 	from vuna_transport.services.execution.driver_stock_policy import initialize_driver_stock_policy
 
+	ensure_item_transport_requirement()
 	ensure_transport_uoms()
 	normalize_transport_cost_natures()
 	ensure_transport_demand_sources()
 	ensure_dispatch_scan_roles()
 	ensure_delivery_methods()
 	initialize_driver_stock_policy()
+
+
+def ensure_item_transport_requirement():
+	"""Install just this new field on upgrades; do not overwrite unrelated Item customizations."""
+	from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
+	fixture = frappe.get_file_json(
+		frappe.get_app_path("vuna_transport", "vuna_transport", "custom", "item.json")
+	)
+	field = next(row for row in fixture["custom_fields"] if row["fieldname"] == "vuna_requires_transport")
+	# Exported record metadata is not part of the field definition. In particular,
+	# an old `modified` value replaces the live timestamp and makes save() fail
+	# Frappe's optimistic-lock check on an already-installed Custom Field.
+	record_metadata = {"name", "creation", "modified", "modified_by", "owner", "docstatus", "doctype"}
+	definition = {key: value for key, value in field.items() if key not in record_metadata}
+	create_custom_fields({"Item": [definition]})
 
 
 def ensure_transport_demand_sources():
@@ -59,52 +76,6 @@ def ensure_transport_demand_sources():
 		},
 	)
 	settings.save(ignore_permissions=True)
-
-
-def cleanup_retired_delivery_order_navigation():
-	"""Remove stale retired links without overwriting sidebar customizations.
-
-	Clean archived sidebars as well: subsequent framework conversion must not
-	reintroduce links to removed DocTypes/reports. Never export site navigation
-	back into the app's source files from this upgrade helper.
-	"""
-	if frappe.db.exists("DocType", "Delivery Order"):
-		return 0
-	retired_links = {
-		("DocType", "Delivery Order"),
-		("DocType", "Delivery Order Item"),
-		("Report", "Open Delivery Demand"),
-		("Report", "Unallocated Delivery Orders"),
-	}
-	removed = 0
-	for parent_type, table_field in (
-		("Sidebar", "items"),
-		("Workspace Sidebar", "items"),
-		("Custom Sidebar", "sidebar_items"),
-		("Workspace", "links"),
-	):
-		if not frappe.db.exists("DocType", parent_type):
-			continue
-		meta = frappe.get_meta(parent_type)
-		table = meta.get_field(table_field)
-		if not table:
-			continue
-		scope = {"module": "Vuna Transport"} if parent_type == "Custom Sidebar" else {"app": "vuna_transport"}
-		parents = frappe.get_all(parent_type, filters=scope, pluck="name")
-		if not parents:
-			continue
-		rows = frappe.get_all(
-			table.options,
-			filters={"parent": ["in", parents], "parenttype": parent_type, "parentfield": table_field},
-			fields=["name", "link_type", "link_to"],
-		)
-		obsolete = [row.name for row in rows if (row.link_type, row.link_to) in retired_links]
-		if obsolete:
-			frappe.db.delete(table.options, {"name": ["in", obsolete]})
-			removed += len(obsolete)
-	if removed:
-		frappe.clear_cache()
-	return removed
 
 
 def ensure_delivery_methods():

@@ -55,7 +55,9 @@ def receipt_context(source_name, allocation_name, *, check_permissions=True):
 	transit = resolve_vehicle_transit_warehouse(allocation)
 	if frappe.get_doc("Warehouse", transit).get("is_rejected_warehouse"):
 		frappe.throw(_("The vehicle transit warehouse must hold inventory, not automatically write it off."))
-	legs = build_supplier_pickup_legs(order)
+	from vuna_transport.services.demand.item_transport_policy import existing_source_items
+
+	legs = build_supplier_pickup_legs(order, preserved_source_items=existing_source_items(order))
 	return order, allocation, transit, legs
 
 

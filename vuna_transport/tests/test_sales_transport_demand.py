@@ -10,6 +10,9 @@ from vuna_transport.vuna_transport.doctype.transport_load.transport_load import 
 
 
 class TestDirectSalesDemand(unittest.TestCase):
+	def setUp(self):
+		self.enterContext(patch.object(service, "item_requires_transport", return_value=True))
+
 	def test_preview_switch_is_off_by_default_and_uses_numeric_site_opt_in(self):
 		for value, expected in ((0, False), ("0", False), (1, True), ("1", True)):
 			with (
@@ -30,6 +33,32 @@ class TestDirectSalesDemand(unittest.TestCase):
 		self.assertNotEqual(
 			service.sales_source_key("SO-1", key, ["a"]), service.sales_source_key("SO-2", key, ["a"])
 		)
+
+	def test_delivery_group_uses_item_then_shipping_then_billing_address(self):
+		for item_address, shipping, billing, expected in (
+			("Item destination", "Shipping", "Billing", "Item destination"),
+			(None, "Shipping", "Billing", "Shipping"),
+			("", "Shipping", "Billing", "Shipping"),
+			(None, None, "Billing", "Billing"),
+			(None, "", "Billing", "Billing"),
+			(None, None, None, None),
+		):
+			with (
+				self.subTest(item=item_address, shipping=shipping, billing=billing),
+				patch.object(
+					service.sales,
+					"get_address_planning_data",
+					return_value=frappe._dict(delivery_zone="Destination Zone"),
+				) as location,
+				patch.object(service.sales, "_get_item_delivery_group", return_value=None),
+				patch.object(service.sales, "canonical_delivery_method", return_value="Company Delivery"),
+			):
+				source = SimpleNamespace(customer_address=billing, shipping_address_name=shipping)
+				row = SimpleNamespace(customer_address=item_address)
+				key = service.sales._get_group_key(source, row)
+				self.assertEqual(key[1], expected)
+				self.assertEqual(key[3], "Destination Zone")
+				location.assert_called_once_with(expected)
 
 	@patch.object(service, "frappe")
 	def test_native_and_legacy_rows_both_prevent_double_planning(self, framework):

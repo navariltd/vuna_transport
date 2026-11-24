@@ -46,6 +46,12 @@ class TestTransportDemandService(unittest.TestCase):
 		self.assertEqual(get_demand_type("Warehouse Transfer"), "Internal")
 
 	def setUp(self):
+		self.enterContext(
+			patch(
+				"vuna_transport.services.demand.transport_demand_service.item_requires_transport",
+				return_value=True,
+			)
+		)
 		translation = patch(
 			"vuna_transport.services.demand.transport_demand_service._", side_effect=lambda text: text
 		)
