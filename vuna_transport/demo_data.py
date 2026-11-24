@@ -254,14 +254,14 @@ def _ensure_warehouse_addresses():
 
 def _ensure_vehicle_categories():
 	definitions = (
-		("3 Ton Van", 3000, 12, 6, 0, 0, None),
-		("5 Ton Box Truck", 5000, 20, 10, 0, 1, None),
-		("8 Ton Box Truck", 8000, 30, 16, 0, 1, None),
-		("15 Ton Truck", 15000, 50, 28, 0, 1, None),
-		("8 Ton Refrigerated Truck", 8000, 28, 14, 1, 1, "Temperature Logger"),
+		("3 Ton Van", 3000, 12, 6, 0, None),
+		("5 Ton Box Truck", 5000, 20, 10, 1, None),
+		("8 Ton Box Truck", 8000, 30, 16, 1, None),
+		("15 Ton Truck", 15000, 50, 28, 1, None),
+		("8 Ton Refrigerated Truck", 8000, 28, 14, 1, "Temperature Logger"),
 	)
 	result = {}
-	for label, payload, volume, pallets, refrigerated, tail_lift, equipment in definitions:
+	for label, payload, volume, pallets, tail_lift, equipment in definitions:
 		name = frappe.db.exists("Vehicle Category", {"vehicle_category_name": label})
 		doc = frappe.get_doc("Vehicle Category", name) if name else frappe.new_doc("Vehicle Category")
 		doc.vehicle_category_name = label
@@ -273,8 +273,6 @@ def _ensure_vehicle_categories():
 		doc.max_pallets = pallets
 		doc.max_cases = 1000
 		doc.max_crates = 500
-		doc.closed_body = 1
-		doc.refrigerated = refrigerated
 		doc.tail_lift = tail_lift
 		doc.special_equipment = equipment
 		doc.disabled = 0
@@ -308,6 +306,8 @@ def _ensure_vehicles(categories):
 		doc.fuel_type = "Diesel"
 		doc.uom = "Litre"
 		doc.vuna_vehicle_category = categories[category_label]
+		doc.vuna_body_configuration = "Closed Body"
+		doc.vuna_refrigerated = int(category_label == "8 Ton Refrigerated Truck")
 		doc.vuna_transport_enabled = 1
 		doc.vuna_vehicle_owner = "Company"
 		doc.save(ignore_permissions=True)

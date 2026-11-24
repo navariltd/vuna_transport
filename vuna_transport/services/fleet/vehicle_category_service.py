@@ -26,7 +26,6 @@ def get_vehicle_categories(load_uoms, capacity_buffer_percentage=0):
 			"max_cases",
 			"max_crates",
 			"capacity_override_percentage",
-			"refrigerated",
 			"tail_lift",
 			"body_type",
 			"special_equipment",
@@ -133,11 +132,9 @@ def validate_minimum_load_requirements(load, category):
 
 
 def evaluate_vehicle_category(totals, category, requirements=None):
-	"""Return compatibility details without throwing, so suggestions remain explainable."""
+	"""Check shared category constraints; refrigeration is checked on the physical vehicle."""
 	requirements = requirements or {}
 	rejections = []
-	if requirements.get("refrigeration_required") and not category.refrigerated:
-		rejections.append(_("Refrigerated transport is required."))
 	if requirements.get("tail_lift_required") and not category.tail_lift:
 		rejections.append(_("A tail lift is required."))
 	if requirements.get("required_body_type") and getattr(category, "body_type", None) != requirements.get(
@@ -240,7 +237,9 @@ def maximum_fitting_fraction(totals, category):
 	return min([1, *ratios]) if ratios else 1
 
 
-def get_available_vehicle_category_counts(company, dispatch_date, from_time=None, to_time=None):
+def get_available_vehicle_category_counts(
+	company, dispatch_date, from_time=None, to_time=None, *, refrigeration_required=False
+):
 	"""Return canonical available counts while preserving the existing API shape."""
 	from vuna_transport.services.fleet.vehicle_availability_service import (
 		get_vehicle_category_availability,
@@ -248,7 +247,9 @@ def get_available_vehicle_category_counts(company, dispatch_date, from_time=None
 
 	from_time = get_datetime(from_time or dispatch_date)
 	to_time = get_datetime(to_time or add_days(from_time, 1))
-	availability = get_vehicle_category_availability(company, from_time, to_time)
+	availability = get_vehicle_category_availability(
+		company, from_time, to_time, refrigeration_required=refrigeration_required
+	)
 	return {
 		"counts": {
 			category: summary["available"] for category, summary in availability["categories"].items()

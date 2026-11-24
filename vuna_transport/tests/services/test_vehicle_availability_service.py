@@ -53,6 +53,19 @@ class TestVehicleAvailabilityService(UnitTestCase):
 		self.assertEqual(result.operational_state, "Available")
 		self.assertFalse(result.reasons)
 
+	def test_two_vehicles_in_same_category_can_have_different_refrigeration_capability(self):
+		self.vehicle.vuna_refrigerated = 0
+		result = self._evaluate(refrigeration_required=True)
+		self.assertFalse(result.dispatch_eligible)
+		self.assertIn("REFRIGERATION_REQUIRED", [reason.code for reason in result.reasons])
+		self.vehicle.vuna_refrigerated = 1
+		self.assertTrue(self._evaluate(refrigeration_required=True).dispatch_eligible)
+
+	def test_ordinary_load_allows_both_refrigerated_and_ordinary_vehicles(self):
+		for refrigerated in (0, 1):
+			self.vehicle.vuna_refrigerated = refrigerated
+			self.assertTrue(self._evaluate().dispatch_eligible)
+
 	def test_transport_disabled_vehicle_is_unavailable(self):
 		self.vehicle.vuna_transport_enabled = 0
 		result = self._evaluate()
@@ -263,6 +276,7 @@ class TestVehicleAvailabilityService(UnitTestCase):
 		compliance="default",
 		availability_blocks=None,
 		incidents=None,
+		refrigeration_required=False,
 	):
 		return _evaluate_vehicle(
 			self.vehicle,
@@ -278,6 +292,7 @@ class TestVehicleAvailabilityService(UnitTestCase):
 			self.to_time,
 			"Vuna Foods",
 			None,
+			refrigeration_required=refrigeration_required,
 		)
 
 

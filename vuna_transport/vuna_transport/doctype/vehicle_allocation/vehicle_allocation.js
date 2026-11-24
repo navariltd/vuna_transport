@@ -39,6 +39,9 @@ frappe.ui.form.on("Vehicle Allocation", {
 				filters: {
 					company: frm.doc.company,
 					required_vehicle_category: frm.doc.required_vehicle_category,
+					delivery_loads: (frm.doc.delivery_loads || [])
+						.map((row) => row.delivery_load)
+						.filter(Boolean),
 				},
 			};
 		});

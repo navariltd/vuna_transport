@@ -16,6 +16,20 @@ class TestVehicleFirstAllocationSearch(UnitTestCase):
 		super().setUp()
 		self.enterContext(patch("vuna_transport.api.now_datetime", return_value=datetime(2026, 11, 21, 8)))
 
+	def test_vehicle_picker_checks_refrigeration_when_only_a_later_selected_load_requires_it(self):
+		loads = [
+			frappe._dict(name="AMBIENT", refrigeration_required=0),
+			frappe._dict(name="COLD", refrigeration_required=1),
+		]
+		with (
+			patch("vuna_transport.api.validate_allocation_load_set", return_value=loads),
+			patch("vuna_transport.api.require_document_permission"),
+			patch("vuna_transport.api.get_allocation_resource_window", return_value=("start", "end")),
+			patch("vuna_transport.api.get_vehicle_availability_map", return_value={}) as availability,
+		):
+			get_vehicles_for_allocation("Vehicle", "", "name", 0, 20, {"delivery_loads": ["AMBIENT", "COLD"]})
+		self.assertTrue(availability.call_args.kwargs["refrigeration_required"])
+
 	def test_optional_category_keeps_availability_and_permission_filters(self):
 		for category in (None, "Canter"):
 			with (
@@ -134,6 +148,23 @@ class TestAllocationLoadSearch(UnitTestCase):
 		self.assertEqual(frappe.local.message_log, [])
 		self.assertFalse(frappe.flags.mute_messages)
 		self.validation.assert_any_call(["SELECTED", "FITS"], "FH")
+
+	def test_load_picker_excludes_cold_cargo_for_an_ordinary_vehicle(self):
+		self.validation.side_effect = lambda names, category: [
+			frappe._dict(name=names[-1], refrigeration_required=int(names[-1] == "FITS"))
+		]
+		for cold in (0, 1):
+			with patch(
+				"vuna_transport.api.frappe.db.get_value",
+				return_value=frappe._dict(vuna_vehicle_category="FRR", vuna_refrigerated=cold),
+			):
+				rows = get_delivery_loads_for_allocation(
+					"Transport Load", "", "name", 0, 20, {"vehicle": "TRUCK"}
+				)
+			self.assertEqual(
+				[row[0] for row in rows], [row.name for row in self.candidates if cold or row.name != "FITS"]
+			)
+		self.assertEqual(frappe.local.message_log, [])
 
 	def test_dictionary_search_also_silently_filters_rejected_candidates(self):
 		self.validation.side_effect = self.reject_incompatible

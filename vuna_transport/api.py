@@ -566,9 +566,12 @@ def get_delivery_loads_for_allocation(
 	vehicle_category = filters.get("required_vehicle_category")
 	vehicle_name = filters.get("vehicle")
 	if vehicle_name:
-		vehicle_category = (
-			frappe.db.get_value("Vehicle", vehicle_name, "vuna_vehicle_category") or vehicle_category
+		vehicle = frappe.db.get_value(
+			"Vehicle", vehicle_name, ["vuna_vehicle_category", "vuna_refrigerated"], as_dict=True
 		)
+		if not vehicle:
+			return []
+		vehicle_category = vehicle.vuna_vehicle_category or vehicle_category
 	if not vehicle_category:
 		return []
 	load_filters = {
@@ -607,7 +610,13 @@ def get_delivery_loads_for_allocation(
 			loads = validate_allocation_load_set([*selected, candidate.name], vehicle_category)
 			for load in loads:
 				require_document_permission(load, "read")
-		except (frappe.ValidationError, frappe.PermissionError):
+			if (
+				vehicle_name
+				and not vehicle.vuna_refrigerated
+				and any(getattr(load, "refrigeration_required", 0) for load in loads)
+			):
+				continue
+		except frappe.ValidationError, frappe.PermissionError:
 			continue
 		finally:
 			frappe.flags.mute_messages = previous_mute
@@ -707,6 +716,9 @@ def get_vehicles_for_allocation(
 		from_time=from_time,
 		to_time=to_time,
 		delivery_load=loads[0] if load_names else None,
+		refrigeration_required=(
+			any(getattr(load, "refrigeration_required", 0) for load in loads) if load_names else False
+		),
 	)
 	available = [row.vehicle for row in availability.values() if row.dispatch_eligible]
 	if not available:

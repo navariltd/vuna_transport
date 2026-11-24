@@ -14,11 +14,6 @@
   "body_type",
   "column_break_pxpq",
   "disabled",
-  "refrigerated",
-  "tanker",
-  "trailer",
-  "open_body",
-  "closed_body",
   "section_break_pbqv",
   "max_payload_weight",
   "max_payload_weight_uom",
@@ -86,36 +81,6 @@
    "fieldname": "disabled",
    "fieldtype": "Check",
    "label": "Disabled"
-  },
-  {
-   "default": "0",
-   "fieldname": "refrigerated",
-   "fieldtype": "Check",
-   "label": "Refrigerated"
-  },
-  {
-   "default": "0",
-   "fieldname": "tanker",
-   "fieldtype": "Check",
-   "label": "Tanker"
-  },
-  {
-   "default": "0",
-   "fieldname": "trailer",
-   "fieldtype": "Check",
-   "label": "Trailer"
-  },
-  {
-   "default": "0",
-   "fieldname": "open_body",
-   "fieldtype": "Check",
-   "label": "Open Body"
-  },
-  {
-   "default": "0",
-   "fieldname": "closed_body",
-   "fieldtype": "Check",
-   "label": "Closed Body"
   },
   {
    "fieldname": "section_break_pbqv",

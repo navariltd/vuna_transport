@@ -71,6 +71,7 @@ def evaluate_vehicle_availability(
 	required_vehicle_category=None,
 	delivery_load=None,
 	exclude_allocation=None,
+	refrigeration_required=False,
 ):
 	"""Evaluate one Vehicle using the same bulk engine used by planning screens."""
 	load_name = _document_name(delivery_load)
@@ -83,6 +84,7 @@ def evaluate_vehicle_availability(
 		delivery_load=delivery_load,
 		exclude_allocation=exclude_allocation,
 		exclude_delivery_load=load_name,
+		refrigeration_required=refrigeration_required,
 	)
 	return results.get(vehicle) or _missing_vehicle_result(vehicle)
 
@@ -111,12 +113,14 @@ def get_vehicle_category_availability(
 	to_time,
 	*,
 	delivery_method=None,
+	refrigeration_required=False,
 ):
 	"""Return category counts and vehicle details from one preloaded evaluation."""
 	results = get_vehicle_availability_map(
 		company=company,
 		from_time=from_time,
 		to_time=to_time,
+		refrigeration_required=refrigeration_required,
 	)
 	summaries = defaultdict(_empty_category_summary)
 	for result in results.values():
@@ -151,9 +155,15 @@ def get_vehicle_availability_map(
 	exclude_allocation=None,
 	exclude_delivery_load=None,
 	expected_company=None,
+	refrigeration_required=False,
 ):
 	"""Bulk-load operational records and evaluate every matching Vehicle once."""
 	from_time, to_time = _normalize_interval(from_time, to_time)
+	if isinstance(delivery_load, str):
+		delivery_load = frappe.get_doc("Transport Load", delivery_load)
+	refrigeration_required = bool(
+		refrigeration_required or getattr(delivery_load, "refrigeration_required", False)
+	)
 	filters = {}
 	if vehicle_names:
 		filters["name"] = ["in", list(dict.fromkeys(vehicle_names))]
@@ -169,6 +179,7 @@ def get_vehicle_availability_map(
 			"license_plate",
 			"company",
 			"vuna_vehicle_category",
+			"vuna_refrigerated",
 			"vuna_transport_enabled",
 			"vuna_disabled",
 			"vuna_vehicle_owner",
@@ -354,6 +365,7 @@ def get_vehicle_availability_map(
 			to_time,
 			expected_company or company,
 			compatible_categories,
+			refrigeration_required=refrigeration_required,
 		)
 		for vehicle in vehicles
 	}
@@ -391,12 +403,16 @@ def _evaluate_vehicle(
 	to_time,
 	company,
 	compatible_categories,
+	*,
+	refrigeration_required=False,
 ):
 	reasons = []
 	current_allocation = None
 	current_trip = None
 	next_available_at = None
 	state = "Available"
+	if refrigeration_required and not getattr(vehicle, "vuna_refrigerated", 0):
+		reasons.append(_reason("REFRIGERATION_REQUIRED", _("This load requires a refrigerated vehicle.")))
 
 	if not vehicle.vuna_transport_enabled:
 		reasons.append(_reason("TRANSPORT_DISABLED", _("Vehicle is not enabled for transport planning.")))
@@ -593,6 +609,7 @@ def _evaluate_vehicle(
 		license_plate=vehicle.license_plate or vehicle.name,
 		vehicle_category=vehicle.vuna_vehicle_category,
 		vehicle_category_label=vehicle.vuna_vehicle_category,
+		refrigerated=bool(getattr(vehicle, "vuna_refrigerated", 0)),
 		linked_asset=asset_name,
 		asset_status=getattr(asset, "status", None),
 		active_asset_repair=asset_repairs[0].name if asset_repairs else None,
@@ -700,7 +717,7 @@ def _normalize_interval(from_time, to_time):
 	try:
 		from_time = get_datetime(from_time or now_datetime())
 		to_time = get_datetime(to_time or add_to_date(from_time, seconds=1))
-	except (TypeError, ValueError):
+	except TypeError, ValueError:
 		frappe.throw(_("Select a valid planning date and time window."))
 	# A current-availability request may lose sub-second precision in transit.
 	# Treat a zero/near-zero interval as a point-in-time check, but still reject

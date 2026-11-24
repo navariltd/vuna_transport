@@ -796,6 +796,7 @@ def _validate_vehicle_is_available(allocation, loads):
 		from_time,
 		to_time,
 		exclude_allocation=allocation.name,
+		refrigeration_required=any(getattr(load, "refrigeration_required", 0) for load in loads),
 	)
 	if not result.dispatch_eligible:
 		frappe.throw(_("Vehicle {0} is unavailable: {1}").format(allocation.vehicle, result.primary_reason))
