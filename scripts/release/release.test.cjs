@@ -259,7 +259,10 @@ test("semantic-release starts at v16.0.0 and previews the next patch without pub
       ],
     },
     // Do not let the real Actions PR/branch identity leak into this local fixture.
-    { cwd, env: { PATH: process.env.PATH, CI: "false", GIT_CONFIG_NOSYSTEM: "1" } }
+    {
+      cwd,
+      env: { PATH: process.env.PATH, CI: "false", GIT_CONFIG_NOSYSTEM: "1" },
+    }
   );
   assert.equal(result.lastRelease.version, "16.0.0");
   assert.equal(result.nextRelease.version, "16.0.1");
