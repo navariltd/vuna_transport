@@ -1,0 +1,19 @@
+{
+  "name": "vuna-transport-release-tools",
+  "private": true,
+  "description": "Release automation for the Vuna Transport Python application",
+  "engines": {
+    "node": ">=24.10.0"
+  },
+  "scripts": {
+    "release": "semantic-release",
+    "test:release": "node --test scripts/release/*.test.cjs"
+  },
+  "devDependencies": {
+    "@semantic-release/commit-analyzer": "13.0.1",
+    "@semantic-release/git": "10.0.1",
+    "@semantic-release/github": "12.0.11",
+    "@semantic-release/release-notes-generator": "14.1.1",
+    "semantic-release": "25.0.9"
+  }
+}

@@ -3,28 +3,31 @@
 
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Count
+
+from vuna_transport.services.shared.security_service import filter_readable_rows
 
 
 def execute(filters=None):
 	filters = frappe._dict(filters or {})
-	conditions = ["dt.docstatus = 1", "ds.vuna_proof_of_delivery is null", "ds.delivery_note is not null"]
-	values = {}
-	if filters.company:
-		conditions.append("dt.company = %(company)s")
-		values.company = filters.company
-	if filters.delivery_load:
-		conditions.append("ds.vuna_delivery_load = %(delivery_load)s")
-		values.delivery_load = filters.delivery_load
-	rows = frappe.db.sql(
-		f"""select dt.name, dt.company, dt.status, dt.vehicle, dt.driver,
-			ds.vuna_delivery_load, count(ds.name) as pending_stops
-			from `tabDelivery Trip` dt
-			join `tabDelivery Stop` ds on ds.parent = dt.name
-			where {" and ".join(conditions)} group by dt.name, dt.company, dt.status,
-			dt.vehicle, dt.driver, ds.vuna_delivery_load order by dt.creation limit 500""",
-		values,
-		as_dict=True,
+	trip = frappe.qb.DocType("Delivery Trip")
+	stop = frappe.qb.DocType("Delivery Stop")
+	fields = (trip.name, trip.company, trip.status, trip.vehicle, trip.driver, stop.vuna_delivery_load)
+	query = (
+		frappe.qb.from_(trip)
+		.join(stop)
+		.on((stop.parent == trip.name) & (stop.parenttype == "Delivery Trip"))
+		.select(*fields, Count(stop.name).as_("pending_stops"))
+		.where((trip.docstatus == 1) & stop.vuna_proof_of_delivery.isnull() & stop.delivery_note.notnull())
+		.groupby(*fields, trip.creation)
+		.orderby(trip.creation)
+		.limit(500)
 	)
+	if filters.company:
+		query = query.where(trip.company == filters.company)
+	if filters.delivery_load:
+		query = query.where(stop.vuna_delivery_load == filters.delivery_load)
+	rows = query.run(as_dict=True)
 	columns = [
 		{"label": _("Delivery Trip"), "fieldname": "name", "fieldtype": "Link", "options": "Delivery Trip"},
 		{"label": _("Company"), "fieldname": "company", "fieldtype": "Link", "options": "Company"},
@@ -39,4 +42,4 @@ def execute(filters=None):
 		},
 		{"label": _("Pending Stops"), "fieldname": "pending_stops", "fieldtype": "Int"},
 	]
-	return columns, rows
+	return columns, filter_readable_rows("Delivery Trip", rows)

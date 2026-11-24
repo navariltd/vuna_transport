@@ -3,31 +3,39 @@
 
 import frappe
 from frappe import _
+from frappe.utils import cint
+
+from vuna_transport.services.shared.security_service import filter_readable_rows
 
 
 def execute(filters=None):
 	filters = frappe._dict(filters or {})
-	conditions = ["vi.docstatus < 2"]
-	values = {}
+	incident = frappe.qb.DocType("Vehicle Incident")
+	query = (
+		frappe.qb.from_(incident)
+		.select(
+			incident.name,
+			incident.company,
+			incident.vehicle,
+			incident.driver,
+			incident.incident_type,
+			incident.incident_datetime,
+			incident.severity,
+			incident.vehicle_immobilized,
+			incident.resolution_status,
+			incident.asset_repair,
+			incident.replacement_vehicle_allocation,
+		)
+		.where(incident.docstatus < 2)
+		.orderby(incident.incident_datetime, order=frappe.qb.desc)
+		.limit(500)
+	)
 	for field in ("company", "vehicle", "resolution_status"):
 		if filters.get(field):
-			conditions.append(f"vi.{field} = %({field})s")
-			values[field] = filters[field]
-	if filters.get("vehicle_immobilized"):
-		conditions.append("vi.vehicle_immobilized = 1")
-	rows = frappe.db.sql(
-		f"""
-		SELECT vi.name, vi.company, vi.vehicle, vi.driver, vi.incident_type,
-			vi.incident_datetime, vi.severity, vi.vehicle_immobilized,
-			vi.resolution_status, vi.asset_repair, vi.replacement_vehicle_allocation
-		FROM `tabVehicle Incident` vi
-		WHERE {" AND ".join(conditions)}
-		ORDER BY vi.incident_datetime DESC
-		LIMIT 500
-	""",
-		values,
-		as_dict=True,
-	)
+			query = query.where(incident[field] == filters[field])
+	if cint(filters.get("vehicle_immobilized")):
+		query = query.where(incident.vehicle_immobilized == 1)
+	rows = query.run(as_dict=True)
 	columns = [
 		{"label": _("Incident"), "fieldname": "name", "fieldtype": "Link", "options": "Vehicle Incident"},
 		{"label": _("Company"), "fieldname": "company", "fieldtype": "Link", "options": "Company"},
@@ -51,4 +59,4 @@ def execute(filters=None):
 			"options": "Vehicle Allocation",
 		},
 	]
-	return columns, rows
+	return columns, filter_readable_rows("Vehicle Incident", rows)

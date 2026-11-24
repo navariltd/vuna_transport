@@ -110,7 +110,9 @@ class TransportCostStructureAssignment(Document):
 			key = (row.source_warehouse or "", row.territory, row.county or "", row.town or "")
 			if key in destinations:
 				frappe.throw(
-					_("Destination geography {0} is duplicated.").format(" / ".join(filter(None, key)))
+					_("Destination geography {0} is duplicated.").format(
+						" / ".join(value for value in key if value)
+					)
 				)
 			destinations.add(key)
 		if self.vehicle:

@@ -80,7 +80,8 @@ def lock_document(doctype, name):
 		raise ValueError(f"Unsupported dispatch lock DocType: {doctype}")
 	if not name:
 		return
-	frappe.db.sql(f"select name from `tab{doctype}` where name = %s for update", name)
+	table = frappe.qb.DocType(doctype)
+	frappe.qb.from_(table).select(table.name).where(table.name == name).for_update().run()
 
 
 def get_locked_delivery_load(load):

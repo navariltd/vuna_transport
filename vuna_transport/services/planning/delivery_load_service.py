@@ -37,7 +37,14 @@ MAX_PLANNING_ALLOCATION_ROWS = 500
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
 def get_available_delivery_orders(
-	doctype, txt, searchfield, start, page_len, filters, as_dict=False, **kwargs
+	doctype: str,
+	txt: str,
+	searchfield: str,
+	start: int,
+	page_len: int,
+	filters: dict | str | None,
+	as_dict: bool = False,
+	**kwargs,
 ):
 	"""Return Delivery Orders with their live unallocated quantities."""
 	require_doctype_permission("Delivery Order", "read")
@@ -152,7 +159,12 @@ def get_compatible_vehicle_categories(
 
 
 @frappe.whitelist()
-def get_vehicle_category_capacity_summary(vehicle_category, totals=None, weight_uom=None, volume_uom=None):
+def get_vehicle_category_capacity_summary(
+	vehicle_category: str,
+	totals: dict | str | None = None,
+	weight_uom: str | None = None,
+	volume_uom: str | None = None,
+):
 	"""Return the live capacity breakdown for a selected Vehicle Category."""
 	require_doctype_permission("Vehicle Category", "read")
 	totals = frappe.parse_json(totals) if isinstance(totals, str) else dict(totals or {})
@@ -532,7 +544,7 @@ def _get_on_hand_stock(item_codes, warehouse):
 	This intentionally does not reserve stock or decide Pick List/Delivery Note
 	availability. ERPNext stock documents remain the execution authority.
 	"""
-	item_codes = sorted(set(filter(None, item_codes or [])))
+	item_codes = sorted({code for code in item_codes or [] if code})
 	if not item_codes or not warehouse:
 		return {}
 	return {
@@ -547,7 +559,10 @@ def _get_on_hand_stock(item_codes, warehouse):
 
 @frappe.whitelist()
 def get_delivery_order_item_allocation_preview(
-	delivery_order_item, allocated_quantity=None, exclude_load=None, source_warehouse=None
+	delivery_order_item: str,
+	allocated_quantity: float | str | None = None,
+	exclude_load: str | None = None,
+	source_warehouse: str | None = None,
 ):
 	"""Return authoritative partial-allocation dimensions for immediate form feedback."""
 	item = frappe.get_doc("Delivery Order Item", delivery_order_item)

@@ -759,8 +759,8 @@ def get_sales_invoice_return_context(sales_invoice: str, exclude_request: str | 
 	return {"source_type": "Sales Invoice", "delivery_note": None, "items": items}
 
 
-@frappe.whitelist()
-def create_return_request_from_delivery_note(delivery_note):
+@frappe.whitelist(methods=["POST"])
+def create_return_request_from_delivery_note(delivery_note: str):
 	"""Create a prefilled draft for a later customer return."""
 	require_doctype_permission("Return Request", "create")
 	source = frappe.get_doc("Delivery Note", delivery_note)
@@ -790,8 +790,8 @@ def create_return_request_from_delivery_note(delivery_note):
 	return request.name
 
 
-@frappe.whitelist()
-def transition_return_request(return_request, action):
+@frappe.whitelist(methods=["POST"])
+def transition_return_request(return_request: str, action: str):
 	"""Retain only explicit terminal actions; operational stages are derived."""
 	request = frappe.get_doc("Return Request", return_request)
 	require_document_permission(request, "write")
@@ -809,8 +809,10 @@ def transition_return_request(return_request, action):
 	return request.name
 
 
-@frappe.whitelist()
-def record_custody_transfer(return_request, to_custody, responsible_party=None, remarks=None):
+@frappe.whitelist(methods=["POST"])
+def record_custody_transfer(
+	return_request: str, to_custody: str, responsible_party: str | None = None, remarks: str | None = None
+):
 	"""Record a custody handover without allowing the history to be edited in the browser."""
 	request = frappe.get_doc("Return Request", return_request)
 	require_document_permission(request, "write")
@@ -833,7 +835,7 @@ def record_custody_transfer(return_request, to_custody, responsible_party=None, 
 	return request.name
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_return_stock_document(return_request: str):
 	"""Prepare the appropriate ERPNext stock return for the request source."""
 	frappe.db.sql("select name from `tabReturn Request` where name = %s for update", return_request)
@@ -971,8 +973,8 @@ def _sales_return_quantity(row, request_item, collected, source_field):
 	return quantity
 
 
-@frappe.whitelist()
-def record_no_further_action(return_request, remarks):
+@frappe.whitelist(methods=["POST"])
+def record_no_further_action(return_request: str, remarks: str):
 	request = frappe.get_doc("Return Request", return_request)
 	require_document_permission(request, "write")
 	require_company_access(request.company)
@@ -993,8 +995,8 @@ def record_no_further_action(return_request, remarks):
 	return request.name
 
 
-@frappe.whitelist()
-def create_replacement_sales_order(return_request):
+@frappe.whitelist(methods=["POST"])
+def create_replacement_sales_order(return_request: str):
 	"""Prepare a draft replacement Sales Order for stock that was actually returned."""
 	require_doctype_permission("Sales Order", "create")
 	frappe.db.sql("select name from `tabReturn Request` where name = %s for update", return_request)
