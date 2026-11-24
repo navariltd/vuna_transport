@@ -24,7 +24,6 @@ class TestCapacityOverridePlanning(TestCase):
 			max_cases=20,
 			max_crates=10,
 			capacity_override_percentage=10,
-			refrigerated=0,
 			tail_lift=0,
 		)
 		self.settings = frappe._dict(allow_capacity_override=1)
@@ -112,10 +111,18 @@ class TestCapacityOverridePlanning(TestCase):
 		self.assertFalse(self.category.capacity_override_applied)
 
 	def test_equipment_requirements_are_not_bypassed_by_extra_capacity(self):
+		for tail_lift, equipment in ((1, None), (0, "Crane")):
+			with self.subTest(tail_lift=tail_lift, equipment=equipment):
+				self.load.tail_lift_required = tail_lift
+				self.load.special_equipment_required = equipment
+				self.assertEqual(loads.get_compatible_vehicle_category_names(self.load), [])
+				with self.assertRaises(frappe.ValidationError):
+					loads.validate_capacity(self.load)
+
+	def test_refrigeration_is_deferred_to_vehicle_validation_even_with_capacity_override(self):
 		self.load.refrigeration_required = 1
-		self.assertEqual(loads.get_compatible_vehicle_category_names(self.load), [])
-		with self.assertRaises(frappe.ValidationError):
-			loads.validate_capacity(self.load)
+		self.assertEqual(loads.get_compatible_vehicle_category_names(self.load), ["Truck"])
+		self.assertTrue(loads.validate_capacity(self.load)["capacity_override_applied"])
 
 	def test_shared_categories_apply_allowance_to_all_configured_dimensions(self):
 		category = categories.get_vehicle_categories({})[0]

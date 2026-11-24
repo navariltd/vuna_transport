@@ -111,7 +111,10 @@ test("vehicle searches include every selected load for capability checks", () =>
     { delivery_load: "" },
   ];
   const query = state.queries.vehicle();
-  assert.deepEqual(Array.from(query.filters.delivery_loads), ["AMBIENT", "COLD"]);
+  assert.deepEqual(Array.from(query.filters.delivery_loads), [
+    "AMBIENT",
+    "COLD",
+  ]);
 });
 
 test("selecting a vehicle fills category, ownership, supplier and cost structure", async () => {
