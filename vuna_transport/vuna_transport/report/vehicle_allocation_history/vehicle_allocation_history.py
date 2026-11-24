@@ -3,39 +3,57 @@
 
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Coalesce, Date
+
+from vuna_transport.services.shared.security_service import filter_readable_rows
 
 
 def execute(filters=None):
 	filters = frappe._dict(filters or {})
-	conditions = ["va.docstatus < 2"]
-	values = {}
+	allocation = frappe.qb.DocType("Vehicle Allocation")
+	load = frappe.qb.DocType("Vehicle Allocation Load")
+	effective_date = Coalesce(allocation.effective_from, allocation.creation)
+	query = (
+		frappe.qb.from_(allocation)
+		.select(
+			allocation.name,
+			allocation.company,
+			allocation.vehicle,
+			allocation.driver,
+			allocation.allocation_type,
+			allocation.assignment_event,
+			allocation.status,
+			allocation.effective_from,
+			allocation.effective_to,
+			allocation.replacement_of,
+			allocation.replaced_by,
+		)
+		.where(allocation.docstatus < 2)
+		.orderby(effective_date, order=frappe.qb.desc)
+		.limit(500)
+	)
 	for field in ("company", "vehicle"):
 		if filters.get(field):
-			conditions.append(f"va.{field} = %({field})s")
-			values[field] = filters[field]
+			query = query.where(allocation[field] == filters[field])
 	if filters.from_date:
-		conditions.append("DATE(COALESCE(va.effective_from, va.creation)) >= %(from_date)s")
-		values.from_date = filters.from_date
+		query = query.where(Date(effective_date) >= filters.from_date)
 	if filters.to_date:
-		conditions.append("DATE(COALESCE(va.effective_from, va.creation)) <= %(to_date)s")
-		values.to_date = filters.to_date
-	rows = frappe.db.sql(
-		f"""
-		SELECT va.name, va.company, va.vehicle, va.driver,
-			NULLIF(GROUP_CONCAT(DISTINCT val.delivery_load ORDER BY val.idx SEPARATOR ', '), '') AS delivery_load,
-			va.allocation_type, va.assignment_event, va.status,
-			va.effective_from, va.effective_to, va.replacement_of, va.replaced_by
-		FROM `tabVehicle Allocation` va
-		LEFT JOIN `tabVehicle Allocation Load` val
-			on val.parent = va.name and val.parenttype = 'Vehicle Allocation'
-		WHERE {" AND ".join(conditions)}
-		GROUP BY va.name
-		ORDER BY COALESCE(va.effective_from, va.creation) DESC
-		LIMIT 500
-	""",
-		values,
-		as_dict=True,
-	)
+		query = query.where(Date(effective_date) <= filters.to_date)
+	rows = filter_readable_rows("Vehicle Allocation", query.run(as_dict=True))
+	loads_by_allocation = {row["name"]: [] for row in rows}
+	if rows:
+		load_rows = (
+			frappe.qb.from_(load)
+			.select(load.parent, load.delivery_load)
+			.where((load.parent.isin(list(loads_by_allocation))) & (load.parenttype == "Vehicle Allocation"))
+			.orderby(load.parent, load.idx)
+		).run(as_dict=True)
+		for row in load_rows:
+			names = loads_by_allocation[row.parent]
+			if row.delivery_load and row.delivery_load not in names:
+				names.append(row.delivery_load)
+	for row in rows:
+		row["delivery_load"] = ", ".join(loads_by_allocation[row["name"]]) or None
 	columns = [
 		{"label": _("Allocation"), "fieldname": "name", "fieldtype": "Link", "options": "Vehicle Allocation"},
 		{"label": _("Company"), "fieldname": "company", "fieldtype": "Link", "options": "Company"},

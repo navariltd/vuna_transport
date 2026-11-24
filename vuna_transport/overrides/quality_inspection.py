@@ -53,7 +53,7 @@ class ReturnQualityInspectionMixin:
 
 
 @frappe.whitelist()
-def check_item_quality_inspection(doctype, docstatus, items):
+def check_item_quality_inspection(doctype: str, docstatus: int, items: list | str):
 	"""Feed positive return quantities into ERPNext's standard inspection dialog."""
 	parsed_items = frappe.parse_json(items) if isinstance(items, str) else items
 	return_request = _get_vuna_return_request(doctype, items=parsed_items)
@@ -74,8 +74,10 @@ def check_item_quality_inspection(doctype, docstatus, items):
 	]
 
 
-@frappe.whitelist()
-def make_quality_inspections(company, doctype, docname, items, inspection_type):
+@frappe.whitelist(methods=["POST"])
+def make_quality_inspections(
+	company: str, doctype: str, docname: str, items: list | str, inspection_type: str
+):
 	"""Use ERPNext's creator after normalizing Vuna Sales Return quantities."""
 	parsed_items = frappe.parse_json(items) if isinstance(items, str) else items
 	return_request = _get_vuna_return_request(doctype, docname=docname)

@@ -121,8 +121,6 @@ def ensure_transport_uoms():
 		if not frappe.db.get_single_value("Transport Settings", fieldname):
 			frappe.db.set_single_value("Transport Settings", fieldname, uom_name)
 
-	frappe.db.commit()
-
 
 def normalize_transport_cost_natures():
 	"""Convert the retired Accessorial / Actual value to the supported Fixed nature."""
@@ -132,15 +130,10 @@ def normalize_transport_cost_natures():
 		("Transport Cost Structure Assignment Component", "cost_nature"),
 	):
 		if frappe.db.has_column(doctype, fieldname):
-			frappe.db.sql(
-				f"""
-				update `tab{doctype}`
-				set `{fieldname}` = 'Fixed'
-				where `{fieldname}` = 'Accessorial / Actual'
-				"""
-			)
-
-	frappe.db.commit()
+			table = frappe.qb.DocType(doctype)
+			frappe.qb.update(table).set(table[fieldname], "Fixed").where(
+				table[fieldname] == "Accessorial / Actual"
+			).run()
 
 
 def ensure_dispatch_scan_roles():
@@ -165,7 +158,6 @@ def ensure_dispatch_scan_roles():
 
 	if changed:
 		settings.save(ignore_permissions=True)
-		frappe.db.commit()
 
 
 def migrate_province_to_territory():

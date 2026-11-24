@@ -3,6 +3,7 @@
 import frappe
 from frappe import _
 from frappe.utils import add_to_date, cint, now_datetime
+from pypika.terms import ExistsCriterion
 
 from vuna_transport.services.fleet.license_plate_service import normalize_and_validate_license_plate
 from vuna_transport.services.fleet.vehicle_availability_service import (
@@ -10,7 +11,10 @@ from vuna_transport.services.fleet.vehicle_availability_service import (
 	get_vehicle_status,
 )
 from vuna_transport.services.fleet.vehicle_owner_service import normalize_vehicle_owner
-from vuna_transport.services.shared.security_service import require_document_permission
+from vuna_transport.services.shared.security_service import (
+	require_doctype_permission,
+	require_document_permission,
+)
 
 
 def validate_vehicle(doc, method=None):
@@ -110,34 +114,44 @@ def get_vehicles_by_operational_role(role, *, company=None, include_disabled=Fal
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def get_unlinked_assets(doctype, txt, searchfield, start, page_len, filters=None):
+def get_unlinked_assets(
+	doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict | str | None = None
+):
 	"""Return submitted, usable Assets not already linked to another Vehicle."""
+	require_doctype_permission("Asset", "read")
 	filters = frappe.parse_json(filters or {})
 	company = filters.get("company")
 	current_vehicle = filters.get("current_vehicle") or ""
 	searchfield = searchfield if searchfield in ("name", "asset_name") else "name"
-	conditions = [
-		"a.docstatus = 1",
-		"a.status not in ('Sold', 'Scrapped', 'Cancelled')",
-		"not exists (select 1 from `tabVehicle` v where v.vuna_asset = a.name and v.name != %s)",
-	]
-	values = [current_vehicle]
-	if company:
-		conditions.append("a.company = %s")
-		values.append(company)
-	if txt:
-		conditions.append(f"a.`{searchfield}` like %s")
-		values.append(f"%{txt}%")
-	return frappe.db.sql(
-		f"""
-		select a.name, a.asset_name, a.company
-		from `tabAsset` a
-		where {" and ".join(conditions)}
-		order by a.asset_name asc, a.name asc
-		limit %s offset %s
-		""",
-		[*values, page_len, start],
+	asset = frappe.qb.DocType("Asset")
+	vehicle = frappe.qb.DocType("Vehicle")
+	linked_vehicle = (
+		frappe.qb.from_(vehicle)
+		.select(vehicle.name)
+		.where((vehicle.vuna_asset == asset.name) & (vehicle.name != current_vehicle))
 	)
+	query = (
+		frappe.qb.from_(asset)
+		.select(asset.name, asset.asset_name, asset.company)
+		.where((asset.docstatus == 1) & asset.status.notin(["Sold", "Scrapped", "Cancelled"]))
+		.where(ExistsCriterion(linked_vehicle).negate())
+		.orderby(asset.asset_name, asset.name)
+		.limit(page_len)
+		.offset(start)
+	)
+	if company:
+		query = query.where(asset.company == company)
+	if txt:
+		query = query.where(asset[searchfield].like(f"%{txt}%"))
+	rows = query.run()
+	if not rows:
+		return []
+	readable = set(
+		frappe.get_list(
+			"Asset", filters={"name": ["in", [row[0] for row in rows]]}, pluck="name", limit=len(rows)
+		)
+	)
+	return [row for row in rows if row[0] in readable]
 
 
 def _validate_vehicle_asset(doc):
@@ -205,7 +219,7 @@ def _validate_vehicle_cost_structure(doc):
 
 
 @frappe.whitelist()
-def get_vehicle_operational_status(vehicle):
+def get_vehicle_operational_status(vehicle: str):
 	"""Return the current derived status for one readable standard Vehicle."""
 	doc = frappe.get_doc("Vehicle", vehicle)
 	require_document_permission(doc, "read")

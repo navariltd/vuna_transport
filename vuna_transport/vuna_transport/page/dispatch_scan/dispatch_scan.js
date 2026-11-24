@@ -39,7 +39,9 @@ frappe.pages["dispatch-scan"].on_page_load = function (wrapper) {
 							(action, index) =>
 								`<button type="button" class="btn btn-outline-primary scan-action ${
 									index === 0 ? "active" : ""
-								}" data-action="${action}">${__(`Mark ${action}`)}</button>`
+								}" data-action="${action}">${
+									action === "Loaded" ? __("Mark Loaded") : __("Mark Dispatched")
+								}</button>`
 						)
 						.join("")}
 				</div>

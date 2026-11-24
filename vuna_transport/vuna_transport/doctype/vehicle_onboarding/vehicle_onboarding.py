@@ -165,7 +165,7 @@ class VehicleOnboarding(Document):
 
 
 @frappe.whitelist()
-def get_onboarding_template_documents(transport_cost_structure):
+def get_onboarding_template_documents(transport_cost_structure: str):
 	"""Return the configured checklist for a submitted cost structure."""
 	require_doctype_permission("Vehicle Onboarding Template", "read")
 	if not transport_cost_structure:

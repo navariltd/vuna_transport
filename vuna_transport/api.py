@@ -178,16 +178,16 @@ def prepare_mobile_transport_proof(
 	}
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def bootstrap_mobile_device(
-	installation_id,
-	device_identifier=None,
-	platform=None,
-	manufacturer=None,
-	model_name=None,
-	os_name=None,
-	os_version=None,
-	app_version=None,
+	installation_id: str,
+	device_identifier: str | None = None,
+	platform: str | None = None,
+	manufacturer: str | None = None,
+	model_name: str | None = None,
+	os_name: str | None = None,
+	os_version: str | None = None,
+	app_version: str | None = None,
 ):
 	return bootstrap_device(
 		installation_id=installation_id,
@@ -202,11 +202,11 @@ def bootstrap_mobile_device(
 
 
 @frappe.whitelist()
-def get_mobile_driver_profile(installation_id, device_identifier=None):
+def get_mobile_driver_profile(installation_id: str, device_identifier: str | None = None):
 	return get_current_driver_profile(installation_id, device_identifier)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def register_mobile_device_push_token(
 	installation_id: str,
 	push_token: str,
@@ -222,17 +222,19 @@ def register_mobile_device_push_token(
 
 
 @frappe.whitelist()
-def get_mobile_assigned_delivery_trips(installation_id, device_identifier=None):
+def get_mobile_assigned_delivery_trips(installation_id: str, device_identifier: str | None = None):
 	return get_assigned_delivery_trips(installation_id, device_identifier)
 
 
 @frappe.whitelist()
-def get_mobile_offline_work(installation_id, device_identifier=None):
+def get_mobile_offline_work(installation_id: str, device_identifier: str | None = None):
 	return get_mobile_offline_manifest(installation_id, device_identifier)
 
 
 @frappe.whitelist()
-def get_mobile_delivery_trip_details(installation_id, trip_name, device_identifier=None):
+def get_mobile_delivery_trip_details(
+	installation_id: str, trip_name: str, device_identifier: str | None = None
+):
 	return get_delivery_trip_details(installation_id, trip_name, device_identifier)
 
 
@@ -272,10 +274,10 @@ def start_mobile_navigation(
 
 @frappe.whitelist()
 def get_mobile_delivery_note_details(
-	installation_id,
-	trip_name,
-	stop_name,
-	device_identifier=None,
+	installation_id: str,
+	trip_name: str,
+	stop_name: str,
+	device_identifier: str | None = None,
 ):
 	return get_delivery_note_details(
 		installation_id,
@@ -285,22 +287,22 @@ def get_mobile_delivery_note_details(
 	)
 
 
-@frappe.whitelist()
-def start_mobile_trip(installation_id, trip_name, device_identifier=None):
+@frappe.whitelist(methods=["POST"])
+def start_mobile_trip(installation_id: str, trip_name: str, device_identifier: str | None = None):
 	return start_mobile_delivery_trip(installation_id, trip_name, device_identifier)
 
 
 @frappe.whitelist()
-def get_mobile_incidents(installation_id, trip_name, device_identifier=None):
+def get_mobile_incidents(installation_id: str, trip_name: str, device_identifier: str | None = None):
 	return get_mobile_trip_incidents(installation_id, trip_name, device_identifier)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def report_mobile_incident(
-	installation_id,
-	trip_name,
-	payload,
-	device_identifier=None,
+	installation_id: str,
+	trip_name: str,
+	payload: dict | str,
+	device_identifier: str | None = None,
 ):
 	return report_mobile_trip_incident(
 		installation_id,
@@ -310,13 +312,13 @@ def report_mobile_incident(
 	)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def resolve_mobile_incident(
-	installation_id,
-	trip_name,
-	incident_name,
-	resolution,
-	device_identifier=None,
+	installation_id: str,
+	trip_name: str,
+	incident_name: str,
+	resolution: str,
+	device_identifier: str | None = None,
 ):
 	return resolve_mobile_trip_incident(
 		installation_id,
@@ -327,8 +329,10 @@ def resolve_mobile_incident(
 	)
 
 
-@frappe.whitelist()
-def prepare_mobile_pod(installation_id, trip_name, stop_name, device_identifier=None):
+@frappe.whitelist(methods=["POST"])
+def prepare_mobile_pod(
+	installation_id: str, trip_name: str, stop_name: str, device_identifier: str | None = None
+):
 	return prepare_mobile_proof_of_delivery(
 		installation_id,
 		trip_name,
@@ -337,13 +341,13 @@ def prepare_mobile_pod(installation_id, trip_name, stop_name, device_identifier=
 	)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def submit_mobile_pod(
-	installation_id,
-	trip_name,
-	stop_name,
-	payload,
-	device_identifier=None,
+	installation_id: str,
+	trip_name: str,
+	stop_name: str,
+	payload: dict | str,
+	device_identifier: str | None = None,
 ):
 	return submit_mobile_proof_of_delivery(
 		installation_id,
@@ -354,17 +358,17 @@ def submit_mobile_pod(
 	)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def upload_mobile_pod_file(
-	installation_id,
-	trip_name,
-	stop_name,
-	pod_name,
-	attachment_type,
-	content,
-	filename,
-	device_identifier=None,
-	content_encoding="base64",
+	installation_id: str,
+	trip_name: str,
+	stop_name: str,
+	pod_name: str,
+	attachment_type: str,
+	content: str,
+	filename: str,
+	device_identifier: str | None = None,
+	content_encoding: str = "base64",
 ):
 	return upload_mobile_pod_attachment(
 		installation_id,
@@ -380,7 +384,7 @@ def upload_mobile_pod_file(
 
 
 @frappe.whitelist()
-def get_mobile_trip_request_setup(installation_id, trip_name, device_identifier=None):
+def get_mobile_trip_request_setup(installation_id: str, trip_name: str, device_identifier: str | None = None):
 	return get_mobile_request_setup(installation_id, trip_name, device_identifier)
 
 
@@ -396,10 +400,10 @@ def get_mobile_request_history(
 
 @frappe.whitelist()
 def get_mobile_request(
-	installation_id,
-	doctype,
-	name,
-	device_identifier=None,
+	installation_id: str,
+	doctype: str,
+	name: str,
+	device_identifier: str | None = None,
 ):
 	return get_mobile_request_details(
 		installation_id,
@@ -411,10 +415,10 @@ def get_mobile_request(
 
 @frappe.whitelist()
 def search_mobile_material_items(
-	installation_id,
-	trip_name,
-	txt=None,
-	device_identifier=None,
+	installation_id: str,
+	trip_name: str,
+	txt: str | None = None,
+	device_identifier: str | None = None,
 ):
 	return search_mobile_material_request_items(
 		installation_id,
@@ -424,12 +428,12 @@ def search_mobile_material_items(
 	)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_mobile_trip_expense_claim(
-	installation_id,
-	trip_name,
-	payload,
-	device_identifier=None,
+	installation_id: str,
+	trip_name: str,
+	payload: dict | str,
+	device_identifier: str | None = None,
 ):
 	return create_mobile_expense_claim(
 		installation_id,
@@ -439,12 +443,12 @@ def create_mobile_trip_expense_claim(
 	)
 
 
-@frappe.whitelist()
+@frappe.whitelist(methods=["POST"])
 def create_mobile_trip_material_request(
-	installation_id,
-	trip_name,
-	payload,
-	device_identifier=None,
+	installation_id: str,
+	trip_name: str,
+	payload: dict | str,
+	device_identifier: str | None = None,
 ):
 	return create_mobile_material_request(
 		installation_id,
@@ -737,7 +741,9 @@ def get_vehicles_for_allocation(
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
-def get_drivers_for_allocation(doctype, txt, searchfield, start, page_len, filters):
+def get_drivers_for_allocation(
+	doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict | str | None
+):
 	filters = frappe.parse_json(filters) if isinstance(filters, str) else (filters or {})
 	load_names = filters.get("delivery_loads") or []
 	if isinstance(load_names, str):

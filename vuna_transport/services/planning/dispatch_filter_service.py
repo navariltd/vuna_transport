@@ -8,35 +8,39 @@ from vuna_transport.vuna_transport.doctype.dispatch_planning_filter.dispatch_pla
 	ALLOWED_FILTER_KEYS,
 )
 
-FILTER_DEFINITIONS = {
-	"delivery_group": {"label": _("Delivery Group"), "fieldtype": "Link", "options": "Delivery Group"},
-	"transport_compatibility_group": {
-		"label": _("Transport Compatibility Group"),
-		"fieldtype": "Link",
-		"options": "Transport Compatibility Group",
-	},
-	"preferred_route": {"label": _("Preferred Route"), "fieldtype": "Link", "options": "Transport Route"},
-	"maximum_vehicle_category": {
-		"label": _("Maximum Vehicle Category"),
-		"fieldtype": "Link",
-		"options": "Vehicle Category",
-	},
-	"delivery_address": {"label": _("Delivery Address"), "fieldtype": "Link", "options": "Address"},
-	"territory": {"label": _("Territory"), "fieldtype": "Link", "options": "Territory"},
-	"county": {"label": _("County"), "fieldtype": "Link", "options": "County"},
-	"constituency": {
-		"label": _("Constituency / Sub-county"),
-		"fieldtype": "Link",
-		"options": "Constituency",
-	},
-	"town": {"label": _("Town"), "fieldtype": "Link", "options": "Town"},
-	"transport_zone": {"label": _("Transport Zone"), "fieldtype": "Link", "options": "Transport Zone"},
-	"delivery_method": {"label": _("Delivery Method"), "fieldtype": "Link", "options": "Delivery Method"},
-	"priority": {"label": _("Priority"), "fieldtype": "Select", "options": "Low\nMedium\nHigh\nUrgent"},
-	"customer": {"label": _("Customer"), "fieldtype": "Link", "options": "Customer"},
-	"source_warehouse": {"label": _("Source Warehouse"), "fieldtype": "Link", "options": "Warehouse"},
-	"transport_handling_profile": {"label": _("Transport Handling Profile"), "fieldtype": "Data"},
-}
+
+def _filter_definitions():
+	"""Translate labels in the requesting site's language, not at module import."""
+	return {
+		"delivery_group": {"label": _("Delivery Group"), "fieldtype": "Link", "options": "Delivery Group"},
+		"transport_compatibility_group": {
+			"label": _("Transport Compatibility Group"),
+			"fieldtype": "Link",
+			"options": "Transport Compatibility Group",
+		},
+		"preferred_route": {"label": _("Preferred Route"), "fieldtype": "Link", "options": "Transport Route"},
+		"maximum_vehicle_category": {
+			"label": _("Maximum Vehicle Category"),
+			"fieldtype": "Link",
+			"options": "Vehicle Category",
+		},
+		"delivery_address": {"label": _("Delivery Address"), "fieldtype": "Link", "options": "Address"},
+		"territory": {"label": _("Territory"), "fieldtype": "Link", "options": "Territory"},
+		"county": {"label": _("County"), "fieldtype": "Link", "options": "County"},
+		"constituency": {
+			"label": _("Constituency / Sub-county"),
+			"fieldtype": "Link",
+			"options": "Constituency",
+		},
+		"town": {"label": _("Town"), "fieldtype": "Link", "options": "Town"},
+		"transport_zone": {"label": _("Transport Zone"), "fieldtype": "Link", "options": "Transport Zone"},
+		"delivery_method": {"label": _("Delivery Method"), "fieldtype": "Link", "options": "Delivery Method"},
+		"priority": {"label": _("Priority"), "fieldtype": "Select", "options": "Low\nMedium\nHigh\nUrgent"},
+		"customer": {"label": _("Customer"), "fieldtype": "Link", "options": "Customer"},
+		"source_warehouse": {"label": _("Source Warehouse"), "fieldtype": "Link", "options": "Warehouse"},
+		"transport_handling_profile": {"label": _("Transport Handling Profile"), "fieldtype": "Data"},
+	}
+
 
 ALLOWED_FILTER_OPERATORS = {
 	"=",
@@ -65,8 +69,9 @@ def get_filter_definitions(company=None):
 		limit_page_length=50,
 	)
 	definitions = []
+	filter_definitions = _filter_definitions()
 	for row in rows:
-		definition = FILTER_DEFINITIONS.get(row.field_key)
+		definition = filter_definitions.get(row.field_key)
 		if not definition:
 			continue
 		definitions.append(

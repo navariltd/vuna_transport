@@ -108,11 +108,14 @@ def validate_load_allocations(load, lock=True, for_execution=False):
 def _lock_delivery_order_items(item_names):
 	if not item_names:
 		return
-	placeholders = ", ".join(["%s"] * len(item_names))
-	frappe.db.sql(
-		f"select name from `tabDelivery Order Item` where name in ({placeholders}) order by name for update",
-		tuple(item_names),
-	)
+	item = frappe.qb.DocType("Delivery Order Item")
+	(
+		frappe.qb.from_(item)
+		.select(item.name)
+		.where(item.name.isin(item_names))
+		.orderby(item.name)
+		.for_update()
+	).run()
 
 
 def _validate_required_row_links(row):

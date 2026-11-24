@@ -217,8 +217,8 @@ def link_replacement_allocation_to_incident(allocation):
 	incident.db_set("replacement_vehicle_allocation", allocation.name, update_modified=True)
 
 
-@frappe.whitelist()
-def create_asset_repair(source_name):
+@frappe.whitelist(methods=["POST"])
+def create_asset_repair(source_name: str):
 	incident = frappe.get_doc("Vehicle Incident", source_name)
 	require_document_permission(incident, "write")
 	if incident.asset_repair:

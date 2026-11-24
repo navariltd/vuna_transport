@@ -40,3 +40,13 @@ def require_company_access(company):
 			_("You do not have access to Company {0}.").format(company),
 			frappe.PermissionError,
 		)
+
+
+def filter_readable_rows(doctype, rows):
+	"""Keep aggregate report rows within the user's document and company scope."""
+	require_doctype_permission(doctype, "read")
+	if not rows:
+		return []
+	names = list({row["name"] for row in rows})
+	readable = set(frappe.get_list(doctype, filters={"name": ["in", names]}, pluck="name", limit=len(names)))
+	return [row for row in rows if row["name"] in readable]

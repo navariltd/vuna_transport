@@ -169,7 +169,7 @@ def make_vehicle_allocation_from_load(source_name: str):
 
 
 @frappe.whitelist()
-def make_replacement_allocation_from_load(source_name):
+def make_replacement_allocation_from_load(source_name: str):
 	"""Prepare an auditable replacement for the load's current allocation."""
 	return make_replacement_allocation(source_name)
 

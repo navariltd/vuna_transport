@@ -3,31 +3,47 @@
 
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Coalesce
+
+from vuna_transport.services.shared.security_service import filter_readable_rows
 
 
 def execute(filters=None):
 	filters = frappe._dict(filters or {})
-	conditions = ["dt.docstatus < 2"]
-	values = {}
+	trip = frappe.qb.DocType("Delivery Trip")
+	stop = frappe.qb.DocType("Delivery Stop")
+	vehicle = Coalesce(trip.vuna_current_vehicle, trip.vehicle)
+	driver = Coalesce(trip.vuna_current_driver, trip.driver)
+	query = (
+		frappe.qb.from_(trip)
+		.join(stop)
+		.on((stop.parent == trip.name) & (stop.parenttype == "Delivery Trip"))
+		.select(
+			trip.name,
+			trip.company,
+			vehicle.as_("vehicle"),
+			driver.as_("driver"),
+			stop.vuna_delivery_load,
+			trip.departure_time,
+			trip.status,
+		)
+		.where(trip.docstatus < 2)
+		.groupby(
+			trip.name,
+			trip.company,
+			vehicle,
+			driver,
+			stop.vuna_delivery_load,
+			trip.departure_time,
+			trip.status,
+		)
+		.orderby(trip.departure_time, order=frappe.qb.desc)
+		.limit(500)
+	)
 	for field in ("company", "status"):
 		if filters.get(field):
-			conditions.append(f"dt.{field} = %({field})s")
-			values[field] = filters[field]
-	rows = frappe.db.sql(
-		f"""
-		SELECT dt.name, dt.company, COALESCE(dt.vuna_current_vehicle, dt.vehicle) AS vehicle,
-			COALESCE(dt.vuna_current_driver, dt.driver) AS driver,
-			ds.vuna_delivery_load, dt.departure_time, dt.status
-		FROM `tabDelivery Trip` dt
-		JOIN `tabDelivery Stop` ds ON ds.parent = dt.name AND ds.parenttype = 'Delivery Trip'
-		WHERE {" AND ".join(conditions)}
-		GROUP BY dt.name, dt.company, vehicle, driver, ds.vuna_delivery_load, dt.departure_time, dt.status
-		ORDER BY dt.departure_time DESC
-		LIMIT 500
-	""",
-		values,
-		as_dict=True,
-	)
+			query = query.where(trip[field] == filters[field])
+	rows = query.run(as_dict=True)
 	columns = [
 		{"label": _("Delivery Trip"), "fieldname": "name", "fieldtype": "Link", "options": "Delivery Trip"},
 		{"label": _("Company"), "fieldname": "company", "fieldtype": "Link", "options": "Company"},
@@ -42,4 +58,4 @@ def execute(filters=None):
 		{"label": _("Departure"), "fieldname": "departure_time", "fieldtype": "Datetime"},
 		{"label": _("Status"), "fieldname": "status", "fieldtype": "Data"},
 	]
-	return columns, rows
+	return columns, filter_readable_rows("Delivery Trip", rows)
