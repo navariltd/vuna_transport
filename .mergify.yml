@@ -1,0 +1,24 @@
+pull_request_rules:
+  - name: backport stable fixes to develop
+    conditions:
+      - merged
+      - base = version-16
+      - label = backport develop
+    actions:
+      backport:
+        branches:
+          - develop
+        assignees:
+          - "{{ author }}"
+
+  - name: backport reviewed development changes to version-16
+    conditions:
+      - merged
+      - base = develop
+      - label = backport version-16
+    actions:
+      backport:
+        branches:
+          - version-16
+        assignees:
+          - "{{ author }}"

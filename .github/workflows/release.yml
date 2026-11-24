@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - version-16
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: release-version-16
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Wait for tests and linters
+        id: checks
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release/wait-for-ci.cjs
+
+      - name: Generate release token
+        if: steps.checks.outputs.ready == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+          owner: navariltd
+          repositories: vuna_transport
+
+      - name: Checkout stable branch for release
+        if: steps.checks.outputs.ready == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: version-16
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Install pinned release tools
+        if: steps.checks.outputs.ready == 'true'
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Publish release from the tested stable commit
+        if: steps.checks.outputs.ready == 'true'
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          if [ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]; then
+            echo "Stable branch advanced; its own workflow will release it."
+            exit 0
+          fi
+          npm run release
