@@ -4,10 +4,13 @@ on:
   push:
     branches:
       - develop
+      - version-16
+    tags:
+      - 'v16.*'
   pull_request:
 
 concurrency:
-  group: develop-vunapos-${{ github.event.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
