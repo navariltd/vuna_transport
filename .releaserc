@@ -1,0 +1,21 @@
+{
+  "branches": ["version-16"],
+  "tagFormat": "v${version}",
+  "repositoryUrl": "https://github.com/navariltd/vuna_transport.git",
+  "plugins": [
+    ["@semantic-release/commit-analyzer", {"preset": "angular"}],
+    "@semantic-release/release-notes-generator",
+    "./scripts/release/python-version.cjs",
+    [
+      "@semantic-release/git",
+      {
+        "assets": ["vuna_transport/__init__.py"],
+        "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+      }
+    ],
+    [
+      "@semantic-release/github",
+      {"successComment": false, "failComment": false, "releasedLabels": false}
+    ]
+  ]
+}

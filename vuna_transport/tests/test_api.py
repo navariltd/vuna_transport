@@ -2,6 +2,7 @@ from datetime import datetime
 from unittest.mock import patch
 
 import frappe
+from frappe import _
 from frappe.tests import UnitTestCase
 
 from vuna_transport.api import (
@@ -137,9 +138,9 @@ class TestAllocationLoadSearch(UnitTestCase):
 
 	def reject_incompatible(self, names, category):
 		if names[-1] == "BAD-UNITS":
-			frappe.throw("Selected Transport Loads must use the same transport Weight and Volume UOMs.")
+			frappe.throw(_("Selected Transport Loads must use the same transport Weight and Volume UOMs."))
 		if names[-1] == "TOO-HEAVY":
-			frappe.throw("Vehicle Category FH is incompatible: Weight capacity exceeded.")
+			frappe.throw(_("Vehicle Category FH is incompatible: Weight capacity exceeded."))
 		return [frappe._dict(name=name) for name in names]
 
 	def test_search_returns_only_fitting_loads_without_popup_messages(self):
@@ -173,7 +174,9 @@ class TestAllocationLoadSearch(UnitTestCase):
 
 	def test_permission_denied_candidates_are_not_offered(self):
 		self.validation.return_value = [frappe._dict(name="LOAD")]
-		self.permission.side_effect = lambda *args: frappe.throw("No read permission", frappe.PermissionError)
+		self.permission.side_effect = lambda *args: frappe.throw(
+			_("No read permission"), frappe.PermissionError
+		)
 		self.assertEqual(self.search(), [])
 		self.assertEqual(frappe.local.message_log, [])
 		self.assertFalse(frappe.flags.mute_messages)

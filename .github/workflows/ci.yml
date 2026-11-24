@@ -4,13 +4,28 @@ on:
   push:
     branches:
       - develop
+      - version-16
+    tags:
+      - 'v16.*'
   pull_request:
 
 concurrency:
-  group: develop-vunapos-${{ github.event.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  release-tools:
+    name: Release tooling
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run test:release
+
   tests:
     runs-on: ubuntu-latest
     strategy:

@@ -83,8 +83,10 @@ def _require_scan_action_permission(action):
 		)
 
 
-@frappe.whitelist()
-def scan_delivery_note_qr(token, action, device_reference=None, remarks=None):
+@frappe.whitelist(methods=["POST"])
+def scan_delivery_note_qr(
+	token: str, action: str, device_reference: str | None = None, remarks: str | None = None
+):
 	"""Apply one authenticated loading or gate-dispatch scan."""
 	_require_scan_action_permission(action)
 	doc = _resolve_qr_token(token)
@@ -139,7 +141,6 @@ def scan_delivery_note_qr(token, action, device_reference=None, remarks=None):
 		},
 		update_modified=True,
 	)
-	frappe.db.commit()
 
 	return {
 		"delivery_note": doc.name,

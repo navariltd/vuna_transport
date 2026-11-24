@@ -3,6 +3,7 @@
 import json
 
 import frappe
+from frappe import _
 from frappe.contacts.doctype.address.address import get_address_display
 from frappe.utils import add_days, flt, nowdate, nowtime
 
@@ -52,7 +53,6 @@ def generate_dispatch_test_data():
 		],
 		order_by="required_delivery_date asc, source_warehouse asc, creation asc",
 	)
-	frappe.db.commit()
 	return {
 		"company": COMPANY,
 		"warehouses": [NAIROBI_WAREHOUSE, MERU_WAREHOUSE],
@@ -76,10 +76,10 @@ def generate_dispatch_test_data():
 
 def _validate_prerequisites():
 	if not frappe.db.exists("Company", COMPANY):
-		frappe.throw(f"Company {COMPANY} does not exist.")
+		frappe.throw(_("Company {0} does not exist.").format(COMPANY))
 	for warehouse in (NAIROBI_WAREHOUSE, MERU_WAREHOUSE):
 		if not frappe.db.exists("Warehouse", warehouse):
-			frappe.throw(f"Warehouse {warehouse} does not exist.")
+			frappe.throw(_("Warehouse {0} does not exist.").format(warehouse))
 
 
 def _ensure_zones():
