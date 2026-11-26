@@ -113,6 +113,8 @@ def validate_collection(proof):
 def _normalize_item(row, seen_serials, source=None):
 	from erpnext.stock.get_item_details import get_conversion_factor
 
+	from vuna_transport.services.execution.collection_reference_service import collection_conversion_factor
+
 	item = frappe.get_doc("Item", row.item_code)
 	if item.disabled or not item.is_stock_item:
 		frappe.throw(_("Only active stock items may be collected."))
@@ -127,7 +129,7 @@ def _normalize_item(row, seen_serials, source=None):
 	if not source and row.uom != item.stock_uom and not any(detail.uom == row.uom for detail in item.uoms):
 		frappe.throw(_("Select a configured Item UOM for {0}.").format(item.name))
 	factor = flt(
-		source["conversion_factor"]
+		collection_conversion_factor(source, row.uom)
 		if source
 		else get_conversion_factor(item.name, row.uom).get("conversion_factor")
 	)
@@ -167,7 +169,7 @@ def _normalize_item(row, seen_serials, source=None):
 	elif serials:
 		frappe.throw(_("This item does not use serial numbers."))
 	row.serial_no = "\n".join(serials)
-	row.ordered_qty = source["qty"] if source else quantity
+	row.ordered_qty = source["stock_qty"] / factor if source else quantity
 	row.rejected_qty = row.rejected_stock_qty = row.missing_qty = 0
 	row.rejected_serial_no = None
 

@@ -100,6 +100,11 @@ class TestUnplannedCollection(unittest.TestCase):
 							"uom": "Carton",
 							"qty": 10,
 							"conversion_factor": self.conversion.return_value["conversion_factor"],
+							"uom_factors": {
+								"Carton": self.conversion.return_value["conversion_factor"],
+								"Pcs": 1,
+								"Pack": 5,
+							},
 							"stock_qty": 100,
 							"warehouse": "Depot",
 							"batch_no": self.row.batch_no,
@@ -241,11 +246,25 @@ class TestUnplannedCollection(unittest.TestCase):
 		with self.assertRaisesRegex(ValueError, "Only dispatch"):
 			service.validate_collection(self.proof)
 
-	def test_uom_must_match_the_reference_document(self):
+	def test_unknown_uom_is_rejected_before_item_conversion(self):
 		self.row.uom = "Unknown Packaging"
 		with self.assertRaisesRegex(ValueError, "referenced document"):
 			service.validate_collection(self.proof)
 		self.conversion.assert_not_called()
+
+	def test_piece_collection_uses_stock_factor_not_carton_or_client_factor(self):
+		self.row.uom, self.row.delivered_qty, self.row.conversion_factor = "Pcs", 5, 999
+		service.validate_collection(self.proof)
+		self.assertEqual(
+			(self.row.uom, self.row.conversion_factor, self.row.stock_qty, self.row.ordered_qty),
+			("Pcs", 1, 5, 100),
+		)
+		self.conversion.assert_not_called()
+
+	def test_alternate_pack_collection_uses_configured_conversion(self):
+		self.row.uom, self.row.delivered_qty = "Pack", 2
+		service.validate_collection(self.proof)
+		self.assertEqual((self.row.conversion_factor, self.row.stock_qty, self.row.ordered_qty), (5, 10, 20))
 
 	def test_nonpositive_and_nonfinite_quantities_rejected(self):
 		for qty in (-1, 0, float("inf"), float("nan")):
