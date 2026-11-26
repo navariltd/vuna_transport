@@ -8,6 +8,7 @@ from erpnext.utilities.transaction_base import validate_uom_is_integer
 from frappe import _
 from frappe.utils import flt, nowdate
 
+from vuna_transport.services.execution.return_uom_service import configure_return_uom
 from vuna_transport.services.execution.transfer_proof_service import stock_identities
 from vuna_transport.services.shared.security_service import require_document_permission
 
@@ -124,43 +125,52 @@ def validate_manual_depot_return(request):
 		qty = flt(row.requested_return_qty)
 		if not source or row.item_code != source.item_code or not math.isfinite(qty) or qty <= 0:
 			frappe.throw(_("Select a valid received item/batch and a positive return quantity."))
+		configure_return_uom(row, source)
 		chosen = [value.strip() for value in (row.serial_no or "").splitlines() if value.strip()]
 		allowed = set(source.serial_no.splitlines())
 		if (
 			len(chosen) != len(set(chosen))
 			or serials.intersection(chosen)
 			or not set(chosen).issubset(allowed)
-			or (allowed and len(chosen) != flt(qty * source.conversion_factor))
+			or (allowed and len(chosen) != flt(qty * row.conversion_factor))
 		):
 			frappe.throw(_("Select the original serial numbers matching the requested quantity."))
 		serials.update(chosen)
 		for field in (
 			"item_name",
-			"uom",
-			"stock_uom",
-			"conversion_factor",
 			"source_bundle",
 			"custody_warehouse",
-			"delivered_qty",
 		):
 			row.set(field, source[field])
-		quantities[key] += qty
+		quantities[key] += qty * row.conversion_factor
 	# Locking the original voucher serializes approvals/edits against the same receipt.
-	for existing in frappe.db.sql(
-		"""select i.stock_entry_detail, i.batch_no, i.requested_return_qty, i.serial_no
-		from `tabReturn Request Item` i join `tabReturn Request` r on r.name=i.parent
-		where r.docstatus!=2 and r.source_stock_entry=%s and r.source_warehouse=%s
-		and r.name!=%s for update""",
-		(stock.name, request.source_warehouse, request.name or ""),
-		as_dict=True,
-	):
+	item, parent = frappe.qb.DocType("Return Request Item"), frappe.qb.DocType("Return Request")
+	for existing in (
+		frappe.qb.from_(item)
+		.join(parent)
+		.on(parent.name == item.parent)
+		.select(
+			item.stock_entry_detail,
+			item.batch_no,
+			item.requested_return_qty,
+			item.serial_no,
+			item.conversion_factor,
+		)
+		.where(
+			(parent.docstatus != 2)
+			& (parent.source_stock_entry == stock.name)
+			& (parent.source_warehouse == request.source_warehouse)
+			& (parent.name != (request.name or ""))
+		)
+		.for_update()
+	).run(as_dict=True):
 		key = (existing.stock_entry_detail, existing.batch_no or "")
 		if key in quantities:
-			quantities[key] += flt(existing.requested_return_qty)
+			quantities[key] += flt(existing.requested_return_qty) * (flt(existing.conversion_factor) or 1)
 		if serials.intersection((existing.serial_no or "").splitlines()):
 			frappe.throw(_("A selected serial number is already reserved by another Return Request."))
 	for key, quantity in quantities.items():
-		if flt(quantity - options[key].delivered_qty, precision) > 0:
+		if flt(quantity - options[key].delivered_qty * options[key].conversion_factor, precision) > 0:
 			frappe.throw(_("Return quantities exceed the original receipt after other active requests."))
 	validate_uom_is_integer(request, "uom", "requested_return_qty", "Return Request Item")
 	request.return_context, request.return_source = "Depot", "Manual"
