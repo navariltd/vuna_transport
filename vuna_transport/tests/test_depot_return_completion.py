@@ -99,6 +99,14 @@ class TestDepotInspection(unittest.TestCase):
 		inspection.validate_inspection(self.doc)
 		self.assertEqual(self.doc.pending_stock_qty, 8)
 
+	def test_five_piece_receipt_splits_into_three_accepted_and_two_rejected(self):
+		self.source.stock_qty = 5
+		self.doc.results = [self.result(3), self.result(2, "Rejected")]
+		inspection.validate_inspection(self.doc)
+		self.assertEqual(
+			(self.doc.accepted_stock_qty, self.doc.rejected_stock_qty, self.doc.pending_stock_qty), (3, 2, 0)
+		)
+
 	def test_partial_inspection_cannot_submit(self):
 		self.doc.results = [self.result(12)]
 		with self.assertRaises(ValueError):
@@ -291,14 +299,38 @@ class TestManualDepotApproval(unittest.TestCase):
 		self.assertEqual((self.row.uom, self.row.conversion_factor), ("Carton", 10))
 
 	def test_other_requests_reserve_original_receipt_quantity(self):
-		self.framework.db.sql.return_value = [
-			frappe._dict(stock_entry_detail="SED-1", batch_no="B1", requested_return_qty=2, serial_no="")
+		self.framework.qb.from_.return_value.join.return_value.on.return_value.select.return_value.where.return_value.for_update.return_value.run.return_value = [
+			frappe._dict(
+				stock_entry_detail="SED-1",
+				batch_no="B1",
+				requested_return_qty=2,
+				serial_no="",
+				conversion_factor=10,
+			)
 		]
 		with self.assertRaises(ValueError):
 			manual.validate_manual_depot_return(self.request)
 
 	def test_over_return_is_rejected(self):
 		self.row.requested_return_qty = 3
+		with self.assertRaises(ValueError):
+			manual.validate_manual_depot_return(self.request)
+
+	def test_piece_request_and_carton_reservation_share_one_stock_limit(self):
+		self.row.uom, self.row.requested_return_qty = "Pcs", 5
+		query = self.framework.qb.from_.return_value.join.return_value.on.return_value.select.return_value.where.return_value.for_update.return_value
+		query.run.return_value = [
+			frappe._dict(
+				stock_entry_detail="SED-1",
+				batch_no="B1",
+				requested_return_qty=1,
+				conversion_factor=10,
+				serial_no="",
+			)
+		]
+		manual.validate_manual_depot_return(self.request)
+		self.assertEqual((self.row.uom, self.row.conversion_factor, self.row.delivered_qty), ("Pcs", 1, 20))
+		self.row.requested_return_qty = 11
 		with self.assertRaises(ValueError):
 			manual.validate_manual_depot_return(self.request)
 

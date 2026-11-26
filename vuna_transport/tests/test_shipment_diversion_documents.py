@@ -261,10 +261,14 @@ class TestDiversionDocuments(TestCase):
 	def test_return_mapper_keeps_original_price_but_receives_only_approved_quantity(self):
 		self.framework.get_doc.return_value = frappe._dict(process_version="Custody and Inspection")
 		self.framework.get_all.return_value = []
-		row = Document(dn_detail="DNI", qty=-10, rate=1200)
+		row = Document(dn_detail="DNI", qty=-10, stock_qty=-240, conversion_factor=24, rate=1200)
 		target = Document(items=[row], calculate_taxes_and_totals=MagicMock())
 		with (
 			patch("erpnext.controllers.sales_and_purchase_return.make_return_doc", return_value=target),
+			patch(
+				"vuna_transport.services.execution.return_service.sales_return_stock_allowance",
+				return_value=240,
+			),
 			patch.object(service, "_bundle") as bundle,
 		):
 			service._make_sales_return(self.doc)

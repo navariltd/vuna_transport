@@ -150,20 +150,21 @@ def validate_depot_return(request):
 		group = expected.get(key)
 		source = group.result if group else None
 		quantity = flt(row.requested_return_qty)
+		if source:
+			from vuna_transport.services.execution.return_uom_service import configure_return_uom
+
+			configure_return_uom(row, source)
 		if (
 			not source
 			or key in seen
 			or not math.isfinite(quantity)
 			or quantity <= 0
-			or flt(quantity - group.qty, precision)
+			or flt(quantity * row.conversion_factor - group.qty * source.conversion_factor, precision)
 		):
 			frappe.throw(_("Return expectations must preserve each POD rejection group and its quantity."))
 		for field in (
 			"item_code",
 			"item_name",
-			"uom",
-			"stock_uom",
-			"conversion_factor",
 			"batch_no",
 			"source_bundle",
 		):

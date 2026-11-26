@@ -27,6 +27,17 @@ class ReturnRequest(Document):
 	def before_update_after_submit(self):
 		from vuna_transport.services.demand.delivery_method_service import validate_source_delivery_method
 
+		previous = self.get_doc_before_save()
+		if previous:
+			approved = {row.name: row for row in previous.items}
+			for row in self.items:
+				source = approved.get(row.name)
+				if not source or any(
+					row.get(field) != source.get(field) for field in ("uom", "stock_uom", "conversion_factor")
+				):
+					frappe.throw(
+						_("The UOM and conversion factor cannot change after Return Request submission.")
+					)
 		validate_source_delivery_method(self)
 
 	def before_submit(self):

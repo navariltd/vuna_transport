@@ -182,6 +182,7 @@ async function select_depot_return_items(frm) {
 						item.batch_no === row.batch_no
 				);
 				frm.add_child("items", {
+					_return_uom: source.uom,
 					...source,
 					requested_return_qty: row.requested_return_qty,
 					serial_no: row.serial_no,
@@ -201,6 +202,13 @@ frappe.ui.form.on("Return Request", {
 	},
 
 	setup(frm) {
+		frm.set_query("uom", "items", (doc, cdt, cdn) => {
+			const [source_doctype, source_row] = return_uom_source(frappe.get_doc(cdt, cdn));
+			return {
+				query: "vuna_transport.services.execution.return_uom_service.get_return_uom_query",
+				filters: { source_doctype, source_row },
+			};
+		});
 		frm.set_query("source_warehouse", () => ({
 			filters: {
 				company: frm.doc.company,
@@ -259,6 +267,7 @@ frappe.ui.form.on("Return Request", {
 	},
 
 	refresh(frm) {
+		for (const row of frm.doc.items || []) row._return_uom = row.uom;
 		add_shipment_diversion_action(frm);
 		for (const field of [
 			"customer",
@@ -636,7 +645,44 @@ function clear_customer_dependent_context(frm) {
 	frm.refresh_field("items");
 }
 
+function return_uom_source(row) {
+	if (row.delivery_note_item) return ["Delivery Note Item", row.delivery_note_item];
+	if (row.sales_invoice_item) return ["Sales Invoice Item", row.sales_invoice_item];
+	if (row.source_pod_item) return ["Proof of Delivery Item", row.source_pod_item];
+	return ["Stock Entry Detail", row.stock_entry_detail];
+}
+
 frappe.ui.form.on("Return Request Item", {
+	async uom(frm, cdt, cdn) {
+		const row = frappe.get_doc(cdt, cdn);
+		if (frm.doc.docstatus !== 0 || row._changing_return_uom || !row.uom) return;
+		const sources = return_uom_source(row);
+		if (!sources[1]) return;
+		const previous = row._return_uom;
+		const oldFactor = flt(row.conversion_factor) || 1;
+		row._changing_return_uom = true;
+		try {
+			const { message } = await frappe.call({
+				method: "vuna_transport.services.execution.return_uom_service.get_return_uom_details",
+				args: { source_doctype: sources[0], source_row: sources[1], uom: row.uom },
+				freeze: true,
+			});
+			const ratio = oldFactor / message.conversion_factor;
+			await frappe.model.set_value(cdt, cdn, {
+				conversion_factor: message.conversion_factor,
+				stock_uom: message.stock_uom,
+				requested_return_qty: flt(row.requested_return_qty) * ratio,
+				delivered_qty: flt(row.delivered_qty) * ratio,
+				remaining_qty: flt(row.remaining_qty) * ratio,
+			});
+			row._return_uom = row.uom;
+		} catch (error) {
+			await frappe.model.set_value(cdt, cdn, "uom", previous || "");
+			throw error;
+		} finally {
+			row._changing_return_uom = false;
+		}
+	},
 	requested_return_qty(frm, cdt, cdn) {
 		const row = frappe.get_doc(cdt, cdn);
 		frappe.model.set_value(
@@ -683,19 +729,21 @@ function show_returnable_items_dialog(frm, items) {
 	);
 	const data = items.map((item) => {
 		const existing = existing_items.get(get_return_item_source_key(item));
+		const factor = flt(existing?.conversion_factor || item.conversion_factor) || 1;
+		const ratio = (flt(item.conversion_factor) || 1) / factor;
 		return {
 			delivery_note_item: item.delivery_note_item,
 			sales_invoice_item: item.sales_invoice_item,
 			delivery_order_item: item.delivery_order_item,
 			transport_demand_item: item.transport_demand_item,
 			stock_uom: item.stock_uom,
-			conversion_factor: item.conversion_factor,
+			conversion_factor: factor,
 			batch_no: item.batch_no,
 			item_code: item.item_code,
 			item_name: item.item_name,
-			delivered_qty: item.delivered_qty,
-			available_return_qty: item.requested_return_qty,
-			uom: item.uom,
+			delivered_qty: flt(item.delivered_qty) * ratio,
+			available_return_qty: flt(item.requested_return_qty) * ratio,
+			uom: existing?.uom || item.uom,
 			requested_return_qty: existing
 				? flt(existing.requested_return_qty)
 				: flt(item.requested_return_qty),
@@ -797,6 +845,7 @@ function show_returnable_items_dialog(frm, items) {
 			frm.clear_table("items");
 			selected.forEach((item) => {
 				frm.add_child("items", {
+					_return_uom: item.uom,
 					delivery_note_item: item.delivery_note_item,
 					sales_invoice_item: item.sales_invoice_item,
 					delivery_order_item: item.delivery_order_item,

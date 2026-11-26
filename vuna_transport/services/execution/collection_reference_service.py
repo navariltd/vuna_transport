@@ -1,10 +1,43 @@
 """Resolve stop parties and allow only goods from their submitted stock documents."""
 
+import math
 from collections import defaultdict
 
 import frappe
 from frappe import _
 from frappe.utils import flt
+
+
+def collection_uom_options(source):
+	"""Offer Item units while retaining the original voucher's conversion snapshot."""
+	item = frappe.get_cached_doc("Item", source.item_code)
+	factors = {row.uom: flt(row.conversion_factor) for row in item.uoms}
+	if item.variant_of:
+		template = frappe.get_cached_doc("Item", item.variant_of)
+		factors = {**{row.uom: flt(row.conversion_factor) for row in template.uoms}, **factors}
+	factors.update({source.uom: flt(source.conversion_factor), source.stock_uom: 1})
+	allowed, whole = {}, []
+	for uom, factor in factors.items():
+		if not math.isfinite(factor) or factor <= 0:
+			continue
+		settings = frappe.db.get_value("UOM", uom, ["enabled", "must_be_whole_number"])
+		if not settings or not settings[0]:
+			continue
+		allowed[uom] = factor
+		if settings[1]:
+			whole.append(uom)
+	return allowed, whole
+
+
+def collection_conversion_factor(source, uom):
+	factors = source.get("uom_factors")
+	if factors is None:
+		# Legacy reference snapshots expose only the source unit.
+		factors = {source["uom"]: source["conversion_factor"]}
+	factor = flt(factors.get(uom))
+	if not math.isfinite(factor) or factor <= 0:
+		frappe.throw(_("Select a configured UOM from the referenced document's item."))
+	return factor
 
 
 def stop_context(trip, stop_name, *, allow_empty=False):
@@ -79,8 +112,9 @@ def reference_options(trip, stop_name, reference_type, reference_name, *, lock=F
 			):
 				continue
 		factor = flt(row.conversion_factor)
-		if factor <= 0:
+		if not math.isfinite(factor) or factor <= 0:
 			frappe.throw(_("The source document has an invalid UOM conversion factor."))
+		uom_factors, whole_number_uoms = collection_uom_options(row)
 		groups = _identity_groups(row, reference_type)
 		for batch, group in groups.items():
 			stock_qty = group["stock_qty"]
@@ -99,7 +133,9 @@ def reference_options(trip, stop_name, reference_type, reference_name, *, lock=F
 					"name": row.item_code,
 					"item_name": row.item_name or row.item_code,
 					"uom": row.uom,
-					"uoms": [row.uom],
+					"uoms": list(uom_factors),
+					"uom_factors": uom_factors,
+					"whole_number_uoms": whole_number_uoms,
 					"stock_uom": row.stock_uom,
 					"conversion_factor": factor,
 					"qty": stock_qty / factor,
@@ -145,8 +181,9 @@ def validate_reference_rows(proof, reference):
 	for row in proof.items:
 		key = (row.get("collection_reference_row"), row.batch_no or "")
 		source = options.get(key)
-		if not source or row.item_code != source["name"] or row.uom != source["uom"]:
+		if not source or row.item_code != source["name"]:
 			frappe.throw(_("Select an item row, batch and UOM from the referenced document."))
+		collection_conversion_factor(source, row.uom)
 		if reference["party_type"] == "Depot":
 			if proof.get("collection_warehouse") and proof.collection_warehouse != source["warehouse"]:
 				frappe.throw(
