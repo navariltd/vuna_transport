@@ -345,19 +345,24 @@ def validate_rejection_request(request):
 	for row in request.items:
 		key = (row.source_pod_item, row.custody_warehouse)
 		group = expected.get(key)
+		if group:
+			from vuna_transport.services.execution.return_uom_service import configure_return_uom
+
+			configure_return_uom(row, group.result)
 		if (
 			not group
 			or key in seen
 			or not math.isfinite(flt(row.requested_return_qty))
-			or abs(flt(row.requested_return_qty) - group.qty) > 1e-6
+			or abs(
+				flt(row.requested_return_qty) * row.conversion_factor
+				- group.qty * group.result.conversion_factor
+			)
+			> 1e-6
 		):
 			frappe.throw(_("Preserve every rejected POD custody group and its exact quantity."))
 		for field in (
 			"item_code",
 			"item_name",
-			"uom",
-			"stock_uom",
-			"conversion_factor",
 			"batch_no",
 			"source_bundle",
 		):

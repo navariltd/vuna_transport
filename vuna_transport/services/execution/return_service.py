@@ -6,6 +6,11 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, flt, now_datetime, nowdate
 
+from vuna_transport.services.execution.return_uom_service import (
+	apply_sales_return_uom,
+	configure_return_uom,
+	copy_return_commercial_terms,
+)
 from vuna_transport.services.execution.stock_identity_service import (
 	get_delivery_note_item_batches,
 	get_single_delivery_note_item_batch,
@@ -169,6 +174,7 @@ def _validate_return_warehouse(request):
 def _validate_items(request, source, source_type):
 	if not request.items:
 		frappe.throw(_("At least one Return Request Item is required."))
+	frappe.db.get_value(source_type, source.name, "name", for_update=True)
 	source_items = {row.name: row for row in source.items}
 	seen = set()
 	for row in request.items:
@@ -184,9 +190,7 @@ def _validate_items(request, source, source_type):
 			)
 		row.item_code = source_item.item_code
 		row.item_name = source_item.item_name
-		row.uom = source_item.uom
-		row.stock_uom = source_item.stock_uom
-		row.conversion_factor = flt(source_item.conversion_factor) or 1
+		configure_return_uom(row, source_item)
 		if source_type == "Delivery Note":
 			allocation = (
 				frappe.db.get_value(
@@ -213,7 +217,6 @@ def _validate_items(request, source, source_type):
 				)
 			if len(source_batches) == 1:
 				row.batch_no = source_batches[0]
-		row.delivered_qty = abs(flt(source_item.qty))
 		if source_type == "Delivery Note" and row.delivery_order_item and source_item.so_detail:
 			if (
 				frappe.db.get_value("Delivery Order Item", row.delivery_order_item, "sales_order_item")
@@ -229,10 +232,17 @@ def _validate_items(request, source, source_type):
 			if source_type == "Delivery Note"
 			else get_remaining_returnable_sales_invoice_quantity(reference, request.name)
 		)
-		remaining = _round_return_request_qty(remaining)
+		remaining_stock = remaining * (flt(source_item.conversion_factor) or 1)
+		remaining = _round_return_request_qty(
+			remaining * (flt(source_item.conversion_factor) or 1) / row.conversion_factor
+		)
 		requested = flt(row.requested_return_qty, row.precision("requested_return_qty"))
 		row.requested_return_qty = requested
-		if requested <= 0 or requested > remaining:
+		if (
+			requested <= 0
+			or flt(requested * row.conversion_factor - remaining_stock, row.precision("requested_return_qty"))
+			> 0
+		):
 			frappe.throw(
 				_("Return quantity for {0} must be greater than zero and no more than {1}.").format(
 					row.item_code, remaining
@@ -580,79 +590,104 @@ def recalculate_return_request(return_request):
 
 
 def get_remaining_returnable_quantity(delivery_note_item, exclude_request=None):
-	"""Return remaining quantity in the Delivery Note item's transaction UOM."""
-	row = frappe.db.get_value(
-		"Delivery Note Item",
-		delivery_note_item,
-		["parent", "stock_qty", "qty", "conversion_factor"],
-		as_dict=True,
+	"""Return remaining quantity in the source transaction UOM, reserving stock units."""
+	return _remaining_returnable_quantity(
+		"Delivery Note", "dn_detail", "delivery_note_item", delivery_note_item, exclude_request
 	)
-	if not row:
-		frappe.throw(_("Delivery Note Item {0} was not found.").format(delivery_note_item))
-	conversion_factor = flt(row.get("conversion_factor")) or 1
-	delivered = abs(flt(row.get("qty")))
-	returned_stock = frappe.db.sql(
-		"""
-		select coalesce(sum(abs(dni.stock_qty)), 0)
-		from `tabDelivery Note Item` dni
-		inner join `tabDelivery Note` dn on dn.name = dni.parent
-		where dni.dn_detail = %s and dn.is_return = 1 and dn.docstatus = 1
-		""",
-		delivery_note_item,
-	)[0][0]
-	returned = flt(returned_stock) / conversion_factor
-	requested = frappe.db.sql(
-		"""
-		select coalesce(sum(greatest(
-			rri.requested_return_qty - coalesce((
-				select sum(abs(return_item.stock_qty)) / %s
-				from `tabDelivery Note Item` return_item
-				inner join `tabDelivery Note` return_dn on return_dn.name = return_item.parent
-				where return_dn.name = rr.return_stock_document
-				  and return_dn.docstatus = 1
-				  and return_item.dn_detail = rri.delivery_note_item
-			), 0), 0)), 0)
-		from `tabReturn Request Item` rri
-		inner join `tabReturn Request` rr on rr.name = rri.parent
-		where rri.delivery_note_item = %s
-		  and rr.docstatus != 2
-		  and (%s is null or rr.name != %s)
-		""",
-		(conversion_factor, delivery_note_item, exclude_request, exclude_request),
-	)[0][0]
-	return max(delivered - flt(returned) - flt(requested), 0)
 
 
 def get_remaining_returnable_sales_invoice_quantity(sales_invoice_item, exclude_request=None):
-	"""Return remaining quantity in a stock-updating Sales Invoice item's UOM."""
-	row = frappe.db.get_value(
-		"Sales Invoice Item", sales_invoice_item, ["qty", "conversion_factor"], as_dict=True
+	"""Return remaining quantity in the original stock invoice UOM."""
+	return _remaining_returnable_quantity(
+		"Sales Invoice", "sales_invoice_item", "sales_invoice_item", sales_invoice_item, exclude_request
 	)
-	if not row:
-		frappe.throw(_("Sales Invoice Item {0} was not found.").format(sales_invoice_item))
-	conversion_factor = flt(row.conversion_factor) or 1
-	delivered = abs(flt(row.qty))
-	returned_stock = frappe.db.sql(
-		"""
-		select coalesce(sum(abs(sii.stock_qty)), 0)
-		from `tabSales Invoice Item` sii
-		inner join `tabSales Invoice` si on si.name = sii.parent
-		where sii.sales_invoice_item = %s and si.is_return = 1 and si.docstatus = 1
-		""",
-		sales_invoice_item,
-	)[0][0]
-	returned = flt(returned_stock) / conversion_factor
-	requested = frappe.db.sql(
-		"""
-		select coalesce(sum(rri.requested_return_qty), 0)
-		from `tabReturn Request Item` rri
-		inner join `tabReturn Request` rr on rr.name = rri.parent
-		where rri.sales_invoice_item = %s and rr.docstatus != 2
-		and (%s is null or rr.name != %s)
-		""",
-		(sales_invoice_item, exclude_request, exclude_request),
-	)[0][0]
-	return max(delivered - returned - flt(requested), 0)
+
+
+def _posted_sales_return_stock(doctype, reference_field, reference):
+	detail, parent = frappe.qb.DocType(doctype + " Item"), frappe.qb.DocType(doctype)
+	rows = (
+		frappe.qb.from_(detail)
+		.join(parent)
+		.on(parent.name == detail.parent)
+		.select(detail.parent, detail.stock_qty)
+		.where((detail[reference_field] == reference) & (parent.is_return == 1) & (parent.docstatus == 1))
+	).run(as_dict=True)
+	posted = defaultdict(float)
+	for row in rows:
+		posted[row.parent] += abs(flt(row.stock_qty))
+	return posted
+
+
+def sales_return_stock_allowance(doctype, source_item):
+	"""ERPNext's mapper can subtract raw transaction qty across different UOMs.
+
+	Rebuild its allowance from posted stock instead, before changing the mapped
+	UOM. This also handles a zero mapped qty after an earlier piece-based return.
+	"""
+	reference = "dn_detail" if doctype == "Delivery Note" else "sales_invoice_item"
+	posted = _posted_sales_return_stock(doctype, reference, source_item.name)
+	delivered = abs(
+		flt(source_item.stock_qty or flt(source_item.qty) * (flt(source_item.conversion_factor) or 1))
+	)
+	return max(delivered - sum(posted.values()), 0)
+
+
+def _remaining_returnable_quantity(doctype, reference_field, request_field, reference, exclude_request):
+	source = frappe.db.get_value(
+		doctype + " Item", reference, ["qty", "stock_qty", "conversion_factor"], as_dict=True
+	)
+	if not source:
+		frappe.throw(_("{0} Item {1} was not found.").format(doctype, reference))
+	factor = flt(source.get("conversion_factor")) or 1
+	posted = _posted_sales_return_stock(doctype, reference_field, reference)
+	item, request = frappe.qb.DocType("Return Request Item"), frappe.qb.DocType("Return Request")
+	query = (
+		frappe.qb.from_(item)
+		.join(request)
+		.on(request.name == item.parent)
+		.select(
+			item.parent,
+			item.requested_return_qty,
+			item.conversion_factor,
+			request.return_stock_document,
+			request.credit_note,
+		)
+		.where((item[request_field] == reference) & (request.docstatus != 2))
+	)
+	if exclude_request:
+		query = query.where(request.name != exclude_request)
+	reservations = query.run(as_dict=True)
+	# Link by each posted document's request, not just the latest forward link:
+	# V2 can receive one approved request over several partial Sales Returns.
+	posted_by_request = defaultdict(float)
+	if posted and doctype == "Delivery Note":
+		for row in frappe.get_all(
+			doctype, filters={"name": ["in", list(posted)]}, fields=["name", "vuna_return_request"]
+		):
+			posted_by_request[row.vuna_return_request] += posted[row.name]
+	for row in reservations:
+		linked = row.return_stock_document if doctype == "Delivery Note" else row.credit_note
+		posted_by_request[row.parent] = max(posted_by_request[row.parent], posted.get(linked, 0))
+	outstanding = sum(
+		max(
+			flt(row.requested_return_qty) * (flt(row.conversion_factor) or 1) - posted_by_request[row.parent],
+			0,
+		)
+		for row in reservations
+	)
+	delivered_stock = abs(flt(source.get("stock_qty") or flt(source.get("qty")) * factor))
+	# Editing/revalidating this request must retain its own approved allowance,
+	# including goods it has already received. Other requests still see that
+	# stock as returned and cannot reserve it again.
+	own_posted = 0
+	if exclude_request and posted:
+		linked = frappe.db.get_value(
+			"Return Request",
+			exclude_request,
+			"return_stock_document" if doctype == "Delivery Note" else "credit_note",
+		)
+		own_posted = max(posted_by_request[exclude_request], posted.get(linked, 0))
+	return max(delivered_stock - sum(posted.values()) + own_posted - outstanding, 0) / factor
 
 
 @frappe.whitelist()
@@ -675,7 +710,8 @@ def get_returnable_items(delivery_note: str, exclude_request: str | None = None)
 
 	items = []
 	for row in source.items:
-		remaining = _round_return_request_qty(get_remaining_returnable_quantity(row.name, exclude_request))
+		# Keep the stock-unit remainder exact until the user chooses the return UOM.
+		remaining = get_remaining_returnable_quantity(row.name, exclude_request)
 		if remaining <= 0:
 			continue
 		delivery_order_item = row.get("delivery_order_item")
@@ -739,9 +775,7 @@ def get_sales_invoice_return_context(sales_invoice: str, exclude_request: str | 
 
 	items = []
 	for row in source.items:
-		remaining = _round_return_request_qty(
-			get_remaining_returnable_sales_invoice_quantity(row.name, exclude_request)
-		)
+		remaining = get_remaining_returnable_sales_invoice_quantity(row.name, exclude_request)
 		if remaining <= 0:
 			continue
 		items.append(
@@ -854,6 +888,7 @@ def create_return_stock_document(return_request: str):
 
 		source = frappe.get_doc("Sales Invoice", request.sales_invoice)
 		require_document_permission(source, "read")
+		source_items = {row.name: row for row in source.items}
 		target = make_return_doc("Sales Invoice", source.name)
 		collected = _get_collected_return_stock_quantities(request, "sales_invoice_item")
 		requested_by_item = {row.sales_invoice_item: row for row in request.items}
@@ -862,6 +897,10 @@ def create_return_stock_document(return_request: str):
 			request_item = requested_by_item.get(row.sales_invoice_item)
 			if not request_item:
 				continue
+			row.stock_qty = -sales_return_stock_allowance(
+				"Sales Invoice", source_items[row.sales_invoice_item]
+			)
+			apply_sales_return_uom(row, request_item, RETURN_SALES_ITEM_COMMERCIAL_FIELDS)
 			quantity = _sales_return_quantity(row, request_item, collected, "sales_invoice_item")
 			if quantity <= 0:
 				continue
@@ -888,6 +927,7 @@ def create_return_stock_document(return_request: str):
 
 	source = frappe.get_doc("Delivery Note", request.delivery_note)
 	require_document_permission(source, "read")
+	source_items = {row.name: row for row in source.items}
 	target = make_return_doc("Delivery Note", source.name)
 	collected = _get_collected_return_stock_quantities(request, "delivery_note_item")
 	requested_by_item = {row.delivery_note_item: row for row in request.items}
@@ -896,6 +936,8 @@ def create_return_stock_document(return_request: str):
 		request_item = requested_by_item.get(row.dn_detail)
 		if not request_item:
 			continue
+		row.stock_qty = -sales_return_stock_allowance("Delivery Note", source_items[row.dn_detail])
+		apply_sales_return_uom(row, request_item, RETURN_SALES_ITEM_COMMERCIAL_FIELDS)
 		conversion_factor = flt(row.conversion_factor) or 1
 		expected_qty = _sales_return_quantity(row, request_item, collected, "delivery_note_item")
 		if expected_qty <= 0:
@@ -949,27 +991,26 @@ def _get_collected_return_stock_quantities(request, source_field):
 
 
 def _sales_return_quantity(row, request_item, collected, source_field):
-	if collected is None:
-		return _round_return_request_qty(request_item.requested_return_qty)
 	factor = flt(row.conversion_factor)
 	if factor <= 0:
 		frappe.throw(_("Sales Return items require a positive UOM conversion factor."))
 	key = request_item.get(source_field)
 	stock_qty = min(
-		max(flt(collected.get(key)), 0),
+		max(flt(collected.get(key)), 0) if collected is not None else abs(flt(row.stock_qty)),
 		abs(flt(row.stock_qty)),
 		_round_return_request_qty(request_item.requested_return_qty)
 		* (flt(request_item.conversion_factor) or 1),
 	)
 	quantity = flt(stock_qty / factor, row.precision("qty"))
-	if flt(quantity * factor - stock_qty, row.precision("stock_qty")) > 0:
+	if abs(flt(quantity * factor - stock_qty, row.precision("stock_qty"))) > 0:
 		frappe.throw(
 			_(
 				"Collected quantity for {0} cannot be represented in the Sales Return UOM at the current quantity precision."
 			).format(request_item.item_code)
 		)
 	# Consume the allowance in case ERPNext maps the same source row more than once.
-	collected[key] = max(flt(collected.get(key)) - quantity * factor, 0)
+	if collected is not None:
+		collected[key] = max(flt(collected.get(key)) - quantity * factor, 0)
 	return quantity
 
 
@@ -1028,10 +1069,14 @@ def create_replacement_sales_order(return_request: str):
 		)
 	}
 	returned_by_sales_order_item = defaultdict(float)
+	request_items = {row.delivery_note_item: row for row in request.items}
 	for delivery_note_item, returned_qty in state["returned_stock_by_item"].items():
 		delivery_item = delivery_items.get(delivery_note_item)
 		if delivery_item and delivery_item.so_detail:
-			returned_by_sales_order_item[delivery_item.so_detail] += returned_qty
+			item = request_items[delivery_note_item]
+			returned_by_sales_order_item[
+				(delivery_item.so_detail, item.uom, flt(item.conversion_factor) or 1)
+			] += returned_qty
 
 	target = frappe.new_doc("Sales Order")
 	target.update(
@@ -1048,19 +1093,19 @@ def create_replacement_sales_order(return_request: str):
 			"plc_conversion_rate": source.plc_conversion_rate,
 		}
 	)
-	for source_item in source.items:
-		stock_qty = returned_by_sales_order_item.get(source_item.name, 0)
+	source_items = {row.name: row for row in source.items}
+	for (source_name, uom, conversion_factor), stock_qty in returned_by_sales_order_item.items():
+		source_item = source_items[source_name]
 		if stock_qty <= 0:
 			continue
-		conversion_factor = flt(source_item.conversion_factor) or 1
-		target.append(
+		row = target.append(
 			"items",
 			{
 				"item_code": source_item.item_code,
 				"item_name": source_item.item_name,
 				"description": source_item.description,
 				"qty": stock_qty / conversion_factor,
-				"uom": source_item.uom,
+				"uom": uom,
 				"conversion_factor": conversion_factor,
 				"stock_uom": source_item.stock_uom,
 				"warehouse": source_item.warehouse,
@@ -1068,6 +1113,7 @@ def create_replacement_sales_order(return_request: str):
 				"delivery_date": add_days(nowdate(), 1),
 			},
 		)
+		copy_return_commercial_terms(row, source_item, RETURN_SALES_ITEM_COMMERCIAL_FIELDS)
 	if not target.items:
 		frappe.throw(_("No returned quantity could be mapped to the original Sales Order."))
 	target.insert()
@@ -1127,7 +1173,11 @@ def validate_linked_sales_invoice_credit_note_submission(doc, method=None):
 					row.idx, row.item_code, request.name
 				)
 			)
-		returned_by_item[row.sales_invoice_item] += abs(flt(row.qty))
+		returned_by_item[row.sales_invoice_item] += (
+			abs(flt(row.qty))
+			* (flt(row.conversion_factor) or 1)
+			/ (flt(request_items[row.sales_invoice_item].conversion_factor) or 1)
+		)
 	for sales_invoice_item, returned_qty in returned_by_item.items():
 		requested = flt(request_items[sales_invoice_item].requested_return_qty)
 		if returned_qty > requested:
@@ -1177,7 +1227,12 @@ def _map_split_sales_return_rows(request, sales_return):
 			source = frappe.db.get_value(
 				"Delivery Note Item",
 				request_item.delivery_note_item,
-				["against_sales_order", "so_detail", *RETURN_SALES_ITEM_COMMERCIAL_FIELDS],
+				[
+					"against_sales_order",
+					"so_detail",
+					"conversion_factor",
+					*RETURN_SALES_ITEM_COMMERCIAL_FIELDS,
+				],
 				as_dict=True,
 			)
 			source_context_by_item[request_item.delivery_note_item] = source
@@ -1186,8 +1241,7 @@ def _map_split_sales_return_rows(request, sales_return):
 
 		row.against_sales_order = source.against_sales_order
 		row.so_detail = source.so_detail
-		for fieldname in RETURN_SALES_ITEM_COMMERCIAL_FIELDS:
-			setattr(row, fieldname, source.get(fieldname))
+		copy_return_commercial_terms(row, source, RETURN_SALES_ITEM_COMMERCIAL_FIELDS)
 
 
 def _map_split_credit_note_rows(request, credit_note):
@@ -1219,12 +1273,11 @@ def _map_split_credit_note_rows(request, credit_note):
 		source = frappe.db.get_value(
 			"Sales Invoice Item",
 			request_item.sales_invoice_item,
-			RETURN_SALES_ITEM_COMMERCIAL_FIELDS,
+			["conversion_factor", *RETURN_SALES_ITEM_COMMERCIAL_FIELDS],
 			as_dict=True,
 		)
 		if source:
-			for fieldname in RETURN_SALES_ITEM_COMMERCIAL_FIELDS:
-				setattr(row, fieldname, source.get(fieldname))
+			copy_return_commercial_terms(row, source, RETURN_SALES_ITEM_COMMERCIAL_FIELDS)
 
 
 def validate_sales_return_request_link(doc, method=None):

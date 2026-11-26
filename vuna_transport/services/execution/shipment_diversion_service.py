@@ -186,7 +186,18 @@ def diversion_item_candidates(request, pod, note):
 				_("Each diversion candidate must identify one distinct received delivery item and POD row.")
 			)
 		seen.add(row.delivery_note_item)
-		factor = flt(source.conversion_factor)
+		factor = flt(row.conversion_factor)
+		from vuna_transport.services.execution.return_uom_service import (
+			approved_return_uom,
+			return_conversion_factor,
+		)
+
+		approved = approved_return_uom(row)
+		valid_factor = (
+			flt(approved.conversion_factor) if approved else return_conversion_factor(source, row.uom)
+		)
+		if (approved and row.uom != approved.uom) or factor != valid_factor:
+			frappe.throw(_("Return item UOM conversion does not match its source or Item configuration."))
 		dispatched_stock_qty = flt(source.stock_qty)
 		quantity = flt(row.requested_return_qty)
 		if (
@@ -196,18 +207,19 @@ def diversion_item_candidates(request, pod, note):
 			or quantity < 0
 			or row.item_code != source.item_code
 			or proof.item_code != source.item_code
-			or row.uom != source.uom
 			or row.stock_uom != source.stock_uom
-			or flt(row.conversion_factor) != factor
 			or not math.isfinite(dispatched_stock_qty)
 			or dispatched_stock_qty <= 0
 			or (proof.get("uom") and proof.uom != source.uom)
-			or (proof.get("conversion_factor") and flt(proof.conversion_factor) != factor)
+			or (
+				proof.get("conversion_factor")
+				and flt(proof.conversion_factor) != flt(source.conversion_factor)
+			)
 			or (proof.get("batch_no") and row.get("batch_no") and proof.batch_no != row.batch_no)
 		):
 			frappe.throw(
 				_(
-					"Return items must retain finite quantities and the original delivery item, UOM and conversion factor."
+					"Return items must retain finite quantities, a positive conversion factor and the original delivery item and stock UOM."
 				)
 			)
 		rejected_stock_qty = get_pod_quantity_in_stock_uom(proof, source, "rejected_qty")
@@ -231,7 +243,7 @@ def diversion_item_candidates(request, pod, note):
 				"proof_of_delivery_item": proof.name,
 				"item_code": source.item_code,
 				"candidate_quantity": quantity,
-				"uom": source.uom,
+				"uom": row.uom,
 				"stock_qty": requested_stock_qty,
 				"source_rejected_stock_qty": min(rejected_stock_qty, dispatched_stock_qty),
 				"stock_uom": source.stock_uom,

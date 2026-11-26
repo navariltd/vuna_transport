@@ -506,15 +506,24 @@ def validate_depot_collection_case(request, proof):
 	seen = set()
 	for row in request.items:
 		source = sources.get(row.source_pod_item)
-		if not source or source.name in seen or flt(row.requested_return_qty) != flt(source.delivered_qty):
+		if source:
+			from vuna_transport.services.execution.return_uom_service import configure_return_uom
+
+			configure_return_uom(row, source)
+		if (
+			not source
+			or source.name in seen
+			or abs(
+				flt(row.requested_return_qty) * row.conversion_factor
+				- flt(source.delivered_qty) * flt(source.conversion_factor)
+			)
+			> 1e-6
+		):
 			frappe.throw(_("Preserve each collected row and its original quantity in the Return Request."))
 		seen.add(source.name)
 		for field in (
 			"item_code",
 			"item_name",
-			"uom",
-			"stock_uom",
-			"conversion_factor",
 			"batch_no",
 			"serial_no",
 		):

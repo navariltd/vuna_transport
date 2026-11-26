@@ -144,18 +144,32 @@ class TestReturnRequest(UnitTestCase):
 		lock_pod.assert_called_once()
 		require_doctype_permission.assert_called_once_with("Return Request", "create")
 
-	@patch("vuna_transport.services.execution.return_service.frappe.db.sql")
 	@patch("vuna_transport.services.execution.return_service.frappe.db.get_value")
-	def test_only_submitted_returns_reduce_returnable_quantity(self, get_value, sql):
+	def test_only_submitted_returns_reduce_returnable_quantity(self, get_value):
 		get_value.return_value = {
 			"parent": "DN-1",
 			"stock_qty": 100,
 			"qty": 10,
 			"conversion_factor": 10,
 		}
-		sql.side_effect = [[(20,)], [(3,)]]
-		self.assertEqual(get_remaining_returnable_quantity("DNI-1", "RR-2"), 5)
-		self.assertIn("dn.docstatus = 1", sql.call_args_list[0].args[0])
+		get_value.side_effect = (
+			lambda doctype, *args, **kwargs: None if doctype == "Return Request" else get_value.return_value
+		)
+		query_type = type(frappe.qb.from_(frappe.qb.DocType("Delivery Note")))
+		with (
+			patch.object(
+				query_type,
+				"run",
+				autospec=True,
+				side_effect=[
+					[frappe._dict(parent="SR-1", stock_qty=-20)],
+					[frappe._dict(parent="RR-1", requested_return_qty=3, conversion_factor=10)],
+				],
+			) as run,
+			patch("vuna_transport.services.execution.return_service.frappe.get_all", return_value=[]),
+		):
+			self.assertEqual(get_remaining_returnable_quantity("DNI-1", "RR-2"), 5)
+			self.assertIn("`tabDelivery Note`.`docstatus`=1", run.call_args_list[0].args[0].get_sql())
 
 	def test_pod_quantity_remains_in_sales_uom_for_return_request(self):
 		pod_item = SimpleNamespace(uom="Carton", rejected_qty=2)
