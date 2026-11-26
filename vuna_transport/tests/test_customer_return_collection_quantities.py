@@ -50,7 +50,16 @@ class TestCustomerReturnCollectionQuantities(unittest.TestCase):
 		self.request.sales_invoice = "SI-1"
 		self.request.credit_note = self.request.return_stock_document = None
 		self.request.return_warehouse = "Returns - Company"
-		self.framework.get_doc.side_effect = [self.request, SimpleNamespace(name="SOURCE-1")]
+		original = frappe._dict(
+			name="SII-1" if invoice else "DNI-1",
+			qty=2,
+			conversion_factor=self.row.conversion_factor,
+			stock_qty=2 * self.row.conversion_factor,
+		)
+		self.framework.get_doc.side_effect = [
+			self.request,
+			SimpleNamespace(name="SOURCE-1", items=[original]),
+		]
 		self.row.dn_detail = "DNI-1"
 		self.row.sales_invoice_item = "SII-1"
 		target = SimpleNamespace(name="RETURN-1", items=[self.row], insert=Mock())
@@ -81,6 +90,33 @@ class TestCustomerReturnCollectionQuantities(unittest.TestCase):
 	def test_creation_without_collection_preserves_expected_quantity(self):
 		_result, target = self._create_return()
 		self.assertEqual((target.items[0].qty, target.items[0].stock_qty), (-2, -20))
+
+	def test_piece_pickup_creates_piece_sales_return_at_original_unit_price(self):
+		self.item.uom, self.item.stock_uom = "Pcs", "Pcs"
+		self.item.requested_return_qty, self.item.conversion_factor = 5, 1
+		self.row.uom, self.row.stock_uom = "Carton", "Pcs"
+		self.row.conversion_factor, self.row.stock_qty, self.row.rate = 12, -24, 1200
+		_result, target = self._create_return(collected={"DNI-1": 3})
+		row = target.items[0]
+		self.assertEqual((row.uom, row.qty, row.stock_qty, row.rate), ("Pcs", -3, -3, 100))
+
+	def test_piece_stock_invoice_return_keeps_credit_amount_proportional(self):
+		self.item.uom, self.item.stock_uom = "Pcs", "Pcs"
+		self.item.requested_return_qty, self.item.conversion_factor = 5, 1
+		self.row.uom, self.row.stock_uom = "Carton", "Pcs"
+		self.row.conversion_factor, self.row.stock_qty, self.row.rate = 12, -24, 1200
+		_result, target = self._create_return(invoice=True)
+		row = target.items[0]
+		self.assertEqual((row.uom, row.qty, row.stock_qty, row.rate), ("Pcs", -5, -5, 100))
+
+	def test_prior_piece_return_does_not_zero_the_next_carton_sale_return(self):
+		self.item.uom, self.item.stock_uom = "Pcs", "Pcs"
+		self.item.requested_return_qty, self.item.conversion_factor = 5, 1
+		self.row.uom, self.row.stock_uom = "Carton", "Pcs"
+		self.row.conversion_factor, self.row.stock_qty, self.row.rate = 12, 0, 1200
+		with patch.object(service, "_posted_sales_return_stock", return_value={"PREVIOUS": 2}):
+			_result, target = self._create_return()
+		self.assertEqual((target.items[0].qty, target.items[0].stock_qty), (-5, -5))
 
 	def test_creation_after_failed_pickup_does_not_create_expected_return(self):
 		for invoice in (False, True):

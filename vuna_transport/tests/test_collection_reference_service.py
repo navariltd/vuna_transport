@@ -76,6 +76,10 @@ class TestCollectionReference(unittest.TestCase):
 			items=[self.row],
 		)
 		self.framework.get_doc.return_value = self.source
+		self.framework.get_cached_doc.return_value = record(
+			variant_of=None,
+			uoms=[record(uom="Carton", conversion_factor=999), record(uom="Pack", conversion_factor=5)],
+		)
 
 	def test_customer_reference_is_limited_to_its_document_rows(self):
 		result = service.reference_options(self.trip, "STOP-1", "Delivery Note", "DN-1")
@@ -89,6 +93,47 @@ class TestCollectionReference(unittest.TestCase):
 		self.source.customer = "OTHER-CUSTOMER"
 		with self.assertRaisesRegex(ValueError, "stop's customer"):
 			service.reference_options(self.trip, "STOP-1", "Delivery Note", "DN-1")
+
+	def test_units_include_stock_and_configured_units_with_original_factor(self):
+		item = service.reference_options(self.trip, "STOP-1", "Delivery Note", "DN-1")["items"][0]
+		self.assertEqual(item["uom_factors"], {"Carton": 10, "Pack": 5, "Pcs": 1})
+		self.assertEqual(set(item["uoms"]), {"Carton", "Pack", "Pcs"})
+
+	def test_disabled_and_invalid_conversions_are_not_offered(self):
+		self.framework.get_cached_doc.return_value.uoms.extend(
+			[
+				record(uom="Invalid", conversion_factor=float("nan")),
+				record(uom="Disabled", conversion_factor=2),
+			]
+		)
+		old = self.framework.db.get_value.side_effect
+		self.framework.db.get_value.side_effect = (
+			lambda doctype, name, field, **kwargs: (0, 0)
+			if doctype == "UOM" and name == "Disabled"
+			else old(doctype, name, field, **kwargs)
+		)
+		factors, _whole = service.collection_uom_options(self.row)
+		self.assertNotIn("Invalid", factors)
+		self.assertNotIn("Disabled", factors)
+
+	def test_mixed_units_share_the_same_stock_reservation(self):
+		reference = service.reference_options(self.trip, "STOP-1", "Delivery Note", "DN-1")
+		proof = self._proof()
+		proof.items[0].uom, proof.items[0].stock_qty = "Pcs", 5
+		proof.items.append(
+			record(
+				collection_reference_row="ROW-1",
+				item_code="MILK",
+				uom="Carton",
+				batch_no="BATCH-1",
+				stock_qty=90,
+				serial_no="",
+			)
+		)
+		service.validate_reference_rows(proof, reference)
+		proof.items[0].stock_qty = 11
+		with self.assertRaisesRegex(ValueError, "exceed"):
+			service.validate_reference_rows(proof, reference)
 
 	def test_draft_cancelled_return_and_cross_company_documents_are_rejected(self):
 		for field, value in (("docstatus", 0), ("docstatus", 2), ("is_return", 1), ("company", "Other")):

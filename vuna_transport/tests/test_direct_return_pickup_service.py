@@ -120,6 +120,13 @@ class TestDirectReturnPickup(unittest.TestCase):
 			service.assign_return_pickup("RR-1", "TRIP-1", "STOP-1")
 		self.framework.new_doc.assert_not_called()
 
+	def test_piece_return_pickup_uses_approved_unit_and_remaining_stock(self):
+		self.row.uom, self.row.conversion_factor = "Pcs", 1
+		self.row.requested_return_qty = 5
+		with patch.object(service, "collected_quantities", return_value={"RRI-1": 2}):
+			items = service.remaining_items(self.request)
+		self.assertEqual((items[0]["uom"], items[0]["qty"], items[0]["stock_qty"]), ("Pcs", 3, 3))
+
 	def test_repeat_assignment_is_idempotent(self):
 		self.framework.db.get_value.side_effect = (
 			lambda doctype, *args, **kwargs: "TASK-1" if doctype == "Transport Trip Task" else None

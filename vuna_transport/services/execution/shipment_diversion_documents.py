@@ -426,8 +426,25 @@ def _make_sales_return(doc):
 	target.set("items", [])
 	for planned in doc.items:
 		row = rows.get(planned.delivery_note_item)
-		if not row or abs(flt(row.qty)) + 1e-6 < planned.qty:
+		from vuna_transport.services.execution.return_service import (
+			RETURN_SALES_ITEM_COMMERCIAL_FIELDS,
+			sales_return_stock_allowance,
+		)
+		from vuna_transport.services.execution.return_uom_service import apply_sales_return_uom
+
+		original = frappe.db.get_value(
+			"Delivery Note Item",
+			planned.delivery_note_item,
+			["name", "qty", "stock_qty", "conversion_factor"],
+			as_dict=True,
+		)
+		if (
+			not row
+			or not original
+			or sales_return_stock_allowance("Delivery Note", original) + 1e-6 < planned.stock_qty
+		):
 			frappe.throw(_("The original Delivery Note no longer has this quantity available to return."))
+		apply_sales_return_uom(row, planned, RETURN_SALES_ITEM_COMMERCIAL_FIELDS)
 		row.qty, row.stock_qty = -planned.qty, -planned.stock_qty
 		row.warehouse, row.vuna_diversion_item = doc.vehicle_warehouse, planned.name
 		row.uom, row.stock_uom, row.conversion_factor = (
