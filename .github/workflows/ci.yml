@@ -22,9 +22,8 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
-      - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: npm run test:release
+      - run: npm install --prefix scripts/release --package-lock=false --ignore-scripts --no-audit --no-fund
+      - run: npm --prefix scripts/release run test:release
 
   tests:
     runs-on: ubuntu-latest

@@ -6,8 +6,8 @@
     "node": ">=24.10.0"
   },
   "scripts": {
-    "release": "semantic-release",
-    "test:release": "node --test scripts/release/*.test.cjs"
+    "release": "node run.cjs",
+    "test:release": "node --test *.test.cjs"
   },
   "devDependencies": {
     "@semantic-release/commit-analyzer": "13.0.1",

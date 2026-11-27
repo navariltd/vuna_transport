@@ -36,6 +36,12 @@ venv.bak/
 node_modules/
 jspm_packages/
 
+# Release automation is isolated from Bench; do not commit generated lockfiles.
+/package-lock.json
+/yarn.lock
+/scripts/release/package-lock.json
+/scripts/release/yarn.lock
+
 # IDEs and editors
 .vscode/
 .vs/
