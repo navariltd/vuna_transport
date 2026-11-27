@@ -29,7 +29,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
 
       - name: Wait for tests and linters
         id: checks
@@ -55,9 +54,9 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
-      - name: Install pinned release tools
+      - name: Install isolated release tools
         if: steps.checks.outputs.ready == 'true'
-        run: npm ci --ignore-scripts --no-audit --no-fund
+        run: npm install --prefix scripts/release --package-lock=false --ignore-scripts --no-audit --no-fund
 
       - name: Publish release from the tested stable commit
         if: steps.checks.outputs.ready == 'true'
@@ -68,4 +67,4 @@ jobs:
             echo "Stable branch advanced; its own workflow will release it."
             exit 0
           fi
-          npm run release
+          npm --prefix scripts/release run release
