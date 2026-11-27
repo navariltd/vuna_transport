@@ -6,6 +6,7 @@ const path = require("node:path");
 const test = require("node:test");
 const versionPlugin = require("./python-version.cjs");
 const { waitForCI } = require("./wait-for-ci.cjs");
+const { repositoryRoot, runRelease } = require("./run.cjs");
 
 const sha = "a".repeat(40);
 const config = {
@@ -210,7 +211,6 @@ test("semantic-release recognizes fixes, features, and breaking changes without 
 });
 
 test("semantic-release starts at v16.0.0 and previews the next patch without publishing", async (t) => {
-  const { default: semanticRelease } = await import("semantic-release");
   const fixture = await fs.mkdtemp(
     path.join(os.tmpdir(), "transport-semantic-release-test-")
   );
@@ -243,7 +243,7 @@ test("semantic-release starts at v16.0.0 and previews the next patch without pub
   git("remote", "add", "origin", remote);
   git("push", "origin", "version-16", "--tags");
   const before = git("rev-parse", "HEAD");
-  const result = await semanticRelease(
+  const result = await runRelease(
     {
       branches: ["version-16"],
       repositoryUrl: remote,
@@ -272,4 +272,73 @@ test("semantic-release starts at v16.0.0 and previews the next patch without pub
     await fs.readFile(path.join(cwd, "vuna_transport", "__init__.py"), "utf8"),
     original
   );
+});
+
+test("Bench installation cannot discover a root release-tool package", async () => {
+  assert.equal(repositoryRoot, path.resolve(__dirname, "../.."));
+  for (const filename of ["package.json", "package-lock.json"]) {
+    await assert.rejects(fs.access(path.join(repositoryRoot, filename)), {
+      code: "ENOENT",
+    });
+  }
+  const manifest = JSON.parse(
+    await fs.readFile(path.join(__dirname, "package.json"), "utf8")
+  );
+  assert.equal(manifest.private, true);
+  assert.equal(manifest.scripts.release, "node run.cjs");
+});
+
+test("release plugins resolve from isolated tools while local plugins stay at the repository root", async () => {
+  const entry = require.resolve("semantic-release");
+  assert.ok(entry.startsWith(path.join(__dirname, "node_modules") + path.sep));
+  const { pathToFileURL } = require("node:url");
+  const { loadPlugin } = await import(
+    pathToFileURL(path.join(path.dirname(entry), "lib/plugins/utils.js")).href
+  );
+  const config = JSON.parse(
+    await fs.readFile(path.join(repositoryRoot, ".releaserc"), "utf8")
+  );
+  assert.deepEqual(config.branches, ["version-16"]);
+  assert.equal(config.tagFormat, "v${version}");
+  for (const plugin of config.plugins) {
+    const name = Array.isArray(plugin) ? plugin[0] : plugin;
+    const loaded = await loadPlugin({ cwd: repositoryRoot }, name, {});
+    assert.ok(
+      loaded &&
+        Object.values(loaded).some((value) => typeof value === "function"),
+      name
+    );
+  }
+});
+
+test("CI and publishing install release tools without a root manifest or lockfile cache", async () => {
+  for (const filename of ["ci.yml", "release.yml"]) {
+    const workflow = await fs.readFile(
+      path.join(repositoryRoot, ".github/workflows", filename),
+      "utf8"
+    );
+    assert.match(
+      workflow,
+      /npm install --prefix scripts\/release --package-lock=false --ignore-scripts/
+    );
+    assert.doesNotMatch(workflow, /npm ci|cache: npm/);
+  }
+  const publishing = await fs.readFile(
+    path.join(repositoryRoot, ".github/workflows/release.yml"),
+    "utf8"
+  );
+  assert.match(publishing, /npm --prefix scripts\/release run release/);
+  assert.match(publishing, /git rev-parse HEAD/);
+  const ignore = await fs.readFile(
+    path.join(repositoryRoot, ".gitignore"),
+    "utf8"
+  );
+  for (const filename of [
+    "/package-lock.json",
+    "/yarn.lock",
+    "/scripts/release/package-lock.json",
+    "/scripts/release/yarn.lock",
+  ]) {
+    assert.ok(ignore.split(/\r?\n/).includes(filename), filename);
+  }
 });
